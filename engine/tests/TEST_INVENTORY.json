@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-02T13:15:03.800245+00:00",
+  "generated_at": "2026-10-02T14:15:20.904369+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
@@ -443,16 +443,10 @@
       ]
     },
     "live_success_no_premise": {
-      "count": 2,
+      "count": 1,
       "rows": [
         {
           "file": "engine/tests/test_modules/effects/recover/to_hand/pb2_live_success_take_member_when_reveal_is_all_one_group_pl_pb2_037_l_test.rs",
-          "test": "<file>",
-          "line": 1,
-          "detail": ""
-        },
-        {
-          "file": "engine/tests/test_modules/effects/score/card_score/pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test.rs",
           "test": "<file>",
           "line": 1,
           "detail": ""
@@ -14672,13 +14666,10 @@
         "engine/tests/test_modules/effects/recover/to_hand/success_zone_revealed_members_pl_s_bp5_019_l_test.rs",
         "engine/tests/test_modules/effects/score/card_score/live_start_distinct_group_member_score_test.rs",
         "engine/tests/test_modules/effects/score/card_score/live_start_distinct_member_name_and_cost_score_test.rs",
-        "engine/tests/test_modules/effects/score/card_score/pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test.rs",
         "engine/tests/test_modules/effects/score/card_score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs",
         "engine/tests/test_modules/effects/score/per_card/aurora_flower_set_card_identity_group_match_test.rs"
       ],
       "covering_tests": [
-        "a_non_mus_member_produces_no_bonus",
-        "an_empty_pool_scores_nothing",
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
         "aoku_haruka_live_start_no_score_when_aurora_missing",
         "aoku_haruka_live_start_scores_with_aurora_in_discard",
@@ -14694,7 +14685,6 @@
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
         "dream_believers_to_105_matches",
-        "fixtures_span_distinct_mus_names_across_units",
         "hanamusubi_alone_no_reduction",
         "hanamusubi_reduces_only_heart04_not_heart0",
         "hanamusubi_with_non_renosora_no_reduction",
@@ -14706,9 +14696,12 @@
         "hinoshita_q236_name_contains_all_matches",
         "hinoshita_q236_name_contains_all_matches_for_all_rarities",
         "hinoshita_q237_name_contains_all_no_match",
-        "hinoshita_q237_no_name_match_for_all_rarities"
+        "hinoshita_q237_no_name_match_for_all_rarities",
+        "hinoshita_reveal_choice_keeps_card_in_hand",
+        "hinoshita_use_limit_once_per_turn",
+        "hs_bp2_001_insufficient_energy_no_recover"
       ],
-      "covering_test_count": 66,
+      "covering_test_count": 62,
       "direct_tests": [
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
         "aoku_haruka_live_start_scores_with_aurora_in_discard",
@@ -44822,13 +44815,10 @@
         "engine/tests/test_modules/effects/recover/to_hand/reveal_live_name_fragment_recovers_matching_live_q236_q237_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/success_zone_revealed_members_pl_s_bp5_019_l_test.rs",
         "engine/tests/test_modules/effects/score/card_score/live_start_distinct_group_member_score_test.rs",
-        "engine/tests/test_modules/effects/score/card_score/pb2_live_success_plus_one_per_distinct_mus_member_pl_pb2_039_l_test.rs",
         "engine/tests/test_modules/effects/score/card_score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs",
         "engine/tests/test_modules/effects/score/per_card/aurora_flower_set_card_identity_group_match_test.rs"
       ],
       "covering_tests": [
-        "a_non_mus_member_produces_no_bonus",
-        "an_empty_pool_scores_nothing",
         "aoku_haruka_live_start_fails_with_only_non_suzu_live_cards",
         "aoku_haruka_live_start_no_score_when_aurora_missing",
         "aoku_haruka_live_start_scores_with_aurora_in_discard",
@@ -44840,7 +44830,6 @@
         "dream_believers_105_to_104_no_match",
         "dream_believers_105_to_base_no_match",
         "dream_believers_to_105_matches",
-        "fixtures_span_distinct_mus_names_across_units",
         "hinoshita_multiple_waitroom_matches_prompts_choice",
         "hinoshita_no_live_card_in_hand_fails",
         "hinoshita_no_matching_live_in_discard_fails",
@@ -44856,9 +44845,12 @@
         "link_to_the_future_to_104_matches",
         "live_start_no_group_members_adds_no_score",
         "live_start_one_group_member_adds_two_score",
-        "live_start_three_distinct_group_members_add_six_score"
+        "live_start_three_distinct_group_members_add_six_score",
+        "p2_success_zone_gate_allows_partial_own_revealed_member_retrieval",
+        "pl_bp4_006_r_low_success_score_does_not_fetch_mus_member",
+        "pl_bp4_006_r_score_three_or_more_fetches_mus_member"
       ],
-      "covering_test_count": 45,
+      "covering_test_count": 41,
       "direct_tests": [
         "hs_pb1_021_live_success_with_dollchestra_in_live_zone_draws_one",
         "link_to_the_future_104_to_base_no_match",

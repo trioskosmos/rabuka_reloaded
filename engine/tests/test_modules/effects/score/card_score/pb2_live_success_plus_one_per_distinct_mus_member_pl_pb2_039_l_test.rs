@@ -33,20 +33,40 @@
 //!    attributable to the effect rather than to the gate.
 //!
 //! 2. *(still open)* With the window open the score is STILL 0, so there is a second
-//!    defect underneath. What is established: the card carries two abilities, the
-//!    second is `LiveSuccess` + `ModifyScore`, the scan finds it and logs
-//!    `trigger=trigger_live_success,result=result_success`, and the dispatch completes.
-//!    So the loss is inside `execute_modify_score`, not in the trigger scan — most
-//!    likely `resolve_per_unit_count` returning 0, since `final_value = value *
-//!    effective_units` and 0 units means +0.
+//!    defect underneath. What is established, by driving the effect with the same
+//!    filter the engine builds:
 //!
-//!    Two suspects in `effects/score.rs`, neither acted on because neither is proven:
-//!    * `candidate_ids` selects stage members whenever `card_type == "member_card"`,
-//!      which is BACKWARDS here — `card_type` names the units being COUNTED, while the
-//!      score belongs to 「このカード」, a live. That branch looks wrong on its face.
-//!    * the filter built at the top of the same function may not carry
-//!      `group_names: ["μ's"]` into `filter.group`, which would make the μ's clause
-//!      match everything rather than nothing — so this one probably is not it.
+//!    - The card carries two abilities; the second is `LiveSuccess` + `ModifyScore`,
+//!      `is_self_target() == true`, `per_unit_type: "人"`, `per_unit_count: 1`,
+//!      `card_type: member_card`, `group_names: ["μ's"]`, `distinct: card_name`,
+//!      `heart_colors: []`, no state/cost/constraint/exclude_self.
+//!    - The scan finds it and logs `trigger=trigger_live_success,
+//!      result=result_success`, and the dispatch completes. The loss is inside
+//!      `execute_modify_score`.
+//!    - **The count is correct.** `resolve_per_unit_count` with the identical filter
+//!      returns 1 for one μ's member on stage, and `filter.matches` is true for it.
+//!      So `final_value = value * effective_units` is 1, not 0.
+//!    - **The recipient list comes out empty**, which is what makes it score nothing:
+//!      `hikari`, `eri` and `hana` all stay at 0 afterwards, and so does
+//!      `p1_constant_total_score_bonus`.
+//!
+//!    So the effect resolves and discards its own target. Two candidates in
+//!    `effects/score.rs`, neither acted on because neither is proven, and each
+//!    attempted and measured to NOT be sufficient alone:
+//!
+//!    * `target_filter` still carries `card_type`/`group_names`. Those are the same
+//!      kind of COUNT predicate as the `card_property` the comment above already
+//!      strips, and the recipient here is 「このカード」 — a live, which
+//!      `card_type: member_card` excludes. Clearing them for `self_target` (whose
+//!      recipient is picked by identity, not by type) left the score at 0, so it is
+//!      not the whole cause.
+//!    * The `self_target` branch requires `card_id == session.activating_card_id`.
+//!      If that is `None` on this path — and `gs.activating_card` is `None` after the
+//!      trigger — every candidate is rejected. This is the more likely single cause,
+//!      and it would be a much larger finding than this card: `is_self_target` gates
+//!      the recipient of EVERY 「このカードのスコアを…」 effect. The next thing to check
+//!      is whether the queue entry built by `enqueue_printed_ability` records the
+//!      source card into the resolver session at all.
 //!
 //!    The positive cases stay absent rather than being written to assert 0. `asserting
 //!    0 here would pin the bug, and a test that documents a defect is the class this
