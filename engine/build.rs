@@ -91,6 +91,16 @@ const EXCLUDED_MODULES: &[&str] = &["pvp_room_test"];
 
 fn generate_test_module_declarations(root: &Path) {
     fn visit(dir: &Path) -> Option<String> {
+        // Cargo's `rerun-if-changed` on a directory tracks THAT directory's mtime and
+        // does NOT recurse. A single `rerun-if-changed=tests/test_modules` therefore
+        // misses a file added in a subdirectory: adding
+        // `tests/test_modules/characterization/foo_test.rs` changes
+        // `characterization/`'s mtime, not `test_modules/`'s. Without a rebuild trigger
+        // the generated `mod.rs` keeps its old contents, so the new test is never
+        // compiled into the suite and never runs — a test that exists, reads
+        // correctly, and silently reports nothing. Declaring every directory the walk
+        // visits makes any structural change anywhere in the tree a trigger.
+        println!("cargo:rerun-if-changed={}", dir.display());
         // A read_dir failure is not "empty directory": it hides every test
         // under it from the suite. Surface it and treat this subtree as
         // absent for the parent's module list (same as before), but loudly.

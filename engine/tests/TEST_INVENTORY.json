@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-02T09:25:39.343637+00:00",
+  "generated_at": "2026-10-02T10:07:47.231434+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
     "total_abilities": 2116,
     "unique_abilities": 985
   },
-  "n_files": 1002,
-  "n_tests": 4110,
+  "n_files": 1003,
+  "n_tests": 4113,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -1070,7 +1070,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4110,
+  "n_test_fns_parsed": 4113,
   "abilities": [
     {
       "idx": 0,
@@ -1842,6 +1842,7 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/characterization/corpus_decode_coverage_test.rs",
         "engine/tests/test_modules/characterization/prohibition_layer_characterization_test.rs",
         "engine/tests/test_modules/characterization/strict_engine_bug_expected_fail_test.rs",
         "engine/tests/test_modules/effects/choice/any_number_choice_cannot_repeat_same_option_pl_n_bp4_030_l_test.rs",
@@ -1894,7 +1895,7 @@
         "compound_dododo_tied_score_with_hasunosora_fails",
         "daydream_mermaid_no_niji_in_success_pick_one"
       ],
-      "covering_test_count": 150,
+      "covering_test_count": 153,
       "direct_tests": [
         "ability_filter_mixed_one_null_one_livestart_gains",
         "ability_filter_no_ability_live_gains",
