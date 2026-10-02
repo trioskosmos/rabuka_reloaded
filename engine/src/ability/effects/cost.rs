@@ -109,7 +109,7 @@ impl AbilityResolver {
                 &gs.mods.orientation_modifiers,
                 gs.activating_card,
             );
-            let per_unit_count = effect.per_unit_count_any().unwrap_or(1);
+            let per_unit_count = effect.per_unit_count_any().unwrap_or(1).max(1);
             let mut units = matching_count / per_unit_count;
             // Apply max_repeats cap (aliased as repeat_limit).
             // The text side-constraint "N枚までしか数えない" is parsed as

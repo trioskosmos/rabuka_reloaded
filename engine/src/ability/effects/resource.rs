@@ -568,7 +568,11 @@ pub(crate) fn execute_gain_surplus_heart(
                 matching_count = 0;
             }
         }
-        let per_unit_count_val = effect.per_unit_count_any().unwrap_or(1);
+        // `.max(1)`: `unwrap_or(1)` only covers an ABSENT field, so a decoded
+        // `per_unit_count: 0` reached the division and panicked. Every other
+        // per-unit site in the engine (ability/util.rs, effects/deck.rs) already
+        // clamps; this was the odd one out.
+        let per_unit_count_val = effect.per_unit_count_any().unwrap_or(1).max(1);
         let mut units = matching_count / per_unit_count_val;
         if effect.max.unwrap_or(false) {
             if let Some(cap) = effect.count_any() {

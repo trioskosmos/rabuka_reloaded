@@ -76,7 +76,10 @@ impl AbilityResolver {
                 .iter()
                 .filter_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.cost))
                 .sum();
-            let divisor = effect.per_unit_count_any().unwrap_or(1);
+            // Clamped for the same reason as the other per-unit divisions: an
+            // absent field defaults to 1, but a decoded `per_unit_count: 0` reached
+            // the division and panicked.
+            let divisor = effect.per_unit_count_any().unwrap_or(1).max(1);
             let mut c = total_cost / divisor;
             if let Some(cap) = effect.repeat_limit_any() {
                 c = c.min(cap);

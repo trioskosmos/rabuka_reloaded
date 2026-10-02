@@ -115,6 +115,55 @@ fn every_duration_in_the_corpus_is_parseable() {
     assert!(seen > 100, "sanity: the corpus should be large, saw {seen} durations");
 }
 
+/// No per-unit divisor in the corpus is zero.
+///
+/// `per_unit_count` is the divisor in four places — `effects/cost.rs`,
+/// `effects/resource.rs`, `effects/reyell.rs` and `compute_play_cost` in
+/// `ability/util.rs` — and every one of them divided by
+/// `per_unit_count_any().unwrap_or(1)`. `unwrap_or(1)` covers an ABSENT field but
+/// not a present zero, and integer division by zero panics in Rust regardless of
+/// build profile, so a single `per_unit_count: 0` anywhere in the corpus takes the
+/// engine down mid-resolution rather than producing a wrong number.
+///
+/// All four now clamp with `.max(1)`, matching what `ability/util.rs` and
+/// `effects/deck.rs` already did. This gate keeps the data honest so the clamps stay
+/// belt-and-braces rather than load-bearing.
+#[test]
+fn no_per_unit_divisor_in_the_corpus_is_zero() {
+    let db = load_real_database();
+    let mut offenders: BTreeSet<String> = BTreeSet::new();
+    let mut seen = 0usize;
+
+    fn scan(eff: &rabuka_engine::card::AbilityEffect, card_no: &str, bad: &mut BTreeSet<String>, seen: &mut usize) {
+        if let Some(n) = eff.per_unit_count_any() {
+            *seen += 1;
+            if n == 0 {
+                bad.insert(format!("{card_no}: per_unit_count=0"));
+            }
+        }
+        if let Some(actions) = eff.compound.actions.as_ref() {
+            for sub in actions {
+                scan(sub, card_no, bad, seen);
+            }
+        }
+    }
+
+    for card in db.cards.values() {
+        for ab in card.resolved_abilities() {
+            if let Some(eff) = ab.effect.as_deref() {
+                scan(eff, card.card_no.as_ref(), &mut offenders, &mut seen);
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "a zero per_unit_count divides by zero and panics the engine mid-resolution: \
+         {offenders:?}"
+    );
+    assert!(seen > 50, "sanity: the corpus should use per_unit widely, saw {seen}");
+}
+
 /// Every non-null ability names at least one trigger the engine recognises.
 ///
 /// `is_null` entries are the synthetic "this card has no printed ability" stubs the

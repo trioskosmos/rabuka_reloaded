@@ -389,7 +389,10 @@ pub fn compute_play_cost(
                     effect.location_any().unwrap_or(""),
                 ) == Some(crate::ability::enums::Zone::SuccessLiveZone)
             {
-                let per_unit_count = effect.per_unit_count_any().unwrap_or(1) as usize;
+                // Clamped: `unwrap_or(1)` only covers an absent field, and a decoded
+                // `per_unit_count: 0` would divide by zero. Matches the other per-unit
+                // divisions in the engine.
+                let per_unit_count = effect.per_unit_count_any().unwrap_or(1).max(1) as usize;
                 let success_count = player.success_live_card_zone.cards.len();
                 let multiplier = effect.count.unwrap_or(1);
                 increase = (success_count / per_unit_count).u8_count() * multiplier;

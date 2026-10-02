@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-02T11:06:08.622542+00:00",
+  "generated_at": "2026-10-02T11:14:16.732412+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
@@ -8,7 +8,7 @@
     "unique_abilities": 985
   },
   "n_files": 1005,
-  "n_tests": 4120,
+  "n_tests": 4121,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -1070,7 +1070,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4120,
+  "n_test_fns_parsed": 4121,
   "abilities": [
     {
       "idx": 0,
@@ -1895,7 +1895,7 @@
         "compound_dododo_tied_score_with_hasunosora_fails",
         "daydream_mermaid_no_niji_in_success_pick_one"
       ],
-      "covering_test_count": 154,
+      "covering_test_count": 155,
       "direct_tests": [
         "ability_filter_mixed_one_null_one_livestart_gains",
         "ability_filter_no_ability_live_gains",
