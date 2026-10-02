@@ -254,6 +254,37 @@ impl AbilityResolver {
                 "set" => effective_value as i16,
                 _ => 0,
             };
+            // A `set` on live_total is NOT the same operation as a `set` on a card.
+            //
+            // The per-card path below calls `set_score_modifier`, which writes a
+            // SEPARATE `set` field that replaces the printed score while leaving
+            // `additive` alone. Here there is one shared accumulator,
+            // `p*_constant_total_score_bonus`, fed by every constant ability, and
+            // the code below only ever does `+=`. So a `set` used to be applied
+            // additively — the same as `add` — which is the opposite of what
+            // 「ライブの合計スコアがNになる」 says, and it fails silently.
+            //
+            // It is left unimplemented rather than guessed. "Set" is genuinely
+            // ambiguous here: it could mean "this ability's contribution is N" (so
+            // re-applying it replaces its own previous value) or "the total IS N"
+            // (so every other constant ability's contribution is discarded). The
+            // per-card model answers the analogous question with a distinct `set`
+            // field, and the live total has no such field. No card in the corpus
+            // uses it; adding one is a model change, not a bug fix.
+            if operation == "set" {
+                log::error!(
+                    "[MODIFY_SCORE] operation 'set' on target 'live_total' is not \
+                     implemented and would silently behave as 'add' ({} points added \
+                     to the shared total rather than replacing anything). p1={} p2={}. \
+                     Either add a live-total set field alongside \
+                     p*_constant_total_score_bonus, or map the printed phrase to 'add' \
+                     in the parser if that is what it means.",
+                    effective_value,
+                    gs.mods.p1_constant_total_score_bonus,
+                    gs.mods.p2_constant_total_score_bonus,
+                );
+                return Ok(());
+            }
             // Resolve correctly via player lookup: use resolved_target ("self") to pick owner
             let owner_is_p1 = {
                 let p = gs.resolve_target_player(resolved_target);

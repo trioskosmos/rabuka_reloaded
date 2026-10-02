@@ -199,6 +199,13 @@ pub fn execute_draw(
         let is_self_target = effect.is_self_target();
 
         if target == "both" {
+            // Measured, not assumed: each side's deck can come up short on its own.
+            let before: usize = ["player1", "player2"]
+                .iter()
+                .map(|p| {
+                    util::get_zone_card_count(gs.resolve_target_player(p), destination)
+                })
+                .sum();
             for player in [&mut gs.player1, &mut gs.player2] {
                 draw_cards_for_player(
                     player,
@@ -212,7 +219,13 @@ pub fn execute_draw(
                     None,
                 )?;
             }
-            self.in_flight.step_state.last_draw_count = count;
+            let after: usize = ["player1", "player2"]
+                .iter()
+                .map(|p| {
+                    util::get_zone_card_count(gs.resolve_target_player(p), destination)
+                })
+                .sum();
+            self.in_flight.step_state.last_draw_count = after.saturating_sub(before).u8_count();
             return Ok(());
         }
 
@@ -229,6 +242,17 @@ pub fn execute_draw(
             gs.mods.last_cost_discard_count,
         );
         let player = gs.resolve_target_player_mut(target);
+
+        // Measure the destination so the step can report what it ACTUALLY drew.
+        //
+        // `last_draw_count` used to be the REQUESTED count, and it is read back as
+        // 「ドローした枚数」 — `dynamic_count`'s `previous_draw` reference, and the
+        // per-step `value` handed to a following card. Asking to draw 2 from a deck
+        // holding 1 reported 2, so a following 「ドローした枚数につき」 multiplied by a
+        // number that never existed. Every draw path can come up short: the deck or
+        // 控え室 runs out, distinct-name dedupe rejects candidates, and a
+        // `card_type` filter rejects them.
+        let destination_before = util::get_zone_card_count(player, destination);
 
         let final_count = if per_unit {
             let matching_count = if Some("discard") == per_unit_type {
@@ -277,6 +301,7 @@ pub fn execute_draw(
                             .to_string(),
                     );
                 }
+                let before = util::get_zone_card_count(player, destination);
                 draw_cards_for_player(
                     player,
                     final_count,
@@ -288,7 +313,12 @@ pub fn execute_draw(
                     &card_db,
                     Some(activating_id),
                 )?;
-                self.in_flight.step_state.last_draw_count = final_count;
+                self.in_flight.step_state.last_draw_count = util::get_zone_card_count(
+                    player,
+                    destination,
+                )
+                .saturating_sub(before)
+                .u8_count();
                 return Ok(());
             }
         }
@@ -419,7 +449,18 @@ pub fn execute_draw(
                 log::debug!("Draw from source '{}' not yet implemented", source);
             }
         }
-        self.in_flight.step_state.last_draw_count = final_count;
+        let drawn_now = util::get_zone_card_count(player, destination)
+            .saturating_sub(destination_before)
+            .u8_count();
+        if drawn_now != final_count {
+            log::debug!(
+                "[DRAW_SHORT] asked for {} but {} reached zone {}",
+                final_count,
+                drawn_now,
+                destination
+            );
+        }
+        self.in_flight.step_state.last_draw_count = drawn_now;
         let dst = if destination.is_empty() {
             "hand"
         } else {
@@ -427,7 +468,7 @@ pub fn execute_draw(
         };
         gs.push_rule_log_fmt(format_args!(
             "{} {}: [[log_draw:n={},from=zone_{},to=zone_{}]]",
-            pp, act_name, final_count, source, dst
+            pp, act_name, drawn_now, source, dst
         ));
         Ok(())
     }
