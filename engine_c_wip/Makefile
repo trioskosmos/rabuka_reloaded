@@ -61,7 +61,7 @@ LDFLAGS ?= -Wl,--stack,33554432
 SRC     := src/ability/enums.c src/ability/types.c src/ability/vm.c src/ability/condition.c src/ability/choice.c src/ability/ability_queue.c src/ability/dynamic_count.c src/ability/util.c src/ability/cost.c src/ability/compound.c src/ability/resolver.c src/ability/effects/executor.c src/ability/effects/ability_effects.c src/ability/effects/custom.c src/ability/effects/move.c src/ability/effects/move_missing.c src/ability/effects/rules.c src/ability/effects/look.c src/ability/effects/state.c src/ability/effects/ability.c src/ability/effects/misc.c src/ability/effects/draw.c src/ability/effects/score.c src/ability/log.c src/ability/debug.c src/ability/abilities_gen.c src/ability/describe.c src/ability/choice_renderer.c src/game/deck_parser.c src/game/deck_builder.c src/game/game_setup.c src/core/card.c src/core/data.c src/core/alloc.c src/core/game_state_core.c src/core/modifiers.c src/core/stats_pipeline.c src/core/game_state_abilities.c src/core/tracking.c src/core/zones.c src/bytecode_data.c src/core/generated/bytecode_blob.c src/core/generated/gen_data.c src/core/gen_data_rom.c src/turn/phase.c src/turn/live.c src/turn/triggers.c src/engine.c src/test_game.c src/main.c
 OBJ     := $(SRC:.c=.o)
 # library objects (everything except main, so tests can supply their own main)
-OBJ_LIB := src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o
+OBJ_LIB := src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o
 TARGET  := rb_engine
 WEB_TARGET := rb_web_server
 GENERATED := tests/test_ported_generated.c
@@ -98,8 +98,8 @@ all: $(TARGET)
 
 web: $(WEB_TARGET)
 
-$(WEB_TARGET): $(OBJ_LIB) src/web_server.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -mwindows -o $@ $(OBJ_LIB) src/web_server.o
+$(WEB_TARGET): $(OBJ_LIB)
+	$(CC) $(CFLAGS) $(LDFLAGS) -mwindows -o $@ $(OBJ_LIB)
 
 regen: data
 	python3 tools/gen_from_rs.py ../cards/build/abilities_gen.rs
@@ -120,27 +120,56 @@ STRINGS_BIN    ?= ../cards/build/abilities_strings.bin
 # as RBKA_STRINGS_TABLE_FNV, so these three numbers describe one artifact:
 #
 #   985 abilities / 6032 interned strings / 2116 card-ability pairs
-#   726831 string-table bytes / 98737 bytecode bytes
+#   726671 string-table bytes / 98782 bytecode bytes
+#
+# ⚠ MOVED 2026-10-04, in the same change as the layer-3 regen that made it
+# necessary. These were 726831 / 89204df0bbde08a0, which had become STALE: layer 2
+# (cards/build) had been regenerated to 726671 and layer 3 had not caught up, so
+# `make data` was hard-FAILING -- refusing the CORRECT blob. Because `t-run` and
+# `run-all-tests` both depend on `data`, that took `make t` and the whole corpus
+# down tree-wide at HEAD 5ce311e6.
+#
+# ⚠ THE ORDER IS LOAD-BEARING AND THIS PIN IS THE HAZARD, NOT THE FIX. Correcting
+# this pin ALONE would have let the guard install the 726671 blob over
+# src/abilities_strings.bin while gen_data.c still recorded 726831 offsets --
+# manufacturing the 2026-09-30 byte splice. It is safe only because
+# `bash tools/regen_all.sh` ran FIRST and gen_data.c now records 726671. Never
+# move this pin without the layer-3 regeneration in the same change.
+# tests/test_artifacts_consistent.c section 6 now fails if the committed tables
+# and this blob are from different generator runs, so this pair cannot drift
+# apart unnoticed again.
 #
 # `make data` VERIFIES before it copies. It used to `cp -f` whatever was in
 # cards/build; see the data rule below for why that byte-spliced the table.
 CARDS_BYTES    := 631890
 CARDS_SHA256   := 728208504fee6217
-STRINGS_BYTES  := 726831
-STRINGS_SHA256 := 89204df0bbde08a0
+STRINGS_BYTES  := 726671
+STRINGS_SHA256 := 32fa1a69c0ba9bc2
 
 GUARD          := tools/guard_data_blob.sh
 
 # `make data` VERIFIES AND THEN COPIES, and it does both on EVERY invocation.
 # It used to run `cp -f $(STRINGS_BIN) src/abilities_strings.bin` as a separate
 # file rule, which meant the copy happened only when make decided the target was
-# out of date -- and cards/build/abilities_strings.bin was once seen at 726649
-# bytes against a canonical 726831. A plain `make` then copied that truncated
-# blob over the good one and BYTE-SPLICED the interned string table, which raises
-# no build error at all: it just returns the wrong string for every ability from
-# that index on (`cost_limit` -> `cost_limitc`). Worse, when make decided the
-# target was UP TO DATE it skipped the copy and reported "nothing to be done"
-# while the two files still disagreed.
+# out of date -- and cards/build/abilities_strings.bin has now been seen at FOUR
+# sizes across successive regenerations of cards/abilities.json: 726649, 726831,
+# 726671, 726742. Each time a plain make copied the wrong blob over the good one
+# and BYTE-SPLICED the interned string table, which raises no build error at all:
+# it just returns the wrong string for every ability from that index on
+# (`cost_limit` -> `cost_limitc`). Worse, when make decided the target was UP TO
+# DATE it skipped the copy and reported "nothing to be done" while the two files
+# still disagreed.
+#
+# The canonical figures are pinned at lines 144-147 and MUST be moved together
+# with RB_GAMESTATE_BYTES_PINNED in tests/test_harness_self.c on any regen.
+#
+# `make t` depends on `data:`, so while upstream is mid-regeneration the guard
+# correctly REFUSES and the whole corpus becomes unrunnable. That is the guard
+# working, not a bug -- but it blocks measurement. `make t-nogate` exists for
+# exactly that: it runs a suite WITHOUT the install gate. Safe, because nothing is
+# copied -- src/ is already self-consistent (its blob length equals gen_data.c's
+# RBKA_STRINGS_TABLE_LEN) and `make all` compiles against it. It weakens nothing:
+# `make data`, `make verify-data` and `make all` are untouched.
 #
 # So `data` is phony and hands the whole job to the guard, which refuses a
 # non-canonical source, repairs a non-canonical src/ copy loudly, and stages the
@@ -842,3 +871,10 @@ $(TARGET)_t7zero: $(OBJ_LIB) $(T7ZERO)
 
 clean:
 	rm -f $(OBJ) $(TARGET) $(VERDICT) $(TARGET)_test $(TARGET)_audit $(TARGET)_replay $(TARGET)_generated $(TARGET)_mechanics $(TARGET)_live_rules $(TARGET)_t_*
+	@# src/web_server.o is deliberately NOT in SRC or OBJ_LIB: adding it would
+	@# duplicate-symbol the web target, which links it explicitly at line 101-102,
+	@# and would drag -mwindows units into every one of the 160+ suite links. But
+	@# that also means $(OBJ) never names it, so `make clean` silently left it
+	@# behind -- and a stale web_server.o gets linked into the next web build.
+	@# Named explicitly here for exactly that reason.
+	rm -f src/web_server.o $(WEB_TARGET)

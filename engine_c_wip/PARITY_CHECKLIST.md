@@ -138,10 +138,11 @@ decoder (`rb_decode_card_ability`) — no bytecode reader is re-implemented.
 2116 card-ability pairs · 726 831 table bytes · 98 737 bytecode bytes ·
 **275 of 2116 pairs carry the 常時 trigger** · 4 925 effect nodes.
 
-- [~] E1 **`evaluate_success_zone_constant_modifiers`** (modifiers.rs:2188) — **BLOCKED-ON, with the defect named.** Not portable in this file: Rust's withdraw-then-reapply needs THREE ledgers `RbMods` has no members for (`success_zone_blade_bonuses`, `success_zone_heart_bonuses`, `success_zone_score_bonuses`; game_modifiers.rs:242/245/248, 0 occurrences anywhere). Reachable, though: **214 constant effect nodes on member cards** carry one of E1's four actions, against Rust's zone split (main loop = STAGE only, `collect_reusable_constant_stage_effect_ids` modifiers.rs:453-455; this function = the four live/success bags, :2232-2237). **The reachable defect is in a file that is not this one:** `triggers.c:810` guards the `live_total` modify_score arm on `card_on_stage(g, pl, host_cid)`, and a card reached through the success/live scan is by definition NOT on stage, so 「ライブの合計スコアを+1する」 is dead on that path — **20** such member-card nodes. **⛔ BLOCKED-ON: (a) `include/rabuka.h` — add `int16_t success_zone_blade_bonuses[RB_MAX_CARD_IDS]; int16_t success_zone_heart_bonuses[RB_MAX_CARD_IDS][8]; int16_t success_zone_score_bonuses[RB_MAX_CARD_IDS];` beside `constant_score`/`constant_heart` (rabuka.h:228-273), mirrored exactly as the existing `constant_cost` ledger is; (b) `src/turn/triggers.c:810` — drop the `card_on_stage` guard on the `live_total` arm (Rust modifiers.rs:2510-2525 has none); (c) `src/turn/triggers.c` — call the new scan at the tail of `rb_recalc_constants`, which is the `modifiers.rs:1398` position.** The `non_stackable` dedupe (modifiers.rs:2221/2280-2287) is **VERIFIED-INERT: 3 of 985**, and all 3 carry distinct `action:text` keys, so the dedupe can never fire.
-- [~] E2 `apply_success_zone_effect` (modifiers.rs:2309) — **BLOCKED-ON E1.** It is private and exists only to serve E1's ledger cycle; with no ledger it cannot be ported without the double-application E1's `success_zone_*_bonuses` exist to prevent. Its per-action semantics are documented in E1's blocker.
-- [~] E3 `evaluate_success_zone_constant_abilities` (modifiers.rs:2147) — **BLOCKED-ON E1 + two call sites that are not this file's.** The body is two statements (`need_heart_modifiers.clear()` then E1); the FIRST one is the only part the C genuinely lacks — `rb_recalc_constants`'s prologue (triggers.c:1335-1343) withdraws only the `constant_need_heart` ledger, so a non-constant need-heart grant survives where Rust clears it. **⛔ BLOCKED-ON: `src/turn/live.c:2126-2127` and `src/turn/triggers.c` (the live-success scan, twin of trigger_scan.rs:357-365) — call `evaluate_success_zone_constant_abilities()` then `restore_performance_need_heart_modifiers()` between `rb_apply_deferred_reyell` and `rb_rebuild_stage_hearts_with_yell`, at the `live.rs:1325-1327` position.** The C has no clear at all today, so this is inert-by-absence rather than inert-by-measurement.
-- [~] E4 `restore_performance_need_heart_modifiers` (modifiers.rs:2159) — **BLOCKED-ON: THE GRANTING SIDE DOES NOT EXIST IN C.** Precisely: Rust flattens `mods.need_heart_modifiers` into the snapshot at the head of `execute_performance_phase` (`turn/phases.rs:320-333`), passes it to `build_snapshot` (`turn/live.rs:3136`) which stores it (`turn/live.rs:3179`), and `restore_performance_need_heart_modifiers` reads it back. In C, `RbLiveSnapshot::performance_need_heart_modifiers[]` (`rabuka.h:1342-1343`) has **0 writers and 0 readers tree-wide** — the head of the performance phase in `src/turn/phase.c` was never ported. **Landing the restorer alone would be exactly the no-op this cluster is warned against** (an empty snapshot list means the loop body never runs), so nothing was landed. **⛔ BLOCKED-ON: `src/turn/phase.c` — at the head of the performance-phase function (twin of `phases.rs:320-333`), flatten `g->mods.need_heart[cid][color]` for every non-zero entry into the pending `RbLiveSnapshot.performance_need_heart_modifiers`; the reader (a ~20-line faithful body, mine, in `src/core/modifiers.c` the moment the writer exists) then restores it.** Reachable once written: every live_start-sourced need-heart modifier.
+- [x] E1 **`evaluate_success_zone_constant_modifiers`** (modifiers.rs:2188) — ✅ **LANDED 2026-10-04 as `rb_evaluate_success_zone_constant_modifiers` in `src/core/modifiers.c`**, called from `src/turn/triggers.c` at Rust's `modifiers.rs:1396-1400` position (after the `p1/p2_constant_total_score_bonus` assignment, before `rb_refresh_yell_sources`). All three `success_zone_*_bonuses` ledgers now have a real writer and a real reader; `tools/e1_ledger_probe.c` proves it at runtime (`success_zone_heart_bonuses[17][3]=1` written then read back, 39 of 137 `gain_resource` hosts move a ledger, `p1_constant_total_score_bonus=1` for a `live_total` host). The withdraw prologue (`:2200-2214`) and the withdraw-then-reapply cycle are faithful; the three `success_zone_*_sources` DISPLAY ledgers are deliberately absent (`RbMods` has no such members and no C reader). **THE BRIEF'S "214 / member cards" TALLY WAS THE WRONG CRITERION AND IS CORRECTED HERE.** Rust's E1 iterates the four live/success BAGS and never tests card type (`modifiers.rs:2232-2242`); measuring with `rb_card_is_member` answers a different question. Correct per-action counts over the whole corpus: **`modify_required_hearts` 1, `gain_resource` 176, `modify_score` 29, `sequential` 14 = 220.** The member-only subset of the same walk is the old 214 (0/174/26/14), and the 1-vs-0 difference is cardid **291 = `PL!-bp6-022-L`**, whose type byte is 1 (`live_card`) — a member filter discards exactly the one card whose `modify_required_hearts` arm is reachable. Three tools, one disagreement explained: `tools/census_e1_exact.c` 220 (Rust-faithful dispatch), `tools/census_e1_all.c` 220, `tools/census_e.c` 214 (member-only), `tools/census_e1.c` **226 = overcount** whose extra 12 were traced node-by-node (`tools/census_e1_probe.c`) and all sit under `gained_effect`, where the dispatch sees `gain_ability` and falls into `_ => {}` (`modifiers.rs:2580`). `non_stackable` **VERIFIED-INERT: 3 nodes**, `NS_KEY_COLLISIONS 0`, not ported. `sizeof(GameState)` unchanged at **1090264** (no field added, so `RB_GAMESTATE_BYTES_PINNED` and `Makefile:3` need no move).
+- [x] E2 `apply_success_zone_effect` (modifiers.rs:2309) — ✅ **LANDED with E1**, as file-static `sz_apply_effect` in `src/core/modifiers.c`, all four arms plus `_ => {}`. `GainResource` implements the stage candidate set with its `position`/`group_names` filters, `resource_icon_count_any().unwrap_or(count_or(1))`, and the blade/heart split where `per_color` divides by the DECLARED colour count **before** the `heart01` default is appended (`:2455` vs `:2459-2460`). `ModifyScore` reproduces Rust's asymmetry exactly: `live_total` keys off **`player_idx`**, the zone the card was found in — deliberately NOT the `target`-resolved player — and has **no** membership test. `Sequential` recurses into `compound.actions` only, which is the C's `child[]`, with **no** condition and **no** `non_stackable` gate on the recursion (Rust skips both by calling `apply_success_zone_effect` directly).
+- [x] E3 `evaluate_success_zone_constant_abilities` (modifiers.rs:2147) — ✅ **LANDED WITH BOTH OF ITS CALL SITES.** `rb_evaluate_success_zone_constant_abilities` is in `src/core/modifiers.c`: it zeroes every `mods.need_heart[cid][color].{add,set}` and then delegates to E1, matching `:2148`. It deliberately does **not** touch `constant_need_heart[]`, because that C array is the stand-in for Rust's separate `constant_need_heart_global_bonuses` map, which `:2148` does not clear either. An exhaustive sweep of every `*.rs` under `engine/src` confirms **two** callers and no more: `turn/live.rs:1326` and `turn/trigger_scan.rs:360`. Both are now wired, at Rust's positions and no others — `src/turn/live.c` `rb_execute_live_victory_determination` (`live.rs:1323-1329`, between `rb_apply_deferred_reyell` and `rb_rebuild_stage_hearts_with_yell`), and `src/turn/triggers.c` `rb_trigger_live_success` (`trigger_scan.rs:357-365`, **before** the `rb_should_trigger_live_success` gate, because Rust evaluates and restores first and only then tests the gate at `:372-378`). The scope was measured, not assumed: the C's clear is the **whole** `need_heart` table, `RB_MAX_CARD_IDS × 8`, not the live/success bags — which is what `clear()` on a map means, and it is what makes the as-long-as expiry of a success-zone grant real. `need_heart_modifiers.clear()` occurs **exactly once in the whole Rust tree**, here, at `:2148`; E1 explicitly does not (`:2185`), and `rb_recalc_constants` cannot substitute, because Rust's `recalculate_constants` calls **E1** (`modifiers.rs:1398`) and never E3 — so the C's tail call to `rb_evaluate_success_zone_constant_modifiers` is correct as it stands and was left alone. The C's `constant_need_heart` prologue is `modify_required_hearts_global`'s ledger (Rust `constant_global_need_heart`, `game_modifiers.rs:194`), a **different action** from the plain `modify_required_hearts` that E1's need_heart arm dispatches, which is why that prologue cannot withdraw E1's grant.
+- [x] E4 `restore_performance_need_heart_modifiers` (modifiers.rs:2159) — ✅ **LANDED WITH BOTH OF ITS CALL SITES *AND* ITS PRODUCER.** `rb_restore_performance_need_heart_modifiers` is in `src/core/modifiers.c`, an exact body including the cross-snapshot `(cid,color)` dedupe (Rust's own comment calls it out as preventing double-counting across players' snapshots) and the restore-only-when-`target.set == 0` rule (`:2176-2178`). It reads `g->snapshots[0..n_snapshots)`, which **exists** (`rabuka.h:1620-1621`). Its two callers — the only two in `engine/src` — are wired immediately after E3 at both live-flow sites: `live.rs:1327` (`src/turn/live.c`) and `trigger_scan.rs:365` (`src/turn/triggers.c`). **The producer now exists, so this is no longer a no-op.** Two halves, because the C fuses `build_snapshot` into the push: the **capture** is `rb_capture_performance_need_heart` in `src/turn/phase.c`, called as the **first statement** of `rb_execute_performance_phase` (Rust `phases.rs:320-333` runs before `player_id` `:334`, before `performer` `:339` and long before `rb_recalc_constants`), and the **store** is in `src/turn/live.c`'s inline push inside `rb_perform_live`, which is the C's `build_snapshot` (`phases.rs:621-632` passes `&nhm_flat` at `:627`; `live.rs:3179` stores it with `.to_vec()`). The capture is a **wholesale flattening of the whole map**, not a delta and not per-card, because the restore re-adds every recorded triple. The capture lives in a module-scope buffer in `phase.c` rather than a new `GameState` field: `sizeof(GameState)` is pinned at 1 090 264 B by `tests/test_harness_self.c` §A4 (`RB_GAMESTATE_BYTES_PINNED`, an exact equality), so no field was appended and §A4 is still green. Stated divergence: when a choice pauses `rb_perform_live`, this C port returns and the phase machine re-enters from the top, so the capture is retaken on the resume pass where Rust's blocking call would keep the original; that is inherent to the resumable phase machine and already applies to the whole function, `rb_recalc_constants` included. One representational gap, matching the one already stated at `modifiers.c:1990`: the dense C `need_heart[cid][color]` cannot distinguish "absent" from "present and zero", so a zero-valued entry is not captured — which is exact here, because a zero Rust entry contributes nothing to the restore (`target.additive += 0`, and the `set` arm is guarded by `entry.set != 0`). Pinned by `tests/test_parity_need_heart_live_flow.c` (23 assertions, PASSED).
+- [ ] **MEASURED, NOT A TODO — `parity_required_hearts` is `assert=32` and stays there; E3/E4 were NOT its cause.** An earlier revision of item E3 above claimed the two reds `j_activator_not_in_success_zone` and `j_as_long_as_expiration` were "the sole cause" of 28 → 32 and that wiring E3 would clear them. **That claim is wrong and is retracted here.** Both fixtures build their board with the raw zone helpers (`test_add_to_success` / `test_add_to_live`) and then call **`rb_recalc_constants` only** — never `rb_execute_live_victory_determination`, never `rb_trigger_live_success`. They therefore never reach either of E3/E4's two call sites, and landing both changed the suite by exactly **0** (measured on a clean build, 27 suites swept before and after: total `assert` 1235 → 1235, SUM-of-`^FAIL` 1283 → 1283, every suite identical). The reason is in the oracle: Rust's `recalculate_constants` calls **E1** (`modifiers.rs:1398`) and **never** E3, and there is no ledger anywhere for the plain `modify_required_hearts` need_heart path — Rust's only withdrawal is E3's `clear()` at `:2148`, reachable only from the live flow. So on the C, and equally on Rust, a `rb_recalc_constants`-only sequence that first grants (E1 sees the activator in the success zone) and then moves the activator out leaves the grant at `-2` and the assertion expecting `0` cannot be satisfied by any faithful port. Two consequences, both deliberate. (a) **The C's tail call stays `rb_evaluate_success_zone_constant_modifiers`, not `rb_evaluate_success_zone_constant_abilities`** — matching `modifiers.rs:1398` is worth more than satisfying a fixture that probes the wrong Rust function. (b) **The rule those two assertions are really about is now pinned where Rust implements it**, in `tests/test_parity_need_heart_live_flow.c`: the as-long-as expiry is asserted end-to-end through `rb_execute_live_victory_determination`, where a grant made **after** the performance window is withdrawn by E3 and cannot be restored by E4, while a performance-time grant survives. The two `j_*` assertions were left exactly as written — not weakened, not deleted, not ignored — and they remain red. The third red in the same cluster, `j_non_stackable` (got `-4`, expected `-2`), is a **separate** gap: Rust's E1 carries the `non_stackable` dedupe at `modifiers.rs:2280-2287` (`let key = format!("{}:{}", effect.action, effect.text)`, local to one evaluation) and the C's `rb_evaluate_success_zone_constant_modifiers` does not. It is left alone here on purpose: `non_stackable` is measured **VERIFIED-INERT: 3 nodes, 0 key collisions** on the corpus, so porting it is a separate decision, and it is not E3/E4's business.
 - [~] E5 `remove_revealed_cost_card` (modifiers.rs:2053) — **BLOCKED-ON `src/ability/cost.c`.** `GameState::revealed_cost_cards[]` EXISTS (`rabuka.h:1512-1513`) but has **0 writers and 0 readers in the whole C tree**, so the function would have nothing to remove. The producer `GameState::push_revealed_cost_card` (`core/game_state/mod.rs:1091-1110`, callers `ability/cost/handlers.rs:1286` + siblings) has no C twin at all. **⛔ BLOCKED-ON: `src/ability/cost.c` — port `push_revealed_cost_card` (set semantics, newest-last, bounded by `RB_MAX_ZONE`) and its handlers.rs call sites; only then is E5/E6 worth landing.** Also note Rust's twin drops the parallel `revealed_cost_card_meta[index]`, which C has no field for (same shape as `revealed_card_meta`, already recorded above `clear_revealed_cards`).
 - [~] E6 `remove_from_source_hands` (modifiers.rs:2071) — **BLOCKED-ON E5, same producer.** Its own gate is `if !self.revealed_cost_cards.contains(&cid) { continue; }` (modifiers.rs:2080-2082), and that set is empty in C, so every candidate would `continue` — the port would be a silent no-op on every input.
 - [~] E7 `set_heart_override` (modifiers.rs:1656) — **BLOCKED-ON `src/ability/choice.c`; the function already exists and is correct.** `rb_mods_set_heart_override` is defined at `modifiers.c:262` (the twin of `game_modifiers.rs:437`, a 3-arg mods-level setter) with **0 callers**. Rust's GameState-level `set_heart_override` (modifiers.rs:1656-1672) is **4-arg** — it takes a `duration` — and the single call site is `ability/choice.rs:3806` `gs.set_heart_override(card_id, color, count.max(1), "live_end")`. **⛔ BLOCKED-ON: `src/ability/choice.c` — at the twin of choice.rs:3806, call `rb_mods_set_heart_override(&g->mods, card_id, color, count>0?count:1)`; if the duration is load-bearing, the setter needs a 4th parameter and that is a `rabuka.h` change.**
@@ -1945,6 +1946,129 @@ gate *fixes* — is the C's translation of Rust's
 The four suites whose reds the gate caused still carry the comment that gave it away:
 `"C GameState has no live_card_zone.face_up field"` — written when `GameState` had no
 face-down state, which `2130769d` gave it. The tests were never updated.
+
+---
+
+## 🐛 THE ORACLE HAS ITS OWN DEFECTS — `RUST_REFERENCE_AUDIT.md`
+
+"Rust is the authoritative reference" was an ASSUMPTION. It is not. Verified at HEAD
+`b45ff90e`. **Do not "fix" the C to match Rust where these apply.**
+
+### Where the C is RIGHT and Rust is WRONG
+- **`turn/phases.rs:831-836` LOSES THE CARD.** It removes the card from hand, then
+  returns `Err` on a full live zone — the card ceases to exist. **The C refuses first
+  and deliberately does not inherit it.** A case where matching Rust would be a
+  regression. Recorded so it is never "fixed" for consistency.
+- **`ability/effects/look.rs:1031-1040`** `fetch_look_pool` ignores `all_any` for both
+  deck arms while the stage/hand arms honour it.
+- **`game_state/modifiers.rs:2280-2287`** keys `non_stackable` by *text*, not card id;
+  the four-zone scan widens the collision.
+
+### Where the C INHERITS a Rust bug
+- **Q213** (`PL!HS-bp5-019-L`) — confirmed again: `check_invalid_live_cards` is gated on
+  `face_up` (`actions/mod.rs:1734`), set true only at `phases.rs:343`, while
+  `trigger_live_start_abilities` runs at `:245-246`. Members count toward the live-slot
+  total (`condition/card.rs:4419-4421`, no `is_live` filter), so **the second attacker's
+  members survive the entire first performance.** Filed against `actions/mod.rs:1734`.
+- **Q68** (`PL!HS-bp2-014-N`, `PL!SP-bp1-001-P/R`) — `trigger_live_start_abilities`
+  (`trigger_scan.rs:186-212`) **never consults `cannot_live_players`**, so ライブ開始時
+  fires for a ライブできない player and the live cards are discarded during the yell.
+  **The C inherits this. This one IS actionable in C.**
+- `PL!N-bp1-027-L` (Q67) — open, could not be settled.
+
+### The oracles that never run
+- **`pvp_room_test` CANNOT COMPILE.** `engine/build.rs:90` excludes it; the file imports
+  `web_server::pvp_player_can_act`, and `lib.rs:149` gates that behind
+  `#[cfg(feature = "server")]`, which is **not** in `Cargo.toml:62` `default`. Its **14
+  tests / 345 lines are the sole oracle for `choice_player_id` routing**, including the
+  JSON key `"choice_player_id"` (`:267`), which **no compiled test asserts anywhere.**
+- **`bytecode_deep_compare_test`** is gated `feature = "json_path_test"`, also not
+  default — **the bytecode↔JSON oracle never runs.**
+- **3 phantom `mod.rs`** naming modules absent from disk *and from all of git*:
+  `bounded_fan_cost_equality_gate_test`, `set_heart_type_multi_target_test`,
+  `pbl02_card_table_test`. Each parent directory contains **only** `mod.rs` — zero tests.
+  `ability_gates/` is an empty top-level category.
+- **`unique_abilities_test.rs` is 0 bytes.**
+
+### Q213 HAS ZERO EFFECTIVE COVERAGE
+`live_start_heart_requirement_reduction_counts_live_slot_cards_only_test.rs:59` is
+`assert!(after_waitroom >= before_waitroom)` — **satisfied by zero cards added, so it
+cannot fail.** The file's stated purpose is the Q213 heart reduction and **it never reads
+a heart modifier.** Its sibling `hanamusubi_required_hearts_exclude_self_test.rs` has 9
+real tests, **none of which stages a member in the live slot.** So the ruling that
+exposed the biggest cross-engine bug has **no test that can detect it.**
+
+### 325/805 — THE PREMISE WAS INVERTED. There is no Rust data bug.
+Both engines are **internally exact**: `vm.rs:174-183` strips the `RBKA` header, and
+`OFFSET_DELTAS` sums to **98725 == the payload exactly**, 985/985 slices tag-valid. The
+C's own `bytecode_blob.c` is 98737 B, also 985/985. Slices **325 (149→159)** and
+**805 (236→238)** are the two abilities that changed between generations; **63 277 bytes
+differ.** It is a generation skew, not corruption.
+⚠️ **But `build.rs:325` THROWS AWAY the staleness verdict** — `let _ = stale;` with the
+panic commented out at `:323`. **The staleness check exists and is disabled.** That is
+why the skew went unnoticed. Re-enabling it is a Rust-side change.
+3 Rust tests still pin the OLD encoding (325 = `PL!-pb2-012-P＋`, 2 tests; 805 =
+`PL!N-bp7-028-L`, 1 test).
+
+### Corrections to claims in this project
+- **`trigger_counts` keys are NOT mojibake** at HEAD or working tree.
+- There are **NOT 6 untracked Rust test files — there is 1**:
+  `self_to_waitroom_recover_member_own_card_is_candidate_test.rs` (155 lines, 3 tests,
+  with a negative control) — untracked, so it runs nowhere.
+- `ability/condition/card.rs:1632-1658` (the `cause_card_id` arm three agents rewrote in
+  C) — **no defect found.** Recorded so it is not audited a fourth time.
+- Both deck-order producers (`:1864`, `:3120`) — **consistent, no defect.**
+- HEAD moved twice during the audit and `cf315a9a`/`2130769d` were **squashed away.**
+
+---
+
+## ⚠ CITATION TRAPS THAT HAVE ALREADY MISLED AGENTS
+
+### There are TWO `choice.rs` in `engine/src`
+- `engine/src/ability/choice.rs` — **3 921 lines**, `execute_choice` at `:27`
+- `engine/src/ability/effects/choice.rs` — **277 lines**, the `choice_maker` stamp at `:142-153`
+
+**A bare `choice.rs:142` resolves to the WRONG file** — `ability/choice.rs:142` is inside
+the REPEAT prompt. An agent hit this and corrected it. **Always cite the full path.**
+
+### `src/web_server.o` is linked ONLY into `$(WEB_TARGET)` — never into `OBJ_LIB`
+So **no test suite can reach any symbol defined in `web_server.c`.** A reader that a suite
+needs must live elsewhere (e.g. `game_state_abilities.c`) with a file-scope extern in
+`web_server.c`. This is why `append_pending_choice` has no suite coverage at all.
+
+### `WARN_AUDIT_BASELINE` is keyed `file:line`
+Two struct fields declared on one line is deliberate — splitting them would move pins.
+Do not "tidy" that.
+
+---
+
+## ✅ Q68 — PORTED via a TURN STAMP, not the rollover clear
+
+`rb_trigger_live_start` had exactly Rust's two gates and no third. Rust first reads
+`cannot_live_players` at `phases.rs:351` — **after** the scan at `:245-246` — then
+discards the live cards at `live.rs:2053-2055`.
+
+The prescribed fix (a rollover clear in `phase.c`) was **unreachable**, because
+`rb_rules_state` is `static` inside `rules.c`. Instead the flags now carry the turn they
+were set on (`cannot_live_turn[2]`, `cannot_activate_turn[2]`) and **both readers drop a
+stale stamp**. That is the idiom already blessed for Rust's per-turn
+`turn_limited_abilities` (`ability_queue.c:1138`), needs no `phase.c` or header edit, and
+gives the same guarantee.
+
+**Rust's clear is in TWO places** — `phases.rs:279-280` AND `abilities.rs:3207`
+(`clear_live_only_state` ← `check_expired_effects:3241` ← `phases.rs:310`). A C fold must
+cover both or neither; **the turn stamp covers both by construction.**
+
+Reachability: **2 of 985** ability nodes carry `"restriction_type": "cannot_live"`
+(`PL!SP-bp1-001-P/R` 常時 target:self; `PL!SP-bp1-005-P/R` 登場). `PL!HS-bp2-014-N` is
+**not** in that set despite the ruling naming it. Zero suite movement — correct, since
+no test exercises those two nodes.
+
+### The three "C is right / Rust is wrong" items — the C inherits NONE
+`phases.rs:831-836` no (`rb_handle_set_live_card` refuses on capacity **before**
+`rb_hand_remove_card`, `phase.c:1335-1346`). `look.rs:1031-1040` no — and it goes the
+OTHER way, `look_at_fetch` applies `all` to every source; **VERIFIED-NOOP: 0 of 84**.
+`modifiers.rs:2280-2287` no — the text-keyed dedupe only arrived in C with E1.
 
 ---
 
@@ -4983,7 +5107,7 @@ one line each in a file this wave does not own.
 | `player1_cheer_revealed_cards` + `n_`, `player2_cheer_revealed_cards` + `n_` (4) | 2 consumers + the producer | PRODUCER site is MINE and located: `src/turn/live.c:676-679`, right after the `g->revealed_cards[]` push (twin of phases.rs:396-398), before `g->yell_occurred = n_yell > 0;` (twin of :421). CONSUMERS: `src/ability/effects/move.c:1780` (`rb_move_resolve_source_revealed_cards` -- add the `cheer_is_empty` branch ahead of the :1783-1807 filter loop, per move/mod.rs:1580-1621) and `src/ability/dynamic_count.c:683` (`rb_revealed_count`, whose comment at :681 states the gap outright, per dynamic_count.rs:159-180). **The producer is deliberately NOT landed alone.** |
 | `revealed_cost_cards` + `n_` (2) | producer | `src/ability/cost.c` -- port `GameState::push_revealed_cost_card` (mod.rs:1091-1110) and call from the twin of handlers.rs:1286. Readers to wire after: move.c (:368/:1831/:1955), modifiers.c (:2055/:2080 for E5/E6), choice.c (choice.rs:3377). |
 | `success_zone_blade_bonuses`, `_heart_bonuses`, `_score_bonuses` (3) | the whole producer/consumer function | `src/core/modifiers.c` -- port `evaluate_success_zone_constant_modifiers` (modifiers.rs:2188-2305) with its `core::mem::take` + withdraw prologue (:2200/:2204/:2211) and call at the tail of `rb_recalc_constants` (:1398). Rust DOES read these three -- the withdraw loop drives `remove_blade/heart/score_modifier` -- so they are load-bearing for E1 and for nothing else; outside that function the only mention is a `log::debug!` inequality (:2293-2302). E1/E2 stay blocked. The header half of E1's blocker was ALREADY DONE; the old E1 text asking for these lines is corrected. |
-| `performance_need_heart_modifiers` + `n_` (2) | producer | `src/turn/phase.c` -- flatten `mods.need_heart[cid][color]` at the head of the performance phase (Rust phases.rs:320-333). Reader is `restore_performance_need_heart_modifiers` (modifiers.rs:2165), called from trigger_scan.rs:365 and live.rs:1327, and belongs in `src/core/modifiers.c`. Unchanged from item E4, now with the Rust line numbers re-verified. |
+| `performance_need_heart_modifiers` + `n_` (2) | producer — **WRITTEN** | `src/turn/phase.c` `rb_capture_performance_need_heart`, the **first statement** of `rb_execute_performance_phase` (Rust phases.rs:320-333, before the recalc at :352), flattening `mods.need_heart[cid][color]` for every entry with `add != 0 \|\| set != 0` into a module-scope buffer; stored in `src/turn/live.c`'s inline push inside `rb_perform_live`, which is the C's `build_snapshot` (phases.rs:627 passes `&nhm_flat`; live.rs:3179 stores `.to_vec()`). 1 writer / 1 reader, both live. The buffer is module-scope, **not** a `GameState` field, because `sizeof(GameState)` is pinned at 1 090 264 B by test_harness_self §A4. Reader is `restore_performance_need_heart_modifiers` (modifiers.rs:2159-2182, not :2165), called from live.rs:1327 and trigger_scan.rs:365, and lives in `src/core/modifiers.c`. Pinned by tests/test_parity_need_heart_live_flow.c. |
 
 ### 0 WIRED -- and that is the finding, not an omission
 
@@ -5425,3 +5549,992 @@ positive and the `0xFF` fallback control.
 dirty at this wave's baseline** and were never written here — they are a peer's
 pre-existing edits, carried into both snapshots identically. No git write of any kind
 was performed.
+
+---
+
+## Q68 / choice_player_id WAVE — LANDED (this is not a BLOCKED-ON record)
+
+Measured at **HEAD `5ce311e6`**, working tree otherwise clean of my files. Both of
+my snapshots were taken from the same tree and differ in exactly 4 source files
+(`rules.c`, `triggers.c`, `game_state_abilities.c`, `web_server.c`) + 3 new tests;
+the file-hash sweep says 451 files byte-identical. The peer's concurrent edit to
+`src/core/modifiers.c` (mtime 06:32:47Z, hash `c237acbb9dbE0bdf`) landed in the
+LIVE tree after both snapshots and is in NEITHER measurement — the pair was taken
+against `modifiers.c@d804483c3ebe4066`.
+
+### Q68 — 「ライブ開始時」 IS UNUSABLE FOR A 「ライブ不能」 PLAYER. LANDED.
+
+The C **inherited** it. `rb_trigger_live_start` (triggers.c:277, the twin of
+`trigger_live_start_abilities`) had exactly Rust's two gates — `is_trigger_suppressed`
+and the Q72 empty-live-zone guard — and no third. Rust is wrong here: FAQ Q68
+(2025.02.07, `PL!HS-bp2-014-N` / `PL!SP-bp1-001-P` / `PL!SP-bp1-001-R`) says the
+abilities are UNUSABLE, and `engine/src/turn/trigger_scan.rs:186-212` never reads
+`cannot_live_players`; Rust first reads it at `phases.rs:351`, i.e. **after** the
+scan (`:245-246`) and inside the yell.
+
+**The latch WAS a live hazard, and it is now closed.** `RbRulesState::cannot_live_players[2]`
+had no clear: the flag is written by the `cannot_live` arm of
+`rb_rules_execute_restriction` and read by nobody, forever. The rollover clear
+Rust gets at `phases.rs:280` is unreachable from outside `rules.c` because
+`rb_rules_state` is `static` — so the `I2` tombstone at `phase.c:521` and the
+`live.c:576-638` comment block are still correct as written and are **not**
+resolved by this work.
+
+What *is* resolved: the flag now carries the turn it was set on
+(`cannot_live_turn[2]`, `cannot_activate_turn[2]`) and both readers drop a stamp
+from an older turn. That is the idiom the C already uses for Rust's per-turn
+`turn_limited_abilities` (the use-limit table is keyed by turn at
+`ability_queue.c:1138`), so it needs no `phase.c` edit and no header edit, and it
+is the same guarantee the explicit clear gives, not a weaker one. **The Q68 gate
+is therefore landed rather than BLOCKED-ON.**
+
+`WARN_AUDIT_BASELINE` is keyed on `file:line` and pins `rules.c:215/:261/:895/:1398/:1601`,
+so the two new struct fields are **declared on one line, on purpose**. Any comment
+block there turns five pinned diagnostics into NEW ones. Verified:
+`make warnings-audit` → `PASS -- 12 diagnostic(s), all pinned; 0 new`, identical
+to the baseline.
+
+- `src/ability/effects/rules.c:72` — the two turn stamps, ONE line.
+- `src/ability/effects/rules.c:1922-1955` — both writers stamp `g->turn`.
+- `src/ability/effects/rules.c:2291-2313` — both readers are per-turn.
+- `src/turn/triggers.c:20-30` — file-scope `extern` for the reader (same precedent
+  as `:6-16`); `:305-333` — the Q68 gate.
+- `tests/test_parity_q68_cannot_live.c` — **NEW, 4 sections, GREEN.** Includes the
+  assertion that FAILS against the pre-fix reader (the flag outliving its turn) and
+  the one that fails against a naive clear-on-read.
+
+⛔ **BLOCKED-ON `include/rabuka.h`** (main's file): declare `rb_rules_cannot_live_player`
+and `rb_rules_execute_restriction` beside the other `rb_rules_*` accessors. The test
+and `triggers.c` declare them locally for now.
+
+### choice_player_id — the C's WIRE WAS SILENT, AND ONE READER WAS WRONG. LANDED (partly).
+
+From the Rust **source**, not the dead test. `pvp_room_test.rs` cannot compile
+(`build.rs:90` `EXCLUDED_MODULES`; it imports `web_server::pvp_player_can_act`, which
+`lib.rs:149-150` gates behind a feature that is not in `Cargo.toml:62` `default`).
+
+- `queue.rs:312-366` `pause_for_choice`: an existing stamp is never overwritten
+  (`:319`); the redirect needs an opponent CHOICE **and** an opponent ENTRY CONTEXT
+  (`:322-331` × `:335-345`); the universal default is the entry's owner (`:354-360`).
+  → **`src/ability/ability_queue.c:537-608` is faithful.** No change.
+- The JSON key is `choice_player_id` = `choice_player_id` else `player_id`,
+  `player1|player2` → `p1|p2`, `_` passed through
+  (`core/game_state/abilities.rs:2559-2568`).
+
+Two real defects, both fixed:
+
+1. `rb_inject_choice_ability_context` read `entry.player_id` and **never
+   `entry.choice_player_id`**, so every routed choice was announced as the ability
+   OWNER; it also fabricated `"p1"` for an empty id, which would have satisfied
+   Rust's leak filter for the wrong seat. Fixed (`game_state_abilities.c:1507-1553`).
+2. `append_pending_choice` (`src/web_server.c`) emitted **no `choice_player_id`
+   key at all** — only `kind`/`zone`/`target`/`card_type`/`count`/`allow_skip` and
+   an integer `actor`. Rust's client depends on the key twice (`web_server.rs:1240-1249`
+   drops the whole choice when it is missing or names anyone but the requester;
+   `pvp_player_can_act` at `:1151` gates the answer endpoint on it). Now emitted.
+
+The three readers in `game_state_abilities.c` (`:2590`, `:2696`, `:2736`) all read
+`g->queue.actor` / `entry->player_id`, i.e. Rust's **`ability_master_id`** /
+**`current_pid`**, not the choice owner — they agree with Rust and were left alone.
+(`:2696` reads the card owner *before* the queue entry where Rust's
+`resolve_master_id` reads the entry first; noted, not changed, not in scope.)
+
+The one reader that is genuinely the choice owner is
+`rb_get_pending_choice_player_id` (`src/ability/choice.c:4696-4699`), and it
+**disagrees with Rust**: `queue.rs` stamps the routed seat, but
+`ability_queue.c:593`/`:605` set `g->queue.actor = g->active`, so it returns the
+ACTIVE seat. Its one production consumer, `rb_gsc_can_player_act`
+(`src/core/game_state_core.c:261-283`, whose own comment calls pending choices
+"authoritative"), therefore answers for the wrong seat on exactly the prompts the
+routing exists to redirect. **⛔ BLOCKED-ON `src/ability/choice.c` (+ the comment at
+`game_state_core.c:258-260`)**: return the current entry's `choice_player_id` seat
+with no fallback (Rust `abilities.rs:2457-2469`), keeping `g->queue.actor` only for
+the dummy-entry case. One line. The new suite already pins the field it must read.
+
+⚠️ `src/web_server.o` is linked **only** into `$(WEB_TARGET)` (`Makefile:100-102`),
+never into `OBJ_LIB`, so no `tests/test_*.c` binary can reach any symbol defined
+there — `rb_wire_pending_choice_player_id` is therefore defined in
+`src/core/game_state_abilities.c` (in `OBJ_LIB`) and declared file-scope in
+`web_server.c`. **⛔ BLOCKED-ON the Makefile** if anyone wants `append_pending_choice`
+itself covered from a suite: `src/web_server.o` has to join the suite link.
+
+- `tests/test_parity_choice_routing.c` — **NEW, 5 sections, GREEN.** Includes both
+  negative controls (`SELECT_CARD{target_player_id:"opponent"}` alone, and an
+  opponent CONTEXT alone, each of which must NOT redirect) and the pre-stamp
+  case that must not be overwritten.
+
+### bytecode_deep_compare_test — NEVER RUNS, AND A C COPY WOULD BE RED ON ARRIVAL
+
+`bytecode_deep_compare_test.rs:1` is `#[cfg(all(feature = "bytecode_abilities",
+feature = "json_path_test"))]`; `json_path_test` is not in `Cargo.toml:62` `default`
+and `build.rs:149-152` adds only the `bytecode_abilities` cfg to the `mod.rs`
+declaration, so the module is **registered and then compiles to nothing**.
+
+What it would catch: for each of the 985 abilities, a **bytecode-decode vs
+`serde_json`→`Ability`→`populate_from_json` field-by-field** comparison
+(`:137-192`, diffs by JSON path). Any field the bytecode round-trip drops, defaults
+differently, or spells differently from the JSON — including the three
+normalisations the test has to perform itself (`:20-41` `has_moved`/`not_moved`
+type tags, `:46-49` cost key normalisation, `:62-78` the compound `draw_card`
+`count` default). Because the two inputs are two GENERATIONS apart, it would
+**fail today** on slices 325 and 805 — which is the point: it is the oracle that
+would have caught the skew, and it is the oracle that is switched off.
+
+The C's equivalent-class gate is `tests/test_artifacts_consistent.c`, and it is
+good: offsets monotonic + sentinel (`:109-115`), a whole-table FNV digest
+recomputed from disk (`:117-146`), and `RBKA_BYTECODE_LEN == sum(RBKA_OFFSET_DELTAS)`
+(`:180-185`). What had **no** compiled guard on either side is the per-slice
+measurement — "985/985 slices begin with the format tag `0x08`" and the prefix sums
+strictly increasing — which is exactly the byte-splice signature that corrupted
+494 of 985 abilities on 2026-10-01. **A full C deep-compare was deliberately NOT
+written**: it would be red on arrival for the skew reason and would report
+differences that are not defects.
+
+- `tests/test_decode_bytecode_shape.c` — **NEW, 4 checks, GREEN.** Only pins what
+  cannot be red unless the committed blob is genuinely corrupt.
+
+### THE THREE "C IS RIGHT / RUST IS WRONG" ITEMS — the C INHERITS NONE OF THEM
+
+- **9a** `phases.rs:831-836` (the card vanishes: taken out of hand, then `Err` on a
+  full live zone). **The C does not inherit it.** `rb_handle_set_live_card`
+  (`src/turn/phase.c:1335-1346`) refuses on capacity **before** `rb_hand_remove_card`,
+  with the divergence documented at `:1347-1354`. Correct as it stands; do not
+  "fix" it.
+- **9c** `look.rs:1031-1040` (`all_any` ignored for both deck arms). **The C does
+  not inherit it** — it goes the other way: `look_at_fetch` (`src/ability/effects/look.c:355-393`)
+  applies `look_bool(effect,"all")` by setting `count = RB_MAX_ZONE` for **every**
+  source, including the three deck arms. **MEASURED `VERIFIED-NOOP: 0 of 84`**: of
+  the 84 `all=true` effect nodes in `cards/abilities.json`, **none** has an action
+  containing `look` (the tally by action: `gain_resource` 24, `move_cards` 23,
+  `change_state` 8, `modify_score` 6, `select` 5, `select_cards` 3, …), so the
+  divergence is unreachable on this corpus. `look.c` is contested and was not
+  touched. (The same function's deck-BOTTOM arm at `:379-383` reverses
+  `taken[]`, which reproduces Rust's `drain(start..)` index order exactly.)
+- **9d** `modifiers.rs:2280-2287` (`non_stackable` keyed by `format!("{}:{}", action, text)`
+  instead of by card id). **The C does not inherit it** — `evaluate_success_zone_constant_modifiers`
+  is not ported at all; the four-zone scan exists only as comments at
+  `triggers.c:1538` and `modifiers.c:1364`. The C has the `non_stackable` *reader*
+  (`src/core/card.c:771`) and nothing that would mis-key it.
+
+### `engine/build.rs:325` — REPORT ONLY, NOT EDITED
+
+`let _ = stale;` with the panic commented out at `:323`. **Re-enabling it would NOT
+fire on the current tree** — all four checks pass, measured:
+
+| check | measured | verdict |
+|---|---|---|
+| `:268-275` `abilities_time < cards_time` | `cards/abilities.json` 05:54:18.172Z vs `cards/cards.json` 2026-09-29T03:34:22.196Z | NEWER, no stale |
+| `:276-283` `abilities_gen` older | `engine/src/ability/abilities_gen.rs` 05:54:20.412Z | NEWER, no stale |
+| `:288-299` manifest digest | `generation_manifest.json` contains `"sha256": "4753ff27e561e7db"`; `sha256(cards/abilities.json) = 4753ff27e561e7db022adaac36b3cee96b7691042c7bddc6a163e25d245138e1` | MATCH, no stale |
+| `:313-320` `abilities.bin.z` older | `cards/build/abilities.bin.z` 05:54:20.292Z | NEWER, no stale |
+
+So it is a **no-op today and a tripwire later** — worth having, and safe to land.
+⚠️ Two things it would NOT do, which matter more than the panic:
+(1) it has no knowledge of the C tree at all, so it **cannot** detect the C/Rust
+generation skew — the thing that went unnoticed for the whole project;
+(2) `cards/abilities.json`, `cards/build/abilities.bin.z` and
+`engine/src/ability/abilities_gen.rs` all carry mtimes inside a 3-second window at
+05:54:20 today, i.e. one regeneration ran mid-session, while the C's blob is from
+2026-10-02. A generator run between the JSON and `abilities_gen.rs` is exactly the
+window this guard closes.
+
+**Patch text (NOT applied — `engine/` is the oracle):**
+```diff
+--- a/engine/build.rs
++++ b/engine/build.rs
+@@ -321,5 +321,5 @@
+     // In CI, stale is a hard error; locally it still warns but `cargo test` will surface the warning.
+     // To make it a hard error everywhere, uncomment the next two lines:
+-    // if stale { panic!("Stale generated files — regenerate as warned above"); }
++    if stale { panic!("Stale generated files — regenerate as warned above"); }
+     // For now keep it as warning so local `cargo test` stays green while CI can gate on `cargo:warning` → error via `ci.yml` deny-warnings.
+-    let _ = stale;
+```
+Deleting `let _ = stale;` is required as well as uncommenting, or the unused-assignment
+lint fires.
+
+---
+
+# FOUR-ITEM PASS — 2026-10-04, HEAD `5ce311e683141ccdc7abfce452980c9c310ae20b`
+
+Items 1 and 3 LANDED. Items 2 and 4 VERIFIED, not changed. The oracle tree is
+**dirty** at this HEAD (`engine/src/ability/choice.rs`, `condition/card.rs`,
+`condition_decoder_gen.rs`, `effect_decoder_gen.rs`, `effects/move/mod.rs`,
+`core/card.rs`, three `engine/tests/**` files), so every Rust citation below is
+**by content, read out of the working tree**, not out of HEAD.
+
+## ITEM 1 — `rb_get_pending_choice_player_id` ANSWERED FOR THE WRONG SEAT. LANDED.
+
+It returned `g->queue.actor`. `ability_queue.c:593` and `:605` set that to
+`g->active` **deliberately** — the reasoning at `:584-592` is sound (the
+opponent-movement and cross-player watchers read it to know which seat MOVED,
+and redirecting it silenced `cross_player_interaction`'s "opponent movement
+watcher fires" pin). `choice.c` has **20 further writers** of `queue.actor`
+meaning other things again (`:2565` `actor_pending`, `:2591` `actor_pending ^ 1`,
+`:1101` `self->actor`). So the old body answered out of a field whose only claim
+to agree with Rust was its name.
+
+Its one production consumer, `rb_gsc_can_player_act`
+(`src/core/game_state_core.c:261-283`, whose own comment calls pending choices
+"authoritative"), therefore named the ACTIVE seat on exactly the prompts the
+G1/G3 redirect exists to move.
+
+**LANDED**, Rust by content:
+
+- `engine/src/core/game_state/abilities.rs:2457-2469`
+  `get_pending_choice_player_id` — the current entry's `choice_player_id`, a bare
+  `.and_then(|e| e.choice_player_id.as_ref().cloned())`, **no fallback to
+  `player_id`**, plus a `pending_loop_protocol` arm.
+- `engine/src/ability/queue.rs:312-366` `pause_for_choice` — `:319` an existing
+  stamp is never overwritten; `:346-352` the redirect writes the other seat;
+  `:354-360` the universal default copies `entry.player_id`. All three already
+  faithful in `ability_queue.c:537-608`.
+- `engine/src/ability/queue.rs:234-242` `current_entry()` is **None** for `Idle`
+  and for `WaitingForAutoAbilityChoice` — which is why the auto-ability prompt
+  must NOT answer from the entry behind it.
+- `engine/src/core/game_state/mod.rs:495-573` `can_player_act`: stamp first
+  (normalised, `:506-511`), else the Choice-embedded picker/target
+  (`:517-541`), else the phase match (`:544-572`).
+- `engine/src/ability/vm.rs:247-268` `get_ability` — `idx >= NUM_ABILITIES` is
+  the ONLY bounds check; `start >= end` returns `Ok(Ability::default())`.
+
+The C body now reads the stamp, gated on the C's own spelling of
+`current_entry() == None` (reused from `rb_queue_current_entry_mut`,
+`ability_queue.c:184-190`, not re-derived), with `mod.rs:506-511`'s
+`player1|player2 -> p1|p2` mapping (the same one as `seat_of_token` in
+`src/test_game.c`).
+
+`g->queue.actor` is **left exactly as `pause_for_choice` wrote it** — the fix is
+in the reader, not in the field, precisely because `:584-592`'s argument holds.
+
+**Two divergences left in place, deliberately:**
+
+1. `has_pending` STAYS a guard on the reader. Rust's getter does not consult it,
+   but every Rust call site already does (`match_runner.rs:429-455`,
+   `mod.rs:498-505`), so no Rust program can observe the difference. Dropping it
+   would change `test_parity_zone_source.c:259`'s `pending_seat()` at every
+   non-pending call site for no faithfulness gain.
+2. Rust's `Some(token)` that names **no** seat makes `can_player_act` return
+   false for **both** seats; the C's `-1` falls through to the Choice-embedded
+   arm. Measured unreachable: `rb_build_ability_queue_entry`
+   (`game_state_abilities.c:1849-1857`) canonicalises `entry.player_id` to
+   `p1`/`p2` before anything is stamped from it, `ability_queue.c:572-573` writes
+   the literals `p1`/`p2`, and the `queue.rs:367-409` dummy takes NULL. So
+   `choice_player_id` is only ever `"p1"`, `"p2"` or `""`.
+   **`VERIFIED-NOOP: 0 of 3`** reachable token values.
+
+`rb_gsc_can_player_act` needed **no** change, and its stale comment at `:258-260`
+(which named `g->queue.actor` as the stamp) was corrected **in place at the same
+line count** — a 15-line comment there moved the two pinned `-Wformat-truncation`
+diagnostics (FT-8, FT-9) off `game_state_core.c:868/:947` and turned them into 2
+NEW pins, which is the trap `Makefile:748-755` warns about. The reasoning lives
+here and in `choice.c` instead, so the contested Makefile needs **no** re-pin.
+
+Reported there and not changed: its **fallback** arm also answers from
+`target_player_id` for `SELECT_TARGET` / `SELECT_POSITION` /
+`SELECT_HEART_COLOR` / `SELECT_NUMBER`, where Rust's or-pattern
+(`mod.rs:517-541`) covers only `SelectAutoAbility`, `SelectLiveSuccess` and
+`SelectCard{target_player_id,picker}` and sends everything else to the
+`_ => {}` at `:540` and then to the phase match. Rust also has a
+`SelectLiveSuccess` variant with its own `player_id`, which `RbChoiceKind`
+(`include/rabuka.h:877-883`) has no member for. Out of item 1's scope; the
+fallback's reachability also just shrank, because the reader now returns `-1`
+only where Rust's `current_entry()` is `None`.
+
+**`tests/test_parity_choice_routing.c` — section 6 added, 13 new assertions.**
+Every one of them fails against the old body, and the discriminator in each case
+is that the stamp and `g->active` are made to disagree (`test_game_new` leaves
+`active = 0`). The two that a routed-only test would miss are called out in the
+file: **6(b)** an UNROUTED prompt owned by p2 with p1 active (no redirect happens
+and the C was still wrong), and **6(d)** the **no-fallback** property — an entry
+with an owner and an emptied stamp must read `-1`, not borrow the owner, because
+`abilities.rs:2468` has no `unwrap_or` where `abilities.rs:2559` has one.
+**6(e)** pins both `current_entry() == None` arms, including the auto-ability
+prompt, which parks a pending choice with no entry behind it. **6(f)** pins the
+field the fix must NOT touch: on a board where `queue.actor == 0` and the stamp is
+`p2`, the reader answers `1` and leaves `queue.actor` at `0` after three calls —
+so a future "simplification" that folds the stamp into `queue.actor` fails here.
+
+## ITEM 2 — THE `choice_player_id` JSON KEY. VERIFIED (both halves correct).
+
+`src/web_server.c:221-222` emits it; `rb_wire_pending_choice_player_id` is defined
+in `src/core/game_state_abilities.c:1590-1599` (in `OBJ_LIB`) and declared
+file-scope in `web_server.c:198`, the same shape as `rb_check_effect_position` in
+`src/turn/triggers.c`. **CORRECT**, checked against
+`engine/src/core/game_state/abilities.rs:2559-2568`:
+
+- `let raw_pid = entry.choice_player_id.as_ref().unwrap_or(&entry.player_id)` ->
+  `game_state_abilities.c:1564` `e->choice_player_id[0] ? e->choice_player_id : e->player_id`
+- `"player1" => "p1"`, `"player2" => "p2"`, `_` passed through ->
+  `choice_seat_wire` at `:1517-1524`
+- The `"p1"`-for-empty-id fabrication is **gone**: the `_` arm passes `""`
+  through unchanged, which is what the `queue.rs:367-409` dummy (empty
+  `player_id`) needs — a fabricated `"p1"` would have satisfied Rust's leak filter
+  (`web_server.rs:1243`) **for the wrong seat**.
+- `rb_inject_choice_ability_context` **does** read `choice_player_id` now. Before,
+  it read `player_id` and never the routed field, so every routed choice was
+  announced as the ability OWNER.
+
+**FOUND, REPORTED, NOT FIXED** — a second producer of the same key that the C
+does not have. `abilities.rs:2679-2697` is an `else` arm on the same
+`if let Some(entry) = entry_ref`: when there is **no** current entry it still
+emits `choice_player_id`, from the Choice's own `player_id`, for
+`SelectAutoAbility` and `SelectLiveSuccess`. `rb_wire_pending_choice_player_id`
+returns `""` there. **Direction is safe** — `web_server.rs:1240-1249` then HIDES
+the choice rather than leaking it, and a hidden prompt is a smaller bug than a
+leaked opponent prompt — but the prompt is lost. The fix belongs in
+`src/core/game_state_abilities.c`, which is contested, so it is pinned as a
+known divergence in `test_parity_choice_routing.c` section 7 instead.
+
+**`web_server.o` in `OBJ_LIB`? RECOMMENDATION: NO — keep the reader where it is.**
+Measured, and the deciding argument is not taste:
+
+1. `Makefile:101-102` links `src/web_server.o` **only** into `$(WEB_TARGET)`, and
+   `make clean` (`:843-844`) does not remove it, because `SRC` (`:61`) does not
+   list it — so `src/web_server.o` is the one object `clean` misses.
+2. Adding it to `OBJ_LIB` would put `-mwindows` web-server translation units into
+   **every one of the 163 suite links**, and `$(WEB_TARGET)` (`:101-102`) already
+   links it explicitly — so `OBJ_LIB` + `src/web_server.o` would then be a
+   **duplicate-symbol link error on the web target itself**.
+3. `append_pending_choice` is `static` (`web_server.c:200`) and is the only
+   caller of the reader, so joining `OBJ_LIB` would not even make it reachable:
+   a suite could reach `rb_wire_pending_choice_player_id`, which it already can,
+   and still never execute the emitter.
+4. What would actually cover the emitter is a **separate link target** that
+   includes `src/web_server.o` plus a test that `#include`s the `.c` to reach the
+   static function — i.e. a Makefile target, not an `OBJ_LIB` edit, and it pulls
+   in a socket/HTTP surface for one JSON object.
+
+So: **keep the file-scope extern in `game_state_abilities.c`** (which is what is
+already landed), and if the emitter itself is ever to be covered, add a
+`$(TARGET)_websurface` target rather than touching `OBJ_LIB`. **One line of
+Makefile to report, not to edit:**
+`src/web_server.o` added to the `clean:` target's `rm -f` list.
+
+## ITEM 3 — THE SHAPE GUARD, AT FULL STRENGTH. LANDED.
+
+`tests/test_decode_bytecode_shape.c` goes from 4 checks to **13**, in four
+sections, and the ordering changes because the old body had a hole in the guard
+itself:
+
+- **The old tag loop read `blob[off]` with no bounds test** and compared
+  `running` to `RBKA_BYTECODE_LEN` only *after* the loop. On precisely the input
+  this gate exists to catch — deltas from one generator run, bytes from another,
+  summing **past** the blob — that is an out-of-bounds read **in the guard,
+  before it can report anything**. This tree has already shipped one SIGSEGV that
+  gcc predicted and nobody read (`Makefile:680`), so the guard is not allowed to
+  be the next one. All the arithmetic now runs first; the per-slice walk is
+  reached only from a table whose total is known to land inside the blob.
+- **The counts are now pinned against `gen_data.h`, not against the generated
+  tables.** Every one of the old checks derived its bound from a symbol living in
+  the SAME generated file as the bytes it describes, so a regeneration that moved
+  `bytecode_blob.c` and `gen_data.c` together left all of them green. `gen_data.h`
+  is a different file. `RBKA_NUM_ABILITIES == 985` also **bounds the loop**:
+  `RBKA_OFFSET_DELTAS` is declared `[985]` (`gen_data.c:7`), so a
+  `RBKA_NUM_ABILITIES > 985` would read past its end, and the pin is the only
+  thing between the loop and that.
+- The zero-delta case gets its own check, because it is **invisible by
+  construction on both engines**: Rust `vm.rs:263-265` returns
+  `Ok(Ability::default())` when `start >= end`, and `rb_decode_ability` mirrors
+  it exactly (`if (!slice || len == 0) return 1;`). `bytecode_validation_test.rs`
+  asserts every ability **decodes** (`:62-80`) — and an empty slice decodes, so
+  it cannot see this either. That is the concrete reason the guard has to be
+  arithmetic rather than behavioural.
+
+**MEASURED, GREEN, and PROVEN TO BITE.** 13 checks, 0 failed. Prints
+`deltas: min=25 max=339 total=98737`, `985/985` tagged. Negative control: setting
+`RBKA_BYTECODE_LEN` to **98733** — the Rust generation's own size — turns **4 of
+the 13 red** (`RBKA_BYTECODE_LEN == 98737`, no prefix sum overruns, prefix sums
+land exactly on the length, and the tagged count). It names
+`first overflow at slice 984`, a diagnostic the old 4-check version could not have
+produced without reading off the end of the blob first.
+
+**Why the 494 number is the shape guard's whole argument**, read against
+`rb_bc_slice` (`src/core/data.c:374-382`): `if (start + len > g_bc_len) return NULL;`
+and `rb_decode_ability` turns a NULL slice into a default `Ability` with
+`return 1` and **no diagnostic**. So one spliced delta does not corrupt one
+ability — it makes **every slice from that index onward** decode as an empty
+default, silently. `494 = 985 - 491`. That is a splice at slice 491, and it is
+why nothing noticed for a whole project: the engine is memory-safe
+(`rb_bc_slice` returns NULL rather than reading past the end), so the only
+symptom is 494 abilities quietly becoming `Ability::default()`.
+
+**THE SEMANTIC COMPARISON SHOULD WAIT. Stated plainly: yes, wait.** Not for
+difficulty and not for want of a decoder — `rb_decode_ability` exists and walks
+the same object form — but because it would be **RED ON ARRIVAL for something
+that is not a defect**, and now with the skew measured from the two artifacts
+rather than quoted from a report:
+
+| | Rust (`cards/build/generation_manifest.json`) | C (committed tables) |
+|---|---|---|
+| payload bytes | `output.bytes` **98733** | `RBKA_BYTECODE_LEN` **98737** |
+| interned strings | `output.interned_strings` **6030** | `RBKA_NUM_STRING_OFFSETS - 1` **6032** |
+
+**4 bytes and 2 strings**, with slices 325 and 805 as the two encoding changes.
+A deep-compare written today reports those as failures, and a suite whose
+failures are known-not-bugs is a suite that trains its readers to ignore it.
+The order is: (1) one `tools/regen_all.sh` run so `cards/build` and the committed
+C tables come from the same pass — `tools/guard_data_blob.sh` exists because
+doing it in two steps byte-splices the unseparated interned pool; (2) re-point or
+retire the three Rust tests pinning the old encoding; (3) enable the oracle **in
+the same commit as (1)**.
+
+**THE SHAPE GUARD IS NECESSARY BUT NOT SUFFICIENT, and the gap is exactly one
+failure mode.** A splice that keeps every offset and every `0x08` tag and
+corrupts only the bytes *within* slices is invisible to this file, to
+`test_artifacts_consistent`'s offsets, and to every count above. Only the
+semantic comparison sees it. So the two are not alternatives: the shape guard is
+what can be landed today, the semantic comparison is what makes the pair
+complete, and the guard prints the skew on every run (section 4) so the deferral
+has a **visible end condition** rather than becoming a permanent omission.
+
+## ITEM 4 — `build.rs:325`. CONFIRMED A NO-OP TODAY, BY HAND, WITHOUT `cargo`.
+
+All four staleness checks re-measured at HEAD `5ce311e6`:
+
+| check | measured | verdict |
+|---|---|---|
+| `:268-275` `abilities_time < cards_time` | `cards/abilities.json` 2026-10-04T05:54:18.173Z vs `cards/cards.json` 2026-09-29T03:34:22.197Z | NEWER, no stale |
+| `:276-283` `abilities_gen` older | `engine/src/ability/abilities_gen.rs` 2026-10-04T05:54:20.413Z | NEWER (by 2.24 s), no stale |
+| `:288-299` manifest digest | manifest holds `"sha256": "4753ff27e561e7db"`; `sha256(cards/abilities.json)[..16]` = `4753ff27e561e7db` | MATCH, no stale |
+| `:313-320` `abilities.bin.z` older | `cards/build/abilities.bin.z` 2026-10-04T05:54:20.293Z | NEWER, no stale |
+
+⇒ `stale == false` ⇒ the uncommented panic **would not fire**. No-op now,
+tripwire later. (`cards/build/generation_manifest.json` also records
+`"engine_commit": "5ce311e6"`, matching the HEAD measured.)
+
+**THE SHARPER POINT, NOW MEASURED INSTEAD OF ASSERTED.** Every one of those four
+checks compares a file against another file **inside the Rust generation chain**:
+`../cards/cards.json`, `../cards/abilities.json`, `src/ability/abilities_gen.rs`,
+`../cards/build/generation_manifest.json`, `../cards/build/abilities.bin.z`.
+Not one of them names `engine_c_wip/src/core/generated/bytecode_blob.c`,
+`gen_data.c`, `src/abilities_strings.bin`, or any C file at all. So it cannot
+detect the C/Rust skew — and the manifest proves the skew is **live right now**
+while all four checks report fresh: the Rust tree is on 98733 bytes / 6030
+interned strings, the committed C tables are on 98737 / 6032.
+
+**Items 3 and 4 together are the missing tripwire; either alone is not.** Item 4
+alone keeps the *Rust* chain honest and is blind to the C by construction. Item 3
+alone pins the C table's internal shape and is blind to which *generation* it is
+from — it is green today, and it is green across the skew on purpose, which is
+also why it needs item 4's manifest numbers printed beside it to be readable as
+a deferral rather than as a pass. The tripwire needs both ends: a C-side gate
+that says "this table is well formed" **and** a manifest that says "…and it is
+this generation", compared against each other. Nothing in the tree compares them.
+
+## THE REGRESSION ITEM 1 CAUSED, AND THE THIRD DEFECT IT EXPOSED
+
+**Stated plainly, because it is a regression and not a clean win.**
+`tests/test_parity_zone_source.c` goes **70 -> 78 `^FAIL`** (+8). `^FAIL` for the
+whole corpus goes **4048 -> 4056**. PASSED count is **unchanged at 50**;
+`parity_choice_routing` is green in both. The +8 is entirely
+`pending_seat(&tg)` (`test_parity_zone_source.c:259`), which reads the getter
+directly with no `has_pending` gate of its own, and five of the eight are
+`got -1 expected 0|1`.
+
+**Root cause, measured not guessed.** `rb_emit_choice`
+(`src/ability/choice.c:5711-5716`) stamps the entry **only** when a live entry
+exists:
+
+```c
+if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+    RbChoice ch = g->queue.pending;  ch.actor = actor;
+    rb_queue_pause_for_choice(g, &ch);      /* <-- this is what stamps */
+    g->queue.actor = actor;
+}
+g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+```
+
+so a choice emitted while the queue is Idle reaches the reader unstamped, and a
+faithful reader reports None. Three of the eight are
+`rb_move_live_to_success_and_handle_wins` prompts, and there the divergence is a
+**real, separate C defect** — see below.
+
+**`coverage_gate` moved 151 -> 5 `^FAIL` and that is NOT a result.** It is a
+meta-suite that walks `tests/*.log` while `run-all-tests` is still writing them,
+so its count is a function of corpus progress, not of any suite. Run on the
+settled corpus it reports **654 checks, 5 failures**; in the baseline it read
+**151**. Its verdict is **FAILED in both runs**. Do not quote its count as a
+before/after number.
+
+### THIRD DEFECT, FOUND BY THE FIX, NOT LANDED — `live.rs:1576-1578` has no C counterpart
+
+Rust's `pause_success_zone_choice`, `engine/src/turn/live.rs:1570-1579`:
+
+```rust
+game_state.ability_queue.pause_for_choice(choice);
+if let Some(entry) = game_state.ability_queue.current_entry_mut() {
+    entry.choice_player_id = Some(player_id.to_string());
+}
+```
+
+Two statements, and the second is the one that matters: it stamps the
+**answering** player onto whatever entry is current, **including the dummy one
+`pause_for_choice` mints for the Idle branch** (`queue.rs:367-409`, whose
+`player_id` is `""`).
+
+The C's fold of that function is `rb_try_take_success_zone_choice`
+(`src/turn/live.c:1393-1411`), and it has **no second statement**. It calls
+`rb_emit_choice(g, player_pl, ...)` — which declines to pause when there is no
+live entry — and then writes `g->queue.pending.actor = player_pl`, which is the
+**flat choice's** field, not the **entry's** stamp. So for a live-phase
+replacement prompt raised on a fresh queue:
+
+| | who answers, per `abilities.rs:2457-2469` |
+|---|---|
+| Rust | `Some("p1")` / `Some("p2")` — the dummy entry carries the stamp |
+| C, before this wave | the ACTIVE seat, read out of `queue.actor` |
+| C, after this wave | **`None` / `-1`** — faithful to the reader, wrong to the stamp |
+
+**⛔ `src/turn/live.c` is CONTESTED, so this is reported, not landed.** The fix is
+one statement after the `rb_emit_choice` call at `live.c:1403-1405`, mirroring
+Rust's `if let Some(entry) = current_entry_mut()`:
+
+```c
+int ci = rb_queue_current_entry(g);
+if (ci >= 0) {
+    RbQueueEntry *e = rb_queue_get_entry_mut(g, ci);   /* does not exist yet */
+    if (e) snprintf(e->choice_player_id, sizeof(e->choice_player_id),
+                    "%s", player_pl == 0 ? "p1" : "p2");
+}
+```
+
+⛔ Two dependencies it needs, both outside this task's files: there is **no
+`rb_queue_get_entry_mut`** in `include/rabuka.h` (only the `const`
+`rb_queue_get_entry` at the header, and the non-`const`
+`rb_queue_current_entry_mut` in `src/ability/ability_queue.c:184-190`), so
+either add the mutator or use `current_entry_mut` directly. **The token must be
+spelled `"p1"`/`"p2"`**, not `test_seat_id()` — that helper lives in
+`src/test_game.c` and is not linked into `$(WEB_TARGET)`.
+
+**Until that lands, the correct reading of the +8 is: 5 assertions in
+`test_parity_zone_source.c` are asserting the pre-fix behaviour of a reader that
+answered with `g->queue.actor`, and the suite's own `DIAG` proves it — it prints
+`ch->actor`, i.e. the flat choice's actor, and that line reads `seat=0` for a
+prompt whose `target_player_id` is `p2`. The remaining 3 are the live-success
+defect above.** No test was weakened, deleted or ignored to reach a number.
+
+---
+
+## ORPHANED-LOGIC WAVE (2026-10-04) — O1, O3 and the O2/D3 choice-context items
+
+**HEAD MEASURED: `5ce311e6`** (`git rev-parse HEAD`, taken at the top of this
+work and unchanged by it). Every file hash in this section was taken from the LIVE
+tree at that HEAD; the baseline was a snapshot of it, so it is a snapshot with
+only these hunks reverted, not git HEAD.
+
+| file | before | after |
+|---|---|---|
+| `src/turn/phase.c` | `022c09ef8ef1f423076d0c3c30b8f965cc977ec47e5d4033277de73718de0156` | see the LANDED table below |
+| `src/ability/effects/misc.c` | `1a329049b1d0718ec437c2c9b82c407fa50270470f731e9f26a0466ad24065b8` | " |
+| `src/ability/effects/rules.c` | `05675a19f00d610b84a05e7f35cf4b9ae30e12d2e08469faae92587f4d9670f6` | " |
+| `src/web_server.c` | `addcabf8ff7dbf26248fbc4e698273028b28b9f49d76bc01d008e134cea56293` | " |
+| `src/core/tracking.c` (READ ONLY, unchanged) | `5c286684f068cbef60041ebb5e959955312077b006fe4700d884224412ac73a2` | `5c286684f068cbef60041ebb5e959955312077b006fe4700d884224412ac73a2` |
+| `include/rabuka.h` (NOT MINE, unchanged by me) | `6259f1ed0fa6190ed6673a5adf8957d96b0cafab3d54a1cbd011dc4925fd0f82` | `6259f1ed0fa6190ed6673a5adf8957d96b0cafab3d54a1cbd011dc4925fd0f82` |
+| `src/core/tracking.c` — NOTE: the audit and the work order both spell the READ-ONLY file `src/ability/effects/tracking.c`. **That file does not exist.** The function is `src/core/tracking.c:38`. | | |
+
+Line endings, measured per file because a whole-file copy of the wrong kind
+CR-strips: `phase.c` is **MIXED** (245 CRLF / 1973 bare LF), `misc.c` `rules.c`
+`web_server.c` and `Makefile` are pure LF, `include/rabuka.h` is pure CRLF. Every
+edit was applied with `edit` and every inserted line uses the dominant ending of
+its own region.
+
+### MEASUREMENT THAT DECIDED THE SCOPE, before any code was written
+
+`nm -f posix` over all 49 `OBJ_LIB` objects at the baseline (2125 defined symbols,
+516 undefined references):
+
+| symbol | defined in | referenced by another `src` object |
+|---|---|---|
+| `rb_rules_execute_restriction` | `rules.o` | **NO** |
+| `rb_rules_cannot_activate_player` | `rules.o` | **NO** |
+| `rb_rules_is_wait_immune` | `rules.o` | **YES** (`state.c:391`, `state.c:492`) |
+| `rb_reset_keyword_tracking` | `tracking.o` | **NO** |
+| `rb_inject_choice_ability_context` | `game_state_abilities.o` | **NO** |
+| `rb_ability_debug_set` | `debug.o` | **NO** |
+| `rb_rules_take_changed_state_members` | `rules.o` | YES — the precedent for the two-file split |
+
+## LANDED
+
+### O1 — `rb_reset_keyword_tracking` had no production call site. **LANDED.**
+
+**`src/turn/phase.c`, first statement of the `if(g->phase==RB_PHASE_ACTIVE)`
+arm** — which is the C's fold of `Phase::Active` in
+`engine/src/turn/phases.rs:94-99`, where Rust's `game_state.reset_keyword_tracking()`
+is the FIRST line of the arm.
+
+**⛔ THE AUDIT'S PATCH POINTER IS STALE AND WAS NOT FOLLOWED.** The order said
+"before `phase.c:655`". At this HEAD `:655` is inside a COMMENT BLOCK, the
+bookkeeping it described moved, and `P->deck_refreshed_this_turn = 1` now lives at
+`phase.c:725` inside `rb_player_refresh`. The correct insertion point was derived
+from Rust's semantics, not from the line number: Rust's reset is on ENTRY TO EACH
+PLAYER'S ACTIVE PHASE, i.e. twice per round, and this arm is that entry. Placing
+it in the victory rollover instead would clear these trackers ONCE PER ROUND,
+which is a weaker scope than Rust's and is exactly what
+`o1_second_active_entry_in_the_same_round` exists to catch.
+
+Coverage of every production driver, which is why this location and not another:
+`rb_advance_phase` is the one entry all of them use — `src/main.c:97`/`:102`
+(interactive), `src/main.c:134` `rb_turn`, `src/engine.c:1550` (web).
+
+`src/core/tracking.c` was **not** edited, as instructed.
+
+**TEST: `tests/test_parity_orphan_producers.c`,
+`o1_active_entry_resets_the_keyword_trackers` +
+`o1_second_active_entry_in_the_same_round`.** 7 assertions, all on the PRODUCTION
+entry `rb_advance_phase`, each with a negative control that names the tracker as
+one the round rollover does **not** clear, so a passing assertion cannot be
+credited to the wrong step. `PL!S-bp2-022-L` 「{{ライブ成功時}}このターン、自分の
+デッキがリフレッシュしていた場合、このカードのスコアを＋２する。」 is cited in the
+failing assertion because that card is what the reset is for.
+
+### O3 — the only producer of a live reader's input. **LANDED, ONE ARM OF TWO.**
+
+**`src/ability/effects/rules.c`** — the `cannot_wait_by_effect` scan was extracted
+verbatim out of the uncalled twin `rb_rules_execute_restriction` into the
+exported `rb_rules_record_wait_immune_by_effect`, and the twin now calls it. One
+function, two callers, no duplication.
+**`src/ability/effects/misc.c`** — the live `h_restriction` calls it in its
+`cannot_wait_by_effect` arm. ⛔ **NOT a delegation**: `h_restriction` stays the
+live handler and keeps the arms the twin does not have. `misc.c`'s own comment at
+`:1049-1053` ("none of rules.c's wait_immune list") is now obsolete and was
+replaced with the measurement.
+**`src/ability/effects/rules.c` + `src/turn/phase.c`** —
+`rb_rules_clear_turn_state(g)` is the per-round clear, called from the rollover
+next to `player_cannot_activate`. This is the symbol `phase.c` and `live.c` have
+been asking for in tombstone comments since 2026-10-03, and both of those
+tombstones were written against a definition that did not exist.
+
+**⚠ THE CLEAR IS NOT OPTIONAL AND THAT IS WHY IT IS IN THIS ROW.** The reader
+`rb_rules_is_wait_immune` carries **no turn stamp**. A writer without the clear
+would latch the list for the rest of the match — trading a check that can never
+fail for one that can never stop being true. Rust empties it at
+`phases.rs:281`; so does the C now.
+
+**TEST: `o3_wait_immune_is_produced_on_the_live_path` +
+`o3_the_rollover_clears_the_list`.** The producer is driven by
+`test_play_to_stage_for` — the real card, real 登場, real queue, real
+`h_restriction`. Fixture: **`PL!S-bp7-003-{P,P＋,R＋,SEC}`** 松浦果南 is the ONLY
+`cannot_wait_by_effect` in the corpus (1 unique ability / 4 pairs / 4 cards),
+`blade_limit 3`, `<=`, `original_value true`, group `Aqours` — which
+`src/ability/util.c:461` resolves as a **series** name
+(`strstr(series, "サンシャイン")`), so the victim fixture is
+`PL!S-bp2-009-P` 黒澤ルビィ, original blade 1, inside the limit.
+
+**⛔ THE BRIEF'S `PL!SP-bp4-011-*` HALF IS NOT IN THE TEST, AND CANNOT BE.**
+Measured over `cards/abilities.json`: `PL!SP-bp4-011-{P,P＋,R＋,SEC}` is a
+`change_state` / `state: wait` / `target: opponent` node with **no `action_by`
+key**, and the reader the fix makes live sits at `state.c:385-387` behind
+`action_by == "opponent"`. So that card never reaches the filter, before or after
+this patch. The **3** abilities that do reach it are `PL!-bp4-009-{P,R}`,
+`PL!-pb1-015-{P＋,R}` and `PL!HS-bp6-007-{P,R}`, all
+「相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする」 (Q275).
+The 48-ability forced-wait family is what those three filters choose from.
+
+### D3 — `rb_ability_debug_set` had no production writer. **LANDED.**
+
+**It IS a real gap, and it is one line wide.** Rust's *only* production writer is
+`engine/src/game/web_server.rs:3652-3655`, the first statement of
+`run_web_server_with_ngrok`:
+
+```rust
+if std::env::var("RABUKA_RULE_LOG").as_deref() == Ok("1") {
+    crate::ability::debug::set_debug(true);
+}
+```
+
+The C's `src/web_server.c` read no environment variable at all. Now it does, same
+var, same comparison, same one-shot-at-startup placement, before `rb_load`.
+Rust's other ability-debug reader is `ABILITY_DEBUG_BATON_TOUCH`
+(`ability/condition/state.rs:617`), a separate flag with its own accessor, and is
+deliberately not touched.
+
+### O2 — the choice UI. **LANDED IN SOURCE, NOT REACHABLE BY ANY SUITE.**
+
+`src/web_server.c` now calls `rb_inject_choice_ability_context` from
+`append_pending_choice` and merges `card_no` / `ability_text` / `card_name` /
+`card_id` into the pending_choice object flat, as `get_pending_choice_json`
+merges it; and it runs **Rust's seat-leak filter verbatim**
+(`web_server.rs:1240-1249`, dropping the whole object when `choice_player_id` is
+missing or names anybody but the requester). The requester is now a named value
+(`requester_player_id`) used by BOTH the filter and `ui_config.perspective_player`,
+so the perspective the client is told about and the perspective the choice is
+filtered against cannot drift.
+
+⛔ **STILL UNREACHABLE, AND THE MAKEFILE IS THE COORDINATOR'S.**
+`src/web_server.o` is linked only into `$(WEB_TARGET)` (`Makefile:101-102`) and
+never into `OBJ_LIB`, so no `tests/test_*.c` binary can link a symbol defined
+there. **The change needed is to the `OBJ_LIB` recipe, which I did not make.**
+Until then this fix has no suite, and `parity_orphan_producers`'s O2 case asserts
+only what a suite *can* see: the producer's own value (which seat it reports),
+not its reachability.
+
+## VERIFIED-NOOP
+
+### O3's second arm, `cannot_activate_members`. **NOT LIFTED — MEASURED.**
+
+The brief asks for both `wait_immune` and `cannot_activate_members`. The first is
+a real orphan. The second is not, and lifting it would have created a **dead
+write** — the defect this wave is about:
+
+* its reader `rb_rules_cannot_activate_player` (`rules.c:2338`) has **zero
+  callers tree-wide** (`nm`, above);
+* the behaviour is **already shipped** through the GameState fold
+  `GameState.player_cannot_activate[2]` — written by the LIVE handler at
+  `misc.c:1118` and read at `state.c:235`, which is the C's fold of Rust's ONE
+  production reader `engine/src/ability/effects/change_state.rs:310-317`, plus
+  `engine.c:460` and `engine.c:1453`.
+
+So `cannot_activate` is not missing; it is filed in the wrong place, and
+`phase.c:582`'s "zero callers" note is the correct reading.
+
+### D2 — `card_total_hearts`, three copies. **CONFIRMED: 3 copies, 2 of them live.**
+
+| # | location | linkage | callers |
+|---|---|---|---|
+| 1 | `src/ability/effects/state.c:2044` | **exported**, `int rb_card_total_hearts(const Card *)` | 3 test files only (`test_parity_card_identity`, `test_parity_full_round3`) |
+| 2 | `src/ability/condition.c:4011` | `static` | `:2920`, `:4101`, `:4107`, `:4114` — **LIVE** |
+| 3 | `src/ability/util.c:863` | `static` | `:1872` — **LIVE** |
+
+Recorded so that any future Q149/Q172 fix lands three times. Consolidating is a
+separate, risky change and is **not** attempted here: all three files are
+contested or test-owned.
+
+### D4 — `rb_card_filter_subset`. **CONFIRMED HARMLESS; THE FIX IS A COMMENT DELETE.**
+
+`include/rabuka.h:2715-2723` is a comment block whose prose narrates a
+`#define` that no longer exists; the `#define` text at `:2716` is **inside that
+comment**, so there is no live macro and nothing is shadowed. The only live
+definition is the `static inline` at `:2724`. **The exact removal is
+`include/rabuka.h` lines 2715-2723 — nine lines, comment only, no code.** It is
+safe: the block contains no `/*` (the `-Wcomment` hazard the Makefile header
+warns about), `include/rabuka.h` has no `WARN_AUDIT_BASELINE` entries, and a
+comment delete cannot move `sizeof(GameState)`. Not landed — the file is not mine.
+
+## THE FOURTH ORPHAN FOUND WHILE MEASURING, REPORTED NOT LANDED
+
+`cannot_live` is the same defect as O3 and is **not** in the work order:
+`RbRulesState::cannot_live_players[2]` is written only by the uncalled
+`rb_rules_execute_restriction` (`rules.c:1926`), while its reader
+`rb_rules_cannot_live_player` (`rules.c:2328`) is **live** — called from
+`src/turn/triggers.c:336` and `src/turn/live.c:646`. So the reader always answers
+0, which is the Q68 / checklist item I2 defect, and it is a fourth instance of the
+audit's own finding D6. It is NOT fixed here: `triggers.c` and `live.c` are
+contested, and wiring that writer is I2's, not this wave's.
+
+## REGRESSION THIS WAVE CAUSED
+
+**`parity_per_card2`: 14 → 16 failures. Two, both from O1, both attributed by
+isolation build.** `orph5` = baseline + O3 only → `parity_per_card2` = **14**,
+identical to baseline, so O3 moves nothing in that suite and the two extra
+failures are O1's. `g->live_success[0/1]` is cleared in exactly one place in the
+tree — `src/core/tracking.c:56-57`, inside `rb_reset_keyword_tracking` — which
+only the new O1 call site now reaches.
+
+* `e2 PRECONDITION: p1's live SUCCEEDED … (phase=5 success=0)`
+* `e2_bouken_gained_draws`
+
+**MECHANISM, AND IT IS NOT A WEAKENING TO "FIX" IT.** `advance_to_live_success`
+in that suite walks up to 10 `test_pass` steps and ends at `phase=5`
+(`RB_PHASE_ENERGY`) — i.e. it crosses a **round boundary**. It then asserts a
+per-turn flag. Before the fix the flag LATCHED, so the assertion read a value from
+the previous round; after the fix it is correctly cleared at the round's own
+Active entry, exactly as `phases.rs:98` clears it in Rust. The gained ability's
+ライブ成功時 dispatch had already fired in that earlier round and cannot fire
+again, which is correct engine behaviour.
+
+**`tests/test_parity_per_card2.c` WAS NOT EDITED.** It is not in this task's file
+list and `tests/**` is largely contested, so this is reported with the fix named
+instead: `advance_to_live_success` must return as soon as the ライブ成功時 dispatch
+is seen **in the round that produced it**, the same way
+`advance_to_live_start`/`advance_to_live_set` are bounded, rather than walking a
+fixed 10 steps. **No test was weakened, deleted or ignored to reach a number.**
+
+## THE OTHER SUITE THAT MOVED, AND WHY IT IS NOT A REGRESSION
+
+`coverage_gate` 164 → 165, from exactly one new line:
+`G1 manifest-vs-glob: tests/test_parity_orphan_producers.c has no
+tests/parity_orphan_producers.log`. **This rule is already failing 162 times at
+baseline** — `make t` does not write `tests/*.log`; only `make run-all-tests`
+does, and that target was not run in the shared tree. At baseline the same suite
+also emits the two meta failures `G4/G5: there are NO tests/*.log files` and
+`G5: zero suites reported PASSED`. The +1 is the new file meeting a pre-existing
+red rule, and a `run-all-tests` pass would clear all 165 at once.
+
+## GATES AND THE FULL RUN
+
+| measurement | baseline (snapshot, only these hunks reverted) | after |
+|---|---|---|
+| suites | 164 | **165** (the new one) |
+| `FAIL:` lines (case-sensitive, stdout + stderr) | 3923 | **3926** |
+| suites `FAILED:` / `PASSED:` | 113 / 51 | 113 / **52** |
+| build-red / no-verdict | 0 / 0 | 0 / 0 |
+| `make check-suite-names` | PASSED | **PASSED** (165 suites, 47 names) |
+| `make warnings-audit` | **RED** — 2 NEW + 2 STALE, both `src/core/game_state_core.c:883`/`:962` vs pins `:868`/`:947` | **PASS — 12 diagnostics, all pinned, 0 new** |
+| `src/abilities_strings.bin` | 726831 B / `89204df0bbde08a0…` | **726831 B / `89204df0bbde08a0…`** |
+| `src/cards.bin` | 631890 B / `728208504fee6217…` | **631890 B / `728208504fee6217…`** |
+
+**⚠ THE GATE TURNED GREEN, AND IT WAS NOT THIS WAVE.** The four
+`game_state_core.c` records moved because that file changed underneath
+(`src/core/game_state_core.c` is contested and was already listed modified when
+this wave started). **This wave's contribution to the gate is: zero.** The proof
+is that all five `rules.c` pins — `215`, `261`, `895`, `1398`, `1601`, cluster-W
+rows FT-1..FT-5 — still match, which is why the new rules.c functions are placed
+AFTER line 1601 and why a peer's file-scope forward declaration for
+`rb_rules_record_wait_immune_by_effect`, which had been added at `rules.c:39-43`,
+was **moved down to `rules.c:~1862`**: at `:39` it would have shifted all five
+pins by +5 and manufactured five NEW plus five STALE records out of a comment.
+
+## THE NEGATIVE CONTROL, PROVEN NOT ASSERTED
+
+`orph3` = the baseline snapshot with **only these four hunks reverted** and
+`tests/test_parity_orphan_producers.c` byte-identical to the version that passes:
+
+```
+FAILED: parity_orphan_producers [exit=1, 12 result line(s) …]
+8 failed  —  o1_active_entry_resets_the_keyword_trackers
+             o1_second_active_entry_in_the_same_round
+             o3_wait_immune_is_produced_on_the_live_path
+             o3_the_rollover_clears_the_list
+PASSED:   parity_orphan_producers [exit=0, 0 result line(s)]   (with the fixes)
+```
+
+Every one of those four functions drives a production entry point; none calls the
+function under repair directly, which is the failure mode that let O1 and O3
+survive an audit in the first place.
+
+## NEW EXPORTS CREATED BY THIS WAVE — STATED EXPLICITLY, BECAUSE THIS IS HOW THE CLASS GROWS
+
+**Two, and both are production-called from `src/`, not from `tests/`:**
+
+| symbol | defined | production caller |
+|---|---|---|
+| `rb_rules_record_wait_immune_by_effect` | `rules.c` | `src/ability/effects/misc.c` (`h_restriction`) **and** `rb_rules_execute_restriction` |
+| `rb_rules_clear_turn_state` | `rules.c` | `src/turn/phase.c` (the rollover) |
+
+`nm` over all 49 `OBJ_LIB` objects at the after snapshot confirms both are
+referenced by another `src` object. **No TEST-ONLY export was created.** The
+prototypes for both are declared **file-scope in the consuming `.c`** — not in
+`include/rabuka.h`, which is the coordinator's file and which is unchanged.
+The suite declares `rb_rules_is_wait_immune` the same way `src/ability/effects/state.c:25`
+already does; that declaration is a `BLOCKED-ON` for the header, not a new symbol.
+
+## WHAT THIS WAVE DID NOT DO, ON PURPOSE
+
+* `src/core/tracking.c` — READ ONLY, hash unchanged.
+* `include/rabuka.h` and the `Makefile` — not mine, not edited.
+* `src/ability/effects/state.c` — the reader site is already correct; the C's
+  `cannot_activate` reader at `state.c:235` was left exactly as found.
+
+---
+
+# WAVE: the 224 dead globals that have a Rust twin — ALL ADJUDICATED
+
+**2026-10-04.** Full write-up, with a row per function and every measurement,
+in **`CENSUS_dupes2.md`**. Summary of the tally:
+
+| verdict | count over the 219 measured | action |
+|---|---|---|
+| DEAD-IN-RUST-TOO | **31** | tombstoned |
+| **DEAD-WRONG** | **6** | **4 fixed faithfully, 2 deleted + tombstoned** |
+| DEAD-CORRECT | **182** | tombstoned as faithful |
+| WIRE IT | **0 landed** | 1 missing engine path found, now closed |
+
+6 + 31 + 182 = 219, **zero rows unclassified**. The 219 is a fresh measurement,
+not the census's 224: `CENSUS_wiring.md` is stale (`rb_rules_execute_forget`,
+quoted there as a live example, no longer exists in `src/` or `include/`), and
+its per-file counts do not reproduce. `TEST_ONLY_AUDIT.md` was **not** redone;
+the 141 test-named rows in these files are listed in `CENSUS_dupes2.md` §10 and
+excluded from the denominator.
+
+## DEAD-WRONG — the six, and what each one got wrong
+
+| function | file | the divergence | action |
+|---|---|---|---|
+| `rb_card_property_str` / `rb_card_property_from_str` | `core/card.c` | Rust `CardProperty` has **four** variants (`card.rs:2750-2785`); the C tables had three. `has_draw_icon` (3) round-tripped to 0 = `has_blade_heart`. **`abilities.json:13305` carries it — 1 of 49 `card_property` nodes.** The live path bypasses the tables (`rb_check_card_property` matches the raw string), which is why nothing fired. | **both arms added** |
+| `rb_energy_add_active` | `core/zones.c` | `saturating_add` is on a **`u8`** (`zones.rs:682-684`) so Rust clamps at 255; the C clamped only the lower bound and `RbPlayer.energy_active` is **`int`** (`rabuka.h:800`). | **upper clamp added** |
+| `rb_player_draw_energy` | `core/zones.c` | **three** defects vs `player.rs:585-591` + `zones.rs:718-722`: appended at `energy.n` instead of inserting at the active boundary (corrupts the active prefix when energy is waited — the exact thing Rust's comment forbids); **drew before the capacity test, so a full zone DESTROYED the card**; no `u8` saturation. | **rewritten faithfully** |
+| `rb_play_card` | `engine.c` | no Rust twin. Any non-member — **energy included** — went to `P->live`; the live path ran **no live-card rule at all**; "first free stage slot" is a policy Rust does not have (`phases.rs:1260-1271` takes an explicit area). | **deleted + tombstoned** |
+| `heart_color_of` | `engine.c` | no Rust twin. Mapped `"b_all"` → index 7; Rust's `heart_color_table!` (`card.rs:4460-4476`) has `BAll => "b_all", 0` and `All => "all", 7` — the **blade wildcard collapsed into the all-colours wildcard**. `"b_all"` appears 0× as a quoted value in `abilities.json`. | **deleted + tombstoned** |
+| `rb_try_phase4` / `rb_try_all_distribution` | `turn/live.c` | exported shapes that cannot be written faithfully (no pool, no allocations, no deficit list); `rb_try_all_distribution` is a bare `return 0`. The **faithful ports are live and file-local** (`rb_backtrack_allocate → bt_search → bt_try_surplus → bt_try_*`). | prior adjudication **upheld**, not re-adjudicated |
+
+**Coverage: `tests/test_parity_dead_twins.c`, 47 assertions, 0 failures.** New
+suite; no existing test weakened, deleted or ignored.
+
+## MISSING ENGINE PATH — one, now closed
+
+`rb_ability_debug_set` (see D3 above, landed by a peer at `web_server.c:883-886`).
+**Verified working**, and the `web_server.c` JSON sweep is **CLEAN as a code
+guarantee, not a data-shape dependency**: `json_string()` (`web_server.c:76-88`)
+escapes `"`, `\`, `\n`, `\r`, `\t` and every C0 control as `\u00xx`, and
+`c.name` is routed through it at `:117`. The only two `snprintf("%s")` into a
+json-ish buffer are a fixed key at `:365` and a filesystem path at `:837`.
+
+## `alloc_counter.c` — TOMBSTONED, NOT WIRED
+
+34 exports, 780 lines, in neither `SRC` nor `OBJ_LIB`. Rust's
+`alloc_counter.rs` is **unreachable in every default build**:
+`lib.rs:58-59` gates the module behind `#[cfg(feature = "alloc_tracker")]` and
+`alloc_tracker` is **not** in `Cargo.toml`'s `default` feature set, so
+`lib.rs:94-99` installs plain `std::alloc::System`; the only library call site
+(`core/game_state/abilities.rs:1917-1919`) is itself feature-gated; and the
+readers `alloc_count()`/`alloc_buckets()` are double-gated behind
+`timer::Timer`, itself `#[cfg(feature = "profiling")]`, whose **five** library
+call sites all compile out. Already recorded independently at
+`AUDIT_core_state.md:799`. **No `rabuka.h` prototypes are requested**; the
+paste-ready block is in `CENSUS_dupes2.md` §4 for the record only.
+
+Compile matrix, measured: `-std=c99`/`c11`/`c17` compile with **0 warnings**;
+`-std=c2x` fails on `ATOMIC_VAR_INIT` (C23 removed it). The project builds
+`-std=c11`, so that was never the reason for the verdict.
+
+## `card_total_hearts` — three copies, all semantically identical. RECORDED.
+
+`effects/state.c:2044` (global, `tests/` only, **no `src/` caller**),
+`ability/condition.c:4011` (static, **4 live**), `ability/util.c:863` (static,
+**1 live**). All three implement `card.rs:4370-4379` correctly and clamp by
+`n_hearts`; the null guard on the global copy has no Rust counterpart (Rust
+cannot return -1, and an older port did, making running aggregates go DOWN).
+**New defect found:** all three comments cite the Rust twin at the **wrong
+line** (`4194-4202` / `4263-4271`; it is at **`4370-4379`**). **Not consolidated** —
+all three files are in the DO NOT EDIT fence; each static body would just call
+the exported `rb_card_total_hearts`. The new suite now pins the shared
+semantics, so a Q149/Q172 fix landing in only some copies fails there.
+
+## BEFORE / AFTER
+
+`make clean` before both builds; 165 → **166** suites; `^FAIL` counted
+case-sensitively with **no colon**, stdout **and** stderr, strictly sequential.
+
+| | before | after | delta |
+|---|---|---|---|
+| suites | 165 | **166** | +1 (new suite) |
+| **`^FAIL` (no colon)** | **1 348** | **1 348** | **0** |
+| `^FAIL:` | 2 814 | 2 815 | +1, **entirely `coverage_gate`** (not a metric) |
+| GREEN | 55 | **56** | +1 |
+
+**No regression.** `coverage_gate`'s single line is its manifest-vs-glob gate
+counting the one new `tests/test_*.c` with no `tests/*.log`
+(`sources=165 → 166`). `zone_filter_parity` was recorded `BUILD_RED` because the
+harness timeout killed the runner mid-link and left a 0-byte log; re-run
+standalone it compiles, runs, prints `ALL ZONE AND FILTER CHECKS PASSED` and
+emits **0** `^FAIL` lines — that row was corrected from a measured re-run.
+
+## MEASUREMENT TRAPS THAT FIRED ON THE MEASUREMENT ITSELF
+
+Two of my own instruments were wrong **in the direction that makes work look
+unnecessary**, which is the failure mode the brief warns about. Full detail in
+`CENSUS_dupes2.md` §0:
+
+1. `-Wl,--gc-sections` **does nothing on PE/COFF** — it reported 0 dead of
+   1 433 because `-ffunction-sections` emits `.text$name` and the linker option
+   is ELF-only. Method discarded.
+2. `re.sub(r"/\*.*?\*/", " ", src, flags=re.S)` **is not a C lexer**: it opens a
+   false `/*` at `y/*p`, and the non-greedy match swallows the rest of the file.
+   Measured on `src/turn/phase.c`: **2 309 lines in → 547 out**, destroying all
+   three intra-TU call sites of `rb_backtrack`. Replaced with a character-wise C
+   lexer. A third defect — excluding the whole defining TU from the intra-TU map
+   — was a 100 % false-positive rate on that axis.
+3. A 14-row random sample of the final actionable set was re-verified by eye
+   against raw `grep`: **14/14 correct**.
+* No generator was run. No `.o` or `rb_engine*` was left in the live tree.

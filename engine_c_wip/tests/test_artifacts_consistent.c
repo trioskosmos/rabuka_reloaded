@@ -62,11 +62,18 @@ extern int rb_verify_generated_tables(int *out_bad_strings, int *out_bad_keys,
 
 static int g_fail = 0, g_checks = 0;
 
+/* Result lines start at COLUMN 0 with the canonical `FAIL: ` prefix, not with
+ * the indented `  FAIL  ` this suite used to print. tools/verdict_runner.c
+ * only rewrites a prefix that begins the line, so the indented form was
+ * invisible to every `^FAIL` count in the project: a build-gate failure in
+ * this file would have shown up as a red suite but never as a failure line. A
+ * gate whose failures nobody can count is how §6 below stayed invisible for two
+ * generations. */
 static void ck(int cond, const char *what) {
     g_checks++;
     if (cond) return;
     g_fail++;
-    printf("  FAIL  %s\n", what);
+    printf("FAIL: %s\n", what);
 }
 
 /* FNV-1a 32, resumable. MUST match fnv1a() in tools/gen_from_rs.py and
@@ -76,6 +83,81 @@ static void ck(int cond, const char *what) {
 static uint32_t fnv1a32_resume(uint32_t h, const unsigned char *p, size_t n) {
     for (size_t i = 0; i < n; i++) { h ^= (uint32_t)p[i]; h *= 0x01000193u; }
     return h;
+}
+
+/* ── the cross-generation readers (section 6) ──────────────────────────────
+ * A whole-FILE digest, over bytes read straight off disk, not through the
+ * interned pool. That distinction is the point: the pool is what a stale offset
+ * table silently mis-slices, so hashing through it can only ever re-derive the
+ * island. Hashing the file itself compares the two artefacts as bytes. */
+static int fnv1a32_file(const char *path, uint32_t *out_h, unsigned long *out_n)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0;
+    uint32_t h = 0x811C9DC5u;
+    unsigned long total = 0;
+    unsigned char buf[65536];
+    size_t got;
+    while ((got = fread(buf, 1, sizeof buf, f)) > 0) {
+        h = fnv1a32_resume(h, buf, got);
+        total += (unsigned long)got;
+    }
+    fclose(f);
+    *out_h = h;
+    *out_n = total;
+    return 1;
+}
+
+/* generation_manifest.json, slurped once. Static and bounded rather than
+ * heap- or stack-allocated: this tree already overflows a 1 MB stack on a
+ * GameState local, and a manifest is a few KB of JSON that no honest run
+ * approaches this cap. A truncated read is treated as no manifest at all. */
+static char g_man[1 << 19];
+static size_t g_man_len;
+
+static int load_manifest(void)
+{
+    static const char *const PATHS[] = {
+        "../cards/build/generation_manifest.json",
+        "cards/build/generation_manifest.json",
+        "../../cards/build/generation_manifest.json",
+        NULL
+    };
+    if (g_man_len) return 1;
+    for (const char *const *p = PATHS; *p; p++) {
+        FILE *f = fopen(*p, "rb");
+        if (!f) continue;
+        size_t got = fread(g_man, 1, sizeof g_man - 1, f);
+        fclose(f);
+        g_man[got] = '\0';
+        g_man_len = got;
+        return 1;
+    }
+    return 0;
+}
+
+/* First unsigned integer following "key", searching only at or after `from`.
+ * Callers pass the offset of "c_artifacts" so the search cannot wander into the
+ * sibling `output` block, which carries its own interned_strings. Returns 0 for
+ * "key absent or carries no number", and every caller in section 6 treats 0 as
+ * a FAILURE -- a digest that was never recorded is not a digest that matched. */
+static unsigned long long man_u64(size_t from, const char *key)
+{
+    char needle[128];
+    int nl = snprintf(needle, sizeof needle, "\"%s\"", key);
+    if (nl <= 0 || (size_t)nl >= sizeof needle) return 0;
+    if (from >= g_man_len) return 0;
+    const char *p = strstr(g_man + from, needle);
+    if (!p) return 0;
+    p += nl;
+    while (*p && (*p < '0' || *p > '9')) p++;
+    if (!*p) return 0;
+    unsigned long long v = 0;
+    while (*p >= '0' && *p <= '9') {
+        v = v * 10u + (unsigned long long)(*p - '0');
+        p++;
+    }
+    return v;
 }
 
 int main(void) {
@@ -165,7 +247,7 @@ int main(void) {
         }
         if (!found) {
             missing++;
-            printf("  FAIL  key \"%s\" absent from the pool (spliced under skew)\n",
+            printf("FAIL: key \"%s\" absent from the pool (spliced under skew)\n",
                    KEYS[i]);
         }
     }
@@ -184,15 +266,134 @@ int main(void) {
            "bytecode_blob.c length == sum(RBKA_OFFSET_DELTAS)");
     }
 
+    /* ── 6. THE CROSS-GENERATION GATE ─────────────────────────────────────
+     *
+     * EVERYTHING ABOVE IS AN ISLAND, AND THAT IS THE WHOLE DEFECT.
+     *
+     * Sections 1-5 compare the compiled-in tables (gen_data.c) against the blob
+     * `rb_load("src")` happened to open. On 2026-10-04 that pair was the STALE
+     * generation -- src/abilities_strings.bin at 726831 bytes, matching a stale
+     * gen_data.c at 726831 -- so all of it passed and this suite printed "all
+     * digests match" while the tree carried two generations-old card data. The
+     * pool is UNSEPARATED, so a stale offsets table against a fresh blob is a
+     * silent byte splice and every internal check is happy with it.
+     *
+     * A self-consistency check can NEVER detect this class, because the two
+     * halves of the check move together. So this section reaches outside the
+     * island to the two things that are generated by the OTHER pipeline and
+     * committed independently:
+     *
+     *   (a) cards/build/abilities_strings.bin -- the blob the C tables were
+     *       MEANT to be generated from. Compared by LENGTH and by whole-file
+     *       FNV-1a, the same digest gen_data.c records, so this detects the skew
+     *       directly rather than by proxy.
+     *   (b) cards/build/generation_manifest.json's `c_artifacts` block -- the
+     *       cross-engine provenance record. Compared against the values actually
+     *       compiled into this binary, so the record cannot rot unnoticed.
+     *
+     * "Not recorded" is a FAILURE in both cases, never a pass. An absent
+     * `c_artifacts` block means nobody recorded this generation, and a
+     * generation nobody recorded is exactly how the 2026-10-04 skew shipped.
+     */
+    {
+        static const char *const BLOB[] = {
+            "../cards/build/abilities_strings.bin",
+            "cards/build/abilities_strings.bin",
+            "../../cards/build/abilities_strings.bin",
+            NULL
+        };
+        uint32_t canon_h = 0;
+        unsigned long canon_n = 0;
+        int have_canon = 0;
+        for (const char *const *p = BLOB; *p; p++)
+            if (fnv1a32_file(*p, &canon_h, &canon_n)) { have_canon = 1; break; }
+
+        ck(have_canon,
+           "the canonical cards/build/abilities_strings.bin is reachable from "
+           "here; without it NO cross-generation check is possible");
+        if (have_canon) {
+            printf("canonical blob: %lu bytes, FNV-1a 32 = %u\n", canon_n,
+                   (unsigned)canon_h);
+            printf("committed C   : %u bytes, FNV-1a 32 = %u\n",
+                   (unsigned)RBKA_STRINGS_TABLE_LEN, (unsigned)RBKA_STRINGS_TABLE_FNV);
+            ck((unsigned long)RBKA_STRINGS_TABLE_LEN == canon_n,
+               "RBKA_STRINGS_TABLE_LEN == the canonical blob's length "
+               "(the committed offsets DO index the canonical blob)");
+            ck(RBKA_STRINGS_TABLE_FNV == canon_h,
+               "RBKA_STRINGS_TABLE_FNV == the canonical blob's whole-file digest");
+        }
+
+        ck(load_manifest(),
+           "cards/build/generation_manifest.json is reachable from here");
+        if (g_man_len) {
+            const char *ca = strstr(g_man, "\"c_artifacts\"");
+            ck(ca != NULL,
+               "generation_manifest.json records a c_artifacts block for the C "
+               "generation (absent == cannot cross-check, never == agrees; if it "
+               "vanished, cards/build_lib.py dropped it on a rebuild)");
+            if (ca) {
+                size_t off = (size_t)(ca - g_man);
+                unsigned long long r;
+                char what[320];
+
+                r = man_u64(off, "strings_table_len");
+                snprintf(what, sizeof what,
+                         "c_artifacts.strings_table_len %llu == compiled "
+                         "RBKA_STRINGS_TABLE_LEN %u", r,
+                         (unsigned)RBKA_STRINGS_TABLE_LEN);
+                ck(r == (unsigned long long)RBKA_STRINGS_TABLE_LEN, what);
+
+                r = man_u64(off, "bytecode_len");
+                snprintf(what, sizeof what,
+                         "c_artifacts.bytecode_len %llu == compiled "
+                         "RBKA_BYTECODE_LEN %u", r, (unsigned)RBKA_BYTECODE_LEN);
+                ck(r == (unsigned long long)RBKA_BYTECODE_LEN, what);
+
+                r = man_u64(off, "num_string_offsets");
+                snprintf(what, sizeof what,
+                         "c_artifacts.num_string_offsets %llu == compiled "
+                         "RBKA_NUM_STRING_OFFSETS %d", r, RBKA_NUM_STRING_OFFSETS);
+                ck(r == (unsigned long long)RBKA_NUM_STRING_OFFSETS, what);
+
+                r = man_u64(off, "num_abilities");
+                snprintf(what, sizeof what,
+                         "c_artifacts.num_abilities %llu == compiled "
+                         "RBKA_NUM_ABILITIES %u", r, (unsigned)RBKA_NUM_ABILITIES);
+                ck(r == (unsigned long long)RBKA_NUM_ABILITIES, what);
+
+                r = man_u64(off, "strings_table_fnv1a32");
+                snprintf(what, sizeof what,
+                         "c_artifacts.strings_table_fnv1a32 %llu == compiled "
+                         "RBKA_STRINGS_TABLE_FNV %u", r,
+                         (unsigned)RBKA_STRINGS_TABLE_FNV);
+                ck(r == (unsigned long long)RBKA_STRINGS_TABLE_FNV, what);
+
+                /* The one-line statement of the whole skew, and the check that
+                 * makes it a build gate rather than a report: the C generation
+                 * and the canonical generation are the SAME generation. */
+                r = man_u64(off, "strings_table_len");
+                snprintf(what, sizeof what,
+                         "c_artifacts.strings_table_len %llu == the canonical "
+                         "blob's length %lu -- the C tables and cards/build are "
+                         "from ONE regen_all.sh run", r, canon_n);
+                ck(have_canon && r == (unsigned long long)canon_n, what);
+            }
+        }
+    }
+
     printf("\n=== %d checks, %d failed ===\n", g_checks, g_fail);
     if (g_fail) {
         printf("RESULT: THE GENERATED ARTIFACTS ARE INCONSISTENT.\n"
                "A skewed engine links silently -- the interned pool is\n"
                "unseparated, so drift returns byte splices, not errors.\n"
+               "If only the CROSS-GENERATION checks above failed, the C tables\n"
+               "and the blob they index are each internally fine but come from\n"
+               "different generator runs -- the 2026-10-04 state exactly.\n"
                "FIX: bash tools/regen_all.sh\n"
                "     then commit cards/build/abilities_strings.bin,\n"
                "     src/core/generated/gen_data.c and bytecode_blob.c\n"
-               "     TOGETHER, in one commit.\n");
+               "     TOGETHER, in one commit, and update the c_artifacts\n"
+               "     block in cards/build/generation_manifest.json to match.\n");
         return 1;
     }
     printf("RESULT: consistent. %u interned strings, %u bytes, all digests match.\n",

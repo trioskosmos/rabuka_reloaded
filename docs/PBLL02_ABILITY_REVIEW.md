@@ -1251,7 +1251,8 @@ These cannot be settled by a test and are recorded rather than guessed.
     (empty pool, non-μ's staged, non-μ's revealed) are pinned, so a future
     over-firing regression is caught while the under-firing gap stays open.
 14. **`PL!-pb2-021-N` — the 自動 over-fires; one of its two `or` branches is a
-    vacuous comparison. Parser half FIXED, runtime half open.**
+    vacuous comparison. BOTH HALVES NOW FIXED (2026-10-04); the OPEN line below was
+    stale.**
     「このメンバーが、自分のカードの能力のコストを支払うため**か**、自分のカードの効果に
     よってウェイト状態になったとき」 — the wait branch works (she is activated and
     gains a blade, pinned), but the ability fires even with her active, having paid
@@ -1263,12 +1264,30 @@ These cannot be settled by a test and are recorded rather than guessed.
       `self_became_wait` condition pattern. Blast radius checked: 11 `state_condition`
       nodes exist in the corpus and **none carries heart colours**, so all 11 were
       previously decided by an unrelated path; the suite stays green.
-    - *OPEN.* Branch 1, 「…能力のコストを支払うため」, is an EVENT ("she paid a cost")
-      but is parsed as a cost **comparison** with no operator and no count.
-      `compare_counts` defaults to `>=` (util.rs:2128), so it evaluates as
-      `cost >= 0` — **always true**. With one branch vacuous the `or` always passes.
-      The correct fix is to parse 「コストを支払う／支払った」 as a trigger event
-      rather than a comparison; there is currently no such rule.
+    - *~~OPEN~~ **FIXED — this item was stale as of 2026-10-04.*** Branch 1, 「…能力のコストを
+      支払うため」, is an EVENT ("she paid a cost"), not a comparison. The parser now emits
+      `paid_cost_this_turn: true` and nothing else, backed by the per-turn set
+      `GameState::cards_paid_cost_this_turn`, written by `GameState::record_cost_paid()` at
+      the cost-payment sites and cleared with the other per-turn trackers. The evaluator
+      branches on the flag at `condition/card/comparison.rs` **before** the numeric path,
+      which is the whole point: without that branch it fell through to `compare_counts`,
+      which defaults to `>=` (`util.rs`), and with no bound to compare against that is
+      `cost >= 0`. The `or` no longer passes unconditionally.
+
+      `engine/tests/test_modules/effects/auto/pb2_self_wait_or_cost_paid_activates_and_gains_blade_pl_pb2_021_n_test.rs`
+      is now **8 tests** and holds both branches plus the negatives:
+      `an_active_member_with_no_trigger_grants_nothing` (was named
+      `…_is_NOT_yet_true`, which said out loud that it was documenting a live bug in prose
+      instead of failing on it), `becoming_wait_by_a_card_effect_activates_her_and_grants_a_blade`,
+      `paying_one_of_my_own_ability_costs_triggers_it` — the only test that can reach
+      branch 1 at all, since branch 2 is false on that board — and
+      `being_in_wait_without_a_transition_does_not_trigger_it`, which holds the engine to
+      「…なったとき」 being a transition with a cause rather than the static 「is in wait」
+      state.
+
+      A consequence worth stating, because it looks like a bug and is not: **writing her
+      orientation directly no longer triggers her.** A hand-written orientation is not an
+      event — there is no `turn_state_changes` entry — so branch 2 is correctly false.
 
 15. **Five parser fixes made while writing the per-ability tests.** Each was found
     because a test asserted the printed text and the parse disagreed with it; all five
@@ -1399,6 +1418,47 @@ These cannot be settled by a test and are recorded rather than guessed.
     and `revealed_cards` read the same set (`ability/dynamic_count.rs:57`), the move
     is typed, and nothing is taken. Its four negatives are therefore **vacuous** and
     are labelled as such in the file.
+
+    **BOTH CLAIMS ABOVE ARE NOW RESOLVED, AND THE SECOND ONE WAS A WRONG DIAGNOSIS
+    (2026-10-04).** Two engine fixes, plus a test rewrite that found a third fault
+    that was not in the engine at all.
+
+    - *Parser/shape — FIXED as described.* `all_members` moved to `ConditionCommon`,
+      `get_all_members` reads it through `common()`, and `condition_decoder_gen.rs`
+      was regenerated. All three branches now carry the marker
+      (`vec![true, true, true]`). The marker is also honoured on the `Location`
+      path, so 「すべて」 cannot mean "at least one" on one branch of the same `or`.
+    - *The `all_members` zone dispatch had no `revealed_cards` arm.* It covered
+      Stage / LiveCardZone / SuccessLiveZone and answered `false` for everything
+      else, so 037's lily white and BiBi branches could not match at ANY reveal
+      size. The reveal is game-level shared state, not a player zone, so it cannot
+      be reached through `player`. `card_type` now scopes which revealed cards the
+      「すべて」 is about — the clause counts revealed MEMBERS, so a revealed live
+      card must not count against a group every revealed member satisfies.
+    - ***"Nothing is taken" was not an engine defect.*** The file's helper ended in
+      `drain_auto_ability_choices()`, which answers only `Choice::SelectAutoAbility`
+      and breaks on anything else. 「1枚」 out of a multi-card reveal raises a real
+      `Select 1 card from revealed cards` prompt, so the helper left it standing
+      and the card did nothing — while the ONE-card case took the `Exact` path with
+      no prompt and appeared to work. That count-shaped asymmetry is what the file
+      read as "matches at one card, stops matching past it". It is §8.22's trap.
+    - *A third fault, in the fixture.* The lily white constant was
+      `PL!-pb1-029-SRL`, which is a **ライブ** card. A reveal of two of them holds no
+      member at all, so that case could never have exercised 「すべて『lily white』」 —
+      §8.11's wrong-fixture mode, and the reason the old suite's lily white case
+      stayed red after both engine fixes. Now `PL!-pb2-034-N` (東條 希), with every
+      fixture asserting its own group.
+
+    What this cost, given the file was green throughout: a real defect sat behind
+    three `open_gap_*` tests whose names asserted the behaviour the card is
+    *supposed* to have while their assertions pinned the opposite, and a
+    never-firing positive was attributed to the engine rather than to the harness
+    that declined to answer a prompt. The three `open_gap_*` tests are gone; the
+    card now takes a member for all three groups and takes nothing for every mix.
+
+    Note that item 3 above — whether an EMPTY reveal satisfies 「すべて…のいずれか」 —
+    is still open, and nothing here settles it. `no_revealed_members_takes_nothing`
+    asserts only that no member can reach hand, which is true either way.
 
 21. **A per-unit reading was swallowing a three-option repeatable choice.**
     `PL!-pb2-016-P＋` was parsed as ONE mashed-together `draw_card` carrying

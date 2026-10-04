@@ -4199,18 +4199,51 @@ def _try_movement(text):
     """Area movement event: member moved between areas on stage.
     E.g. このメンバーがエリアを移動したとき (this member moved areas).
     Also handles G17: "エネルギーが置かれたとき" (energy placed into the zone,
-    past-tense, no から/source) — an event-based auto trigger that must fire
-    only on the actual placement. e.g. "自分のカードの効果によって、自分の
-    エネルギー置き場にエネルギーが置かれたとき". Past-tense 置かれた only:
-    "置かれるたび" (each_time, hazuki PL!SP-bp4-016-N) stays a comparison_condition
-    gated by the each_time scan gate, and "から...に置かれた" (zone_change) is
-    handled by _try_zone_placement.
+    no から/source) — an event-based auto trigger that must fire only on the
+    actual placement. e.g. "自分のカードの効果によって、自分のエネルギー置き場に
+    エネルギーが置かれたとき". "から...に置かれた" (zone_change) is handled by
+    _try_zone_placement.
+
+    **The non-past 「〜が置かれるたび」 form is an EVENT too, and was excluded here
+    deliberately until 2026-10-04.** Hazuki `PL!SP-bp4-016-N` reads
+    「カードの効果によって自分のエネルギー置き場にエネルギーカードが置かれるたび」;
+    「たび」 is habitual-present, so it does not carry 「置かれた」, the rule bailed, and
+    the clause fell through to the generic extractor as a `comparison_condition` with
+    **no operator and no count** — `compare_counts` reads a missing operator as `>=`, so
+    it evaluated as `count >= 0` and was true on every board. The comment in
+    `own_effect_energy_placed_each_time_gain_heart06_test.rs` recorded this honestly
+    ("Condition: compares count of energy cards >= 0") and worked around it by seeding an
+    energy card in every fixture, because the positive passes identically either way.
+
+    What actually gated her was never the condition: it was the `each_time`
+    movement-event scan guard. So the exclusion bought nothing and cost the clause its
+    own meaning — a reader of the parse could not tell 「when energy is in the zone」
+    (a state) from 「each time energy is placed there」 (an event), which is the whole
+    difference the card is about. Accepting it here gives the identical shape its sibling
+    already produces (`PL!SP-bp5-004-P`, 「〜置き場にエネルギーが置かれたとき」 →
+    `movement_condition` + `trigger_event.energy_placed`), so the two clauses stop
+    disagreeing about the same Japanese.
+
+    The non-past form requires the energy card to be the grammatical SUBJECT
+(「〜が置かれる」), which is what makes it a placement that happened rather than a
+destination being described; a destination reads 「〜に置かれる」. Do NOT gate this on
+「たび」/「とき」: those words live in the EFFECT text, not the condition clause —
+`split_condition_action` strips them before dispatch, so 葉月恋's clause arrives here
+already ending at 「置かれる」. Corpus blast radius is exactly one clause (葉月恋),
+checked against every condition text in abilities.json.
     Sets trigger_event.watches_area_move=True when the text also watches an
     area move (absent otherwise — the normalizer strips False).
     """
-    # G17: energy placed INTO the zone, past-tense, no source zone.
+    # G17: energy placed INTO the zone, no source zone. Past-tense 置かれた always; the
+    # habitual-present 置かれる only with an event marker, per the docstring above.
+    habitual_energy_placed = (
+        "エネルギー" in text
+        and "が置かれる" in text
+        and "から" not in text
+    )
     is_energy_placed = (
-        "エネルギー" in text and "置かれた" in text and "から" not in text
+        ("エネルギー" in text and "置かれた" in text and "から" not in text)
+        or habitual_energy_placed
     )
     if not (
         is_energy_placed
@@ -4286,7 +4319,7 @@ def _try_movement(text):
     # Extract "エネルギーが置かれ" (energy placed) trigger. The placement verb
     # may be separated from エネルギー by a location phrase ("エネルギーが...メンバーの下に置かれた"),
     # so match on the energy subject + the 置かれ/置かれた placement verb.
-    if re.search(r"エネルギーが.*?(置かれ|置かれた)", text):
+    if re.search(r"エネルギー(?:カード)?が.*?(置かれ|置かれる)", text):
         te_data["energy_placed"] = True
         # "エネルギーが...メンバーの下に置かれた" → placed UNDER a member.
         if "メンバーの下に" in text:
@@ -5243,6 +5276,82 @@ _CONDITION_DISPATCH_ORDER.insert(
     ),
 )
 
+# What sits BENEATH a stage member is not a location the count dispatcher can see:
+# `under_member` resolves to the ACTIVATING card's under-cards (「このメンバーの下」),
+# while this clause is existential over every member on the stage.
+_UNDER_CARD_EXISTENCE_KINDS = (
+    ("エネルギーカード", "energy"),
+    ("ブレードハート", "blade_heart"),
+    ("ハート", "heart"),
+)
+
+
+def _try_under_card_stage_existence(text):
+    """「自分のステージに<card>が下にあるメンバーがいる場合」 — an EXISTENCE check.
+
+    PL!N-bp5-013-N 上原歩夢 ab#0 reads
+    「自分のステージにエネルギーカードが下にあるメンバーがいる場合、ライブ終了時まで、
+    {{heart_01.png/heart01}}を得る」.
+
+    Three separate faults stacked on this one clause, which is why the shape matters more
+    than the wording:
+
+    1. 「〜がいる」 is EXISTENCE, but there is no 「N人」 for the count extractor to read,
+       so nothing set an operator and `compare_counts` read the missing operator as ">="
+       (`ability/util.rs::compare_counts`, deliberately, so a parser gap does not silently
+       disable an ability) — `count >= 0`, true on every board.
+    2. `resource_type: energy` short-circuits the count to the ENERGY ZONE length and
+       never reads the condition's `location`, so 「ステージに…が下にある」 was asking
+       about the energy zone instead of the stage.
+    3. `card_type` was stamped as the card BENEATH the member, but the subject of 「いる」
+       is the member. `card_type: member_card` is what the counted set is; what must be
+       underneath is carried by `resource_type`.
+
+    `member_has_resource_under` is a ConditionCommon flag rather than a new Zone variant:
+    the counted set is the stage, and the qualifier is a property of each card in it.
+    A new `Zone` would have touched all 47 `Zone` match sites for one card.
+
+    Blast radius is one card. 「が下にあるメンバーがいる」 with a named card kind occurs
+    nowhere else in the pool (checked against every condition text in abilities.json),
+    and the rule refuses anything carrying 「コスト」 or a 「N人」 headcount so it cannot
+    claim the cost-qualified and headcount forms, which have their own handlers.
+    """
+    if not re.search(r"が下にある(?:メンバー|カード)がいる", text):
+        return None
+    if "コスト" in text or re.search(r"\d+\s*(?:人|枚|つ)", text):
+        return None
+    m = re.search(r"ステージに([^の]+(?:カード|ハート))が下にある", text)
+    if not m:
+        return None
+    under = m.group(1)
+    for needle, resource in _UNDER_CARD_EXISTENCE_KINDS:
+        if needle in under:
+            break
+    else:
+        return None
+    result = {
+        "type": "card_count_condition",
+        "count": 1,
+        "operator": ">=",
+        "location": "stage",
+        # The subject of 「いる」 is the member, not the card beneath it.
+        "card_type": "member_card",
+        "resource_type": resource,
+        "member_has_resource_under": True,
+        "text": text,
+    }
+    result["target"] = "opponent" if "相手のステージ" in text else "self"
+    return result
+
+
+_CONDITION_DISPATCH_ORDER.insert(
+    0,
+    (
+        "under_card_stage_existence",
+        ConditionPattern(handler=_try_under_card_stage_existence),
+    ),
+)
+
 def _try_paid_own_ability_cost(text):
     """「…コストを支払うためか、…ウェイト状態になったとき」 — two EVENT branches.
 
@@ -5855,6 +5964,23 @@ def _extract_energy_resource(condition, text):
 
 
 def _extract_surplus_resource(condition, text):
+    # NOTE: 「自分が余剰ハートを持たない場合」 (三船栞子 `PL!N-bp5-010-*` ab#0) reaches here
+    # with no number, so no `count` and no `operator` are set, and
+    # `compare_counts(None, surplus, 0)` reads as `surplus >= 0` — true on every board. The
+    # 「ない」 sets `negation: true`, which reads as "has none", but the surplus comparison
+    # does NOT apply `negation`, so the branch is decided by the bound alone.
+    #
+    # Adding `count: 1` + `operator: ">="` here was tried and **reverted**. It makes the
+    # clause discriminating in the letter and moves the error rather than removing it:
+    # with `negation` still ignored, the +1 then fires at surplus >= 1 instead of at every
+    # board, which is wrong in a different place — and it broke
+    # `surplus_conditioned_score_live_total_plus_one_no_floor_needed`, which sets surplus 0
+    # and asserts +1, which is the CORRECT printed behaviour at that point.
+    #
+    # The fix is engine-side (honour `negation` for `surplus_heart`) and must land with,
+    # not before, the parser half: with `negation` honoured, `surplus >= 0` negated is
+    # false everywhere, and only then does `count: 1` turn it into "has none". Doing the
+    # parser half alone is the ordering mistake. See PARSER_NOTES.md.
     if "余剰ハート" in text:
         condition["resource_type"] = "surplus_heart"
         sc = extract_count(text)
@@ -11571,10 +11697,153 @@ def _try_play_time_cost_set(text):
 # Ordering rule, if you add a rule: a NARROWER phrase must come before a
 # broader one that would otherwise swallow it. Narrowest first.
 # ======================================================================
+def _try_two_step_zone_move(text):
+    """「<zone>にあるカードをN枚<dest>に加える。そうしたとき、これにより<...>」
+
+    A MANDATORY two-step effect, gated by 「そうしたとき」 on the second leg. 星空 凛
+    `PL!-pb2-014-P＋` (登場):
+
+    > 手札の『lily white』のライブカードを1枚公開してもよい：
+    > (1) 自分の成功ライブカード置き場にあるカードを1枚手札に加える。
+    > (2) そうしたとき、これにより公開したカードを自分の成功ライブカード置き場に置く。
+
+    The 「してもよい」 belongs to the COST (the optional reveal), so the EFFECT text is
+    the plain two-step sentence above — and this is **not** the shape the existing
+    「そうしたとき」 family handles. Every one of those splits 「<optional>そうしたとき、
+    <consequence>」 and builds a `conditional_on_optional`; here both legs are mandatory
+    and the marker only means "if leg (1) happened".
+
+    What went wrong without this rule: the generic path kept only leg (2) — the
+    `selected_cards` → `success_live_zone` move — and DROPPED leg (1), the take from the
+    success zone to hand. It then tried to express 「そうしたとき」 as a condition and
+    produced `{ locations: [success_live_card_zone, hand], count: 1, operator: "=" }`: a
+    card-count comparison with `=` and no value, which decides nothing. So the card took
+    one card out of the success zone and put nothing into hand.
+
+    The gate on leg (2) is `source: "preceding_moved"` with `count: 1, operator: ">="` —
+    "at least one card moved by the step before". That is the engine's existing spelling
+    for a preceding-step result (`condition::is_moved_source`), so no new vocabulary.
+
+    Scoped tightly: both legs must parse as `move_cards`, and the marker must be the
+    sentence-initial 「。そうしたとき、」 that follows a complete clause — not the
+    「してもよい」 offers the conditional family owns. A 「N人に/枚」 headcount or 「以下」
+    bound in leg (1) is refused so it cannot claim the `previous_moved_cards` batch forms
+    the generic `preceding_moved` handling already covers.
+    """
+    if "そうしたとき" not in text or "してもよい" in text:
+        return None
+    marker = "。そうしたとき、"
+    if marker not in text:
+        return None
+    first, _, rest = text.partition(marker)
+    first = first.strip()
+    rest = rest.strip()
+    if not first or not rest:
+        return None
+    # Both legs are card moves out of a named zone.
+    if ".Success_Live" not in text and "成功ライブカード置き場" not in text:
+        return None
+    if re.search(r"\d+\s*(?:人|名)以上", first) or "以下" in first:
+        return None
+    leg_a = parse_action(first)
+    leg_b = parse_action(rest)
+    if not isinstance(leg_a, dict) or not isinstance(leg_b, dict):
+        return None
+    if leg_a.get("action") != "move_cards" or leg_b.get("action") != "move_cards":
+        return None
+    # 「そうしたとき」 gates the second leg on the first having moved something.
+    leg_b = dict(leg_b)
+    leg_b["condition"] = {
+        "type": "card_count_condition",
+        "source": "preceding_moved",
+        "count": 1,
+        "operator": ">=",
+        "text": "そうしたとき",
+    }
+    return {
+        "type": "sequential",
+        "text": text,
+        "action": "sequential",
+        "actions": [
+            dict(leg_a, text=first),
+            dict(leg_b, text=rest),
+        ],
+    }
+
+
+def _try_optional_state_change_consequence(text):
+    """「〜のメンバーをN人まで(状態)にしてもよい。そうしたとき、…」
+
+    矢澤にこ `PL!-pb2-018-P＋`/`-R` (登場):
+
+    > 相手のステージにいるウェイト状態のメンバーを3人までアクティブにしてもよい。
+    > そうしたとき、これによりアクティブにしたメンバー1人につき、カードを1枚引く。
+
+    The offer is the effect the player MAY take — waking members on the opponent's stage
+    — not a payment. So this must NOT be `conditional_on_optional`: the engine's
+    `execute_conditional_on_optional` presents that shape as a Skip/Pay CHOICE and runs
+    the consequence on Pay, which is a cost-shaped contract. Action-shaped optionals go
+    through `sequential` + `conditional: True`, the same route DIVE! takes (see the NOTE
+    above `_try_conditional`'s caller). Misfiling this as a cost would let a player
+    "pay" by waking nobody.
+
+    **What the parse did before this rule:** the whole sentence collapsed to a bare
+    `draw_card` behind a condition `{ state: wait, count: 1, operator: ">=" }`. So the
+    「3人まで」 cap was lost, the 「てもよい」 was lost, and she drew 1 even when the player
+    woke nobody — the consequence no longer depended on the offer at all.
+
+    The offer node is handed to `parse_action` with the optionality stripped, so the
+    existing `change_state` rules own the 「アクティブにする」/「ウェイトにする」/「能源にする」
+    vocabulary and this rule owns only the optionality and the 「そうしたとき」 wiring.
+
+    Scoped tightly: the offer must parse to `change_state`, and the consequence must be
+    present. 「〜してもよい。そうしたとき、」 clauses whose offer is a payment or a move are
+    already claimed by the `make_conditional_on_optional` family (ミア, 花帆, 澁谷かのん),
+    and those must keep that shape — so a non-`change_state` offer is refused here rather
+    than re-filed.
+    """
+    if "そうしたとき" not in text or "にしてもよい" not in text:
+        return None
+    if not re.search(r"(?:人|枚)まで", text):
+        return None
+    split = _split_optional_offer(text)
+    if split is None:
+        return None
+    opt_text, cons_text = split
+    # 「N人までアクティブにする」 — drop the optionality and let parse_action own the verb.
+    offer_text = opt_text.replace("にしてもよい", "にする").strip()
+    offer = parse_action(offer_text)
+    if not isinstance(offer, dict) or offer.get("action") != "change_state":
+        return None
+    offer = dict(offer)
+    offer["text"] = opt_text
+    # 「N人まで」 is a CAP on the offer, not its count: waking fewer is allowed.
+    m = re.search(r"(\d+)(?:人|枚)まで", opt_text)
+    if m:
+        offer["count"] = as_int(m.group(1))
+        offer["max"] = True
+    offer["optional"] = True
+    cons = parse_effect(cons_text)
+    if not isinstance(cons, dict) or not _parsed_to_something(cons):
+        return None
+    return {
+        "text": text,
+        "action": "sequential",
+        "conditional": True,
+        "actions": [offer, cons],
+    }
+
+
 _EFFECT_DISPATCH_ORDER = [
     # Most specific: play-time costs must beat the generic cost/effect
     # handlers, which would otherwise mis-type 「プレイに際し…」.
     EffectPattern(action="custom", handler=_try_play_time_cost_set),
+    # Ahead of every move handler: it owns a TWO-leg sentence the single-move
+    # rules would otherwise claim, keeping the second leg and losing the first.
+    EffectPattern(action="custom", handler=_try_two_step_zone_move),
+    # Ahead of the generic conditional: the offer is an ACTION, so the generic
+    # handler turns it into a gate and the consequence stops depending on it.
+    EffectPattern(action="custom", handler=_try_optional_state_change_consequence),
     *_EFFECT_RULES,
     *_STRUCTURAL_EFFECT_RULES,
     _EFFECT_BLADE_CONVERSION,

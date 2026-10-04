@@ -242,6 +242,26 @@ impl super::TurnEngine {
                     game_state.current_phase = Phase::FirstAttackerPerformance;
                     let first_attacker_id = game_state.first_attacker().id.clone();
                     let second_attacker_id = game_state.second_attacker().id.clone();
+                    // Q213: a non-live card must LEAVE the live card zone BEFORE the
+                    // ライブ開始時 abilities read it. Ruling:
+                    // 「ライブ開始時能力が発動する前にメンバーカードは控え室に移動します。
+                    // そのため、メンバーカードでは減りません。」
+                    //
+                    // Both performers, and NOT gated on `face_up` — that flag is set at the
+                    // top of `execute_performance_phase`, which runs after this trigger, so
+                    // routing the eviction through `check_invalid_live_cards` here would
+                    // still be a no-op and the member would keep reducing. Constants are
+                    // re-derived only if a card actually moved, since live-zone membership
+                    // is exactly what they read.
+                    let evicted = [
+                        game_state.seat_index_by_id(&first_attacker_id),
+                        game_state.seat_index_by_id(&second_attacker_id),
+                    ]
+                    .into_iter()
+                    .any(|seat| Self::evict_non_live_from_live_slot(game_state, seat));
+                    if evicted {
+                        Self::check_timing(game_state);
+                    }
                     Self::trigger_live_start_abilities(game_state, &first_attacker_id);
                     Self::trigger_live_start_abilities(game_state, &second_attacker_id);
                     game_state.process_pending_auto_abilities(&first_attacker_id);

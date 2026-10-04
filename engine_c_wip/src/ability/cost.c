@@ -1892,6 +1892,26 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
             for (int i = 0; i < n_ids; i++) {
                 if (g->n_revealed < RB_MAX_REVEALED_CARDS)
                     g->revealed_cards[g->n_revealed++] = card_ids[i];
+                /* handlers.rs:1285-1286 -- the SAME loop pushes into TWO lists:
+                 *
+                 *     gs.push_revealed_card(card_id, cost_source, false, cost_owner, "cost");
+                 *     gs.push_revealed_cost_card(card_id, cost_source, false, cost_owner, "cost");
+                 *
+                 * The second is `revealed_cost_cards` (mod.rs:1091-1110), the
+                 * cost-reveal provenance list, and the C pushed only the first.
+                 * Rust reads it in four in-scope places, two of which decide
+                 * real behaviour rather than display:
+                 *   move/mod.rs:1955  `revealed_cost_cards.contains(&card_id)`
+                 *                    -> `was_cost_revealed`, which gates whether a
+                 *                    moved card pays a cost-reveal penalty;
+                 *   move/mod.rs:1831 / :368  `.iter()`, the pool a move drains.
+                 * `push_revealed_cost_card` appends in SET SEMANTICS
+                 * (mod.rs:1090-1108 -> push_revealed_internal), so the loop is the
+                 * faithful shape; `revealed_cost_card_meta` has no C member and its
+                 * only C-side reader would be `remove_revealed_cost_card`, which is
+                 * E5/E6 and out of scope, so the ids alone are recorded here. */
+                if (g->n_revealed_cost_cards < RB_MAX_ZONE)
+                    g->revealed_cost_cards[g->n_revealed_cost_cards++] = card_ids[i];
             }
             if (effect_uses_selected) {
                 g->n_selected_cards = 0;
@@ -2402,6 +2422,32 @@ int rb_handle_pay_cost_all_discard(GameState *g, int actor, const char *selected
     }
     return 1;
 }
+
+/* ── DEAD TOMBSTONE (2026-10-04). `rb_cost_has_skip_prompt` — DEAD-CORRECT.
+ *
+ * Adjudication: engine_c_wip/CENSUS_dupes2.md §9 row 5. Rust item
+ * `has_skip_prompt`, engine/src/ability/cost/handlers.rs:45-51.
+ *
+ *   Rust: match cost.action {
+ *           ActionType::PayEnergy   => !cost.any_number_any().unwrap_or(false),
+ *           ActionType::ChangeState => cost.self_cost_any() == Some(true),
+ *           _                        => false,
+ *         }
+ *
+ * This body is `return has_skip_prompt(cost);` — a one-line forwarder to the
+ * file-local static at cost.c:292, which is itself a faithful port of that Rust
+ * match. So there are two names for one predicate and no divergence to fix: the
+ * exported name is dead, the file-local one is LIVE with two call sites
+ * (cost.c:1647 and :1650, inside the compound-cost sibling scan that mirrors
+ * handlers.rs:1005/:1007).
+ *
+ * Reachability, re-measured on this tree at the moment of landing: the name
+ * occurs at this definition and nowhere else in src/ or tests/. include/rabuka.h
+ * does not declare it.
+ *
+ * KEPT, not deleted: deleting it would remove a header-visible spelling of a
+ * live Rust predicate and change nothing else. Do not wire it, and do not
+ * re-adjudicate it. */
 
 /* ── Public: rb_cost_has_skip_prompt ── */
 int rb_cost_has_skip_prompt(const AbilityEffect *cost) {

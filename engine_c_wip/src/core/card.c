@@ -472,19 +472,45 @@ int rb_comparison_target_from_str(const char *s) {
     return 0;
 }
 
+/* DEAD-WRONG, FIXED 2026-10-04. Rust's CardProperty has FOUR variants
+   (core/card.rs:2750-2765): HasBladeHeart, HasScoreIcon, HasAllBlade and
+   HasDrawIcon, the last added with `PL!-pb2-001-PP` and carrying the comment
+   that its clause 「…ドローを持つカードがある場合」 had no property phrase to
+   match and so parsed as a bare location filter. Both of these tables carried
+   only three arms, so index 3 round-tripped to index 0 -- a card printed with
+   the ドロー icon read back as has_blade_heart, and `from_str("has_draw_icon")`
+   silently answered HasBladeHeart. Neither table has a caller (both are dead),
+   which is why nothing fires today and why this was a latent bug rather than a
+   live one; the arms are added anyway so the twin is correct before anyone
+   wires it.
+
+   REACHABILITY, measured over cards/abilities.json: the `card_property` key
+   carries 49 nodes -- has_blade_heart 34, has_score_icon 12, has_all_blade 2,
+   **has_draw_icon 1** (abilities.json:13305). So one real card-ability pair
+   depends on this variant existing. The LIVE C path does not go through these
+   tables: `rb_check_card_property` (src/ability/util.c:3263) matches the
+   raw string and calls `rb_card_has_draw_icon` (card.rs:4406) directly, which
+   is why the suite corpus does not move. The tables are the enum-level twin
+   and were the only place the variant was missing. */
 const char *rb_card_property_str(int s) {
     switch (s) {
         case 0: return "has_blade_heart";
         case 1: return "has_score_icon";
         case 2: return "has_all_blade";
+        case 3: return "has_draw_icon";
         default: return "";
     }
 }
 
+/* Mirror CardProperty::from_str (card.rs:2778-2785) -- a wire decode table
+   returning a value, not a fallible parser: "has_score_icon" -> 1,
+   "has_all_blade" -> 2, "has_draw_icon" -> 3, EVERYTHING ELSE -> 0. The
+   has_draw_icon arm was missing here too; see rb_card_property_str above. */
 int rb_card_property_from_str(const char *s) {
     if (!s) return 0;
     if (!strcmp(s, "has_score_icon")) return 1;
     if (!strcmp(s, "has_all_blade")) return 2;
+    if (!strcmp(s, "has_draw_icon")) return 3;
     return 0;
 }
 

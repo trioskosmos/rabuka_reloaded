@@ -6,19 +6,22 @@
 //!   (1) 自分の成功ライブカード置き場にあるカードを1枚手札に加える。
 //!   (2) そうしたとき、これにより公開したカードを自分の成功ライブカード置き場に置く。
 //!
-//! # A parser gap this file pins
+//! # The parser dropped a leg until 2026-10-04
 //!
-//! The clause has TWO effects. The parse kept (2) — move the REVEALED card into the
-//! success zone, from `selected_cards` — and DROPPED (1), the take from the success
-//! live zone to hand. The correct shape is a `sequential [move_cards, move_cards]`.
+//! The effect has TWO steps and the parse kept only the second — move the REVEALED card
+//! into the success zone, from `selected_cards` — and dropped the first, the take from the
+//! success live zone to hand. Worse, the 「そうしたとき」 gate was emitted as
+//! `{ locations: [success_live_card_zone, hand], count: 1, operator: "=" }`: a card-count
+//! comparison with `=` and no value, which decides nothing. So the card emptied the
+//! success zone and put nothing into hand.
 //!
-//! The `condition` on the kept node is a garbled attempt at the 「そうしたとき」
-//! gate: `locations: [success_live_card_zone, hand]`, `count: 1`, `operator: "="` — a
-//! card-count comparison with `=` and no value, i.e. a bound it cannot evaluate. It is
-//! pinned below so it cannot be mistaken for the missing step.
+//! The fix is `_try_two_step_zone_move`, a `sequential [take, place]` with the second leg
+//! gated on `source: "preceding_moved"`. This is **not** the 「そうしたとき」 family the
+//! parser already had: every rule there splits 「<optional>そうしたとき、<consequence>」
+//! into a `conditional_on_optional`, and here the optionality belongs to the COST, so both
+//! legs are mandatory and the marker only means "if leg (1) happened".
 //!
-//! What IS correct and pinned: the optional reveal cost, and the placement of the
-//! revealed card into the success live zone.
+//! What was already correct and is still pinned: the optional reveal cost.
 
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
@@ -73,29 +76,48 @@ fn the_effect_places_the_revealed_card_into_the_success_zone() {
         .find(|a| a.triggers.as_deref() == Some("登場"))
         .and_then(|a| a.effect.as_ref().map(|e| e.clone()))
         .expect("登場 ability has an effect");
+    // Leg (2) of the two-step effect — the placement. Leg (1) is pinned by
+    // `the_take_from_the_success_zone_is_the_first_leg_and_the_placement_the_second`.
+    let place = eff
+        .compound
+        .actions
+        .as_ref()
+        .expect("a sequential's legs live in compound.actions")[1]
+        .as_ref()
+        .clone();
     assert_eq!(
-        eff.action,
+        place.action,
         rabuka_engine::ability::enums::ActionType::MoveCards,
         "これにより公開したカードを自分の成功ライブカード置き場に置く — a move"
     );
     assert_eq!(
-        eff.source_any().as_deref(),
+        place.source_any().as_deref(),
         Some("selected_cards"),
         "これにより公開したカード — the card the COST revealed"
     );
     assert_eq!(
-        eff.destination_any().as_deref(),
+        place.destination_any().as_deref(),
         Some("success_live_zone"),
         "自分の成功ライブカード置き場に置く"
     );
-    assert_eq!(eff.count, Some(1), "1枚");
+    assert_eq!(place.count, Some(1), "1枚");
 }
 
-/// OPEN GAP: step (1) — 「自分の成功ライブカード置き場にあるカードを1枚手札に加える」 —
-/// is absent, and the surviving node's `condition` is a card-count comparison with an
-/// `=` operator and no value, which cannot be evaluated.
+/// Both legs are present, in order, and the second is gated on the first.
+///
+/// This was an OPEN GAP asserted the wrong way round — `assert_ne!(Sequential)` with an
+/// "OPEN GAP" message, pinning the partial parse so it could not regress into being fixed.
+/// The parse now builds `sequential [ take, place ]`:
+///
+///   (1) 自分の成功ライブカード置き場にあるカードを1枚手札に加える
+///   (2) そうしたとき、これにより公開したカードを自分の成功ライブカード置き場に置く
+///
+/// 「そうしたとき」 is NOT the 「してもよい」 conditional family here — the optional part
+/// belongs to the COST (the reveal), so both legs are mandatory and the marker only means
+/// "if leg (1) happened". It is expressed as `source: "preceding_moved"`, the engine's
+/// existing spelling for a preceding-step result.
 #[test]
-fn the_take_from_the_success_zone_is_currently_missing() {
+fn the_take_from_the_success_zone_is_the_first_leg_and_the_placement_the_second() {
     let db = load_real_database();
     let game = TestGame::new(db);
     let id = game.id(SHIRO);
@@ -108,32 +130,59 @@ fn the_take_from_the_success_zone_is_currently_missing() {
         .and_then(|a| a.effect.as_ref().map(|e| e.clone()))
         .expect("登場 ability has an effect");
 
-    assert_ne!(
+    assert_eq!(
         eff.action,
         rabuka_engine::ability::enums::ActionType::Sequential,
-        "OPEN GAP: 成功ライブカード置き場にあるカードを1枚手札に加え AND これにより公開したカードを\
-         成功ライブカード置き場に置く is a TWO-step effect, but the node is a bare move_cards, \
-         so the first step is not represented:\n  {:?}",
+        "a take AND a place is a TWO-step effect. The parse used to keep only the place \
+         (: {:?})",
         eff.text
     );
+    let legs = eff
+        .compound
+        .actions
+        .as_ref()
+        .expect("a sequential's legs live in compound.actions");
+    assert_eq!(legs.len(), 2, "(1) take from the success zone, (2) place into it");
 
-    // The leftover gate is a card-count comparison whose operator is `=`, which the
-    // engine's count comparison does not understand, so it cannot decide anything.
-    // Pinned exactly, so it cannot be mistaken for the missing step.
-    let cond = eff.condition.as_deref().expect("the そうしたとき gate");
-    let cj = serde_json::to_value(&cond).unwrap();
+    let take = legs[0].as_ref();
+    assert_eq!(take.action, rabuka_engine::ability::enums::ActionType::MoveCards);
     assert_eq!(
-        cj.get("operator").and_then(|v| v.as_str()),
-        Some("="),
-        "OPEN GAP: the surviving condition is {:?} — a card-count comparison with an \
-         `=` operator, which the count comparison does not understand",
-        cj
+        take.source_any().as_deref(),
+        Some("success_live_zone"),
+        "(1) 自分の成功ライブカード置き場にあるカードを1枚手札に加える — FROM the success zone"
+    );
+    assert_eq!(take.destination_any().as_deref(), Some("hand"), "…を手札に加える");
+    assert_eq!(
+        take.condition, None,
+        "(1) is unconditional: the printed optionality is the COST's reveal, not this leg"
+    );
+
+    let place = legs[1].as_ref();
+    assert_eq!(place.action, rabuka_engine::ability::enums::ActionType::MoveCards);
+    assert_eq!(
+        place.source_any().as_deref(),
+        Some("selected_cards"),
+        "(2) これにより公開したカード — the card the COST revealed"
     );
     assert_eq!(
-        cj.get("count").and_then(|v| v.as_i64()),
-        Some(1),
-        "OPEN GAP: it is a card-count comparison with an `=` operator, which the count \
-         comparison does not understand:\n  {cj}"
+        place.destination_any().as_deref(),
+        Some("success_live_zone"),
+        "自分の成功ライブカード置き場に置く"
+    );
+
+    // 「そうしたとき」 = "if (1) moved something".
+    let gate = place.condition.as_deref().expect("(2) is gated on (1)");
+    assert_eq!(
+        gate.get_source(),
+        Some("preceding_moved"),
+        "そうしたとき is a preceding-step result, not a zone and not a property"
+    );
+    assert_eq!(
+        (gate.get_count(), gate.get_operator()),
+        (Some(1), Some(">=")),
+        "at least one card moved. The old parse emitted `operator: \"=\"` with no value — a \
+         comparison that could not decide anything — which is how the dropped leg went \
+         unnoticed"
     );
 }
 

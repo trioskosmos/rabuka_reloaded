@@ -132,6 +132,16 @@ impl<'a> ConditionContext<'a> {
                         .is_some_and(|s| values.contains(&s))
                 });
             }
+            // Generic 「A、Bのいずれかの場合」 membership — the ladder test 千砂都
+            // `PL!SP-bp1-003-P` needs (「コストの合計が、10、20、30、40、50のいずれか」), and the
+            // only shape `compare_counts` cannot express.
+            //
+            // NOTE this returns WITHOUT applying `negation`, unlike the ordinary path below
+            // (which inverts at :153). Nothing in the corpus carries `values` and
+            // `negation` together today, so this is latent rather than live — but a 「〜の
+            // いずれでもない場合」 clause would parse into exactly this pair and silently lose
+            // its negation. If you add one: apply `negation` here too, or route it through
+            // the shared path below.
             return values.contains(&count);
         }
 

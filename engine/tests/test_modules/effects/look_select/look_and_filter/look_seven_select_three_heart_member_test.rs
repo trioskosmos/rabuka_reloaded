@@ -104,69 +104,45 @@ fn you_ability_select_1_card() {
     );
 }
 
-/// OPEN GAP — 「残りを控え室に置く」 leaves the remainder in the looked-at buffer.
+/// Taking one of seven still mills the other six — the 「残り」 clause.
 ///
-/// `discard_remaining: true` is in the parse (`abilities.json:4569`).
+/// 「…3枚まで公開して手札に加えてもよい。残りを控え室に置く。」 The look is 7
+/// cards; only those passing `card_type: member_card` + `heart_colors:
+/// [heart02, heart04, heart05]` are offerable. Everything else is 「残り」 and
+/// belongs in the waitroom — including cards that WERE offerable but were not
+/// taken.
 ///
-/// # What is established
+/// This is the case that pins the 「残り」 clause for a partly-eligible look.
+/// `you_ability_ends_and_discard_only_grows_at_end` takes nothing, so there
+/// 「残り」 and "all of it" coincide and the clause cannot be seen; every other
+/// test here asserts the hand only. This one looks at the waitroom *after*
+/// taking a card.
 ///
-/// `handle_select_cards_looked_at` (`move/mod.rs`) takes the WHOLE remainder out of
-/// `gs.looked_at_cards` with `core::mem::take` at :3118, into a local. That buffer is
-/// emptied unconditionally.
+/// # The defect this pins (fixed 2026-10-04)
 ///
-/// The remainder is then placed in only two places we can see:
+/// One card reached hand, the waitroom grew by 1 (the optional cost only), and
+/// the six excluded cards were left in `gs.looked_at_cards` — in no zone, yet
+/// still readable as shared state by the next look-based card and by the
+/// opponent.
 ///
-///   * the `needs_order` branch (:3127-3137), which requires a deck destination,
-///     `placement_order: AnyOrder`, and `selected_cards.len() > 1` — none of which hold
-///     here; and
-///   * the re-prompt at :3210-3215, which puts the remainder BACK into
-///     `gs.looked_at_cards` and offers it again, returning without discarding.
+/// Two engine faults, both required:
 ///
-/// When the player then DECLINES that re-offer, `handle_looked_at_selection` is entered
-/// again with `valid` empty, so the `if is_select_cards && !valid.is_empty()` guard at
-/// `choice.rs:2004` is false, the block that would re-offer is skipped, and control
-/// reaches `finalize_choice` — with the remainder still sitting in `gs.looked_at_cards`
-/// and no code path left to discard it. That is the shape of the reported behaviour:
-/// one card in hand, six stranded.
+/// 1. `handle_select_cards_looked_at` gated its 「select up to N more」 re-prompt on
+///    `!remaining_cards.is_empty()` (`effects/move/mod.rs`). A 「残り」 card is by
+///    definition one the filter REJECTS, so once the eligible set ran out the
+///    guard still passed and built a **zero-option** prompt.
+/// 2. `handle_looked_at_selection` then fell through to `finalize_choice`, which
+///    clears `awaiting.choice` unless `should_preserve` holds — and it preserves
+///    only a looked_at choice with queued sequential actions. The zero-option
+///    prompt was destroyed, nothing was ever milled, and the six cards stayed in
+///    the looked-at buffer.
 ///
-/// # What is NOT established, and was wrong before
-///
-/// An earlier version of this comment claimed the declining path reaches
-/// `handle_revealed_cards_selection`, which discards from `gs.revealed_cards`
-/// (`choice.rs:1758-1772`), and called that a buffer mismatch. **It does not.** The
-/// zone dispatch is mutually exclusive — `Zone::LookedAt` goes to
-/// `handle_looked_at_selection` and `Zone::RevealedCards` to
-/// `handle_revealed_cards_selection` (`choice.rs:1114-1124`) — so the latter is never
-/// reached from a looked-at selection. Also recorded here because it is tempting:
-/// passing `ctx.discard_remaining` through at `choice.rs:1997` is provably a NO-OP, since
-/// `move/mod.rs:3030-3034` already reads `sa.discard_remaining_any()` first. Both were
-/// tried or reasoned and neither is the cause.
-///
-/// The precise line that drops the remainder on the declined-re-offer path is not
-/// identified yet; the account above is the narrowest reading consistent with the
-/// observed state and the code read so far, not a confirmed trace.
-///
-/// # Observed, and what the file never asserted
-///
-/// One card reaches hand, the waitroom grows by 1 (the optional cost only), and
-/// `gs.looked_at_cards` holds the six cards the `card_type` + `heart_colors` filter
-/// excluded. They are in no zone, yet still readable as shared state by the next
-/// look-based card and by the opponent.
-///
-/// 「残り」 means the rest of the SEVEN.
-///
-/// 米女 `PL!SP-bp5-007-AR` mills correctly with the same `count`, `max`, `optional`,
-/// `reveal` and `discard_remaining` — so none of those is sufficient to cause it.
-///
-/// Current behaviour recorded, not asserted as correct, per the `open_gap_*` convention.
-/// INVERT every assertion when the clause is fixed.
-///
-/// Nothing could see this before. The only waitroom assertion in this file was in
-/// `you_ability_ends_and_discard_only_grows_at_end`, which takes NOTHING — and taking
-/// none IS everything, so that case cannot distinguish 「残り」 from "discard the lot".
-/// Every test that actually took cards asserted only the hand.
+/// Fixing either alone leaves the bug: (1) alone still stages a prompt that (2)
+/// wipes, and (2) alone still offers a prompt with nothing in it. (1) now tests
+/// reachability against the ELIGIBLE set — which also bounds the offered pick
+/// count honestly — and (2) returns early when the mover left a prompt standing.
 #[test]
-fn open_gap_you_taking_one_of_seven_leaves_the_rest_stranded_in_looked_at() {
+fn you_taking_one_of_seven_discards_the_remaining_six() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let you = game.id("PL!S-bp2-005-R\u{ff0b}");
@@ -203,21 +179,25 @@ fn open_gap_you_taking_one_of_seven_leaves_the_rest_stranded_in_looked_at() {
         "the look window is exactly 7, so a sentinel card below it is untouched"
     );
 
-    // OPEN GAP: the 6 cards the filter excluded are stranded. Expected, once fixed: the
-    // waitroom grows by 7 (1 optional cost + 「残り」 x6) and `looked_at_cards` is empty.
+    // The only eligible card is gone, so the ability ends here without a second
+    // prompt — there is nothing left the filter would let the player take.
+    assert!(
+        !game.has_pending_choice(),
+        "exhausting the eligible set must end the ability, not re-prompt with an \
+         empty option list"
+    );
+
+    // 「残りを控え室に置く」 covers the whole look of 7: the 6 excluded fillers
+    // plus the optional cost card discarded at activation.
     assert_eq!(
         game.state.player1.waitroom.cards.len() - waitroom_before,
-        1,
-        "OPEN GAP: only the cost card was discarded. Expected 1 + 「残りを控え室に置く」 \
-         x6 = 7 — the six fillers are excluded by card_type + heart_colors, so the \
-         cleanup never sees them. INVERT THIS when the clause covers the whole look."
+        7,
+        "1 optional cost + 「残りを控え室に置く」 x6"
     );
-    assert_eq!(
-        game.state.looked_at_cards.len(),
-        6,
-        "OPEN GAP: the 6 「残り」 are stranded in the looked-at buffer — in no zone, \
-         yet still readable as shared state by the next look-based card and by the \
-         opponent. INVERT THIS when they are discarded."
+    assert!(
+        game.state.looked_at_cards.is_empty(),
+        "no card may be left in the looked-at buffer: it is in no zone, yet still \
+         readable as shared state by the next look-based card and by the opponent"
     );
 }
 

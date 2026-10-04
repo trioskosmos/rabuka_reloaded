@@ -1,3 +1,81 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TOMBSTONE (2026-10-04) — THIS FILE IS NOT COMPILED. DO NOT WIRE IT.
+ *
+ * The question this pass was given was: is Rust's `alloc_counter.rs` reachable
+ * at all? Measured answer: NO, in every default build. The evidence, in the
+ * order it should be read:
+ *
+ *  1. engine/src/lib.rs:58-59
+ *         #[cfg(feature = "alloc_tracker")]
+ *         pub mod alloc_counter;
+ *     The whole module is behind a feature.
+ *
+ *  2. engine/Cargo.toml:82  `alloc_tracker = []`
+ *     and the `default` key is
+ *         ["env_logger","debug_conditions","rand","rmp-serde",
+ *          "bytecode_abilities","compact_card_data","serde_support"]
+ *     `alloc_tracker` is NOT in it, and neither is `profiling`.
+ *
+ *  3. engine/src/lib.rs:94-99 — with the module absent the process global
+ *     allocator is plain `std::alloc::System`:
+ *         #[cfg(not(feature = "alloc_tracker"))]
+ *         #[global_allocator]
+ *         static GLOBAL: std::alloc::System = std::alloc::System;
+ *     So in a default build NO allocation passes through CountingAllocator and
+ *     ALLOC_COUNT / BYTES_ALLOCATED never move.
+ *
+ *  4. The only LIBRARY call site, `maybe_arm`, is itself gated:
+ *     engine/src/core/game_state/abilities.rs:1917-1919
+ *         #[cfg(feature = "alloc_tracker")]
+ *         alloc_counter::maybe_arm("process_current_ability");
+ *     The other callers of maybe_arm/arm_alloc_trace are engine/src/bin/
+ *     {bench_profile,debug_alloc_trace,find_slow_paths,sim_bench}.rs, i.e.
+ *     BINARIES, and they reach it by opting in with `--features alloc_tracker`
+ *     (see docs/ALLOCATION_TARGETS.md:29).
+ *
+ *  5. The readers `alloc_count()` / `alloc_buckets()`
+ *     (engine/src/alloc_counter.rs:346, :358) are `#[cfg(feature =
+ *     "alloc_tracker")]`, and their only caller is `timer::Timer`
+ *     (engine/src/timer.rs:113/:120), which is itself
+ *     `#[cfg(feature = "profiling")]`. `timer::Timer::start` has five library
+ *     call sites (ability/vm.rs:252, ability/resolver.rs:1330/:1347/:1380,
+ *     ability/gates.rs:352) and ALL FIVE COMPILE OUT in a default build.
+ *
+ * Corroborated inside this repo, independently of my own reading:
+ * engine_c_wip/AUDIT_core_state.md:799 already records
+ *     "| D12 alloc counters see no traffic | 0 by construction
+ *       (`alloc_tracker` feature) | VERIFIED-NOOP, permanent |"
+ * CONCLUSION: every `rb_allocctr_*` in this file is DEAD-IN-RUST-TOO for the
+ * product. The 34 exports below are a faithful port of a module that does not
+ * exist in the build anyone runs, so wiring them would add 780 lines of
+ * allocation bookkeeping to a hot path in exchange for numbers that can only
+ * ever read zero. That is why this file is in neither SRC nor OBJ_LIB and why
+ * it stays that way.
+ *
+ * It also fails to compile under the one standard nobody here uses:
+ * `ATOMIC_VAR_INIT` was removed in C23, so `-std=c2x` rejects lines 33-43
+ * while `-std=c99` / `c11` / `c17` accept them. The project builds `-std=c11`
+ * (Makefile CFLAGS), so that is a non-issue and was NOT a reason for the
+ * verdict above.
+ *
+ * ── THE ONE PART THAT IS NOT DEAD, AND IS ALSO NOT IN THIS FILE ──────────
+ * The file's second half ports engine/src/core/runtime_flags.rs, which is NOT
+ * feature-gated: `logging_enabled()` has 43 library read sites and
+ * `action_display_enabled()` has 21 (18 of them in game/game_setup.rs:243-277).
+ * Its four writers, however, are called only from the engine/src/bin binaries
+ * (training, bench), so in every library build the flags are provably constant
+ * `true`, and a C engine that does not gate on them behaves identically. The C
+ * has already made and documented that substitution:
+ * game_state_core.c:757-769 gates
+ * gsc_rule_log_push on `rb_ability_debug_enabled()`, whose production writer
+ * now exists (src/web_server.c:883-886, RABUKA_RULE_LOG=1, matching
+ * engine/src/game/web_server.rs:3652-3655).
+ *
+ * So: tombstone, not wire. If a future card or benchmark needs live allocation
+ * counts, the change is to flip `alloc_tracker` into Rust's `default` feature
+ * set FIRST and re-measure — not to add this file to SRC.
+ * ═════════════════════════════════════════════════════════════════════════ */
+
 /* alloc_counter.c — C port of engine/src/alloc_counter.rs
  *                 + engine/src/core/runtime_flags.rs
  *

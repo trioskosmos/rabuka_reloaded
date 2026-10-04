@@ -513,11 +513,9 @@ fn evaluate(&self, gs: &GameState) -> f64 {
             return -1.0e9;
         }
     }
-    let own = features(gs, self.me);
-        let opp = gs.seat_player(1 - self.me);
-        let original_opp = self.root.seat_player(1 - self.me);
-        let (_, opp_blades, opp_cost) = board(gs, 1 - self.me);
-        let hand = value(&own, &self.base, self.deploy)
+let own = features(gs, self.me);
+    let opp = gs.seat_player(1 - self.me);
+    let hand = value(&own, &self.base, self.deploy)
             - 1000.0
                 * (opp.success_live_card_zone.cards.len() as f64 - self.opponent.success as f64)
             + opp_terms(

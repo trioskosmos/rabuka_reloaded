@@ -1348,24 +1348,11 @@ static int position_event_matches_filters(const struct GameState *g,
             if (!any) continue;
         }
         if (req_pos) {                                              /* :554-565 */
-            /* ⛔ BLOCKED-ON include/rabuka.h — RbPositionChangeEvent has only
-               {card_id, position}; Rust's PositionChangeEvent (types.rs) is
-               {moved_card_id, old_position, new_position, cause_card_id,
-               cause_player_id, effect_only}. `area_direction:"from"` compares
-               OLD_POSITION, which the C cannot represent, so the 2 corpus nodes
-               that carry it (cards 2483 / 2484 ab#0,
-               「自分のステージのセンターエリアにいるメンバーがエリアを移動したとき」)
-               take the `continue` below and this filter reports "did not match".
-               That is Rust's own answer for any event whose old_position is not
-               `center`, and it is NOT a guess — but it is not the whole rule,
-               so the field has to be added:
-               BLOCKED-ON: include/rabuka.h — RbPositionChangeEvent gains
-               `int old_position;` and rb_record_stage_position_swap writes
-               `source_index` / `target_index` into it (modifiers.rs:1821 /
-               :1832), after which this becomes
-               `int check_pos = is_from ? e->old_position : e->position;`. */
-            if (is_from) continue;
-            int check_pos = e->position;
+            /* state.rs:555-559 -- `area_direction:"from"` compares the event's
+               OLD position and everything else its NEW one. The field the first
+               half needs is RbPositionChangeEvent.old_position, which
+               rb_record_stage_swap now writes (modifiers.rs:1821 / :1832). */
+            int check_pos = is_from ? e->old_position : e->position;
             if (check_pos < 0 || check_pos >= (int)(sizeof(RB_POS_NAMES) /
                                                     sizeof(RB_POS_NAMES[0])) ||
                 strcmp(RB_POS_NAMES[check_pos], req_pos)) continue;
@@ -1431,6 +1418,46 @@ static int eval_movement(const struct GameState *g, int actor, int host_cid, con
             tm_match = in_batch;
         }
         return (pce_match || tm_match) && moved_cards_match_cost_limit(g, c);  /* :907 */
+    }
+
+    /* movement=="moved" — state.rs:865-868 routes this value to
+     * `evaluate_has_moved` (:1140-1178), which is the SECOND of the three
+     * `position_change_events` readers:
+     *
+     *     moved_cards_match_cost_limit(condition, gs)
+     *         && current_entry()
+     *               .and_then(|e| e.triggering_member_id)
+     *               .or(self.activating_card)
+     *               .is_some_and(|cid| gs.position_change_events.iter()
+     *                                 .any(|event| event.moved_card_id == cid))
+     *
+     * `moved_card_id` is `event.card_id` -- C's RbPositionChangeEvent
+     * (rabuka.h:1478-1494). It is a MEMBERSHIP test on one card id, not a filter:
+     * no position, no group, no self_target, and NO `area_direction`. That is
+     * deliberately narrower than the `position_change` arm above, which is why it
+     * needs its own case rather than falling into `has_any`.
+     *
+     * Before this the C had no arm for the value, so `movement:"moved"` fell
+     * through to `return has_any ? 1 : 0` -- true whenever ANY card had moved
+     * recently, false whenever none had. Corpus reachability, measured on
+     * cards/abilities.json: exactly **1** of the 46 `dynamic_count` nodes and 9 of
+     * the movement-condition nodes carry it ("moves" 8, "moved" 1), so this is a
+     * narrow fix.
+     *
+     * `triggering_member_id` is read from the current queue entry
+     * (RbQueueEntry.triggering_member_id, rabuka.h:1029); -1 is Rust's `None`,
+     * which is also what `queue_mint_dummy_entry` sets
+     * (ability_queue.c:485), so a minted dummy correctly falls through to
+     * `activating_card` exactly as Rust's `.or(...)` does. */
+    if (mv && !strcmp(mv, "moved")) {
+        int cid = -1;
+        if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
+            cid = g->queue.entries[g->queue.cur].triggering_member_id;
+        if (cid < 0) cid = g->activating_card;                   /* .or(activating) */
+        int hit = 0;
+        for (int i = 0; i < g->n_position_change_events; i++)    /* :1162 */
+            if (g->position_change_events[i].card_id == cid) { hit = 1; break; }
+        return hit && moved_cards_match_cost_limit(g, c);       /* :1164 */
     }
 
     /* movement=="baton_touch" routes to state.rs::evaluate_baton_touch_condition,

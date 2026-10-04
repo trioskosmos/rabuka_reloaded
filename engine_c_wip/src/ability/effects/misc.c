@@ -1042,6 +1042,31 @@ static int h_discard_until_count(GameState *g, int actor, const AbilityEffect *e
  * field. Keeping it a two-call read-then-clear (rather than exposing the struct)
  * is what preserves the Rust consume-once semantics. */
 int rb_rules_take_changed_state_members(GameState *g, int *out, int max);
+/* O3 -- the wait_immune arm, the same two-file split as the pair above. Rust has
+ * ONE restriction handler (engine/src/ability/effects/restriction.rs:26
+ * `execute_restriction`) which records both `wait_immune_members` and
+ * `cannot_activate_members`; the C has two, and this file's is the one that runs
+ * (executor.c:370, triggers.c:1207). The rules.c twin recorded the wait-immune
+ * list and nothing on the live path did, so rb_rules_is_wait_immune (rules.c,
+ * called from state.c:391 and :492) always answered "not immune" and the two
+ * candidate filters there never removed anything. See the full measurement and
+ * the reason the cannot_activate arm is NOT lifted in rules.c's own comment. */
+void rb_rules_record_wait_immune_by_effect(GameState *g, const AbilityEffect *e);
+/* The cannot_live twin, in rules.c (defined at rules.c:2426, declared for
+ * rb_rules_execute_restriction at rules.c:1883 and called there at :1967).
+ * h_restriction below is the SECOND handler for the same wire effect -- the
+ * C carries two, exactly as it does for wait_immune (rules.c:2322 vs this
+ * file's :1167) -- and it pushes the prohibition WITHOUT the rules.c latch, so
+ * g->rules.cannot_live_players stayed at its memset value on every path that
+ * arrives through h_restriction and rb_rules_cannot_live_player answered "may
+ * live". REACHABILITY, measured over the corpus: 2 abilities carry
+ * restriction_type "cannot_live", both target "self" -- PL!SP-bp1-001-{P,R}
+ * (澁谷かのん, 常時) and PL!HS-bp2-014-N (大沢瑠璃乃, 登場) -- and both reach
+ * h_restriction, whose `rtype` lookup already matched the string.
+ *
+ * Declared here for the same reason as its wait_immune sibling directly above:
+ * neither is in include/rabuka.h, and the definition is in rules.c. */
+void rb_rules_record_cannot_live_by_effect(GameState *g, int actor, const AbilityEffect *e);
 /* rules.c's own RB_RULES_MOVED_CAP (rules.c:49), repeated rather than copied:
  * the latch there is bounded by 16 and this buffer must not be smaller. */
 #define MISC_CHANGED_STATE_MEMBERS_CAP 16
@@ -1118,11 +1143,46 @@ static int h_restriction(GameState *g, int actor, const AbilityEffect *e){
             g->player_cannot_activate[tgt] = 1;
         }
     }
-    if(rtype && !strcmp(rtype,"cannot_live"))
+    if(rtype && !strcmp(rtype,"cannot_live")){
         push_prohibition(g,"cannot_live", e->target?e->target:"self");
-    if(rtype && !strcmp(rtype,"cannot_wait_by_effect"))
+        rb_rules_record_cannot_live_by_effect(g, actor, e);
+    }
+    if(rtype && !strcmp(rtype,"cannot_wait_by_effect")){
         push_prohibition(g,"cannot_wait_by_effect",
                          eff_extra(e,"group_names")?eff_extra(e,"group_names"):"");
+        /* ── ORPHANED LOGIC O3: THE MISSING ARM, LIFTED ─────────────────────
+           「…は相手の効果によってはウェイトしない」 — Rust's restriction.rs:26
+           handler records the CONTROLLER's own matching stage members as
+           wait-immune, per member, behind a blade-count filter, into
+           `GameState.wait_immune_members` (core/game_state/mod.rs:149).
+           engine/src/turn/phases.rs:281 empties that list each round.
+
+           Until now the ONLY producer of that list was rules.c's
+           rb_rules_execute_restriction, which has zero callers, while the
+           READER is production-wired (rb_rules_is_wait_immune, called from
+           src/ability/effects/state.c:391 and :492). So the filter that chooses
+           which members an opponent may be forced into WAIT could never remove
+           anything -- a check that can never fail, over the 48 of 985 corpus
+           abilities that force a member into WAIT from an activated/auto ability.
+           The shape that needs it is PL!SP-bp4-011-{P,P＋,R＋,SEC}, the
+           blade-count-gated forced wait on the opponent's stage.
+
+           The scan itself lives in rules.c, verbatim, as
+           rb_rules_record_wait_immune_by_effect, so the two handlers cannot
+           drift -- and it is NOT a delegation: h_restriction stays the live
+           handler and keeps the arms the twin does not have (the "cannot_activate"
+           third spelling, the s_activating_card logging, the Q280
+           changed-state_members victim list). The per-round clear that Rust gets
+           at phases.rs:281 is rb_rules_clear_turn_state, called from the
+           rollover in src/turn/phase.c.
+
+           WHAT IS DELIBERATELY NOT ADDED HERE: the cannot_activate arm's
+           `st->cannot_activate_members` write. Its reader
+           rb_rules_cannot_activate_player has zero callers, and the behaviour is
+           already live through g->player_cannot_activate below, which
+           state.c:235 reads -- so that write would be a dead write. */
+        rb_rules_record_wait_immune_by_effect(g, e);
+    }
     return 1;
 }
 

@@ -788,13 +788,24 @@ def member_has_hearts(need, count, all_of):
 def stranded_remainder_risk():
     """Abilities whose 「残り」 can strand cards in the looked-at buffer.
 
-    `discard_remaining` is implemented at `ability/choice.rs:1763` by taking the
-    remainder from `gs.revealed_cards`. 「残りを控え室に置く」 means the rest of the cards
-    that were looked at, which is larger when the select's filter leaves something
-    outside that set.
+    `discard_remaining` is implemented by taking the remainder from
+    `gs.looked_at_cards`. 「残りを控え室に置く」 means the rest of the cards that were
+    looked at, which is larger when the select's filter leaves something outside that
+    set.
 
-    CONFIRMED stranding: `PL!S-bp2-005-P | 渡辺 曜 (ab#0)`, pinned by
-    `open_gap_you_taking_one_of_seven_leaves_the_rest_stranded_in_looked_at` in
+    This was a REAL defect, fixed 2026-10-04, and it is kept here as the standing
+    starting point for the class rather than deleted:
+
+    - `handle_select_cards_looked_at` gated its 「select up to N more」 re-prompt on
+      `!remaining_cards.is_empty()`. A 「残り」 card is by definition one the filter
+      REJECTS, so once the eligible set ran out the guard still passed and built a
+      zero-option prompt;
+    - `handle_looked_at_selection` then fell through to `finalize_choice`, which
+      clears `awaiting.choice` unless `should_preserve` holds. The prompt was
+      destroyed and the remainder was never milled.
+
+    `PL!S-bp2-005-P | 渡辺 曜 (ab#0)` was the confirmed case, and is now pinned as a
+    working behaviour by `you_taking_one_of_seven_discards_the_remaining_six` in
     `look_seven_select_three_heart_member_test.rs`. Its file's only pre-existing
     waitroom assertion covered the take-NOTHING case, where 「残り」 and "everything"
     coincide — which is why the class was invisible.
@@ -802,7 +813,9 @@ def stranded_remainder_risk():
     CLEAN control: 米女 `PL!SP-bp5-007-AR` — identical `count`, `optional`, `reveal`
     and `discard_remaining`, no excluding filter, and it mills correctly.
 
-    This list is a starting point, not a count of broken cards.
+    The rows below are candidates the fix does NOT retroactively clear: the re-prompt
+    is now suppressed when nothing eligible remains, but a card that mangles the
+    remainder some other way would still appear here.
     """
     out = []
     for u in load_abilities()[0]:
@@ -2680,7 +2693,16 @@ def build_inventory():
     # `PL!SP-pb2-000-R`, which has eleven test files, and had ZERO of its own while
     # the report read 48/48. Report the variants separately rather than redefining
     # the existing metric.
+    #
+    # "No test names this print" is NOT by itself a gap, and reporting it as one
+    # would be the same overclaim this report already corrects elsewhere: 35 cards
+    # share 「このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚
+    # 手札に加える」, so an untested `P＋` print of it is exercised through any of the
+    # other 34. So each untested print is split by whether some OTHER print carrying
+    # the SAME printed ability is named in the test tree. Only the second group is a
+    # real gap; the first is a navigation gap at worst.
     variants_without_tests = []
+    variants_no_tested_twin = []
     # One pass over the whole test tree, not per-ability-row: a card can be exercised
     # by a test that covers a DIFFERENT ability on it, and a per-row check reported
     # `PL!SP-pb2-016-P＋` (which has its own file) as untested.
@@ -2699,6 +2721,13 @@ def build_inventory():
                 continue
             if c not in all_test_text:
                 variants_without_tests.append(c)
+                # Same row == same `full_text`, i.e. the ability as printed. A tested
+                # sibling is found on the row itself, so this stays O(1) per row
+                # instead of a second pass over the corpus per card.
+                if not any(
+                    other != c and other in all_test_text for other in r["cards"]
+                ):
+                    variants_no_tested_twin.append(c)
 
     # jidou (自動) multi-ability partners: same base card carries >=1 other ability
     idxs_by_base = defaultdict(set)
@@ -2745,6 +2774,10 @@ def build_inventory():
         "covered_cards": covered_cards,
         # Card VARIANTS (not bases) that no covering test file names at all.
         "variants_without_tests": variants_without_tests,
+        # ...of which no OTHER print carrying the same printed ability is named
+        # either. This is the subset that is a genuine coverage gap; the rest is
+        # exercised through a sibling print of the same ability.
+        "variants_no_tested_twin": variants_no_tested_twin,
         "abilities_on_covered": abilities_on_covered,
         "specific_requirements_total": sum(
             1 for r in rows
@@ -2873,6 +2906,7 @@ def render_coverage(inv):
     if not untested_sorted:
         w("_None — every ability's card is referenced by at least one test._")
         w("")
+
     by_trig = defaultdict(list)
     for r in untested_sorted:
         by_trig[r[2]].append(r)
@@ -2885,6 +2919,73 @@ def render_coverage(inv):
         for base, card, _tr, act, cond, text in sorted(grp, key=lambda r: r[0]):
             safe = text.replace("|", "/").replace("\n", " ")
             w(f"| `{card}` | {card_set(card)} | {act} | {cond} | {safe} |")
+        w("")
+
+    # Card PRINTS, not base identities. The gap table above is empty and the
+    # Overall block reads 809/809 while this list is not, and that is not a
+    # contradiction: a base counts as covered when ANY print of it is, which is
+    # right for ability coverage (the same printed text on the same base) but
+    # hides a specific card that no test ever names. `PL!SP-pb2-000-DUO` is the
+    # case this metric was added for — it shares both of its abilities with
+    # `PL!SP-pb2-000-R`, which has eleven test files, and had ZERO of its own.
+    #
+    # Why it matters rather than being a curiosity: a print is not an alias.
+    # `PL!SP-pb2-011-P` is debut-only and `PL!SP-pb2-011-R` adds 自動 + ライブ開始時,
+    # and `get_card_id` is deliberately lenient — an unknown rarity falls back to
+    # "any print of this base", so a typo resolves to a DIFFERENT print and the
+    # test stages the wrong card without failing. That is how a "known engine gap"
+    # turned out to be a typo once already (see the note above `get_card_id`).
+    w("## Untested card prints (variants)")
+    w("")
+    w("Card identities are counted by BASE, so the 809/809 above counts a base as covered when **any** print of it is referenced. This list is the other half: individual prints that no test file names at all — same base, different card.")
+    w("")
+    w("Scoped to PBLL02 on purpose. Elsewhere in the pool a card is routinely exercised by a shared engine test that never names it, which makes \"no file names this card\" meaningless; the PBLL02 convention is one test file per card, which makes the signal exact. Read it as a floor for the rest of the pool, not as a count of untested cards.")
+    w("")
+    w("**\"No test names this print\" is not by itself a gap**, and the split below is the point: 35 cards share 「このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える」, so an untested `P＋` print of it is exercised through any of the other 34. Treating the raw count as a gap count would overclaim the same way the Jidou section above corrects.")
+    w("")
+    vwt = inv.get("variants_without_tests", [])
+    real = inv.get("variants_no_tested_twin", [])
+    real_set = set(real)
+    proxied = [v for v in vwt if v not in real_set]
+    if real:
+        w(f"**{len(vwt)} prints are named by no test file, and {len(real)} of those are genuine gaps** — the printed ability itself is untested, because no other print carrying that same ability is named either. The other {len(proxied)} are exercised through a sibling print of the same ability.")
+    else:
+        w(
+            f"**All {len(vwt)} are exercised through a sibling print of the same ability** — "
+            "no print's ability is untested. No test names these prints individually, so they "
+            "are a navigation gap (searching by card number finds nothing) and not a coverage "
+            "gap."
+        )
+    w("")
+    if real:
+        w("### Genuine gaps — the printed ability is untested")
+        w("")
+        w("| Print | Base | Ability |")
+        w("|---|---|---|")
+        for v in real:
+            ability = next(
+                (
+                    r["full_text"].split("\n")[0]
+                    for r in rows
+                    if v in r["cards"]
+                ),
+                "",
+            )
+            safe = ability.replace("|", "/").replace("\n", " ")
+            w(f"| `{v}` | `{card_base(v)}` | {safe[:90]} |")
+        w("")
+    else:
+        w("_None — every untested print shares its printed ability with a tested one._")
+        w("")
+    if proxied:
+        w("### Prints no test names individually")
+        w("")
+        w("Listed so the count above is auditable, not because they need work. The ability is covered through a sibling print of the same printed text; what is missing is only a test that names this card number, which matters when someone looks a card up by number and finds nothing.")
+        w("")
+        w("| Print | Base |")
+        w("|---|---|")
+        for v in proxied:
+            w(f"| `{v}` | `{card_base(v)}` |")
         w("")
 
     # jidou (自動) interaction coverage

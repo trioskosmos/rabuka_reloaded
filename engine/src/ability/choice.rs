@@ -2001,7 +2001,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                 return Ok(());
             }
 
-            if is_select_cards && !valid.is_empty() {
+            if !valid.is_empty() {
                 let sa = select_action_entry.as_ref();
                 let any_number = sa.and_then(|s| s.any_number_any()).unwrap_or(false);
                 let is_max = sa.and_then(|s| s.max).unwrap_or(false);
@@ -2057,6 +2057,27 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                     return Ok(());
                 }
             }
+
+            // Nothing re-prompted above, but the MOVER may still have staged a
+            // choice of its own — the 「select up to N more」 prompt, reached when
+            // `can_reprompt` above was narrower than the mover's own test. That
+            // is a LIVE prompt, and falling through to `finalize_choice` clears
+            // it: `should_preserve` only holds for a looked_at choice with queued
+            // sequential actions. The remainder would then be left sitting in
+            // `gs.looked_at_cards` — in no zone, yet still readable as shared
+            // state by the next look-based card and by the opponent.
+            //
+            // The test is safe in both directions because the mover clears
+            // `awaiting.choice` itself on every path that does NOT stage one
+            // (return-to-origin, the looked_at intermediate leg, and the final
+            // `self.awaiting.choice = None`), so `is_some()` here means exactly
+            // "the mover left a prompt standing".
+            if self.awaiting.choice.is_some() {
+                log::debug!(
+                    "[CHOICE] looked_at: keeping the prompt staged by handle_select_cards_looked_at instead of finalizing"
+                );
+                return Ok(());
+            }
         } else {
             self.handle_select_cards_looked_at(
                 gs,
@@ -2064,6 +2085,12 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                 ctx.destination.clone(),
                 ctx.discard_remaining,
             )?;
+            if self.awaiting.choice.is_some() {
+                log::debug!(
+                    "[CHOICE] looked_at: keeping the prompt staged by handle_select_cards_looked_at instead of finalizing"
+                );
+                return Ok(());
+            }
         }
         self.finalize_choice(gs, context)
     }

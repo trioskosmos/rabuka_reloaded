@@ -452,23 +452,56 @@ static void advance_to_live_start(TestGame *tg)
     test_pass(tg);
 }
 
-/* Walks forward until the ライブ成功時 dispatch is on screen or p1's success is
- * already recorded. It STOPS on a standing prompt, never past it.
- * (test_advance_to_phase(RB_PHASE_PERFORMANCE_SECOND) is deliberately NOT used:
- * it destroys the yell window and answers every standing prompt with index 0.) */
-/* Walks forward until the ライブ成功時 dispatch is actually ON SCREEN. It STOPS
- * on the prompt, never past it, and it deliberately does NOT treat
- * state.live_success[] as terminal: measured, that flag is already 1 one pass
- * BEFORE the ability's choice is raised, so returning on it makes the caller's
- * "the choice is offered" check silently vacuous.
+/* Walks forward until the ライブ成功時 dispatch is actually ON SCREEN, and
+ * NEVER PAST THE ROUND BOUNDARY.
+ *
+ * TWO BOUNDS, both load-bearing:
+ *
+ *  1. It STOPS on the prompt, never past it, and it deliberately does NOT treat
+ *     state.live_success[] as terminal: measured, that flag is already 1 one
+ *     pass BEFORE the ability's choice is raised, so returning on it makes the
+ *     caller's "the choice is offered" check silently vacuous (c3 depends on
+ *     the walk still being on screen when it asserts its SelectTarget).
+ *
+ *  2. It returns as soon as the round that PRODUCED the dispatch is complete,
+ *     and can never walk into a later one. This is the same discipline
+ *     advance_to_live_set (5 passes) and advance_to_live_start (2 passes) use:
+ *     each is bounded so it cannot cross a round boundary. The fixed 10-pass
+ *     bound did NOT have that property, and that is the whole defect.
+ *
+ *     MEASURED, per pass, walking e2's board (phase/turn/hand/live_success/
+ *     queue): pass 1 lands in RB_PHASE_VICTORY with this round's determination
+ *     already run (queue 0 -> 1); pass 2 is the rollover, and it ends at
+ *     phase=RB_PHASE_ACTIVE turn+1; pass 3 is the Active ENTRY, where
+ *     rb_reset_keyword_tracking (phase.c:372, Rust phases.rs:98) clears
+ *     live_success[0..1] (tracking.c:56-57); pass 5 is the next round's DRAW
+ *     phase, which adds a card to p1's hand. The old 10-pass bound ran all of
+ *     that, so it ended at phase=5 having asserted a per-turn flag on a state
+ *     the engine had just, correctly, turned over -- reading (phase=5,
+ *     success=0). Before O1 the call site did not exist, the flag latched, and
+ *     the read came out of the PREVIOUS round and passed. O1 is right (Rust
+ *     does it twice per round) and the assertion is right; the bound was wrong.
+ *
+ *     The two return points below are ordered so the PROMPT always wins: c3
+ *     asserts the ライブ成功時 choice is on screen, and a raised prompt means the
+ *     determination is still in flight.
+ *
  * (test_advance_to_phase(RB_PHASE_PERFORMANCE_SECOND) is deliberately NOT used:
  * it destroys the yell window and answers every standing prompt with index 0.) */
 static int advance_to_live_success(TestGame *tg)
 {
+    const int round_at_entry = tg->state.turn;
     for (int i = 0; i < 10; i++) {
         if (pending(tg)) return 1;
+        if (tg->state.turn != round_at_entry) return 0;
         test_pass(tg);
         if (pending(tg)) return 1;
+        /* The determination that produced this round's ライブ成功時 dispatch has
+         * run and the phase machine is parked in VICTORY (or DONE). Everything the
+         * callers assert is this round's, so stop HERE. */
+        if (tg->state.phase == RB_PHASE_VICTORY ||
+            tg->state.phase == RB_PHASE_DONE) return 1;
+        if (tg->state.turn != round_at_entry) return 0;
         drain_choices(tg, 4);
     }
     return pending(tg);

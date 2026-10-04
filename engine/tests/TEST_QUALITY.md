@@ -81,7 +81,7 @@ _file drains a prompt with index [0] AND asserts an absence, while naming a card
 | `engine/tests/test_modules/effects/look_select/look_and_filter/card_filter_test.rs` | `PL!-bp6-002-R,PL!-bp6-004-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/look_at_deck_top_optional_discard_test.rs` | `PL!-sd1-015-SD` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/look_count_from_total_live_score_test.rs` | `PL!-sd1-015-SD` | 1 |  |
-| `engine/tests/test_modules/effects/look_select/look_and_filter/look_seven_select_three_heart_member_test.rs` | `PL!S-sd1-003-SD,PL!SP-bp5-007-AR` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/look_seven_select_three_heart_member_test.rs` | `PL!S-sd1-003-SD` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/mei_debut_optional_cost_look_five_take_one_liella_member_test.rs` | `PL!SP-bp2-007-P` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/no_blade_heart_group_look_test.rs` | `PL!N-bp7-018-N` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/or_card_types_heart05_threshold_look_test.rs` | `PL!S-pb1-015-N` | 1 |  |
@@ -186,11 +186,14 @@ _confusable card numbers (bp2 vs pb2) staged in one file with NO card-identity p
 
 None.
 
-## duplicate_stage_id (0)
+## duplicate_stage_id (2)
 
 _the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`) — not a legal board; anything that counts members or dedupes by name measures a board that cannot occur, so use a second `new_id`_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/integration/choice_player_id_routing_test.rs` | `both_seats_live_start_abilities_get_distinctly_stamped_prompts` | 179 | shizuku in 3 slots |
+| `engine/tests/test_modules/integration/choice_player_id_routing_test.rs` | `both_seats_live_start_abilities_get_distinctly_stamped_prompts` | 179 | shizuku in 3 slots |
 
 ## count_inequality_only (0)
 

@@ -2463,9 +2463,53 @@ fn trigger_auto_ability_by_index_refs(
             };
             return Some(active.to_string());
         }
-        self.ability_queue
-            .current_entry()
-            .and_then(|e| e.choice_player_id.as_ref().cloned())
+        let entry = self.ability_queue.current_entry();
+        // A REAL entry always carries a stamp: `pause_for_choice` applies the universal
+        // default from the entry's own `player_id` before parking the choice
+        // (`ability/queue.rs`, "Universal default"). So a `None` here can only be the
+        // dummy entry that `pause_for_choice` synthesises when the queue is `Idle` —
+        // that one is created with an empty `player_id`, so it is identifiable exactly.
+        //
+        // Without a stamp here the choice is not merely unlabelled: `web_server.rs`
+        // DROPS the whole `pending_choice` object when `choice_player_id` is missing,
+        // so in PVP the prompt is hidden from BOTH seats and the game waits for an
+        // answer that can never arrive. The owner of a choice raised outside the queue
+        // is whoever the game is currently waiting on — the active player.
+        match entry {
+            Some(e) if e.choice_player_id.is_none() && e.player_id.is_empty() => {
+                // …but only when the CHOICE does not name an owner itself. A `picker` /
+                // `target_player_id` of `p2` is a deliberate routing decision and is MORE
+                // specific than "whoever is active"; fabricating a stamp here would
+                // override it, and the observation layer reads those fields to build its
+                // per-viewer view (`bot/observation.rs`), so overriding them makes an
+                // opponent-only prompt visible to the wrong seat.
+                //
+                // Only an ABSOLUTE seat counts. `self` / `opponent` are relative and
+                // resolve against the owning entry, so they identify nobody — which is
+                // exactly the case this fallback exists for.
+                if let Some(c) = self.get_pending_choice() {
+                    let absolute = |s: &str| matches!(s, "p1" | "p2" | "player1" | "player2");
+                    let names_owner = match c {
+                        crate::ability::types::Choice::SelectCard {
+                            picker,
+                            target_player_id,
+                            ..
+                        } => {
+                            picker.as_deref().is_some_and(absolute)
+                                || target_player_id.as_deref().is_some_and(absolute)
+                        }
+                        crate::ability::types::Choice::SelectAutoAbility { .. }
+                        | crate::ability::types::Choice::SelectLiveSuccess { .. } => true,
+                        _ => false,
+                    };
+                    if names_owner {
+                        return None;
+                    }
+                }
+                Some(self.active_player().id.to_string())
+            }
+            other => other.and_then(|e| e.choice_player_id.clone()),
+        }
     }
 
     /// Inject card and ability identity into the pending_choice JSON so the frontend

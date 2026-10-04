@@ -1,45 +1,56 @@
-/// 矢澤にこ `PL!-pb2-018-P＋` **ab#0** — a documented PARSER GAP, pinned.
+/// 矢澤にこ `PL!-pb2-018-P＋` **ab#0** — both halves of an optional offer + payout.
 ///
 ///   相手のステージにいるウェイト状態のメンバーを3人までアクティブにしてもよい。
 ///   そうしたとき、これによりアクティブにしたメンバー1人につき、カードを1枚引く。
 ///
-/// # The gap
+/// # This file used to pin a PARSER GAP. It is now inverted (2026-10-04)
 ///
 /// The sentence has two halves. 「ウェイト状態のメンバーを3人までアクティブにしてもよい」
 /// is an optional player choice; 「これによりアクティブにしたメンバー1人につき、カードを
 /// 1枚引く」 is a payout scoped to what that choice activated.
 ///
-/// Only the payout survived. The parsed effect (`cards/abilities.json:14274-14293`) is
+/// Only the payout used to survive. The parse was a bare
 ///
 ///     condition  state_condition { state: "wait", target: "opponent", … }
 ///     count      1
 ///     action     draw_card
 ///     per_unit   true, per_unit_count 1, per_unit_type "人"
 ///
-/// and contains **no action that activates anything** — no `change_state`, no
-/// `state_change: "active"`. Resolving ab#0 therefore offers no choice beyond the
-/// debut-order prompt, which is exactly what a prompt trace of the engine shows.
+/// with **no action that activates anything** — no `change_state`, no
+/// `state_change: "active"` — so resolving ab#0 offered no choice at all. Two things were
+/// lost with it: the 「3人まで」 cap, and the 「てもよい」 optionality. The card drew 1 for
+/// merely *having* a waited member on the opponent's stage.
 ///
-/// This is asserted rather than described because it is the kind of gap that gets
-/// "fixed" by someone reading only the engine: an implementation that simply pays out
-/// per opponent waited member on every debut of this card looks plausible, and no test
-/// would object, because none of them asked whether the choice existed.
+/// The gap was tracked here rather than in `PARSER_NOTES.md` alone, which is what made it
+/// findable: this file's own header said to invert the assertions when the activation half
+/// parsed. That is now done, and the shape is pinned below.
+///
+/// # Why `sequential` + `conditional`, not `conditional_on_optional`
+///
+/// The natural-looking shape is the one the parser uses for every 「〜してもよい。そうした
+/// とき、〜」 (ミア, 花帆, 澁谷かのん): `conditional_on_optional` with an `optional_action` and
+/// a `conditional_action`. **That is wrong here.** `execute_conditional_on_optional` treats
+/// the offer as a COST — it presents a Skip/Pay choice and runs the consequence on Pay.
+/// Activating the opponent's members is an effect, not a payment; filing it as a cost
+/// would let a player "pay" by waking nobody. Action-shaped optionals go through
+/// `sequential` + `conditional: true`, the same route DIVE! takes (see the NOTE in
+/// `parser.py` above `_try_conditional`'s caller).
 ///
 /// # What is deliberately NOT asserted
 ///
-/// The engine's actual payout for ab#0. With the activation missing, `per_unit` over
-/// `per_unit_type: "人"` is ambiguous between "per member the player activated" and "per
-/// waited member on the opponent's stage", and a test that picked one of those readings
-/// would be asserting a decision nobody has made rather than a behaviour the card
-/// specifies.
+/// The engine's actual payout for ab#0. With the offer parsed, `per_unit` over
+/// `per_unit_type: "人"` should mean "per member the player activated" — that is the
+/// printed reading — but no test here resolves the ability end to end, because the sibling
+/// file's tests all resolve the debut-order prompt with `select_indices(&[1])` and this
+/// ability's own prompt is a separate question. Asserting a payout nobody has watched
+/// resolve would be pinning a guess; what is pinned here is the PARSE, which is what was
+/// actually broken.
 ///
 /// # Coverage context
 ///
 /// The sibling ability is covered thoroughly by
 /// `pb2_discard_three_distinct_bibi_waits_foe_pl_pb2_018_p_plus_test.rs`, including a
-/// parse-level pin in the same spirit (`the_cost_requires_three_distinct_names`). Every
-/// test in that file resolves the debut-order prompt with `select_indices(&[1])`, so
-/// ab#0 has never been exercised from the test suite at all.
+/// parse-level pin in the same spirit (`the_cost_requires_three_distinct_names`).
 ///
 /// Read through `serde_json` rather than through typed accessors, matching
 /// `the_cost_requires_three_distinct_names` in that sibling file: a missing accessor
@@ -50,109 +61,146 @@ use serde_json::Value;
 
 const ERI: &str = "PL!-pb2-018-P＋";
 
-/// ab#0's parsed effect, as JSON plus the two per-unit values read through the
-/// typed accessors.
+/// ab#0's ability, located by shape: a 登場 `sequential` of exactly two legs whose second
+/// is a `draw_card`.
 ///
-/// Two routes because neither covers everything: `per_unit` is not serialised, so the
-/// JSON cannot see it, while `state_change` reads cleanly there and has no accessor
-/// worth guessing at. Both are read while `effect` is still borrowed, so the returned
-/// values are owned.
+/// Located by shape rather than by index or by root action: the index is exactly what a
+/// parser change would renumber, and hard-coding the old root action (`draw_card`) would
+/// make this finder stop matching the moment the gap was closed — which is what happened
+/// on the first attempt at inverting these tests.
 ///
-/// Located by shape rather than by index: the index is exactly what a parser change
-/// would renumber, and a test hard-coding `abilities()[0]` would then point at the wrong
-/// ability and pass for the wrong reason.
-fn debut_draw_effect(game: &TestGame) -> (Value, Option<u8>, Option<String>) {
+/// `conditional` is read here because it decides the ORDER of operations: the payout must
+/// not run unless the offer was taken.
+fn debut_draw_ability(game: &TestGame) -> std::sync::Arc<rabuka_engine::card::Ability> {
     let card = game
         .db
         .get_card(game.id(ERI))
         .expect("矢澤にこ must be in cards.json")
         .clone();
-    // `resolved_abilities()` yields `Arc<Ability>` by value. Collected into a `Vec` so
-    // the abilities — and the `&AbilityEffect` borrowed from each — outlive the search.
-    let abilities = card.resolved_abilities().collect::<Vec<_>>();
-    for ability in &abilities {
+    for ability in card.resolved_abilities() {
         if ability.triggers.as_deref() != Some("登場") {
             continue;
         }
         let Some(effect) = ability.effect.as_deref() else {
             continue;
         };
-        let value = serde_json::to_value(effect).expect("an effect must serialize");
-        if value.get("action").and_then(Value::as_str) == Some("draw_card") {
-            return (
-                value,
-                effect.per_unit_count_any(),
-                effect.per_unit_type_any().map(str::to_string),
-            );
+        if effect.action != rabuka_engine::ability::enums::ActionType::Sequential {
+            continue;
+        }
+        let legs = effect
+            .compound
+            .actions
+            .as_ref()
+            .expect("a sequential carries its legs");
+        if legs.len() == 2
+            && legs[1].action == rabuka_engine::ability::enums::ActionType::DrawCard
+        {
+            return ability;
         }
     }
-    panic!("ab#0 parses to a 登場 ability whose action is draw_card")
+    panic!("ab#0 does not parse to a two-leg sequential ending in a draw_card")
 }
 
-/// The gap, stated as a test.
+/// The activation half IS represented — the gap this file was written to pin is closed.
 ///
-/// INVERT these assertions when the activation half is parsed. They fail today on
-/// purpose: a green suite here would mean the gap is gone, which is the point.
+/// The sentence has two halves. 「ウェイト状態のメンバーを3人までアクティブにしてもよい」
+/// is an optional player choice; 「これによりアクティブにしたメンバー1人につき、カードを
+/// 1枚引く」 is a payout scoped to what that choice activated. Only the payout used to
+/// survive; the parse now carries both, wired so the payout depends on the offer.
+///
+/// The shape is `sequential` + `conditional`, NOT `conditional_on_optional`:
+/// `execute_conditional_on_optional` presents the offer as a Skip/Pay CHOICE and runs the
+/// consequence on Pay, which is a cost-shaped contract. Activating the opponent's members
+/// is an effect, not a payment — misfiling it as a cost would let a player "pay" by waking
+/// nobody. Action-shaped optionals go through the sequential pipeline, the same route
+/// DIVE! takes (see the note in `parser.py` above `_try_conditional`'s caller).
 #[test]
-fn niko_debut_draw_ability_has_no_activation_action() {
+fn niko_debut_draw_ability_carries_the_activation_half() {
     let db = load_real_database();
     let game = TestGame::new(db);
-    let (effect, _per_unit_count, _per_unit_type) = debut_draw_effect(&game);
+    let ability = debut_draw_ability(&game);
+    let effect = ability.effect.as_deref().expect("has an effect");
 
-    // No activation. An activation would be a `change_state` carrying
-    // `state_change: "active"`; there is none, and no nested action of any kind.
-    assert_ne!(
-        effect.get("action").and_then(Value::as_str),
-        Some("change_state"),
-        "GAP: 「ウェイト状態のメンバーを3人までアクティブにしてもよい」 has no \
-         representation — expected a change_state with state_change \"active\""
-    );
-    assert!(
-        effect.get("state_change").is_none(),
-        "GAP: no `state_change` key at all, so nothing in this effect can move a member \
-         from wait to active; effect={effect}"
-    );
-
-    // The cap is gone too: 「3人まで」 bounds a choice, and with no choice there is
-    // nothing for it to bound. `count` is 1 — that is 「カードを1枚引く」, the payout,
-    // not the number that may be activated.
     assert_eq!(
-        effect.get("count").and_then(Value::as_i64),
-        Some(1),
-        "GAP: 「1人につき」 survives as per_unit_count, but 「3人まで」 — the cap on how \
-         many may be activated — is not in the parse; effect={effect}"
+        effect.conditional,
+        Some(true),
+        "the payout depends on the offer, so the container is a CONDITIONAL sequential"
+    );
+
+    let legs = effect.compound.actions.as_ref().expect("two legs");
+    let offer = legs[0].as_ref();
+
+    assert_eq!(
+        offer.action,
+        rabuka_engine::ability::enums::ActionType::ChangeState,
+        "「ウェイト状態のメンバーを3人までアクティブに」 — expected the activation leg"
+    );
+    assert_eq!(
+        offer.state_change_any(),
+        Some("active"),
+        "ウェイト状態 → アクティブ"
+    );
+    assert_eq!(
+        offer.target_any(),
+        Some("opponent"),
+        "相手のステージにいる…ウェイト状態のメンバー"
+    );
+    assert_eq!(
+        offer.card_type_any(),
+        Some(&rabuka_engine::card::CardType::Member),
+        "the offer acts on メンバー"
+    );
+    assert_eq!(
+        offer.count,
+        Some(3),
+        "「3人まで」 is the CAP on how many may be activated — the field the old parse lost"
+    );
+    assert_eq!(
+        offer.max,
+        Some(true),
+        "「まで」 makes 3 a ceiling, not an exact count: waking one member is allowed"
+    );
+    assert_eq!(
+        offer.optional,
+        Some(true),
+        "「…にしてもよい」 — the offer is the player's may-I choice, which is what the old \
+         parse dropped along with the cap"
     );
 }
 
-/// The per-unit payout IS represented, so the gap is confined to the activation.
+/// The per-unit payout is represented AND now hangs off the activation.
 ///
-/// Separate from the test above so closing the activation gap cannot silently change
-/// what is being protected: 「これにより…1人につき」 is in the parse as `per_unit` with
-/// `per_unit_count: 1`, and that half is intact.
+/// Separate from the test above so a future change to either half is visible on its own.
+/// 「これにより…1人につき」 is `per_unit` with `per_unit_count: 1`, and 「自分のデッキ」 → 手札
+/// is the draw.
 #[test]
 fn niko_debut_draw_payout_per_unit_is_parsed() {
     let db = load_real_database();
     let game = TestGame::new(db);
-    let (effect, per_unit_count, per_unit_type) = debut_draw_effect(&game);
+    let ability = debut_draw_ability(&game);
+    let effect = ability.effect.as_deref().expect("has an effect");
+    let legs = effect.compound.actions.as_ref().expect("two legs");
+    let payout = legs[1].as_ref();
 
     assert_eq!(
-        per_unit_count,
+        payout.action,
+        rabuka_engine::ability::enums::ActionType::DrawCard,
+        "カードを1枚引く"
+    );
+    assert_eq!(payout.per_unit_any(), Some(true), "1人につき");
+    assert_eq!(
+        payout.per_unit_count_any(),
         Some(1),
-        "「これによりアクティブにしたメンバー1人につき、カードを1枚引く」 — the per-unit \
-         shape survives parsing even though the activation it counts does not"
+        "「これによりアクティブにしたメンバー1人につき、カードを1枚引く」"
     );
     assert_eq!(
-        per_unit_type.as_deref(),
+        payout.per_unit_type_any(),
         Some("人"),
         "the unit counted is a 人, i.e. a member"
     );
+    assert_eq!(payout.source_any().as_deref(), Some("deck"), "自分のデッキ");
     assert_eq!(
-        effect.get("source").and_then(Value::as_str),
-        Some("deck"),
-        "自分のデッキ"
-    );
-    assert_eq!(
-        effect.get("destination").and_then(Value::as_str),
+        payout.destination_any().as_deref(),
         Some("hand"),
         "手札に加える"
     );

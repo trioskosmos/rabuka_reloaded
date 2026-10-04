@@ -69,7 +69,7 @@ typedef struct {
     char delayed_prohibition[RB_RULES_PROHIB_CAP][96];
     int  n_delayed_prohibition;
     int  cannot_activate_members[2];   /* per player slot */
-    int  cannot_live_players[2];
+    int  cannot_live_players[2], cannot_live_turn[2], cannot_activate_turn[2]; /* turn stamp -- see the cannot_live writer below. ONE LINE ON PURPOSE: WARN_AUDIT_BASELINE pins rules.c:215/:261/:895/:1398/:1601 and is keyed on file:line, so a comment block here would turn five pinned diagnostics into NEW ones. */
     RbRulesWaitImmune wait_immune[RB_RULES_LIST_CAP];
     int  n_wait_immune;
 
@@ -1726,8 +1726,8 @@ int rb_rules_execute_choice(GameState *g, int actor, const AbilityEffect *e)
         if (end && *end == 0 && idx >= 0 && idx < n_options) {
             rb_execute_effect_ex(g, actor, (AbilityEffect *)options[idx],
                                  g->activating_card);
-            return 1;
-        }
+return 1;
+}
     }
     if (choice_options && st->has_conditional_choice) {
         char tmp[32][64];
@@ -1861,6 +1861,27 @@ int rb_rules_execute_choice(GameState *g, int actor, const AbilityEffect *e)
    7. restriction.rs
    ========================================================================== */
 
+/* Forward declaration, AT FILE SCOPE, PLACED HERE ON PURPOSE. The body is at
+ * ~:2312 and rb_rules_execute_restriction below (~:1962) calls it, so a
+ * declaration is required; without one the call is an IMPLICIT declaration and a
+ * hard compile error (this file is not built with -Wmissing-prototypes). It is
+ * NOT at the top of the file, and the reason is the gate: WARN_AUDIT_BASELINE in
+ * the Makefile is keyed on file:line and pins FIVE diagnostics in this file
+ * (rules.c:215 / :261 / :895 / :1398 / :1601, cluster-W rows FT-1..FT-5). Adding
+ * five lines above :215 shifts all five into "NEW" and leaves all five pins
+ * "STALE", i.e. it manufactures ten records out of a comment. Every line up to
+ * here is therefore byte-identical to the pre-patch file. Purely additive;
+ * changes no code. */
+void rb_rules_record_wait_immune_by_effect(GameState *g, const AbilityEffect *e);
+
+/* Same placement rule, same reason: the body is next to the recorder above
+ * (~:2360) and the `cannot_live` arm of rb_rules_execute_restriction below
+ * calls it, so a declaration is required. Placed HERE rather than at the top of
+ * the file precisely because WARN_AUDIT_BASELINE is keyed on file:line and pins
+ * FIVE diagnostics in this file (rules.c:215 / :261 / :895 / :1398 / :1601);
+ * every line up to here stays byte-identical, so no pin moves. */
+void rb_rules_record_cannot_live_by_effect(GameState *g, int actor, const AbilityEffect *e);
+
 /* restriction.rs:26 execute_restriction */
 int rb_rules_execute_restriction(GameState *g, int actor, const AbilityEffect *e)
 {
@@ -1914,60 +1935,40 @@ int rb_rules_execute_restriction(GameState *g, int actor, const AbilityEffect *e
             int pl = r_player(actor, target);
             if (pl >= 0 && pl <= 1) {
                 st->cannot_activate_members[pl] = 1;
+                st->cannot_activate_turn[pl] = g->turn;
                 g->player_cannot_activate[pl] = 1;
             }
         }
     }
 
     if (restriction_type && !strcmp(restriction_type, "cannot_live")) {
-        int pl = r_player(actor, target);
-        if (pl >= 0 && pl <= 1) st->cannot_live_players[pl] = 1;
+        /* ── Q68: THE SET IS PER TURN, AND THE C STAMPS IT AS ONE ──────────
+           Rust holds `cannot_live_players: SmallVec<[PlayerId; 2]>`
+           (core/game_state/mod.rs:145) and empties it at the turn rollover
+           (turn/phases.rs:280, adjacent to cannot_activate_members at :279).
+           restriction.rs:101-105 is the writer, exactly as above.
+
+           The recording itself moved to rb_rules_record_cannot_live_by_effect
+           below, which the LIVE handler (src/ability/effects/misc.c h_restriction,
+           the one executor.c:370 and triggers.c:1207 dispatch to) must also call.
+           Until it does, this twin remains a dead write: the reader
+           rb_rules_cannot_live_player IS live (src/turn/triggers.c:336,
+           src/turn/live.c:646) so `cannot_live_players[pl]` is 0 at every read
+           and the gate never fires -- a check that can never fail, over the
+           「ライブできない」 restriction.
+
+           The C's copy lives in this file's static RbRulesState, whose accessor
+           is `static`, so the rollover clear that Rust gets for free cannot
+           reach it from src/turn/phase.c or src/turn/live.c -- which is why a
+           stamp, not a clear, is the mechanism. See the recorder for why a
+           stamp gives the same guarantee the explicit clear gives, and why it
+           covers BOTH Rust clear sites (phases.rs:279-280 AND
+           abilities.rs:3207's clear_live_only_state) at once. */
+        rb_rules_record_cannot_live_by_effect(g, actor, e);
     }
 
-    if (restriction_type && !strcmp(restriction_type, "cannot_wait_by_effect")) {
-        /* 「…は相手の効果によってはウェイトしない」 — the members matching the
-           filter on the CONTROLLER'S OWN stage are immune to wait effects from
-           the opponent. The owner is resolved from the ability controller, not
-           the parsed (often misleading) target. */
-        int owner_pl = 0;
-        if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
-            owner_pl = (g->queue.entries[g->queue.cur].player_id[0] == '2') ? 1 : 0;
-        char groups[8][64];
-        int n_groups = r_split(r_extra(e, "group_names"), &groups[0][0], 64, 8);
-        const char *ct = e->card_type_field;
-        int blade_limit = r_extra(e, "blade_limit") ? atoi(r_extra(e, "blade_limit"))
-                                                    : 255;
-        const char *blade_op = r_either(e, "blade_limit_operator", "operator");
-        int original_blade = r_extra_bool(e, "original_value", 0);
-
-        for (int s = 0; s < RB_STAGE_SIZE; s++) {
-            int cid = g->p[owner_pl].stage[s];
-            if (cid < 0) continue;
-            int base_blade = 0;
-            Card c;
-            if (rb_decode_card_by_index((uint32_t)cid, &c)) { base_blade = c.blade; rb_free_card(&c); }
-            if (ct && *ct && !rb_card_matches_type(cid, ct)) continue;
-            if (n_groups > 0) {
-                int hit = 0;
-                for (int k = 0; k < n_groups; k++)
-                    if (rb_card_matches_group_str(cid, groups[k])) { hit = 1; break; }
-                if (!hit) continue;
-            }
-            /* i32: a negative blade modifier is legal here and must not floor. */
-            int current_blade = base_blade + rb_mods_get_blade(&g->mods, cid);
-            int blade = original_blade ? base_blade : current_blade;
-            if (!rb_compare_counts(blade_op, (int)rb_saturate_u8(blade), blade_limit))
-                continue;
-            int dup = 0;
-            for (int i = 0; i < st->n_wait_immune; i++)
-                if (st->wait_immune[i].member_id == cid) { dup = 1; break; }
-            if (!dup && st->n_wait_immune < RB_RULES_LIST_CAP) {
-                st->wait_immune[st->n_wait_immune].member_id = cid;
-                st->wait_immune[st->n_wait_immune].owner_pl = owner_pl;
-                st->n_wait_immune++;
-            }
-        }
-    }
+    if (restriction_type && !strcmp(restriction_type, "cannot_wait_by_effect"))
+        rb_rules_record_wait_immune_by_effect(g, e);
     return 1;
 }
 
@@ -2274,6 +2275,98 @@ int rb_rules_run_replacement_effects(GameState *g, int actor, const AbilityEffec
    10. Accessors for the side tables (the owning files read these)
    ========================================================================== */
 
+/* ==========================================================================
+   10a. ORPHANED-LOGIC O3 — the `wait_immune` PRODUCER (was inside the
+   uncalled twin `rb_rules_execute_restriction`)
+   ==========================================================================
+
+   MEASURED at HEAD 5ce311e6 with `nm -f posix` over all 49 OBJ_LIB objects
+   (2125 defined symbols, 516 undefined references):
+
+     rb_rules_execute_restriction       defined rules.o   referenced by NO object
+     rb_rules_cannot_activate_player    defined rules.o   referenced by NO object
+     rb_rules_is_wait_immune            defined rules.o   referenced BY OBJECTS
+     rb_rules_take_changed_state_members defined rules.o  referenced BY OBJECTS
+     rb_reset_keyword_tracking          defined tracking.o referenced by NO object
+     rb_inject_choice_ability_context   defined gsa.o     referenced by NO object
+
+   That measurement is what decided the scope of this patch. Exactly ONE of this
+   file's two orphan arms is an orphan against a LIVE reader: `wait_immune`.
+   `rb_rules_is_wait_immune` is called from src/ability/effects/state.c:391 and
+   :492 — the candidate filters for the 「相手のメンバーをウェイトにする」 family —
+   while its only producer lived in `rb_rules_execute_restriction`, which nothing
+   calls. `n_wait_immune` was permanently 0, so both filters could never remove
+   anything: a check that can never fail, across the 48 of 985 corpus abilities
+   that force a member into WAIT from an activated/auto ability. The shape that
+   needs this arm is PL!SP-bp4-011-{P,P＋,R＋,SEC} — the blade-count-gated forced
+   wait on the OPPONENT's stage, i.e. exactly the blade-limit filter below.
+
+   THE OTHER ARM IS NOT LIFTED, AND THAT IS A MEASUREMENT, NOT AN OMISSION.
+   `cannot_activate_members[2]` is a second copy of the same Rust set, and its
+   reader `rb_rules_cannot_activate_player` has ZERO callers tree-wide, while the
+   BEHAVIOUR is already shipped through the GameState fold
+   `GameState.player_cannot_activate[2]`: written by the LIVE handler
+   (src/ability/effects/misc.c:1118, `h_restriction`) and read at
+   src/ability/effects/state.c:235 — the C's fold of Rust's ONE production reader,
+   engine/src/ability/effects/change_state.rs:310-317 — plus src/engine.c:460 and
+   :1453. Writing the rules.c copy from h_restriction as well would add a DEAD
+   WRITE, which is the defect this whole audit is about, so it is not done.
+
+   ⚠ THE READER AT :2311 BELOW IS NOT STAMPED BY TURN, so once this writer
+   exists the list would latch for the rest of the match unless something clears
+   it. Rust clears it at engine/src/turn/phases.rs:281
+   (`wait_immune_members.clear()`), adjacent to :279-280. `rb_rules_state` is
+   `static` here, so the clear is `rb_rules_clear_turn_state` below, called from
+   the rollover in src/turn/phase.c next to `player_cannot_activate` — which is
+   the symbol the tombstone at phase.c has been asking for since 2026-10-03. */
+void rb_rules_record_wait_immune_by_effect(GameState *g, const AbilityEffect *e)
+{
+    if (!g || !e) return;
+    RbRulesState *st = rb_rules_state(g);
+    /* 「…は相手の効果によってはウェイトしない」 — the members matching the
+       filter on the CONTROLLER'S OWN stage are immune to wait effects from
+       the opponent. The owner is resolved from the ability controller, not
+       the parsed (often misleading) target. */
+    int owner_pl = 0;
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
+        owner_pl = (g->queue.entries[g->queue.cur].player_id[0] == '2') ? 1 : 0;
+    char groups[8][64];
+    int n_groups = r_split(r_extra(e, "group_names"), &groups[0][0], 64, 8);
+    const char *ct = e->card_type_field;
+    int blade_limit = r_extra(e, "blade_limit") ? atoi(r_extra(e, "blade_limit"))
+                                                : 255;
+    const char *blade_op = r_either(e, "blade_limit_operator", "operator");
+    int original_blade = r_extra_bool(e, "original_value", 0);
+
+    for (int s = 0; s < RB_STAGE_SIZE; s++) {
+        int cid = g->p[owner_pl].stage[s];
+        if (cid < 0) continue;
+        int base_blade = 0;
+        Card c;
+        if (rb_decode_card_by_index((uint32_t)cid, &c)) { base_blade = c.blade; rb_free_card(&c); }
+        if (ct && *ct && !rb_card_matches_type(cid, ct)) continue;
+        if (n_groups > 0) {
+            int hit = 0;
+            for (int k = 0; k < n_groups; k++)
+                if (rb_card_matches_group_str(cid, groups[k])) { hit = 1; break; }
+            if (!hit) continue;
+        }
+        /* i32: a negative blade modifier is legal here and must not floor. */
+        int current_blade = base_blade + rb_mods_get_blade(&g->mods, cid);
+        int blade = original_blade ? base_blade : current_blade;
+        if (!rb_compare_counts(blade_op, (int)rb_saturate_u8(blade), blade_limit))
+            continue;
+        int dup = 0;
+        for (int i = 0; i < st->n_wait_immune; i++)
+            if (st->wait_immune[i].member_id == cid) { dup = 1; break; }
+        if (!dup && st->n_wait_immune < RB_RULES_LIST_CAP) {
+            st->wait_immune[st->n_wait_immune].member_id = cid;
+            st->wait_immune[st->n_wait_immune].owner_pl = owner_pl;
+            st->n_wait_immune++;
+        }
+    }
+}
+
 /* restriction.rs wait immunity — the Q275 「…は相手の効果によってはウェイトしない」
    check. `waiter_pl` is the player performing the wait effect. */
 int rb_rules_is_wait_immune(GameState *g, int member_cid, int waiter_pl)
@@ -2288,16 +2381,131 @@ int rb_rules_is_wait_immune(GameState *g, int member_cid, int waiter_pl)
     return 0;
 }
 
+/* Q68. restriction.rs:101-105 — the 「ライブできない」 producer, lifted into
+   the shape O3 used for wait_immune so the live handler can reach it.
+ *
+   WHY IT IS A SEPARATE FUNCTION AND NOT AN ARM.  The restriction body is
+   triplicated and this file's copy (rb_rules_execute_restriction) has ZERO
+   callers: the handler that runs is src/ability/effects/misc.c's h_restriction
+   (executor.c:370, triggers.c:1207). So an arm here is a DEAD WRITE, which is
+   the exact defect class this audit exists to remove -- and `RbRulesState` is
+   this file's own file-static typedef, so misc.c cannot name the field. Same
+   shape as rb_rules_record_wait_immune_by_effect above and
+   rb_rules_take_changed_state_members at the end of this file: the recording
+   lives in the file that owns the storage, and the live handler calls it.
+ *
+   THE SEAT IS `r_player(actor, rb_effect_target_name(e))`, i.e. Rust's
+   `resolve_target_player`, which is what the twin's arm already did. Both corpus
+   `cannot_live` restrictions carry `"target": "self"`, so this resolves to the
+   controller's own seat -- the same `tgt` misc.c's cannot_activate arm builds.
+ *
+   THE TURN STAMP IS WHAT MAKES THE WRITER SAFE TO CONNECT, and it covers BOTH
+   Rust clear sites by construction, which a hand-rolled single call site does
+   not. Rust empties `cannot_live_players` in TWO places:
+     engine/src/turn/phases.rs:279-280          -- the turn rollover
+     engine/src/core/game_state/abilities.rs:3207 -- clear_live_only_state,
+                                                   reached from
+                                                   check_expired_effects (:3241),
+                                                   which phases.rs:310 invokes
+                                                   at the same rollover
+   A fold that wired only the rollover clear would miss the effect-expiry path
+   (and the second call site is a strict no-op for this set in the current Rust
+   anyway, because its `if current_turn_phase == Live { return }` guard at
+   :3205 no longer holds by then).  A stamp needs no call site at all: the flag
+   is honoured for the remainder of the turn it was set in and reads 0 from the
+   next turn on, which is what BOTH clears produce. This is the SAME idiom the C
+   already uses for Rust's per-turn use-limit table (ability_queue.c:1138,
+   `if (q->use_turn != cur_turn)`).
+ *
+   Nothing reads the flag in the rollover frame itself: the C bumps `g->turn` at
+ * phase.c:523 and clears its own GameState copies beside it, and this copy is
+ * consulted only by the live-start scan (src/turn/triggers.c) and the
+ * cannot_live bail-out (src/turn/live.c) -- neither of which runs in that
+ * frame -- so there is no window in which the bump could re-arm the flag for
+ * the turn that just ended. */
+void rb_rules_record_cannot_live_by_effect(GameState *g, int actor, const AbilityEffect *e)
+{
+    if (!g || !e) return;
+    RbRulesState *st = rb_rules_state(g);
+    int pl = r_player(actor, rb_effect_target_name(e));
+    if (pl < 0 || pl > 1) return;
+    st->cannot_live_players[pl] = 1;
+    st->cannot_live_turn[pl] = g->turn;
+}
+
+/* Q68. restriction.rs:101-105 writes the flag; turn/phases.rs:280 empties the
+   set at the rollover. The C cannot reach that set from outside this file (the
+   RbRulesState accessor is `static`), so the flag carries the turn it was set
+   on and a stamp from an older turn reads 0. See the writer above for why that
+   is the same guarantee the explicit clear gives, not a weaker one. */
 int rb_rules_cannot_live_player(GameState *g, int pl)
 {
     if (!g || pl < 0 || pl > 1) return 0;
-    return rb_rules_state(g)->cannot_live_players[pl];
+    RbRulesState *st = rb_rules_state(g);
+    if (st->cannot_live_turn[pl] != g->turn) return 0;
+    return st->cannot_live_players[pl];
 }
 
+/* turn/phases.rs:279 `cannot_activate_members.clear()`, adjacent to :280 --
+   same fold, same reason. */
 int rb_rules_cannot_activate_player(GameState *g, int pl)
 {
     if (!g || pl < 0 || pl > 1) return 0;
-    return rb_rules_state(g)->cannot_activate_members[pl];
+    RbRulesState *st = rb_rules_state(g);
+    if (st->cannot_activate_turn[pl] != g->turn) return 0;
+    return st->cannot_activate_members[pl];
+}
+
+/* ── the per-turn clear ──────────────────────────────────────────────────────
+   Rust clears three adjacent per-turn sets in the turn rollover of
+   `advance_phase`, in this order:
+
+       engine/src/turn/phases.rs:279  game_state.cannot_activate_members.clear();
+       engine/src/turn/phases.rs:280  game_state.cannot_live_players.clear();
+       engine/src/turn/phases.rs:281  game_state.wait_immune_members.clear();
+
+   All three live in this file's `static` RbRulesState, so none of them was
+   reachable from src/turn/phase.c or src/turn/live.c. The tombstone in phase.c
+   records the consequence: `wait_immune` had NO WRITER at all, and
+   `cannot_activate_members` / `cannot_live_players` were written by the uncalled
+   twin and read by readers with zero callers, so all three sat at their memset
+   values and every per-turn guarantee Rust gets for free was vacuous in the C.
+
+   WHAT THIS CLEARS, AND WHY NOT MORE:
+
+     wait_immune[]              REQUIRED. `rb_rules_is_wait_immune` carries no
+                                turn stamp, so the writer added above
+                                (rb_rules_record_wait_immune_by_effect, reached
+                                from the live h_restriction) would otherwise latch
+                                the list for the rest of the match. Without this
+                                call the O3 fix would trade a check that can never
+                                fail for one that can never stop being true.
+     cannot_activate_members[]  Rust's line. A no-op today (its only writer is the
+                                uncalled twin and its only reader has zero
+                                callers), and correct the moment either is wired.
+     cannot_live_players[]      NOT CLEARED HERE, DELIBERATELY. Its reader
+                                `rb_rules_cannot_live_player` IS live
+                                (src/turn/triggers.c:336, src/turn/live.c:646) and
+                                it stamps `cannot_live_turn`, so it already gets
+                                Rust's per-turn guarantee without this call — but
+                                its WRITER is still only the uncalled twin, so it
+                                reads 0 forever. Wiring that writer is the Q68 /
+                                PARITY_CHECKLIST.md I2 item and is not this
+                                function's to do; clearing the set here would
+                                change cannot_live behaviour for no measured gain.
+
+   The GameState-side folds the rollover already clears on its own
+   (`player_cannot_activate[2]`, `n_cannot_active_cards`) are the live half of
+   the same Rust sets and are cleared by phase.c directly, next to this call. */
+void rb_rules_clear_turn_state(GameState *g)
+{
+    if (!g) return;
+    RbRulesState *st = rb_rules_state(g);
+    st->n_wait_immune = 0;
+    st->cannot_activate_members[0] = 0;
+    st->cannot_activate_members[1] = 0;
+    st->cannot_activate_turn[0] = -1;
+    st->cannot_activate_turn[1] = -1;
 }
 
 int rb_rules_n_delayed_prohibitions(GameState *g)

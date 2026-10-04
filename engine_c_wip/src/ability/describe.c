@@ -32,23 +32,48 @@
  *   literal in this repo is hand-transcribed):
  *
  *   983 identical        983 of 985, both languages, zero byte differences
- *   1 divergence         ability 325
+ *   1 divergence         ability 327  (was 325; see the 2026-10-04 note below)
  *   2 excluded from the fixture
  *
- * The single divergence (ability 325) is NOT a defect in this file. The C renders
- * "Place 2 cards from hand to the waiting room; then Rest 2 Printemps group;
- * then Place 1 live card from the waiting room to hand" and Rust renders
- * "Place 1 live card from the waiting room to hand". Both strings are CORRECT for
- * the tree each engine actually holds: the C's raw bytecode slice for 325 is a
- * `sequential` with two actions, and describe.rs:555-573 formats exactly the
- * string the C emits. The two offset tables disagree: RBKA_OFFSET_DELTAS
- * (gen_data.c:7, sums to 98737 == RBKA_BYTECODE_LEN) vs OFFSET_DELTAS
- * (abilities_gen.rs:25, sums to 98725 against a 98733-byte
- * cards/build/abilities.bin) differ in length at 2 of 985 slices, 325 and 805.
- * abilities_gen.rs:17,55 include_bytes! cards/build/{abilities.bin,
- * abilities_strings.bin}, so Rust reads the STALE 726649-byte string blob while
- * the C reads the canonical 726831-byte src/abilities_strings.bin. Two engines,
- * two data sets. Do NOT "fix" this file for ability 325.
+ * THE 2026-10-04 CORRECTION -- this section used to be exactly backwards.
+ *
+ * It claimed: "Rust reads the STALE 726649-byte string blob while the C reads
+ * the canonical 726831-byte src/abilities_strings.bin. Two engines, two data
+ * sets." MEASURED at HEAD 5ce311e6, the reverse was true, and 726649 was a
+ * third value that was on neither disk:
+ *
+ *   cards/build/abilities_strings.bin  726671 B  sha256 32fa1a69c0ba9bc2...  CANONICAL
+ *   engine_c_wip/src/abilities_strings.bin
+ *                                        726831 B  sha256 89204df0bbde08a0...  STALE
+ *
+ * abilities_gen.rs:55 include_bytes! the cards/build blob, so RUST held the
+ * canonical 726671-byte table and the C held the stale 726831-byte one. The
+ * layer-3 regen has since closed that skew, so the divergence this paragraph
+ * used to excuse NO LONGER EXISTS and both engines now read the same 726671
+ * bytes: src/abilities_strings.bin and cards/build/abilities_strings.bin are
+ * byte-identical at sha256 32fa1a69c0ba9bc2..., and the two offset tables agree
+ * (RBKA_OFFSET_DELTAS, gen_data.c:7, sums to 98782 == RBKA_BYTECODE_LEN, against
+ * OFFSET_DELTAS, abilities_gen.rs:25, over the same 98782-byte payload in
+ * cards/build/abilities.bin; RBKA_STRINGS_TABLE_LEN, gen_data.c:579, is 726671
+ * for both). tests/test_artifacts_consistent.c section 6 now fails if that stops
+ * being true, so it cannot rot silently a second time.
+ *
+ * CONSEQUENCE FOR ABILITY 325: the old text said "Do NOT 'fix' this file for
+ * ability 325." That instruction is WITHDRAWN -- 325 renders identically in both
+ * languages now, because its slice changed (159 -> 149 bytes) and the C's
+ * render tracked it.
+ *
+ * ⛔ ABILITY 327 IS NOT CLAIMED AS FIXED OR AS A DEFECT IN THIS FILE.
+ * tests/test_describe_golden.c is now RED on exactly one ability, 327
+ * (`PL!-pb2-014-P+`/`-R`, whose slice changed 113 -> 141 bytes -- the largest
+ * length change in the corpus). Measured: the C renders two actions ("Place 1
+ * live card from selected cards to success_live_zone; then Place 1 live card
+ * from selected cards to success_live_zone") and the golden records one. The
+ * golden is a fixture of Rust's PRE-regen output, so this is a stale fixture
+ * rather than a rendering defect -- but that is an INFERENCE, not a measurement:
+ * re-deriving the fixture needs the Rust dumper, and `cargo` was not run. Until
+ * someone regenerates it, treat 327 as OPEN and do not "fix" describe.c for it
+ * either. Suite state as measured: 1394 checks, 1 failure.
  *
  * The `gain_resource` shorthand the old header described IS real and IS in this
  * file (the arm at the bottom, mirroring describe.rs:303-311): Rust emits a bare

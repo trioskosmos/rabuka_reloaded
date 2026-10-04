@@ -7,6 +7,72 @@
    because rb_advance_phase dispatches the two performance windows into it. */
 void rb_execute_performance_phase(GameState *g, int is_first);
 
+/* ── E4's PRODUCER SIDE, capture half. Rust phases.rs:320-333 ────────────────
+ *
+ *     let nhm_flat: Vec<(i16, HeartColor, ModifierEntry)> = game_state
+ *         .mods
+ *         .need_heart_modifiers
+ *         .iter()
+ *         .flat_map(|(&card_id, colors)| {
+ *             colors.iter().map(move |(&color, entry)| (card_id, color, *entry))
+ *         })
+ *         .collect();
+ *
+ * A WHOLESALE FLATTENING of the whole need_heart map, not a delta and not a
+ * per-card list: every (card_id, colour, entry) triple that exists is captured,
+ * because rb_restore_performance_need_heart_modifiers (modifiers.rs:2159-2182)
+ * re-adds them from the snapshots after E3's clear(). Only what survives into a
+ * snapshot can come back, which is precisely the "preserve live_start and other
+ * non-constant sources" contract in E4's doc comment.
+ *
+ * WHY A MODULE-SCOPE BUFFER AND NOT A GameState FIELD: sizeof(GameState) is
+ * pinned at 1 090 264 B and tests/test_harness_self.c §A4 pins it; appending a
+ * field turns that red by design. RbLiveSnapshot.performance_need_heart_modifiers
+ * / n_performance_need_heart_modifiers (rabuka.h:1375-1376) already exist for the
+ * store, so the capture is the only piece with nowhere else to live.
+ *
+ * WHY IT IS A BUFFER RATHER THAN A DIRECT READ AT THE PUSH: Rust reads the map
+ * at the head of the window, BEFORE rb_recalc_constants (phases.rs:352) and
+ * before the yell and its 自動 sweep. Reading it at the push instead would
+ * capture post-yell state. The buffer keeps the Rust position.
+ *
+ * THE ONE PLACE THIS DIVERGES, STATED PLAINLY: when a choice pauses
+ * rb_perform_live, this C port returns from rb_execute_performance_phase and the
+ * phase machine re-enters it from the top (phase.c:335), so the capture is taken
+ * again on the resume pass. Rust's single blocking call keeps the original
+ * nhm_flat. That is inherent to the C's resumable phase machine and already
+ * applies to the whole function, rb_recalc_constants (:1662) included -- it is not
+ * introduced by this capture. */
+static RbPerfNeedHeartMod perf_nhm[RB_MAX_PERF_NEED_HEART_MODS];
+static int perf_nhm_n = 0;
+
+int rb_perf_nhm_count(void) { return perf_nhm_n; }
+const RbPerfNeedHeartMod *rb_perf_nhm_at(int i) { return &perf_nhm[i]; }
+
+static void rb_capture_performance_need_heart(GameState *g) {
+    perf_nhm_n = 0;
+    if (!g) return;
+    for (int cid = 0; cid < RB_MAX_CARD_IDS; cid++) {
+        for (int c = 0; c < 8; c++) {
+            const RbModifierEntry *e = &g->mods.need_heart[cid][c];
+            /* Rust iterates the MAP, so it sees exactly the entries that were
+             * created. The C's need_heart[cid][color] is a dense array and cannot
+             * distinguish "absent" from "present and zero" -- the same
+             * representational gap src/core/modifiers.c:1990 states for the
+             * success_zone_* ledgers ("In C, 'present in the map' is 'the entry
+             * is non-zero'"). A zero-valued Rust entry contributes nothing to the
+             * restore anyway: `target.additive += 0` and the `set` arm is guarded
+             * by `entry.set != 0`, so skipping it is exact. */
+            if (e->add == 0 && e->set == 0) continue;
+            if (perf_nhm_n >= RB_MAX_PERF_NEED_HEART_MODS) return;
+            RbPerfNeedHeartMod *d = &perf_nhm[perf_nhm_n++];
+            d->card_id = (int16_t)cid;
+            d->color   = (int8_t)c;
+            d->entry    = *e;
+        }
+    }
+}
+
 /* phases.rs:333 / 339 handle_rps_choice_p1 / _p2 — defined further down this
    file; rb_advance_phase's pre-game arm calls them. */
 int rb_handle_rps_choice_p1(GameState *g, int choice);
@@ -228,7 +294,82 @@ void rb_advance_phase(GameState *g) {
         rb_setup_handle_mulligan_skip(g);
         return;
     }
-    if(g->phase==RB_PHASE_ACTIVE){
+if(g->phase==RB_PHASE_ACTIVE){
+        /* ── THE MISSING ACTIVE-ROLLOVER RESET ──────────────────────────────
+           Rust engine/src/turn/phases.rs:98, the FIRST statement of the
+           `Phase::Active` arm of `advance_phase`:
+
+               game_state.reset_keyword_tracking();
+               tdbg!("PHASE_ACTIVE:1 reset_keyword_tracking OK");
+
+           Its body is engine/src/core/game_state/tracking.rs:6-36. The C's
+           fold of it is src/core/tracking.c:38 `rb_reset_keyword_tracking`,
+           which until now had ZERO production callers -- the exact state
+           src/core/tracking.c:27-30 admitted in its own comment ("The C turn
+           rollover in src/turn/phase.c has no equivalent call"). That comment
+           is now WRONG and this is the call it was asking for.
+
+           WHY IT IS HERE AND NOT IN THE VICTORY ROLLOVER BELOW: Rust runs it
+           on ENTRY TO EACH PLAYER'S ACTIVE PHASE, i.e. TWICE PER ROUND, and
+           this arm is the C's entry to the Active phase -- the `Phase::Active`
+           arm of `rb_advance_phase`, the same frame the C reaches at :325 when
+           it flips to the second attacker. The C also reaches it from :677
+           (the victory arm's tail), from the interactive loop (src/main.c:97/:102
+           call rb_advance_phase directly and never rb_turn), from the batch
+           loop (src/main.c:134 rb_turn, now a thin driver over rb_advance_phase)
+           and from the WEB path (src/web_server.c -> engine.c:1550
+           rb_advance_phase), so the placement covers every production driver.
+           Placing it in the victory rollover instead would clear these trackers
+           ONCE PER ROUND, which is a different, weaker scope than Rust's.
+
+           It goes FIRST, before activate_wait_members, because Rust's reset is
+           at phases.rs:98 and the wait-activation filter that follows is at
+           phases.rs:109-138 -- the same order, and order matters: the reset
+           clears `position_change_occurred_this_turn` (via
+           rb_reset_change_flags) and the activation filter reads
+           constant_cannot_activate_members / is_delayed_cannot_active.
+
+           WHAT IT CLEARS, AND WHY THE BLAST RADIUS IS 40 OF 985 ABILITIES --
+           six keyword-scoped trackers that previously latched for the whole
+           game because nothing reset them:
+             p[].deck_refreshed_this_turn          -> condition.c:542 and :2155
+                                                       read it; 7 production
+                                                       producers, 0 resets
+             player1/2_cheer_blade_heart_count      -> condition.c:2566
+             live_success[0..1]                     -> condition.c:2676/:2681,
+                                                       triggers.c:462
+             n_turn1/2_abilities_played             -> no producer anywhere
+             n_auto_ability_trigger_counts          -> no producer anywhere
+             n_areas_placed_this_turn               -> no producer anywhere
+             last_resolution_cards_p1/p2            -> no producer anywhere
+           plus, through rb_reset_change_flags / rb_reset_loop_detection /
+           rb_clear_baton_touch_tracking, the change-of-state flags, the
+           loop-detection history and the baton-touch history.
+
+           The sharpest single divergence it removes, with its card number:
+             PL!S-bp2-022-L -- 「{{ライブ成功時}}このターン、自分のデッキが
+             リフレッシュしていた場合、このカードのスコアを＋２する。」
+           `deck_refreshed_this_turn` had 7 producers and no reset, so that card
+           paid its +2 from the FIRST deck refresh of the game onward, on every
+           turn where nothing was refreshed. The string 「このターン」 scopes 40 of
+           the 985 unique corpus abilities (69 of 2116 pairs, 65 of 2639 cards).
+           See engine_c_wip/TEST_ONLY_AUDIT.md §4/O1 and PARITY_CHECKLIST.md.
+
+           NOT DONE HERE, ON PURPOSE, AND IT IS NOT AN OVERSIGHT:
+             rb_reset_keyword_tracking does NOT clear debut counts or the
+             card-appearance / movement trackers (tracking.rs:9-17 says so, and
+             src/core/tracking.c:32-37 explains why: it runs twice per round
+             while 「このターン」 spans the whole round, so clearing them here
+             truncated first-attacker-window facts before live-start /
+             live-success conditions could read them -- PL!N-pb1-037-L Q203,
+             PL!N-bp3-005-R＋, PL!HS-bp2-021-L). They are cleared together in
+             the victory rollover below.
+             It also clears `g->game_state_history` (loop detection). That is
+             Rust's line too (tracking.rs:27), and `loop_detected` has NO
+             production reader anywhere in src/ -- it is a flag nothing acts on
+             -- so weakening the window across an Active boundary cannot hang a
+             batch run. */
+        rb_reset_keyword_tracking(g);
         activate_wait_members(g, g->active);
         rb_recalc_constants(g);
         rb_check_timing(g);
@@ -418,6 +559,33 @@ g->active = g->first_attacker;
            line. It has no prototype in include/rabuka.h, hence the narrower
            call. See the field-addition request in the handover report. */
         rb_clear_card_appearance_tracking(g);
+        /* The OTHER THREE fields Rust's single `clear_card_movement_tracking`
+           call drops, so `phases.rs:309` is now fully ported at this site.
+           `rb_clear_card_movement_tracking` (modifiers.c:932) does clear all
+           three -- but it ALSO zeroes `n_batch_movements`, which Rust does not
+           do here: `batch_movements` is per-ABILITY state that Rust turns over
+           in `clear_effect_tracking` (mod.rs:978-984) and only there. Calling
+           the broad function from the rollover would clear it a turn early, so
+           the three field clears are written out instead. That is why this is
+           not BLOCKED-ON `include/rabuka.h` after all: the prototype
+           (`void rb_clear_card_movement_tracking(GameState *g);`, to sit beside
+           `rb_clear_card_appearance_tracking` at rabuka.h:2842) is still worth
+           landing, but nothing here waits for it.
+
+             modifiers.rs:2027  cards_paid_cost_this_turn.clear()
+                 「コストを支払う」 is per-turn; uncleared, a cost paid on turn N
+                 keeps firing PL!S-bp3-021-N on turn N+1, forever.
+             modifiers.rs:2038  turn_area_movements.clear()
+             modifiers.rs:2041  mods.opp_cause_fired_keys.clear()
+                 The opponent-cause watcher dedupe is turn-scoped by Rust's own
+                 comment: "a given move can arm a marked watcher once, and the
+                 set resets with the movement data". The set is still 0W/0R in
+                 the C (the live dedupe is game_state_abilities.c's turn-pruned
+                 `s_opp_cause_fired[]` side table), so these two lines are the
+                 half-port being closed, not a new behaviour. */
+        g->n_cards_paid_cost_this_turn = 0;
+        g->n_turn_area_movements = 0;
+        g->mods.n_opp_cause_fired_keys = 0;
         /* Clear per-turn temporal-condition tracking (mirrors GameState reset of
             moved_this_turn / debut_count_this_turn / position_change_occurred_this_turn). */
         for(int i=0;i<RB_MAX_CARD_IDS;i++) g->moved_this_turn[i]=0;
@@ -557,10 +725,14 @@ cannot_live_players.clear()         phases.rs:280
                 zeroes it. That is the
                 concrete reason this item is still open.
 
-              wait_immune_members.clear()         phases.rs:281
-                there is no writer for it anywhere in the tree (the header says
-                so at rabuka.h:3280-3289), so it is always empty and clearing it
-                would be a no-op.
+wait_immune_members.clear()         phases.rs:281
+                NOW DONE — see the rb_rules_clear_turn_state call below. It was
+                skipped because the list had no writer anywhere in the tree (the
+                header said so at rabuka.h:3280-3289), so it was always empty and
+                clearing it was a no-op. That stopped being true when the wait_immune
+                producer was lifted into the live h_restriction (O3): the reader
+                rb_rules_is_wait_immune carries no turn stamp, so without this
+                clear the list would latch for the rest of the match.
                turn_limited_abilities_used.clear() phases.rs:278
                 already self-clearing in C: the use-limit table is keyed by turn
                 (ability_queue.c:1138/1147 `if (q->use_turn != cur_turn)`), which
@@ -568,6 +740,35 @@ cannot_live_players.clear()         phases.rs:280
         g->player_cannot_activate[0] = 0;
         g->player_cannot_activate[1] = 0;
         g->n_cannot_active_cards = 0;
+        /* Rust phases.rs:279-281 empties three adjacent per-turn sets; the two
+           GameState folds above are the first of them, and all three live in
+           rules.c's `static` RbRulesState, which is why this call is the only way
+           to reach the other two from here. This is the symbol the tombstone
+           above has been asking for since 2026-10-03 — it now has a definition
+           (rules.c), so the two declarations that used to live inside comment
+           blocks in this file and in live.c are correctly absent.
+           Declared here for the same reason and with the same precedent as
+           rb_check_effect_position at src/turn/triggers.c:6-8. */
+        void rb_rules_clear_turn_state(GameState *g);
+        rb_rules_clear_turn_state(g);
+        /* ── Rust's SECOND clear of the same three sets, and the one piece of it
+           that was genuinely missing. `clear_live_only_state`
+           (engine/src/core/game_state/abilities.rs:3201-3209) is called from
+           `check_expired_effects` at :3241, which `advance_phase` invokes at
+           phases.rs:310 — i.e. 30 lines AFTER the explicit clears at :279-281 and
+           AFTER `current_turn_phase` has already been moved off Live at :306-307,
+           so its `if current_turn_phase == Live { return }` guard does not fire.
+           Consequence for the fold: the second site is a strict NO-OP for
+           `cannot_live_players` and `wait_immune_members` (already empty) and
+           therefore `rb_rules_clear_turn_state` above covers BOTH Rust sites,
+           not one of two. Its only effect Rust gets here and the C does not is
+           `prohibition_effects.clear()`, and that set has NO clear anywhere in
+           the C: the one writer (game_state_abilities.c:1418) appends, the three
+           readers (game_state_abilities.c:594, core/tracking.c:197,
+           turn/triggers.c:1414) only ever COMPACT it. So a zone
+           prohibition recorded in turn 1 stayed answerable for the rest of the
+           match. This line is the Rust :3206 statement. */
+        g->n_prohibition_effects = 0;
         g->n_turn_state_changes = 0;
         g->baton_touch_used[0] = 0;
         g->baton_touch_used[1] = 0;
@@ -1640,6 +1841,16 @@ void rb_3ds_tdbg(const char *msg) {
    g->second_attacker`. */
 void rb_execute_performance_phase(GameState *g, int is_first) {
     if (!g) return;
+
+    /* E4's PRODUCER SIDE, capture call. phases.rs:320-333 is the FIRST thing
+     * execute_performance_phase does -- before player_id (:334), before performer
+     * (:339), before `performer.live_card_zone.face_up = true` (:343) and long
+     * before rb_recalc_constants below (:352). It has to be: the snapshot this
+     * window pushes is what rb_restore_performance_need_heart_modifiers replays
+     * after E3 wipes mods.need_heart at victory determination, so a capture taken
+     * after any of those steps would be a different set of entries than Rust's. */
+    rb_capture_performance_need_heart(g);
+
     int performer = is_first ? g->first_attacker : g->second_attacker;
     if (performer < 0 || performer > 1) performer = g->active;
 

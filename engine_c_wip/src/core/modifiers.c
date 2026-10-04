@@ -10,6 +10,12 @@
 extern void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
                                                       int causer_player);
 
+/* src/ability/ability_queue.c:717. include/rabuka.h exports
+ * rb_queue_pop_constant_context (rabuka.h:2069) but NOT its push partner, so the
+ * same local-extern pattern as above is used rather than editing main's header.
+ * Rust's counterpart is AbilityQueue::push_constant_context (queue.rs:466). */
+extern void rb_queue_push_constant_context(GameState *g, const char *player_id);
+
 static int16_t saturate_modifier(int64_t value) {
     if (value > INT16_MAX) return INT16_MAX;
     if (value < INT16_MIN) return INT16_MIN;
@@ -1038,6 +1044,13 @@ void rb_record_stage_position_swap(GameState *g, int source_id, int source_index
             RbPositionChangeEvent *ev = &g->position_change_events[n_events++];
             ev->card_id   = source_id;
             ev->position  = target_index;
+            /* modifiers.rs:1821 old_position: source_index. The `from`
+               direction of area_direction reads THIS field, not `position`
+               (condition/state.rs:555-559), so leaving it unwritten made
+               「自分のステージのセンターエリアにいるメンバーがエリアを移動した
+               とき」 (cards 2483 / 2484) unanswerable. `position` is Rust's
+               new_position, which is what the `to` direction reads. */
+            ev->old_position = source_index;
         }
     }
     if (target_id >= 0) {
@@ -1045,6 +1058,8 @@ void rb_record_stage_position_swap(GameState *g, int source_id, int source_index
             RbPositionChangeEvent *ev = &g->position_change_events[n_events++];
             ev->card_id   = target_id;
             ev->position  = source_index;
+            /* modifiers.rs:1832 old_position: target_index (the mirror). */
+            ev->old_position = target_index;
         }
     }
     g->n_position_change_events = n_events;
@@ -1647,6 +1662,571 @@ void rb_recalculate_constant_cost_modifiers(GameState *g) {
             rb_mods_set_cost(&g->mods, cid, expected_set[cid]);
         } else if (g->mods.cost[cid].set != 0 && !cost_is_constant_host(g, cid)) {
             rb_mods_clear_cost_set(&g->mods, cid);
+        }
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   E1 + E2 — the success/live-zone constant scan.
+
+   RUST ORACLE. engine/src/core/game_state/modifiers.rs, tree master @ master,
+   repo HEAD cf315a9ac5dedd1ca02caeadbfb13f0f74919e5c, cited BY CONTENT:
+     E1  evaluate_success_zone_constant_modifiers   modifiers.rs:2188-2305
+     E2  apply_success_zone_effect                  modifiers.rs:2309-2582
+
+   WHY THIS FUNCTION EXISTS SEPARATELY FROM rb_recalc_constants. Rust splits the
+   constant scan in two, and the split is load-bearing:
+
+     * `recalculate_constants` main loop — STAGE ONLY. Its entry list comes from
+       collect_reusable_constant_stage_effect_ids (modifiers.rs:453-455), which
+       chains player1.stage.stage + player2.stage.stage and nothing else.
+     * E1 — the four LIVE/SUCCESS bags (modifiers.rs:2232-2237): player1.live,
+       player1.success, player2.live, player2.success.
+
+   E1 is withdraw-then-reapply, which is what `success_zone_blade_bonuses`,
+   `success_zone_heart_bonuses` and `success_zone_score_bonuses` exist for
+   (game_modifiers.rs:244/247/250; the C arrays are rabuka.h:267-269). Rust
+   `core::mem::take`s each ledger and immediately withdraws what it finds
+   (modifiers.rs:2200-2214). Without those three arrays E1 cannot be written at
+   all, and without E1 a previous live's success-zone bonus leaks into the next.
+
+   MEASURED REACHABILITY (tools/census_e1_exact.c, run against this tree's own
+   decoder; 2116 card-ability pairs, 4925 effect nodes, 2639 cards). The
+   criterion is Rust's own: iterate the four live/success BAGS, take every
+   printed ability whose triggers contain CONSTANT, and follow only the
+   Sequential -> compound.actions recursion (which is the C's child[]):
+
+     RUST modify_required_hearts      1   (cardid 291 = PL!-bp6-022-L)
+     RUST gain_resource            176       (93 blade / 83 heart;
+                                               20 position-filtered,
+                                               18 group-filtered, 28 per_unit)
+     RUST modify_score              29       (27 carry target=="live_total" as a
+                                               TYPED FIELD; 2 use the per-card
+                                               arm via self_target)
+     RUST sequential                14
+     RUST_E1_TOTAL                 220
+
+     ⚠️ THE BRIEF'S "214" IS A MEMBER-ONLY COUNT AND IS NOT THE RIGHT
+     QUESTION. Restricting the same walk to rb_card_is_member(cid) yields 214
+     (0 / 174 / 26 / 14), which is where that figure comes from -- but Rust's E1
+     never tests card type. It walks the bags (modifiers.rs:2232-2242) and takes
+     whatever card ids are there. Cardid 291's type byte is 1 (live_card), so a
+     member filter throws away precisely the one card whose
+     modify_required_hearts arm is reachable, and reports that arm as dead. The
+     honest total is 220, and modify_required_hearts is 1, not 0.
+
+     Three independent methods, and the one disagreement is explained:
+       tools/census_e1_exact.c   220  Rust-faithful dispatch, no card-type filter
+       tools/census_e1_all.c     220  same actions, unconditional child[] walk
+       tools/census_e.c           214  member-only, 6-link walk -- correct only
+                                         for the member subset it measures
+       tools/census_e1.c          226  overcount; its extra 12 were traced
+                                         node-by-node (tools/census_e1_probe.c)
+                                         and every one sits under gained_effect,
+                                         i.e. the modify_score a 常時
+                                         gain_ability GRANTS elsewhere.
+                                         apply_success_zone_effect dispatches on
+                                         the ability's OWN action -- gain_ability
+                                         for all 8 of those cards, which falls
+                                         into `_ => {}` (modifiers.rs:2580).
+
+   `non_stackable` (modifiers.rs:2221/2280-2287) IS PORTED. An earlier revision
+   of this comment called it "VERIFIED-INERT and NOT ported" on the strength of
+   3 flagged nodes corpus-wide (cardid 288 modify_cost, 291
+   modify_required_hearts, 466 modify_score; tools/census_e.c CENSUS-NS) with
+   NS_KEY_COLLISIONS == 0. That census asked the wrong question: it compared the
+   three flagged nodes WITH EACH OTHER, and the key is `action:text`, so what
+   matters is two flagged nodes sharing BOTH -- which is what a second COPY of
+   one card produces, and a deck holds 2-3 of every card. It also measured a
+   scan, not this loop. The dedupe now lives in E1's apply loop; see the block
+   above it.
+
+   THE THREE success_zone_*_sources DISPLAY LEDGERS ARE DELIBERATELY ABSENT.
+   Rust clears success_zone_{blade,heart,score}_sources alongside the bonus
+   ledgers (modifiers.rs:2216-2218) and pushes a BonusSource per application
+   (:2441/:2471/:2541/:2559). RbMods has no such members (AUDIT_core_state.md
+   :679-681 lists all three as ABSENT) and no C reader exists for them, so they
+   are UI-only and unobservable here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Walk a comma-joined extra into up to `max` borrowed tokens. Rust's
+ * heart_colors_any() and group_names_any() are &[String]/Option<&[String]>
+   (card.rs:2031/2037) built by filter_opt_vec_ref_getter!, and the wire form
+   arrives comma-joined (modifiers.rs:1422-1427 documents the same for
+   group_names), so the C has to split. Returns the token count. */
+static int sz_split_csv(const char *csv, const char **out, int max) {
+    if (!csv || !*csv) return 0;
+    int n = 0;
+    const char *p = csv;
+    while (n < max) {
+        const char *comma = strchr(p, ',');
+        size_t len = comma ? (size_t)(comma - p) : strlen(p);
+        if (len > 0) { out[n] = p; n++; }
+        if (!comma) break;
+        p = comma + 1;
+    }
+    return n;
+}
+
+/* E2. Rust modifiers.rs:2309-2582. Private in Rust (no `pub`), called only by
+ * E1 and by itself through the Sequential arm, so this is file-static too.
+ * `e` is non-const because the ModifyRequiredHearts arm hands it to
+ * rb_execute_modify_required_hearts, whose prototype (rabuka.h:2447) predates
+ * this caller and takes a mutable AbilityEffect. */
+static void sz_apply_effect(GameState *g, int cid, int player_idx,
+                            AbilityEffect *e) {
+    if (!g || !e || !e->action) return;
+    if (player_idx < 0 || player_idx > 1) return;   /* modifiers.rs:2319-2323 */
+
+    if (!strcmp(e->action, "modify_required_hearts")) {
+        /* modifiers.rs:2326-2342. REACHABLE: 1 node (tools/census_e1_exact.c).
+           That node is cardid 291 = PL!-bp6-022-L (Dreamin' Go! Go!!), whose
+           printed 常時 is 「…自分の元々のスコアが５以上の『μ's』のライブカードの
+           必要ハートをheart0を2減らす」, and which sits in the SUCCESS zone.
+
+           An earlier revision of this port declared this arm a VERIFIED-NOOP
+           on a member-only count of 0. That count was wrong: Rust's E1 iterates
+           the four live/success BAGS and never asks whether a card is a member
+           (modifiers.rs:2232-2242), and cardid 291's type byte is 1
+           (live_card), so a member filter discarded the only card that reaches
+           here. Do not reintroduce that filter.
+
+           The C mapping of Rust's three lines:
+             AbilityResolver::new(db, Some(cid))  -> the host is published as
+               g->activating_card, which is exactly how this tree's resolver
+               reads it (src/ability/effects/score.c:33-37,
+               `g->queue.resume_host >= 0 ? ... : g->activating_card`, with the
+               comment "the host card currently resolving ... score.rs reads
+               gs.activating_card").
+             push_constant_context(owner_id)     -> rb_queue_push_constant_context
+             execute_modify_required_hearts      -> rb_execute_modify_required_hearts,
+               the port of required_hearts.rs:28-223 that triggers.c's own
+               apply_constant_effect documents at :1006-1008.
+             pop_constant_context()              -> rb_queue_pop_constant_context */
+        int prev = g->activating_card;
+        g->activating_card = cid;
+        const char *owner_id = (player_idx == 0) ? "player1" : "player2";
+        rb_queue_push_constant_context(g, owner_id);
+        rb_execute_modify_required_hearts(g, player_idx, e);
+        rb_queue_pop_constant_context(g);
+        g->activating_card = prev;
+        return;
+    }
+
+    if (!strcmp(e->action, "gain_resource")) {
+        /* modifiers.rs:2343-2486 */
+        const char *resource = cost_extra(e, "resource");
+        if (!resource) resource = "";
+        /* amount = resource_icon_count_any().unwrap_or(count_or(1))
+           (:2346-2350). AbilityEffect has no typed `resource_icon_count`
+           member (rabuka.h:92-144), so this extra read is the correct one and
+           matches triggers.c:1520-1521, which does exactly this for the
+           under-member blade pass. */
+        int amount = cost_extra_int(e, "resource_icon_count", -999);
+        if (amount == -999) amount = (e->count >= 0) ? e->count : 1;
+
+        /* player = target_name() { self|自分 => owner, opponent|相手 => other,
+           _ => owner }  (:2352-2360). target_name() is the TYPED `target`
+           field (rabuka.h:97); reading an extra named "target" here would be
+           wrong and reads 0 corpus-wide. */
+        const char *tgt = e->target;
+        int tgt_pl = player_idx;
+        if (tgt && (!strcmp(tgt, "opponent") || !strcmp(tgt, "\xe5\xaf\xbe\xe6\x89\x8b")))
+            tgt_pl = 1 - player_idx;
+
+        /* candidates (:2374-2407): the target player's STAGE, skipping empty
+         * slots, filtered by position and then by group membership. */
+        const char *pos_req = cost_extra(e, "position");
+        const char *groups[16];
+        int n_groups = sz_split_csv(cost_extra(e, "group_names"), groups, 16);
+
+        int candidates[RB_STAGE_SIZE];
+        int n_cand = 0;
+        for (int pos = 0; pos < RB_STAGE_SIZE; pos++) {
+            int id = g->p[tgt_pl].stage[pos];
+            if (id == RB_EMPTY_SLOT) continue;              /* idx != -1 */
+            if (pos_req) {
+                /* :2380-2392 -- "center" is index 1, left/left_side 0,
+                 * right/right_side 2, anything else matches everything. */
+                if (!strcmp(pos_req, "center")) { if (pos != 1) continue; }
+                else if (!strcmp(pos_req, "left") || !strcmp(pos_req, "left_side")) { if (pos != 0) continue; }
+                else if (!strcmp(pos_req, "right") || !strcmp(pos_req, "right_side")) { if (pos != 2) continue; }
+            }
+            if (n_groups > 0) {
+                int ok = 0;
+                for (int gi = 0; gi < n_groups && !ok; gi++)
+                    if (rb_card_matches_group_str(id, groups[gi])) ok = 1;
+                if (!ok) continue;
+            }
+            candidates[n_cand++] = id;
+        }
+
+        if (!strcmp(resource, "blade")) {
+            /* :2423-2452 */
+            for (int i = 0; i < n_cand; i++) {
+                int target_id = candidates[i];
+                rb_mods_add_blade(&g->mods, target_id, (int16_t)amount);
+                g->mods.success_zone_blade_bonuses[target_id] =
+                    (int16_t)(g->mods.success_zone_blade_bonuses[target_id] + amount);
+            }
+        } else if (!strcmp(resource, "heart")) {
+            /* :2453-2483 */
+            const char *colors[32];
+            int n_colors = sz_split_csv(cost_extra(e, "heart_colors"), colors, 32);
+            /* per_color divides by the DECLARED colour count, before the
+             * default is appended (:2455 vs :2459-2460). */
+            int per_color = amount / (n_colors > 1 ? n_colors : 1);
+            if (n_colors == 0) {
+                colors[0] = "heart01";
+                n_colors = 1;
+            }
+            for (int i = 0; i < n_cand; i++) {
+                int target_id = candidates[i];
+                for (int ci = 0; ci < n_colors; ci++) {
+                    int hc = (int)rb_parse_heart_color(colors[ci]);
+                    rb_mods_add_heart(&g->mods, target_id, hc, (int16_t)per_color);
+                    /* The ledger is indexed by the 8 stored heart colours. A
+                     * colour string outside them (draw / score / any) maps
+                     * above 7 and rb_mods_add_heart drops it; the ledger write
+                     * is skipped for the same reason so the two can never
+                     * disagree. Corpus colours are heart01..heart06 only. */
+                    if (hc >= 0 && hc < 8) {
+                        g->mods.success_zone_heart_bonuses[target_id][hc] =
+                            (int16_t)(g->mods.success_zone_heart_bonuses[target_id][hc] + per_color);
+                    }
+                }
+            }
+        }
+        /* :2484 `_ => {}` -- any other resource contributes nothing. */
+        return;
+    }
+
+    if (!strcmp(e->action, "modify_score")) {
+        /* modifiers.rs:2487-2572 */
+        const char *tgt = e->target;
+        int tgt_pl = player_idx;
+        if (tgt && (!strcmp(tgt, "opponent") || !strcmp(tgt, "\xe5\xaf\xbe\xe6\x89\x8b")))
+            tgt_pl = 1 - player_idx;
+
+        /* value_or_count(1) (:2498) -- `value.or(count).unwrap_or(1)`. Neither
+         * `value` nor `count` is a typed member except `count` (rabuka.h:98,
+         * -1 = none), so `value` is the extra and `count` the field. */
+        int value = cost_extra_int(e, "value", -999);
+        if (value == -999) value = (e->count >= 0) ? e->count : 1;
+        const char *op = cost_extra(e, "operation");
+        if (!op) op = "add";
+
+        /* ---- THE live_total ARM. modifiers.rs:2510-2525. --------------
+           「ライブの合計スコアを+1する」 modifies the zone OWNER's live total,
+           not any one card, and Rust routes it here with NO membership test.
+           It keys off `player_idx`, the zone the scanning card was found in --
+           deliberately NOT `player`, the target resolved 16 lines earlier -- so
+           an opponent-targeted live_total still credits the scan-side player.
+
+           ALL 26 reachable modify_score nodes in the corpus land in this arm
+           (MS_TARGET_FIELD_LIVE_TOTAL 26, MS_NO_LIVE_TOTAL_TARGET 0), so this
+           is the whole of E1's score behaviour in practice.
+
+           The C previously had no equivalent: src/turn/triggers.c's
+           apply_constant_effect guarded the same effect on card_on_stage()
+           (triggers.c:843), and a card reached through the live/success scan is
+           by definition not on stage, so the arm contributed 0. That guard is
+           gone as of the claimed triggers.c edit; do not reintroduce it here. */
+        if (tgt && !strcmp(tgt, "live_total")) {
+            int delta = value;   /* :2511 both arms are `value` in Rust */
+            if (player_idx == 0)
+                g->mods.p1_constant_total_score_bonus =
+                    saturate_modifier((int64_t)g->mods.p1_constant_total_score_bonus + delta);
+            else
+                g->mods.p2_constant_total_score_bonus =
+                    saturate_modifier((int64_t)g->mods.p2_constant_total_score_bonus + delta);
+            return;              /* :2524 */
+        }
+
+        /* :2529-2533 -- self_target means "the scanning card itself"
+         * (Angelic Angel's +5 self buff); otherwise the target player's whole
+         * live-card zone. self_target_field is the TYPED field
+         * (rabuka.h:143). */
+        int targets[RB_MAX_LIVE_CARDS];
+        int n_targets = 0;
+        if (e->self_target_field[0] && !strcmp(e->self_target_field, "true")) {
+            targets[n_targets++] = cid;
+        } else {
+            for (int i = 0; i < g->p[tgt_pl].live.n; i++) {
+                int id = g->p[tgt_pl].live.cards[i];
+                if (id == RB_EMPTY_SLOT) continue;
+                if (n_targets < RB_MAX_LIVE_CARDS) targets[n_targets++] = id;
+            }
+        }
+        for (int i = 0; i < n_targets; i++) {
+            int target_id = targets[i];
+            if (!strcmp(op, "set")) {
+                rb_mods_set_score(&g->mods, target_id, (int16_t)value);
+                g->mods.success_zone_score_bonuses[target_id] = (int16_t)value;
+            } else {
+                rb_mods_add_score(&g->mods, target_id, (int16_t)value);
+                g->mods.success_zone_score_bonuses[target_id] =
+                    (int16_t)(g->mods.success_zone_score_bonuses[target_id] + value);
+            }
+        }
+        return;
+    }
+
+    if (!strcmp(e->action, "sequential")) {
+        /* modifiers.rs:2573-2579 -- recurse into compound.actions, which is the
+         * C's child[] (rabuka.h:110-114 documents child[] as the mirror of
+         * AbilityEffect::compound; the named branch pointers are separate wire
+         * keys and are NOT compound.actions). Note there is no condition gate
+         * and no non_stackable gate on this recursion -- Rust calls
+         * apply_success_zone_effect directly, skipping the checks at :2268 and
+         * :2280 which live in E1's own loop. */
+        for (int i = 0; i < e->n_child; i++)
+            sz_apply_effect(g, cid, player_idx, e->child[i]);
+        return;
+    }
+    /* :2580 `_ => {}` */
+}
+
+/* E1. Rust modifiers.rs:2188-2305.
+ * MUST be called AFTER rb_recalc_constants has published
+ * p1/p2_constant_total_score_bonus (triggers.c:1565-1566), because the live_total
+ * arm ADDS to those fields and Rust's equivalent runs after
+ * commit_constant_results (modifiers.rs:1375 -> :1398). */
+void rb_evaluate_success_zone_constant_modifiers(GameState *g) {
+    if (!g) return;
+
+    /* ── Withdraw what the previous pass contributed ── modifiers.rs:2200-2214.
+       Rust core::mem::take's each ledger and withdraws through the matching
+       remove_*_modifier. In C, "present in the map" is "the entry is non-zero",
+       so a zero entry needs no withdrawal -- add/remove of 0 are no-ops anyway. */
+    for (int cid = 0; cid < RB_MAX_CARD_IDS; cid++) {
+        int16_t b = g->mods.success_zone_blade_bonuses[cid];
+        if (b) { rb_mods_remove_blade(&g->mods, cid, b); g->mods.success_zone_blade_bonuses[cid] = 0; }
+        int16_t s = g->mods.success_zone_score_bonuses[cid];
+        if (s) { rb_mods_remove_score(&g->mods, cid, s); g->mods.success_zone_score_bonuses[cid] = 0; }
+        for (int c = 0; c < 8; c++) {
+            int16_t h = g->mods.success_zone_heart_bonuses[cid][c];
+            if (h) { rb_mods_remove_heart(&g->mods, cid, c, h); g->mods.success_zone_heart_bonuses[cid][c] = 0; }
+        }
+    }
+
+    /* ── Collect the entries up front ── modifiers.rs:2231-2257.
+       Rust clones each AbilityEffect into a Vec "to avoid borrow conflicts",
+       because the apply loop mutates self. The C has no borrow checker, but it
+       has the same hazard in a different shape: the apply may re-enter
+       rb_recalc_constants, so holding decoded Ability pointers across the loop
+       would dangle. Collecting (card_id, player_index, ability_index) triples
+       and re-decoding per iteration is the idiom already used by the
+       constant-cost pass above (rb_recalculate_constant_cost_modifiers decodes
+       inside its own loop) and by the per-scan dedupe set at triggers.c:140.
+
+       BOTH live zones are scanned, not just the success one (:2225-2230):
+       「自分のライブカード置き場**か**成功ライブカード置き場にあり」
+       (PL!-pb2-038-L) is one disjunction, and the live-card half holds the card
+       currently performing. */
+    enum { SZ_MAX_ENTRIES = 256 };
+    int ent_cid[SZ_MAX_ENTRIES];
+    int ent_pl[SZ_MAX_ENTRIES];
+    int ent_ai[SZ_MAX_ENTRIES];
+    int n_ent = 0;
+
+    for (int pl = 0; pl < 2; pl++) {
+        for (int bag = 0; bag < 2; bag++) {
+            const RbBag *z = bag == 0 ? &g->p[pl].live : &g->p[pl].success;
+            for (int i = 0; i < z->n; i++) {
+                int cid = z->cards[i];
+                if (cid < 0 || cid >= RB_MAX_CARD_IDS) continue;  /* :2239-2242 */
+                int n_ab = rb_card_num_abilities((uint32_t)cid);
+                for (int ai = 0; ai < n_ab; ai++) {
+                    Ability probe;
+                    int ok = 0;
+                    if (rb_decode_card_ability((uint32_t)cid, ai, &probe)) {
+                        /* :2245-2254 -- the trigger must contain CONSTANT
+                         * (triggers.rs:21 `pub const CONSTANT: &str = "常時";`)
+                         * and the ability must carry an effect. */
+                        ok = probe.triggers &&
+                             strstr(probe.triggers, "\xe5\xb8\xb8\xe6\x99\x82") &&
+                             probe.effect != NULL;
+                        rb_free_ability(&probe);
+                    }
+                    if (ok && n_ent < SZ_MAX_ENTRIES) {
+                        ent_cid[n_ent] = cid;
+                        ent_pl[n_ent] = pl;
+                        ent_ai[n_ent] = ai;
+                        n_ent++;
+                    }
+                }
+            }
+        }
+    }
+
+    /* ── Apply ── modifiers.rs:2259-2291. */
+    /* modifiers.rs:2221 -- `let mut local_non_stackable: HashSet<String>`. The
+     * set is LOCAL to one evaluation, so Rust rebuilds it from empty on every
+     * pass, and its key at :2281 is `format!("{}:{}", effect.action,
+     * effect.text)` -- the action SPELLING and the effect TEXT, not a card id.
+     * That is the whole rule 「この効果は重複しない」 states: two INSTANCES of
+     * one non-stackable card sitting in the four live/success bags collapse to
+     * one application, and so do two different cards whose flagged effects
+     * happen to share an action and a text.
+     *
+     * The C HAD NO SUCH SET. `non_stackable` was decoded into the effect's
+     * extras table (src/ability/vm.c:844-847) and rb_effect_non_stackable_any
+     * (src/core/card.c:771) could read it, but nothing in this loop consulted it,
+     * so every flagged node applied once per copy in the zone. The earlier
+     * comment in this file claimed the dedupe was "VERIFIED-INERT" because the
+     * three corpus-wide flagged nodes (cards 288 / 291 / 466) carry distinct
+     * actions AND distinct texts -- which is true ACROSS CARDS and says nothing
+     * about a second copy of the SAME card, which is exactly what a deck of 2-3
+     * copies produces. The census was the wrong question. Measured against the
+     * corpus instead: PL!-bp6-022-L ab#0 (cardid 291, modify_required_hearts,
+     * non_stackable) is the reachable instance, and
+     * tests/test_parity_required_hearts.c::j_non_stackable is the two-distinct-
+     * copies case. Rust reaches this loop through BOTH `recalculate_constants`
+     * (modifiers.rs:1398) and `evaluate_success_zone_constant_abilities`
+     * (modifiers.rs:2187), so the fixture's `rb_recalc_constants` call is on the
+     * real path and the two engines differ.
+     *
+     * Cap: one key slot per collected entry, so the loop cannot outrun the
+     * array. Every flagged entry that reaches the cap is still applied, which is
+     * the fail-open direction and matches Rust's `insert` never failing. */
+    char **ns_keys = NULL;
+    int n_ns = 0;
+    if (n_ent > 0)
+        ns_keys = (char **)calloc((size_t)n_ent, sizeof(char *));
+
+    for (int i = 0; i < n_ent; i++) {
+        int cid = ent_cid[i];
+        int pl  = ent_pl[i];
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)cid, ent_ai[i], &ab)) continue;
+        AbilityEffect *e = ab.effect;
+        if (!e) { rb_free_ability(&ab); continue; }
+
+        /* :2260-2261 -- activating_card is published for the whole entry and
+         * restored on every exit path, because rb_recalc_constants re-enters. */
+        int prev_activating = g->activating_card;
+        g->activating_card = cid;
+
+        /* :2267-2271 -- ConditionContext::new_with_self(self, self_player);
+         * `self_player` is the seat whose bag the card was found in, which is
+         * what `actor` means for rb_eval_condition_for_host. There is NO
+         * activation_position gate here (unlike recalculate_constants :681) and
+         * NO ability-invalidation check -- Rust has neither in E1. */
+        int cond_met = 1;
+        if (e->has_condition && e->condition)
+            cond_met = rb_eval_condition_for_host(g, pl, cid, e->condition);
+
+        /* :2276-2287 -- the non-stackable gate, AFTER the condition and BEFORE
+         * the apply. :2276-2279's `if !cond_met { continue }` is folded into
+         * `cond_met` above, so both Rust exits share one `continue`. */
+        int apply = cond_met;
+        if (apply) {
+            int ns_flag = 0;
+            if (rb_effect_non_stackable_any(e, &ns_flag) && ns_flag && ns_keys) {
+                const char *a = e->action ? e->action : "";
+                const char *t = e->text ? e->text : "";
+                size_t klen = strlen(a) + strlen(t) + 2;
+                char *key = (char *)malloc(klen);
+                if (key) {
+                    snprintf(key, klen, "%s:%s", a, t);
+                    int dup = 0;
+                    for (int k = 0; k < n_ns; k++)
+                        if (!strcmp(ns_keys[k], key)) { dup = 1; break; }
+                    if (dup) apply = 0;                       /* :2282-2285 */
+                    else if (n_ns < n_ent) ns_keys[n_ns++] = key;  /* :2286 */
+                    else free(key);
+                }
+            }
+        }
+
+        if (apply) sz_apply_effect(g, cid, pl, e);          /* :2289 */
+
+        g->activating_card = prev_activating;
+        rb_free_ability(&ab);
+    }
+    for (int k = 0; k < n_ns; k++) free(ns_keys[k]);
+    free(ns_keys);
+}
+
+/* E3. Rust modifiers.rs:2147-2150.
+ *
+ *   pub fn evaluate_success_zone_constant_abilities(&mut self) {
+ *       self.mods.need_heart_modifiers.clear();
+ *       self.evaluate_success_zone_constant_modifiers();
+ *   }
+ *
+ * The first statement is the part the C genuinely lacks: rb_recalc_constants'
+ * prologue (triggers.c:1368-1376) withdraws only the constant_need_heart LEDGER,
+ * so a need-heart grant from any NON-constant source survives, where Rust's
+ * clear() drops the whole map. Clearing mods.need_heart[] here reproduces that.
+ * It does NOT touch constant_need_heart[], which is the C's stand-in for Rust's
+ * separate constant_need_heart_global_bonuses map -- Rust's clear() does not
+ * touch that map either.
+ *
+ * Call sites (Rust turn/live.rs:1326 and turn/trigger_scan.rs:360) are in
+ * src/turn/live.c and the trigger scan, neither of which this file owns. */
+void rb_evaluate_success_zone_constant_abilities(GameState *g) {
+    if (!g) return;
+    for (int cid = 0; cid < RB_MAX_CARD_IDS; cid++)
+        for (int c = 0; c < 8; c++) {
+            g->mods.need_heart[cid][c].add = 0;
+            g->mods.need_heart[cid][c].set = 0;
+        }
+    rb_evaluate_success_zone_constant_modifiers(g);
+}
+
+/* E4. Rust modifiers.rs:2159-2182.
+ *
+ *   for snap in &self.performance_snapshots {
+ *       for &(cid, color, ref entry) in &snap.performance_need_heart_modifiers {
+ *           if !restored.insert((cid, color)) { continue }
+ *           let target = self.mods.need_heart_modifiers.entry(cid).or_default()
+ *                        .entry(color).or_default();
+ *           if entry.set != 0 && target.set == 0 { target.set = entry.set; }
+ *           target.additive += entry.additive;
+ *       }
+ *   }
+ *
+ * The dedupe is load-bearing and its own comment says why: "the same global
+ * modifier may appear in multiple players' snapshots, causing double-counting".
+ * Restoring set only when the target has none (:2176-2178) is likewise exact --
+ * a snapshot never overwrites a set that is already present.
+ *
+ * REACHABILITY CAVEAT, stated plainly: the PRODUCER does not exist in C yet.
+ * RbLiveSnapshot.performance_need_heart_modifiers[] (rabuka.h:1375) and its
+ * counter (:1376) have 0 writers -- Rust flattens mods.need_heart into the
+ * snapshot at the head of execute_performance_phase (turn/phases.rs:320-333)
+ * and build_snapshot stores it (turn/live.rs:3179), and the head of the
+ * performance phase in src/turn/phase.c was never ported. With an empty list
+ * this loop is correctly a no-op today. It is landed anyway because it is a
+ * ~15-line exact body that becomes live the moment the producer lands, and
+ * because the alternative -- leaving the reader absent -- is what kept this
+ * cluster blocked for four waves.
+ * ⛔ BLOCKED-ON: src/turn/phase.c -- flatten g->mods.need_heart[cid][color] for
+ * every non-zero entry into the pending RbLiveSnapshot before it is pushed
+ * (rb_gsc_push_performance_snapshot, game_state_abilities.c). */
+void rb_restore_performance_need_heart_modifiers(GameState *g) {
+    if (!g) return;
+    /* (cid, color) dedupe across ALL snapshots, Rust's `restored` HashSet. */
+    static uint8_t seen[RB_MAX_CARD_IDS][8];
+    memset(seen, 0, sizeof(seen));
+
+    for (int s = 0; s < g->n_snapshots; s++) {
+        const RbLiveSnapshot *snap = &g->snapshots[s];
+        int n = snap->n_performance_need_heart_modifiers;
+        if (n > RB_MAX_PERF_NEED_HEART_MODS) n = RB_MAX_PERF_NEED_HEART_MODS;
+        for (int i = 0; i < n; i++) {
+            int cid   = snap->performance_need_heart_modifiers[i].card_id;
+            int color = snap->performance_need_heart_modifiers[i].color;
+            if (cid < 0 || cid >= RB_MAX_CARD_IDS) continue;
+            if (color < 0 || color >= 8) continue;
+            if (seen[cid][color]) continue;
+            seen[cid][color] = 1;
+            const RbModifierEntry *entry = &snap->performance_need_heart_modifiers[i].entry;
+            RbModifierEntry *target = &g->mods.need_heart[cid][color];
+            if (entry->set != 0 && target->set == 0) target->set = entry->set;
+            target->add = saturate_modifier((int64_t)target->add + entry->add);
         }
     }
 }

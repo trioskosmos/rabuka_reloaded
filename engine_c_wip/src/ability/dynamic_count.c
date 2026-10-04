@@ -678,10 +678,33 @@ int rb_effect_count(const struct GameState *g, int actor, int host_cid, const Ab
         main_deck / energy_deck / live_card_zone / success_live_card_zone /
         resolution_zone.
 
-   The C port does not maintain a separate cheer pool, so step 1 always
-   falls through to the zone-filtering step. */
+   BOTH steps are live. Step 1 became reachable when the producer landed in
+   src/turn/live.c (the twin of turn/phases.rs:405-408); the "does not maintain
+   a separate cheer pool" note that used to sit here was the missing twin. */
 int rb_revealed_count(const struct GameState *g, int owner)
 {
+    /* STEP 1, and it is no longer a no-op. dynamic_count.rs:160-163
+     *
+     *     let cheer = self.cheer_revealed_cards();
+     *     if !cheer.is_empty() { return cheer.len().u8_count(); }
+     *
+     * `cheer_revealed_cards()` (mod.rs:1037-1041) selects the buffer by player id
+     * and DEFAULTS TO PLAYER 1 for anything it does not recognise, so `owner` is
+     * read the same way. Before the producer landed, this step always fell
+     * through to the zone filter below and the count it returned was the size of
+     * the GLOBAL `revealed_cards` pool restricted to one seat's zones — which,
+     * mid-yell, is a different number from "how many cards did I cheer" whenever
+     * the two performers' cards share a zone.
+     *
+     * REACHABILITY, measured against cards/abilities.json: **29 of the 46**
+     * `dynamic_count` nodes carry `reference: "previous_reveal"`, and
+     * dynamic_count.rs:57 routes that reference straight into this function. */
+    {
+        int n_cheer = (owner == 1) ? g->n_player2_cheer_revealed_cards
+                                   : g->n_player1_cheer_revealed_cards;
+        if (n_cheer > 0) return n_cheer;
+    }
+
     const RbPlayer *P = &g->p[owner];
     int count = 0;
 

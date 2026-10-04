@@ -255,9 +255,9 @@ int rb_gsc_phase_invariant(const GameState *g) {
 
 /* ── can_player_act ────────────────────────────────────────────────────────
    Rust: mod.rs:495-573. Pending choices are authoritative (the queue stamps
-   who must answer); the phase match is the fallback. The C queue stamps the
-   seat in g->queue.actor (rb_get_pending_choice_player_id), and the flat
-   RbChoice carries target_player_id for the SelectCard fallback. */
+   who must answer); the phase match is the fallback. The C's stamp is the
+   current entry's choice_player_id (rb_get_pending_choice_player_id, choice.c),
+   NOT g->queue.actor, which is the MOVING seat — see choice.c and cluster Q68. */
 int rb_gsc_can_player_act(const GameState *g, int player_id) {
     if (!g) return 0;
     if (rb_has_pending_choice(g)) {

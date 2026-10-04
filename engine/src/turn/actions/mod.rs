@@ -1734,6 +1734,30 @@ impl super::TurnEngine {
         if !game_state.seat_player(seat).live_card_zone.face_up {
             return;
         }
+        Self::evict_non_live_from_live_slot(game_state, seat);
+    }
+
+    /// Rule 10.5.1 / official ruling Q213: every non-live card in a live card zone is
+    /// moved out — a member to the 控え室, an energy to the energy deck — and the move is
+    /// recorded as a movement event so "from live_card_zone to discard" conditions see it.
+    ///
+    /// **Split out of `check_invalid_live_cards` for Q213, and that is the whole point.**
+    /// The eviction used to be reachable only behind `live_card_zone.face_up`, and
+    /// `face_up` is set at the top of `execute_performance_phase` (`turn/phases.rs`) —
+    /// which runs *after* `trigger_live_start_abilities`. So an illegally-placed member
+    /// was still sitting in the live slot when the ライブ開始時 abilities read it, and a
+    /// requirement-reduction gated on 「『蓮ノ空』のライブカード1枚につき」 counted it.
+    ///
+    /// The ruling is explicit that the card MOVES first:
+    /// 「ライブ開始時能力が発動する前にメンバーカードは控え室に移動します。そのため、
+    /// メンバーカードでは減りません。」 So the eviction has to happen *before* the
+    /// trigger, not merely before the count is read — a filter at the counting site would
+    /// produce the right number while leaving the card in a zone it should not be in, and
+    /// the ruling says it moves.
+    ///
+    /// Returns whether anything moved, so a caller can re-derive constants only when the
+    /// zone membership actually changed.
+    pub(crate) fn evict_non_live_from_live_slot(game_state: &mut GameState, seat: u8) -> bool {
         let invalids: Vec<(usize, i16, bool)> = {
             let player = game_state.seat_player(seat);
             player
@@ -1752,9 +1776,18 @@ impl super::TurnEngine {
                 .collect()
         };
         if invalids.is_empty() {
-            return;
+            log::debug!(
+                "[Q213_EVICT] seat={seat} live_zone={:?} — nothing to evict, all live",
+                game_state.seat_player(seat).live_card_zone.cards
+            );
+            return false;
         }
         let player_id = game_state.seat_player(seat).id.clone();
+        log::debug!(
+            "[Q213_EVICT] seat={seat} player={player_id} evicting {:?} from the live zone \
+             before ライブ開始時",
+            invalids.iter().map(|&(_, id, _)| id).collect::<Vec<_>>()
+        );
         // Live-zone membership changed ↁEconstant outputs may differ.
         let mut moved = Vec::new();
         for &(i, card_id, is_energy) in invalids.iter().rev() {
@@ -1780,6 +1813,7 @@ impl super::TurnEngine {
                 false,
             );
         }
+        true
     }
 
     fn check_duplicate_members(

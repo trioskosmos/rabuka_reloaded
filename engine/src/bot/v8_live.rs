@@ -32,11 +32,6 @@ use crate::game_state::{GameState, Phase};
 
 use super::v8_model::{self, CheckOutcome, OppModel, RngGuard, PLACEMENT_CREDIT};
 
-/// Shorthand for the blade count used on the un-projected path.
-fn active_blades(gs: &GameState, me: u8, db: &CardDatabase) -> i32 {
-    v8_model::active_blades(gs, me, db)
-}
-
 /// A life in hand, priced once.
 struct Life {
     index: usize,

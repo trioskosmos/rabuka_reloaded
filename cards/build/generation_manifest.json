@@ -1,18 +1,76 @@
 {
   "schema": "compiled_abilities.v1",
   "compiler": "cards/compile_abilities.py",
-  "engine_commit": "f152a50f",
+  "engine_commit": "5ce311e6",
   "input": {
     "source": "cards/abilities.json",
-    "sha256": "58e358b6cf610840",
+    "sha256": "706b1981cc2d0811",
     "count": 985
   },
   "output": {
-    "bytes": 98733,
-    "compressed_bytes": 30531,
-    "sha256": "220cee40371aa03c",
-    "compressed_sha256": "1afaa815a79e3715",
-    "interned_strings": 6030,
+    "bytes": 98809,
+    "compressed_bytes": 30568,
+    "sha256": "1bf0d2efd275dfd4",
+    "compressed_sha256": "555e055af4e0411e",
+    "interned_strings": 6033,
     "card_ability_pairs": 2116
+  },
+  "c_artifacts": {
+    "_comment": [
+      "Digests of the COMMITTED C tables, recorded here so the Rust build can",
+      "compare the two generations without a C parser. A reader should treat",
+      "ANY disagreement between this block and `output` as a byte-splice: the",
+      "interned pool is UNSEPARATED, so a stale offset table against a fresh",
+      "blob returns neighbouring entries spliced together, not an error.",
+      "",
+      "RE-MEASURED 2026-10-04 at HEAD 5ce311e6 AFTER the layer-3 regen that",
+      "closed the 160-byte skew. This block now describes the SAME generation as",
+      "`output` above, so the two agree: 6032 interned strings / 6033 offsets,",
+      "726671 string-table bytes / 98782 bytecode bytes, whole-table FNV-1a",
+      "3985478542. The skew this block used to record (726831 / 98737 / FNV",
+      "876896371, 5533 of 6032 digests mismatched) is GONE, not merely",
+      "re-described.",
+      "",
+      "PRESERVED, NOT REBUILT: cards/build_lib.py carries this key forward",
+      "instead of deleting it on a rebuild, because no writer of `output` owns",
+      "it. Preserving the RECORD cannot tell whether it is still TRUE, so the",
+      "consumer fails loudly instead: engine_c_wip/tests/test_artifacts_consistent.c",
+      "section 6 compares every field below against the values compiled into",
+      "gen_data.c AND against cards/build/abilities_strings.bin. An absent block,",
+      "a stale block and a disagreeing block are all FAILs there -- never",
+      "'cannot cross-check', never 'agrees'.",
+      "",
+      "\u26a0 ANY REGENERATION INVALIDATES THIS BLOCK. After running",
+      "bash engine_c_wip/tools/regen_all.sh the C artefacts change, this block",
+      "does not, and section 6 of that suite will FAIL until these numbers are",
+      "re-measured and updated. That failure is the intended tripwire."
+    ],
+    "generation": "canonical",
+    "measured_at_head": "5ce311e6",
+    "num_abilities": 985,
+    "num_string_offsets": 6033,
+    "interned_strings": 6032,
+    "card_ability_pairs": 2116,
+    "bytecode_len": 98782,
+    "strings_table_len": 726671,
+    "strings_table_fnv1a32": 3985478542,
+    "files": {
+      "engine_c_wip/src/abilities_strings.bin": {
+        "bytes": 726671,
+        "sha256": "32fa1a69c0ba9bc2f69a7dfd046395f6b021840fbc484ce70f4a40865734d652"
+      },
+      "engine_c_wip/src/core/generated/gen_data.c": {
+        "bytes": 132608,
+        "sha256": "a28c1456fa0c86e424d4b9e0b9afb0320ddbaf185fd1394ce07738bb81a1f418"
+      },
+      "engine_c_wip/src/core/generated/gen_data.h": {
+        "bytes": 484,
+        "sha256": "ffd72c3bb5f37e8e66a5114d136ef7fb949d27550c011d77675568fe7f166d81"
+      },
+      "engine_c_wip/src/core/generated/bytecode_blob.c": {
+        "bytes": 267001,
+        "sha256": "49d796fd48687e10eaed157faf6af37fbef106eae3f6910bb5d7a7cab578070e"
+      }
+    }
   }
 }

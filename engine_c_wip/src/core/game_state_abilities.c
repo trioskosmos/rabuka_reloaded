@@ -1504,6 +1504,25 @@ void rb_reset_change_flags(GameState *g) {
 
 /* ── Choice context injection ────────────────────────────────────────── */
 
+/* Rust core/game_state/abilities.rs:2560-2564 --
+     let normalized = match raw_pid.as_str() {
+         "player1" => "p1",
+         "player2" => "p2",
+         _ => raw_pid.as_str(),
+     };
+   The `_` arm passes the empty string through UNCHANGED, which matters: the
+   dummy entry queue.rs:367-409 pushes has an empty player_id on purpose, and the
+   old C body substituted a hard "p1" there, which would have satisfied the leak
+   filter at engine/src/game/web_server.rs:1243 for the WRONG seat. */
+static const char *choice_seat_wire(const char *pid, char *buf, size_t n)
+{
+    if (n == 0) return "";
+    if (!strcmp(pid, "player1"))      snprintf(buf, n, "p1");
+    else if (!strcmp(pid, "player2")) snprintf(buf, n, "p2");
+    else                             snprintf(buf, n, "%s", pid);
+    return buf;
+}
+
 void rb_inject_choice_ability_context(GameState *g, char *json_buf, size_t buf_sz) {
     if (!json_buf || buf_sz == 0) return;
     json_buf[0] = '\0';
@@ -1524,11 +1543,59 @@ void rb_inject_choice_ability_context(GameState *g, char *json_buf, size_t buf_s
             rb_free_card(&c);
         }
     }
-    const char *pid = e->player_id[0] ? e->player_id : "p1";
+    /* Rust core/game_state/abilities.rs:2559-2568 --
+         let raw_pid = entry.choice_player_id.as_ref().unwrap_or(&entry.player_id);
+         let normalized = match raw_pid.as_str() {
+             "player1" => "p1",
+             "player2" => "p2",
+             _ => raw_pid.as_str(),
+         };
+         obj.insert("choice_player_id".into(), serde_json::Value::String(normalized.to_string()));
+
+       The C read `e->player_id` and NEVER `e->choice_player_id`, so every
+       ROUTED choice was reported to the client as the ABILITY OWNER: the G1/G3
+       opponent routing (ability_queue.c:569-573, queue.rs:340-352), the
+       `choice_maker` arm (queue.rs:340-352 / choice.rs:142-152) and the
+       live-success zone arm (live.rs:1577) all stamp the field, and none of
+       them changed what this function emitted. The `"p1"` fallback for an empty
+       id was a second, separate fabrication -- Rust's `match` normalises `""`
+       to `""`, and the dummy entry queue.rs:367-409 pushes has an empty
+       player_id on purpose. */
+    const char *pid = e->choice_player_id[0] ? e->choice_player_id : e->player_id;
+    char norm[16];
+    choice_seat_wire(pid, norm, sizeof norm);
     snprintf(json_buf, buf_sz,
         "{\"card_no\":\"%s\",\"ability_text\":\"%s\",\"card_name\":\"%s\","
         "\"choice_player_id\":\"%s\",\"card_id\":%d}",
-        card_no, ability_text, card_name, pid, cid);
+        card_no, ability_text, card_name, norm, cid);
+}
+
+/* The SAME value, as the single accessor every caller should use.
+ *
+ * Rust has no second copy of this expression: `inject_choice_ability_context`
+ * (abilities.rs:2483-...) builds the object and
+ * `get_pending_choice_json` (abilities.rs:2475-2480) merges it, so the key and
+ * its value have exactly one producer. The C needed a second one because
+ * src/web_server.c's `append_pending_choice` — the actual wire — never called
+ * `rb_inject_choice_ability_context` and emitted no such key at all; see
+ * PARITY_CHECKLIST.md for the full finding.
+ *
+ * IT LIVES HERE, NOT IN web_server.c, ON PURPOSE: the Makefile links
+ * src/web_server.o ONLY into $(WEB_TARGET) (Makefile:100-102) and not into
+ * OBJ_LIB, so no tests/test_*.c binary can reach a symbol defined there —
+ * linking one fails with an undefined reference. game_state_abilities.c IS in
+ * OBJ_LIB, so this is the placement that makes the routing observable from a
+ * suite at all. web_server.c declares it file-scope, exactly as
+ * src/turn/triggers.c:6-16 does for rb_check_effect_position. */
+const char *rb_wire_pending_choice_player_id(const GameState *g)
+{
+    static char norm[16];
+    const char *pid = "";
+    if (g && g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+        const RbQueueEntry *e = &g->queue.entries[g->queue.cur];
+        pid = e->choice_player_id[0] ? e->choice_player_id : e->player_id;
+    }
+    return choice_seat_wire(pid, norm, sizeof norm);
 }
 
 /* ── Ability Queue Entry Accessors ──────────────────────────────────── */

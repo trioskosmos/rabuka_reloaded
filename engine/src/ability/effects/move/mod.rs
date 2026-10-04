@@ -3207,31 +3207,40 @@ pub fn execute_selected_cards_from_zone(
             })
             .unwrap_or(false);
 
+        // 「…3枚まで公開して手札に加えてもよい。残りを控え室に置く。」 — a
+        // 「残り」 card is by definition one the filter REJECTS, so it is not
+        // offerable again. Gating the re-prompt on `!remaining_cards.is_empty()`
+        // therefore built a zero-option prompt the moment the eligible set ran
+        // out, and the remainder was stranded rather than milled: see
+        // `stranded_remainder_risk` in `cards/test_inventory.py`. Test
+        // reachability on the ELIGIBLE set — which is also what bounds the
+        // honest pick count.
+        let remaining_indices: Vec<usize> = {
+            let card_db = &gs.card_database;
+            let filter = select_action
+                .as_ref()
+                .map(|sa| util::CardFilter::from_effect(sa));
+            match filter {
+                Some(ref f) if f.has_filter() => remaining_cards
+                    .iter()
+                    .enumerate()
+                    .filter(|&(_, &cid)| f.matches(card_db, cid, false))
+                    .map(|(i, _)| i)
+                    .collect(),
+                _ => (0..remaining_cards.len()).collect(),
+            }
+        };
+
         if selected_count > 0
             && can_select_more
             && max_select > selected_count
-            && !remaining_cards.is_empty()
+            && !remaining_indices.is_empty()
         {
             gs.looked_at_cards = remaining_cards.clone();
             let remaining_available = gs.looked_at_cards.len();
-            let remaining_selections = (max_select - selected_count).min(remaining_available);
-            // Compute filtered_indices for remaining cards
-            let remaining_indices: Vec<usize> = {
-                let card_db = &gs.card_database;
-                let filter = select_action
-                    .as_ref()
-                    .map(|sa| util::CardFilter::from_effect(sa));
-                match filter {
-                    Some(ref f) if f.has_filter() => gs
-                        .looked_at_cards
-                        .iter()
-                        .enumerate()
-                        .filter(|&(_, &cid)| f.matches(card_db, cid, false))
-                        .map(|(i, _)| i)
-                        .collect(),
-                    _ => (0..gs.looked_at_cards.len()).collect(),
-                }
-            };
+            // Never promise more picks than there are cards left that CAN be
+            // picked. With no filter this is `remaining_available` as before.
+            let remaining_selections = (max_select - selected_count).min(remaining_indices.len());
             let description = format!(
                 "Select up to {} more {} from the {} remaining looked-at {}",
                 remaining_selections,

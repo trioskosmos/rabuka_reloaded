@@ -220,27 +220,55 @@ static const char *extra(AbilityEffect *e, const char *k) {
         if (e->extra_k[i] && !strcmp(e->extra_k[i], k)) return e->extra_v[i];
     return NULL;
 }
-int heart_color_of(AbilityEffect *e, int dflt) {
-    const char *h = extra(e, "heart_color");
-    if (!h) h = extra(e, "target");
-    if (!h) return dflt;
-    if (!strcmp(h, "pink") || !strcmp(h, "heart00")) return RB_HEART_PINK;
-    if (!strcmp(h, "red") || !strcmp(h, "heart01")) return RB_HEART_RED;
-    if (!strcmp(h, "yellow") || !strcmp(h, "heart02")) return RB_HEART_YELLOW;
-    if (!strcmp(h, "green") || !strcmp(h, "heart03")) return RB_HEART_GREEN;
-    if (!strcmp(h, "blue") || !strcmp(h, "heart04")) return RB_HEART_BLUE;
-    if (!strcmp(h, "purple") || !strcmp(h, "heart05")) return RB_HEART_PURPLE;
-    if (!strcmp(h, "orange") || !strcmp(h, "heart06")) return RB_HEART_ORANGE;
-    if (!strcmp(h, "all") || !strcmp(h, "heart07") || !strcmp(h, "b_all")) return RB_HEART_ALL;
-    if (!strcmp(h, "draw")) return RB_HEART_DRAW;
-    if (!strcmp(h, "score")) return RB_HEART_SCORE;
-    /* generic "heartNN" (NN = 00..07) → numeric color index */
-    if (!strncmp(h, "heart", 5) && h[5] >= '0' && h[5] <= '9') {
-        int idx = atoi(h + 5);
-        if (idx >= 0 && idx <= 7) return idx;
-    }
-    return dflt;
-}
+/* ── TOMBSTONE (2026-10-04). `heart_color_of` REMOVED.
+ *
+ * A dead, GLOBAL (no `static`, so it was a real defined symbol in every object
+ * and showed up in `nm -g --defined-only`) helper with no Rust twin.
+ * Reachability, measured: 0 callers in src/, 0 in tests/, and the only textual
+ * mention outside its own definition is a comment at
+ * src/ability/effects/state.c:1779. Its Rust counterpart does not exist because
+ * Rust parses effect `heart_color` through `HeartColor::from_str`
+ * (core/card.rs:4554) rather than through a per-effect lookup helper.
+ *
+ * WHY IT WAS DEAD-WRONG, and why the wrongness is worth naming in the
+ * tombstone rather than just deleting: it mapped the string "b_all" to
+ * RB_HEART_ALL, which is index 7. In Rust's `heart_color_table!`
+ * (core/card.rs:4460-4476) "b_all" is `HeartColor::BAll`, index 0 --
+ * `BAll => "b_all", "b_all", 0` -- and index 7 is `All => "all", "all", 7`.
+ * So the C collapsed the BLADE-heart wildcard into the COLOURLESS-everything
+ * wildcard. `RB_HEART_PINK` is also a colour name Rust has no counterpart for
+ * (Rust's index 0 is Heart00), so the whole table is a C-local dialect.
+ *
+ * Measured corpus reachability of the wrong arm: "b_all" occurs 0 times as a
+ * quoted JSON value in cards/abilities.json (the 28 raw `b_all` occurrences are
+ * heart-colour KEYS inside cards.json heart_count maps, which this function
+ * never sees, and 3 more are in cards/qa_data.json). So the arm is wrong and
+ * unreachable at the same time -- which is exactly the profile that hides a bug
+ * until the day someone adds a card.
+ *
+ * The removed body, for the record (it read `extra(e, "heart_color")`, then
+ * `extra(e, "target")`, then fell back to the caller's default, and mapped
+ * pink/heart00..orange/heart06, all/heart07/b_all, draw, score, plus a
+ * generic "heartNN" arm for NN = 00..07 that was already unreachable because
+ * every NN had an explicit arm above it):
+ *
+ *     int heart_color_of(AbilityEffect *e, int dflt) {
+ *         const char *h = extra(e, "heart_color");
+ *         if (!h) h = extra(e, "target");
+ *         if (!h) return dflt;
+ *         if (!strcmp(h, "pink")    || !strcmp(h, "heart00")) return RB_HEART_PINK;
+ *         ...
+ *         if (!strcmp(h, "all")     || !strcmp(h, "heart07") ||
+ *             !strcmp(h, "b_all"))                              return RB_HEART_ALL;
+ *         if (!strcmp(h, "draw"))                              return RB_HEART_DRAW;
+ *         if (!strcmp(h, "score"))                             return RB_HEART_SCORE;
+ *         if (!strncmp(h, "heart", 5) && h[5] >= '0' && h[5] <= '9') {
+ *             int idx = atoi(h + 5);
+ *             if (idx >= 0 && idx <= 7) return idx;
+ *         }
+ *         return dflt;
+ *     }
+ */
 
 /* Move `count` cards from one of actor's zones to another.
    Delegates to rb_card_matches_type (src/ability/util.c) which mirrors
@@ -1457,25 +1485,36 @@ int rb_activate_ability(GameState *g, int pl, int hand_idx) {
     return rb_activate_card(g, pl, (int)P->hand.cards[hand_idx]);
 }
 
-int rb_play_card(GameState *g, int pl, int hand_idx) {
-    RbPlayer *P = &g->p[pl];
-    if (hand_idx < 0 || hand_idx >= P->hand.n) return 0;
-    Card c;
-    if (!rb_decode_card_by_index((uint32_t)P->hand.cards[hand_idx], &c)) return 0;
-    int ok = 0;
-    if (card_is_member(&c)) {
-        for (int q = 0; q < RB_STAGE_SIZE; q++) {
-            if (P->stage[q] < 0) { ok = rb_play_member(g, pl, hand_idx, q); break; }
-        }
-    } else {
-        /* live card: send to live zone during live set */
-        int card = bag_remove_at(&P->hand, hand_idx);
-        bag_push(&P->live, card);
-        ok = 1;
-    }
-    rb_free_card(&c);
-    return ok;
-}
+/* ── TOMBSTONE (2026-10-04). `rb_play_card` REMOVED.
+ *
+ * A dead global with NO Rust twin and a body that cannot be made faithful
+ * against the signature it has. It is removed rather than kept as a stub
+ * because it is a trap with a plausible name: it is the only function in the
+ * tree that takes (game, player, hand index) and "plays a card", which is
+ * exactly the call shape somebody would reach for.
+ *
+ * WHY IT WAS DEAD-WRONG, in the three ways that matter:
+ *
+ *  1. ENERGY CARDS WERE PLAYED INTO THE LIVE ZONE. The branch is
+ *     `card_is_member(c) ? play member : move to live`, so any non-member went
+ *     into `P->live`. An energy card is a non-member. Rule 7.2 sends energy to
+ *     the energy zone; there is no energy branch here at all.
+ *  2. THE LIVE-CARD PATH SKIPS EVERY LIVE-CARD RULE. `bag_remove_at` +
+ *     `bag_push(&P->live, card)` and nothing else: no need-heart check, no
+ *     `LiveCardZone::add_card` validation (zones.rs:523), no face-up flag, no
+ *     auto-ability registration, no capacity check, and no phase check — the
+ *     comment says "during live set" but nothing verifies the phase.
+ *  3. IT PICKED THE FIRST FREE STAGE SLOT. Rust's member placement is
+ *     `move_card_from_hand_to_stage(idx, area, use_baton_touch, ...)` with an
+ *     explicit `area` (phases.rs:1260-1271); "first empty slot" is a policy the
+ *     engine does not have.
+ *
+ * The live C route for a hand play is
+ * rb_handle_play / rb_execute_play -> rb_play_member_ex
+ * (src/turn/phase.c:1739-1746, which decodes the card first and refuses an
+ * undecodable one before the request is latched). Do not reintroduce a
+ * convenience wrapper in its place.
+ */
 
 /* ───────────────────────────── phases ─────────────────────────────
  *

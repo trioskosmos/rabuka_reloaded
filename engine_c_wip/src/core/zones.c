@@ -572,11 +572,26 @@ void rb_energy_set_active_count(RbPlayer *player, int count){
     player->energy_active = count;
 }
 
-/* Mirror EnergyZone::add_active — saturating increment of active energy. */
+/* Mirror EnergyZone::add_active — saturating increment of active energy.
+ *
+ * core/zones.rs:682-684:
+ *     pub fn add_active(&mut self, delta: u8) {
+ *         self.active_energy_count = self.active_energy_count.saturating_add(delta);
+ *     }
+ *
+ * WAS DEAD-WRONG ON THE UPPER BOUND. Rust saturates on a `u8`, so
+ * `saturating_add` clamps at 255. The C clamped only the lower bound (a
+ * `delta <= 0` guard plus a post-hoc `< 0` fixup, and `delta` is a signed
+ * `int` here where Rust's is a `u8`), and `RbPlayer.energy_active` is `int`
+ * (include/rabuka.h:800) — so a large `delta` ran the count straight past 255
+ * and every later reader that compared it against a Rust-shaped `u8` total
+ * would disagree. Upper clamp added; both bounds now match.
+ */
 void rb_energy_add_active(RbPlayer *player, int delta){
     if(!player || delta <= 0) return;
     player->energy_active += delta;
     if(player->energy_active < 0) player->energy_active = 0;
+    if(player->energy_active > 255) player->energy_active = 255;
 }
 
 /* Mirror EnergyZone::sub_active — saturating decrement of active energy. */
@@ -1161,16 +1176,57 @@ int rb_player_draw_card(GameState *g, int pl){
     return cid;
 }
 
-/* Mirror Player::draw_energy — draws the top card from energy deck to the
- * energy zone (active). Returns the card ID, or -1 if energy deck is empty. */
+/* Mirror Player::draw_energy (core/player.rs:585-591):
+ *
+ *     pub fn draw_energy(&mut self) -> Option<i16> {
+ *         self.energy_deck.draw().inspect(|&card_id| {
+ *             // Insert at the active boundary (not append): the drawn card is
+ *             // active, and appending past waited cards would corrupt the
+ *             // active-prefix convention.
+ *             self.energy_zone.push_active(card_id);
+ *         })
+ *     }
+ *
+ * and EnergyZone::push_active (core/zones.rs:718-722):
+ *
+ *     let at = (self.active_energy_count as usize).min(self.cards.len());
+ *     self.cards.insert(at, card_id);
+ *     self.active_energy_count = self.active_energy_count.saturating_add(1);
+ *
+ * WAS DEAD-WRONG ON THREE COUNTS, and this is the class that matters: a dead
+ * twin whose body diverges fires the moment somebody wires it.
+ *   1. POSITION. The old body appended at `energy.n`. With waited energy in
+ *      the zone (`energy_active < energy.n`) that lands the freshly drawn
+ *      card AFTER a waited card, so it becomes waited — precisely what Rust's
+ *      own comment above forbids. Now inserted at
+ *      `min(energy_active, energy.n)`.
+ *   2. CAPACITY. The old body drew from the energy deck FIRST and only then
+ *      tested `energy.n < RB_MAX_ZONE`; on a full zone the card was already
+ *      out of the deck and was then DROPPED ON THE FLOOR. Rust's `Vec::insert`
+ *      always succeeds. The capacity test now precedes the draw, so the card
+ *      stays in the energy deck instead of ceasing to exist.
+ *   3. SATURATION. `saturating_add` is on a `u8`; the C's `energy_active` is
+ *      `int` (include/rabuka.h:800) and would run past 255. Clamped.
+ *
+ * The capacity branch is unreachable on the real corpus (an energy zone never
+ * approaches RB_MAX_ZONE == 512), which is exactly why it is stated here
+ * rather than left to chance.
+ */
 int rb_player_draw_energy(GameState *g, int pl){
     if(!g || pl<0 || pl>1) return -1;
     RbPlayer *P = &g->p[pl];
+    if(P->energy.n >= RB_MAX_ZONE) return -1;
     int cid = rb_energy_deck_draw(g, pl);
     if(cid < 0) return -1;
-    if(P->energy.n < RB_MAX_ZONE){
-        P->energy.cards[P->energy.n++] = cid;
+    {
+        int at = P->energy_active;
+        if(at < 0) at = 0;
+        if(at > P->energy.n) at = P->energy.n;
+        for(int i = P->energy.n; i > at; i--) P->energy.cards[i] = P->energy.cards[i-1];
+        P->energy.cards[at] = cid;
+        P->energy.n++;
         P->energy_active++;
+        if(P->energy_active > 255) P->energy_active = 255;
     }
     return cid;
 }

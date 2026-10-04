@@ -238,8 +238,18 @@ int rb_queue_enqueue(GameState *g, int card_id, int ability_idx,
     e->n_cond_cache = 0;
     if (player_id) snprintf(e->player_id, sizeof(e->player_id), "%s", player_id);
     if (card_id >= 0 && ability_idx >= 0) {
+        /* GAINED-AWARE. ability_idx at or above RB_GAINED_ABILITY_INDEX_BASE
+           addresses the gained store, not the printed list, and
+           rb_decode_card_ability answers 0 for it (card.c:282 rejects any n
+           >= the printed count). A GAINED entry therefore left e->trigger
+           EMPTY here, and the drain's LIVE_START/LIVE_SUCCESS dedupe key at
+           rb_drain_ability_queue gates on e->trigger[0] -- so a gained entry
+           skipped dedupe AND read as triggerless everywhere else that inspects
+           the stamped trigger. rabuka.h:2230-2236 names
+           rb_resolve_card_ability_at as the entry point for this; the enqueue
+           is one of its callers. */
         Ability ab;
-        if (rb_decode_card_ability((uint32_t)card_id, ability_idx, &ab)) {
+        if (rb_resolve_card_ability_at(g, card_id, ability_idx, &ab)) {
             snprintf(e->trigger, sizeof(e->trigger), "%s", ab.triggers ? ab.triggers : "");
             rb_free_ability(&ab);
         }
@@ -1377,8 +1387,26 @@ int rb_drain_ability_queue(GameState *g) {
         /* queue.rs:84 `available_for` skips a finished entry. */
         if (e->effect_started || e->completed) continue;
         if (e->card_id < 0) { e->effect_started = 1; continue; }
-        int n = rb_card_num_abilities((uint32_t)e->card_id);
-        if (e->ability_idx < 0 || e->ability_idx >= n) { e->effect_started = 1; continue; }
+        /* GAINED-AWARE RANGE GUARD. This is the FIRST place a gained entry was
+           retired, and it retired it BEFORE the decode below was reached, so
+           fixing only the decode leaves the bug exactly as visible.
+           rb_card_num_abilities is PRINTED-only: it counts the card's own
+           printed abilities (card.c:272), so a gained entry at
+           RB_GAINED_ABILITY_INDEX_BASE+g has ability_idx >= n for every real
+           card (n is at most a handful), took this branch, and was stamped
+           effect_started = 1 having produced nothing and never re-examined.
+           A GAINED ライブ成功時 / 常時 ability therefore NEVER FIRED.
+
+           The bound for the gained arm is the gained store's occupancy, not a
+           printed count: gidx < rb_card_num_gained_abilities(g, card_id). */
+        if (e->ability_idx < 0) { e->effect_started = 1; continue; }
+        if (e->ability_idx >= RB_GAINED_ABILITY_INDEX_BASE) {
+            if (e->ability_idx - RB_GAINED_ABILITY_INDEX_BASE >=
+                rb_card_num_gained_abilities(g, e->card_id)) { e->effect_started = 1; continue; }
+        } else {
+            int n = rb_card_num_abilities((uint32_t)e->card_id);
+            if (e->ability_idx >= n) { e->effect_started = 1; continue; }
+        }
         /* trigger_scan.rs:188 / :339 `seen.insert((id, idx))` — see
            rb_drain_seen_add. Without it a live card that is also staged, or a
            live zone holding the same card twice, fires its ability twice. The
@@ -1405,7 +1433,13 @@ int rb_drain_ability_queue(GameState *g) {
            silenced 自動 watchers in cross_player_interaction,
            parity_deploy_multi and ported_generated. */
         Ability ab;
-        if (!rb_decode_card_ability((uint32_t)e->card_id, e->ability_idx, &ab)) {
+        /* GAINED-AWARE, per include/rabuka.h:2230-2236: "The queue processor
+           (src/ability/ability_queue.c) must use this, not
+           rb_decode_card_ability, or a queued GAINED ability silently resolves
+           to nothing." rb_decode_card_ability answers 0 for any index at or
+           above RB_GAINED_ABILITY_INDEX_BASE, which is indistinguishable from
+           "no such printed ability" -- the exact failure this replaces. */
+        if (!rb_resolve_card_ability_at(g, e->card_id, e->ability_idx, &ab)) {
             e->effect_started = 1;
             continue;
         }
@@ -1582,6 +1616,58 @@ int rb_drain_ability_queue(GameState *g) {
            prompt closes; if that slot is already taken the trees are left
            detached and unreferenced, the pre-existing bounded leak. */
         if (rb_has_pending_choice(g)) {
+            /* resolver.rs:1234-1246 -- the stamp that makes the re-fire impossible.
+             *
+             *     // Mark effect as started when a pending choice comes from effect
+             *     // execution (not cost). This prevents RWC from re-entering the
+             *     // ability after the effect's choice resolves.
+             *     let is_paid = cost_already_paid
+             *         || gs.ability_queue.current_entry().is_some_and(|e| e.cost_paid);
+             *     if is_paid {
+             *         if let Some(entry) = gs.ability_queue.current_entry_mut() {
+             *             entry.effect_started = true;
+             *         }
+             *     }
+             *     self.store_pending_choice(gs);
+             *     Ok(true)
+             *
+             * `run_ability_effect` returns true exactly when the effect left a
+             * prompt open, so this arm IS the C's fold point for those five lines
+             * -- the same event, the same place in the sequence. The C had no
+             * equivalent, which is the whole defect: the prompt-parking arm below
+             * broke out with the entry STILL UNSTAMPED, so the next
+             * `rb_drain_ability_queue` (which `rb_resolver_clear_choice_state_and_resume`
+             * at choice.c:445-451 ends in, and which the answer path therefore
+             * re-enters from the TOP) hit the skip test at :1378 with
+             * `effect_started == 0 && completed == 0` and RE-EXECUTED the effect,
+             * re-raising the prompt.
+             *
+             * MEASURED shape of that loop, from the suite's own instrumentation:
+             * the same entry, `n=1 started=0 completed=0`, no enqueue and no
+             * compaction between the two drains. `rb_queue_resume_pending_actions`
+             * -- the OTHER stamp site, choice.rs:81-83, folded at :1061-1064 --
+             * cannot cover it because that function only runs while the entry has
+             * `pending_actions_n > 0` (:1033), and this entry has none.
+             *
+             * The `is_paid` gate is Rust's and is load-bearing: a prompt raised
+             * while the COST is still being paid must leave the entry un-stamped,
+             * because the answer path has to re-enter and run the effect then. That
+             * is also why the rejected experiment stamped unconditionally in
+             * `pca_resolve_entry` (game_state_abilities.c) and made
+             * parity_search_reorder go 120 -> 1419-ish: it stamped the cost-side
+             * entries too, not just this effect-side one.
+             *
+             * The entry is re-derived from `i`, not through `e`, because
+             * `rb_execute_effect_ex` may re-enter the queue -- the same reason
+             * rb_queue_resume_pending_actions re-derives after every execution and
+             * the Final-record arm below re-derives too. `current_entry_mut()` in
+             * Rust is `cur`, which this drain deliberately does not publish (see
+             * the note at :1397), so `i` is the entry Rust would have had current.
+             */
+            if (i < g->queue.n_entries) {
+                RbQueueEntry *ce = &g->queue.entries[i];
+                if (cost_already_paid || ce->cost_paid) ce->effect_started = 1;
+            }
             rb_queue_set_state(&g->queue, RB_QUEUE_AWAITING_CHOICE);
             if (g->activation_keepalive_valid) {
                 ab.cost = NULL;

@@ -1,7 +1,23 @@
 # RUST_REFERENCE_AUDIT — findings against the oracle
 
-**HEAD read: `cf315a9a`** (`chore: parity checklist update`). Parent `2130769d`, grandparent `f152a50f`.
-The brief's ordering "`f152a50f` → `cf315a9a` → `2130769d`" is inverted: `cf315a9a` is HEAD and `2130769d` is its **parent**.
+## ⚠ HEAD MOVED TWICE UNDER THIS AUDIT — read this first
+
+| when | HEAD observed | note |
+|---|---|---|
+| audit start | **`cf315a9a`** | `chore: parity checklist update`; parent `2130769d`, grandparent `f152a50f` |
+| audit end | **`b45ff90e`** | `wip: engine/c parity audits, bot v8 live work, test inventory regen…` |
+
+`git log` at the end shows **`b45ff90e` → `f152a50f`**. `cf315a9a` and `2130769d` are **no longer in the
+history** — they were squashed into `b45ff90e` by a peer. The brief's ordering
+"`f152a50f` → `cf315a9a` → `2130769d`" was already inverted (`cf315a9a` was HEAD, `2130769d` its parent), and
+both of those commits have since ceased to exist as commits.
+
+**Every finding below was re-verified against `b45ff90e`.** The working-tree *content* is unchanged — the squash
+carried the previously-uncommitted work into one commit, so `engine/src` is clean at the new HEAD too. All
+cited line numbers re-resolve identically at `b45ff90e`, spot-checked at `phases.rs:240/242/245/246/343/349/351/412/415/832/887`,
+`turn/actions/mod.rs:1734`, `trigger_scan.rs:209`, `vm.rs:179`, `build.rs:325`, `move/mod.rs:1855/1864/3120`.
+*(Note: PowerShell `Get-Content` indexes this tree's files inconsistently — it disagrees with both the `read`
+tool and `Select-String` by one line on `phases.rs`. The two agreeing tools are authoritative here.)*
 
 Every finding below is tagged:
 - **[WT]** = read from the working tree
@@ -348,7 +364,7 @@ and `Makefile:134-151` guards it — the C side is better protected than the Rus
 
 ## Rank 8 — Uncommitted in `engine/src`: **nothing.** The oracle is not moving under us.
 
-`git status --porcelain -- engine/src` → **empty**, at both the start and the end of this audit.
+`git status --porcelain -- engine/src` → **empty**, at the start, at the end, and after the `b45ff90e` squash.
 
 **Correction to the brief: there are not 6 new untracked Rust test files. There is 1.** Untracked in `engine/`:
 
@@ -442,9 +458,13 @@ four-zone widening makes that collision window strictly larger.
   duplicate-members → refresh → victory → invalid-live → invalid-energy → orphaned-under → `recalculate_constants`
   → invalid-resolution → auto-abilities is internally coherent. `:1672-1675` documents why the omitted second
   victory pass is a no-op — that reasoning holds.
-- `ability/effects/move/mod.rs:1855-1869` `maybe_prompt_deck_order` — `is_deck_dest` correctly covers
-  `Deck | DeckTop | DeckBottom`, with `DeckBottom` added for 「3枚まで好きな順番でデッキの下に置く」 and the
-  regression it fixed recorded inline. Sound.
+- `ability/effects/move/mod.rs:1855-1869` and `:3120-3125` — **the two deck-order producers, checked and
+  CONSISTENT.** Both compute `is_deck_dest` over the identical set `Deck | DeckTop | DeckBottom`, both gate on
+  `selected/taken.len() > 1`, and both emit the same choice target string `"order"` (`:1916`, `:3140`).
+  `maybe_prompt_deck_order` is shared by two call sites (`:2272`, `:2739`); `:3130-3134` sends the *unselected*
+  remainder to `discard_remaining ? Discard : DeckBottom`. `DeckBottom` was deliberately added to `:1864` for
+  「3枚まで好きな順番でデッキの下に置く」 and the regression it fixed is recorded inline at `:1866-1868`. **No
+  defect — recorded so this is not re-audited.**
 - `ability/cost/handlers.rs:1683-1700` `pay_cost_all:discard_all` — `hand.cards.drain(..)` →
   `waitroom.cards.extend(..)` ignores `cost.count` and `cost.source_str()`; correct **only** while the caller
   guarantees `source == "hand"`. The prompt arm (`:378-392`) and the execution arm (`:1696`) are bound by the
@@ -507,3 +527,150 @@ this is settled** — three numbers are currently in circulation.
 **Not fixed, by instruction:** every Rust defect above is reported, not edited. Rust's `OFFSET_DELTAS`,
 `set_live_card`, `check_invalid_live_cards` gate and `trigger_live_start_abilities` are all byte-for-byte as I
 found them.
+
+---
+
+## FOLLOW-UP WAVE — RUST-SIDE FINDINGS (measured at HEAD `5ce311e6`)
+
+No `engine/` file was edited. Every claim below was re-read from the working tree
+at the time of measurement; **the Rust tree is being edited concurrently**, so the
+tree each citation was taken from is named. Files cited that are NOT in
+`git status`'s modified list were identical to `5ce311e6` throughout.
+
+### Rank 1/3 — Q68 CONFIRMED, and `trigger_live_start_abilities` is the whole of it
+
+`engine/src/turn/trigger_scan.rs:186-212` (unmodified since `5ce311e6`) reads
+`cannot_live_players` NOWHERE; `grep -n cannot_live` over the whole file returns
+nothing. Rust's two gates for this scan are `:195` (`is_trigger_suppressed`) and
+`:207-212` (Q72). The set is first read at `engine/src/turn/phases.rs:351` — after
+the scan calls at `:245-246`, and inside the yell where
+`engine/src/turn/live.rs:2053-2055` discards the live cards. So Rust fires a
+ライブ不能 player's ライブ開始時 and then throws their live cards away, against
+Q68's explicit 「ライブ開始時の能力は使えず、エールも行いません」.
+
+The C **inherited** this and it is now fixed on the C side (see PARITY_CHECKLIST.md,
+"Q68 … LANDED"). The C-side fix is a **deliberate divergence from Rust**; that is
+the correct direction for this ruling, and it means `rb_trigger_live_start` is now
+one of the places where matching Rust byte-for-byte would be matching a bug.
+
+**Rust-side note worth keeping:** the ruling text is stated on three cards
+(`PL!HS-bp2-014-N`, `PL!SP-bp1-001-P`, `PL!SP-bp1-001-R`) but only TWO ability
+nodes in `cards/abilities.json` carry `"restriction_type": "cannot_live"`
+(abilities.json ~:21485 `PL!SP-bp1-001-P/R`, card_count 2, 常時, `target: "self"`;
+~:28665 `PL!SP-bp1-005-P/R`, 登場). `PL!HS-bp2-014-N` is therefore **not** in that
+set, and neither is `PL!SP-bp1-001-P` reachable by any path other than its own
+常時. The restriction is rare: 2 nodes / 2116 card-ability pairs, and the writer is
+`engine/src/ability/effects/restriction.rs:101-105`.
+
+**NEW finding for Rank 3 — the clear is in TWO places, not one.** `phases.rs:279-280`
+is not the only one: `engine/src/core/game_state/abilities.rs:3207`
+(`clear_live_only_state`, guarded by `current_turn_phase == Live` at `:3205` and
+called from `check_expired_effects` at `:3241`, which `phases.rs:310` invokes at the
+same rollover) clears `cannot_live_players` **and** `cannot_activate_members`
+again. So the Rust set is cleared on both the phase-machine path and the
+effect-expiry path; any C fold needs to cover both or neither. The C's turn-stamp
+covers both by construction.
+
+### Rank 4a — `choice_player_id` REQUIRES MORE THAN THE C HAD (all files unmodified since `5ce311e6`)
+
+From source, because the test is dead (`build.rs:90` `EXCLUDED_MODULES` +
+`lib.rs:149-150` `#[cfg(feature = "server")]`):
+
+1. `queue.rs:312-366` — pre-stamped entries are never overwritten (`:319`); the
+   redirect needs an opponent CHOICE **and** an opponent ENTRY CONTEXT; the
+   universal default is `entry.player_id` (`:354-360`). Every paused choice therefore
+   carries a non-empty `choice_player_id`.
+2. `engine/src/ability/effects/choice.rs:142-153` — `execute_choice` re-stamps from
+   the effect's `choice_maker`. ⚠️ **there are TWO `choice.rs` in `engine/src`**:
+   `ability/choice.rs` (3921 lines, `execute_choice` at `:27`) and
+   `ability/effects/choice.rs` (277 lines, where the `choice_maker` arm actually
+   lives at `:142-153`). Cite the full path; a bare `choice.rs:142` is ambiguous and
+   resolves to the wrong file — `ability/choice.rs:142` is inside the REPEAT prompt.
+3. `core/game_state/abilities.rs:2195-2214` — `pause_for_choice` preserves an
+   existing stamp (`:2196` names `execute_choice`'s `choice_maker` as the writer)
+   and otherwise takes `choice_player_to`.
+4. `core/game_state/abilities.rs:2559-2568` — the JSON value, incl. the `_` arm that
+   passes `""` through.
+5. `core/game_state/abilities.rs:2684-2696` — a **second, later** insert OVERWRITES
+   that key for `SelectAutoAbility`/`SelectLiveSuccess`. `pvp_room_test.rs:262-267`
+   asserts both keys; the C has no equivalent overwrite because the C's
+   `Choice` carries no embedded `player_id` for those kinds.
+6. `core/game_state/abilities.rs:2457-2469` — `get_pending_choice_player_id` returns
+   the stamp with **NO** fallback to `player_id`, plus a `pending_loop_protocol` arm.
+7. `core/game_state/mod.rs:495-512` — `can_player_act` calls it "the single source of
+   truth for pending-choice routing" (`:499-504`) and normalises the same way as (4).
+8. `game/web_server.rs:1240-1249` — the display filter drops the ENTIRE
+   `pending_choice` when the key is **missing OR names anyone but the requester**
+   ("defensive: never leak opponent choices"), so a missing key is a HIDE, not a
+   fallback.
+
+**Rank 4a is worse than "the test does not compile".** The C emitted no
+`choice_player_id` key at all, so against (8) the C's own web client would hide
+every pending choice from both seats — and `pvp_player_can_act` (`:1151`) has no C
+counterpart, so nothing on the C side reproduces the gate. Both are now reported and
+the key is emitted; the `can_player_act` twin is BLOCKED-ON (checklist).
+
+### Rank 7 — `build.rs:325` WOULD NOT FIRE TODAY; it is a no-op, not a false alarm
+
+Measured against the **live** tree (all four checks pass):
+`cards/abilities.json` 05:54:18.172Z · `cards/cards.json` 2026-09-29T03:34:22.196Z ·
+`engine/src/ability/abilities_gen.rs` 05:54:20.412Z ·
+`cards/build/abilities.bin.z` 05:54:20.292Z ·
+`generation_manifest.json` contains `"sha256": "4753ff27e561e7db"` and
+`sha256(cards/abilities.json) = 4753ff27e561e7db022adaac36b3cee96b7691042c7bddc6a163e25d245138e1`.
+So `stale == false` and the panic at `:323` would **not** fire. It is safe to enable
+and worth enabling.
+
+**But the sharper point, which the audit's Rank 7 understates: this detector has no
+knowledge of the C tree.** It compares only Rust's own artefacts against
+`cards/abilities.json`, so it is structurally incapable of noticing the
+325/805 cross-engine skew — the thing that went unnoticed for the whole project.
+What would notice it is `bytecode_deep_compare_test` (§below), and it is gated off.
+**The two together are the missing tripwire; either alone is not.** Re-enabling
+`:323` also cannot detect that `cards/abilities.json` +
+`cards/build/abilities.bin.z` + `abilities_gen.rs` were all written inside a
+3-second window at 05:54:20Z while the C's blob dates from 2026-10-02 — a generator
+run that lands between the JSON and `abilities_gen.rs` is precisely its window.
+
+### Rank 5/6 — `bytecode_deep_compare_test` WOULD FAIL IF ENABLED (this is the prediction, not a measurement)
+
+I did **not** run it: `cargo` would execute `build.rs`, which regenerates
+`engine/tests/test_modules/*/mod.rs` — a git write in the oracle tree. The
+prediction, from the audit's own numbers: the test decodes each ability from the
+blob and from `cards/abilities.json` and compares the two re-serialisations field by
+field (`:137-192`). The blob is 98 737 payload bytes of which 63 277 differ from
+what the current `cards/abilities.json` compiles to, concentrated in slices 325 and
+805. Those two slices are exactly two `assert_eq!` failures. **Enabling the feature
+would therefore turn the suite red immediately** — which is correct behaviour for an
+oracle and a direct argument for item 4 in the audit's recommended order: fix the
+skew (item 4) *before* re-enabling the oracle (item 2), not after.
+
+The C's equivalent-class gate, for the record, is
+`engine_c_wip/tests/test_artifacts_consistent.c` — offsets monotonic and sentinel
+(`:109-115`), a whole-table FNV recomputed from the bytes on disk (`:117-146`), and
+`RBKA_BYTECODE_LEN == sum(RBKA_OFFSET_DELTAS)` (`:180-185`). It is the internal half
+only; nothing in the C compares a decoded ability against the JSON source, and a
+faithful C copy of the Rust oracle would be red on arrival for the same skew reason.
+The per-slice half (985/985 tag `0x08`, prefix sums strictly increasing) had no
+compiled guard on either side and now does.
+
+### Rank 6 (action 6 in the old list) — a `live_start`-suppression test now EXISTS on the C side
+
+`engine_c_wip/tests/test_parity_q68_cannot_live.c` section 3 stages the same
+ライブ開始時 card for both seats and arms only one of them, so the control is the
+control. It is a C test; **no Rust test covers the suppression at all**, and the
+closest one cannot compile. If a Rust gate is ever wanted, `trigger_scan.rs` is the
+only place it can go and the ruling is the only warrant for it.
+
+### Confirmed NOT inherited by the C (the audit's three "C is right" items)
+
+- **9a** `phases.rs:831-836` — `rb_handle_set_live_card` refuses on capacity before
+  removing from hand (`src/turn/phase.c:1335-1346`, divergence documented at
+  `:1347-1354`). Correct; **do not change it for consistency**.
+- **9c** `look.rs:1031-1040` — the C applies `all` to **all** sources via
+  `count = RB_MAX_ZONE` (`src/ability/effects/look.c:363`), the opposite of Rust.
+  **MEASURED `VERIFIED-NOOP: 0 of 84`**: none of the 84 `all=true` nodes in
+  `cards/abilities.json` sits on a `look_at` / `look_and_select` action.
+- **9d** `modifiers.rs:2188-2305` — the C never ported
+  `evaluate_success_zone_constant_modifiers` at all, so it cannot mis-key
+  `non_stackable`. It has the reader (`src/core/card.c:771`) and no caller.

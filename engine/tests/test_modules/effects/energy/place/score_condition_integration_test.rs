@@ -48,7 +48,6 @@ fn group_condition() -> Condition {
             card_type: Some(ConditionCardType::MemberCard),
             ..Default::default()
         }),
-        all_members: None,
     }
 }
 

@@ -167,6 +167,197 @@ rule is almost always live on a clause form the probe did not produce.
 `test_registry_coverage.py` carries this as a comment so the test is not
 re-added.
 
+### A condition with NO operator and NO bound is a tautology, not a gap (2026-10-04)
+
+`compare_counts` reads a **missing** operator as `>=` — deliberately, so a
+parser gap does not silently disable an ability. The cost is that the same
+shape silently does the opposite when there is also nothing to compare
+against: `count >= 0`, true on every board, forever. Three cards have carried
+it, in three different disguises, and **in every case the positive test passed
+identically before and after the fix.** A positive cannot see a tautology; only
+a negative on the board that should fail can.
+
+| Card | Parsed as | Disguise | Now |
+|---|---|---|---|
+| `PL!-pb2-021-N` 南ことり | `comparison_condition`, no operator | an EVENT ("she paid a cost") fell into the numeric path | `paid_cost_this_turn` |
+| `PL!N-bp5-013-N` 上原歩夢 | `comparison_condition`, no operator | plus `resource_type: energy`, which short-circuits to the energy-zone length **without reading `location`** | `card_count_condition` + `member_has_resource_under` |
+| `PL!SP-bp4-016-N` 葉月恋 | `comparison_condition`, no operator | an EVENT ("each time energy is placed") read as a zone STATE — `「〜が置かれるたび」` is habitual-present, and the rule accepted only `「置かれた」` | `movement_condition` + `trigger_event.energy_placed` |
+| `PL!N-bp5-010-*` 三船栞子 | `comparison_condition`, no operator, `negation: true` | **negating a tautology**, and the engine does not apply `negation` on this path — so the branch is decided by a bound it does not have | **OPEN, and deliberately so — see below** |
+| `PL!-pb2-037-L` 春咲Lewitt | `all_members` dropped at decode | not a missing operator — a marker lost to the wrong variant (see below) | `all_members` on `ConditionCommon` |
+
+### 三船栞子 is OPEN, and the parser half alone makes it worse
+
+This one is recorded as a fixed row only to be immediately withdrawn. 「余剰ハートを
+持たない場合、＋１」 parses to `comparison_condition { resource_type: "surplus_heart",
+negation: true }` with no `count` and no `operator`, so `compare_counts(None, surplus, 0)`
+reads `surplus >= 0` — true everywhere. The tempting fix is to emit `count: 1` and
+`operator: ">="` so the clause is discriminating in the letter. **That was tried and
+reverted**, for a reason worth keeping:
+
+> `negation` is **not applied** on the surplus comparison path. So the branch is decided by
+> the bound alone, and adding a bound of 1 does not produce "has none" — it produces
+> "surplus >= 1". At surplus 0 the old shape was *correct* (and is pinned by
+> `surplus_conditioned_score_live_total_plus_one_no_floor_needed`), and the new shape broke
+> it. The error moved from surplus 0–∞ to surplus 1–∞: still over-firing, just somewhere
+> else, and a green test became red.
+
+**The ordering is the lesson.** Honouring `negation` makes the current shape false
+*everywhere*, and only then does `count: 1` turn it into 「has none」. Engine first, parser
+second — never parser alone. A half-fix that changes a pinned behaviour without fixing the
+mechanism is worse than the gap, because it looks like progress and costs a test.
+
+The genuinely unpinned case is surplus **exactly 1**: neither branch should apply there,
+and nothing in the suite says so. That is the test to write first, and it will fail until
+the engine side lands.
+
+Three lessons worth keeping, all of which cost a card:
+
+- **A flag on the wrong struct is a silent discard.** `all_members` lived on
+  the `Group` variant, so a clause the parser typed as `location_condition`
+  dropped it at decode and degraded to "at least one". Nothing warned: the
+  condition still decoded, still evaluated, still had a plausible shape.
+  Anything a clause can carry belongs on `ConditionCommon`, which is why the
+  fix is a field move rather than a handler.
+- **`resource_type` is not a location, and a count dispatcher that
+  short-circuits on it will ignore `location` entirely.** 歩夢's clause reads
+  「自分のステージにエネルギーカードが**下にあるメンバーがいる**」 — the counted set
+  is MEMBERS on the stage, and the qualifying fact is about a card
+  *beneath* each one. No `Location` expresses that (`under_member` means the
+  ACTIVATING card's under-cards — 中須かすみ `PL!N-pb1-002-P＋`, a different
+  clause), so it is a `ConditionCommon` flag that filters the stage set, and
+  the clause reuses the ordinary operator/threshold comparison.
+- **A condition can be vacuous while the engine still works, because a gate
+  downstream is doing the real check.** 葉月恋 fired correctly for a long time
+  on `core/game_state/abilities.rs`'s `each_time` movement-event guard — and that
+  guard's clause is keyed on the condition being `Condition::Comparison`
+  *specifically*. Fixing her parse therefore switched the gate **off** and made
+  her under-fire until `energy_placed: true` was added. Three of the five
+  failures in that run were the honest parse being under-served by the engine,
+  not the parse being wrong. **When a condition is found vacuous, expect the
+  real check to be somewhere else and find it before changing anything** —
+  otherwise you replace a working over-firer with a broken under-firer and read
+  the regression as evidence that the fix was wrong.
+- **A regex keyed on a word the card happens not to use will silently drop a
+  flag.** `エネルギーが` does not match `エネルギーカードが`. The marker is
+  read by `condition.get_energy_placed().or_else(trigger_event)` — a fallback
+  that looks redundant and is the reason a `trigger_event`-only marker works at
+  all — so the parse decoded cleanly and evaluated to "no energy check", which
+  the engine then read as "an area-move watcher".
+
+**How to find these:** a shape scan over `abilities.json` for
+`comparison_condition` / `card_count_condition` nodes carrying no operator and no bound
+returns 10 hits on 7 cards, of which 3 are fixed and 1 is open by choice. Most of the rest
+are legitimate — 「此外」/「=」 forms and headcounts the extractor reads correctly, and the
+`source`-keyed `これにより…` result conditions have a discriminator — so the scan is a
+*triage* list, not a defect count. Add the negative first and let it fail; do not reason
+about the shape.
+
+### Two of these were invisible for a reason worth naming
+
+栞子's `+1` and the tests around it are the clearest case in the corpus of a green test
+proving nothing:
+
+- the clause was `negation` over a tautology, so the branch **under**-fired — and the
+  file's two tests asserted a **net of 0**, which is what both a correct cancellation and
+  an ability that never ran produce;
+- the tests also stopped at `FirstAttackerPerformance` while the trigger is ライブ成功時
+  (`LiveVictoryDetermination`), and read the result through `mods.get_score_modifier` when
+  a `live_total` change is only visible on `performance_snapshots`. They were reaching
+  nothing, for three independent reasons, and asserting the value that reaching nothing
+  produces.
+
+A **net** assertion is the weakest kind: it is satisfied by "both halves ran" and by
+"neither ran". Where a card has a `+1` and a `−1` on the same target, assert each half
+against a board built for it, and read the target where it actually lands. And when the
+fixture turns out to be hard — 栞子 needs 余剰ハート = 0 while her own hearts guarantee
+excess against every live card in the pool — **pin the parse and say the behavioural half
+is open**. Do not ship a test that passes because the harness does nothing.
+
+### A two-leg sentence loses a leg, and the leftover gate cannot decide anything (2026-10-04)
+
+星空 凛 `PL!-pb2-014-P＋` (登場):
+
+> 手札の『lily white』のライブカードを1枚公開してもよい：**(1) 自分の成功ライブカード置き場にあるカードを1枚手札に加える。(2)
+> そうしたとき、これにより公開したカードを自分の成功ライブカード置き場に置く。**
+
+The parse kept (2) and **dropped (1)** entirely, so the card emptied the success live zone and
+put nothing into hand. What made it invisible is the second half: with the first leg gone,
+「そうしたとき」 had nothing to gate, and the generic condition path expressed it as
+`{ locations: [success_live_card_zone, hand], count: 1, operator: "=" }` — a card-count
+comparison with `=` and no value, which decides nothing and therefore blocks nothing. A
+half-built gate is worse than a wrong one: it looks like a condition.
+
+Two things this is *not*:
+
+- **Not the 「そうしたとき」 family.** Every existing rule for that marker splits
+  「<optional>そうしたとき、<consequence>」 into a `conditional_on_optional`. Here the
+  「してもよい」 belongs to the **cost** (the optional reveal), so the effect text is a
+  plain two-step sentence and both legs are mandatory; the marker only means "if leg (1)
+  happened". Reaching for that family would have built a conditional on an optional that
+  does not exist in this clause.
+- **Not new vocabulary.** `source: "preceding_moved"` is the engine's existing spelling
+  for "the cards the preceding step moved" (`ability::condition::is_moved_source`), so the
+  gate needed no new field and no new evaluator.
+
+`_try_two_step_zone_move` owns it: both legs must parse as `move_cards`, the marker must be
+the sentence-initial 「。そうしたとき、」, and a 「N人に以上」 headcount or 「以下」 bound is
+refused so it cannot claim the `previous_moved_cards` batch forms the generic
+`preceding_moved` handling already covers. Blast radius: one card.
+
+**The lesson generalises to a shape, not a card.** When a clause is dropped, check what the
+surviving node's condition is doing — an unevaluable one (`=` with no value, an operator
+outside the engine's vocabulary) is the fingerprint of a dropped sibling clause, and it is
+invisible to every coverage count because the node still decodes and still looks plausible.
+
+### An ACTION-shaped optional offer is not a cost-shaped one (2026-10-04)
+
+矢澤にこ `PL!-pb2-018-P＋`/`-R` (登場):
+
+> 相手のステージにいるウェイト状態のメンバーを3人までアクティブにしてもよい。
+> そうしたとき、これによりアクティブにしたメンバー1人につき、カードを1枚引く。
+
+This reads like the ordinary 「〜してもよい。そうしたとき、〜」 family — ミア,
+日野下花帆, 澁谷かのん, 津島善子 all parse into `conditional_on_optional` with an
+`optional_action` and a `conditional_action`. **Filing it there would be a real bug.**
+`execute_conditional_on_optional` treats `optional_action` as a COST: it presents a
+Skip/Pay choice and runs the consequence on Pay. Here the offer is an EFFECT — waking
+members on the opponent's stage — so a player could "pay" by waking nobody and still draw.
+Action-shaped optionals go through `sequential` + `conditional: true`, the route DIVE!
+already takes (see the NOTE above `_try_conditional`'s caller).
+
+What the parse did before: the whole sentence collapsed to a bare `draw_card` behind
+`condition { state: wait, count: 1, operator: ">=" }`. Three separate losses in one node —
+the **activation**, the **「3人まで」 cap**, and the **「てもよい」 optionality** — and the
+consequence no longer depended on the offer at all. She drew 1 for merely *having* a waited
+member on the opponent's stage.
+
+`_try_optional_state_change_consequence` owns it and hands the offer to `parse_action` with
+the optionality stripped, so the existing `change_state` rules keep the
+「アクティブにする」/「ウェイトにする」/「 energetics vocabulary and this rule owns only the
+optionality and the 「そうしたとき」 wiring. It refuses any offer that does not parse to
+`change_state`, precisely so it cannot re-file the cost-shaped members of the family onto
+the wrong container.
+
+**Why it is worth writing down as a class:** the same sentence shape fails two different
+ways depending on what the offer does. A `move_cards` offer is correctly a cost
+(`make_conditional_on_optional`); a `change_state` offer must not be. A future 「〜を配置
+してもよい。そうしたとき、〜」 is the third case and will need a third answer, so the rule
+refuses rather than guesses.
+
+### The gap-pin file was the thing that made it findable
+
+`engine/tests/test_modules/effects/choice/selection_filter/niko_debut_draw_per_activated_parser_gap_test.rs`
+asserted the *absence* of the activation and said, in its own header, to invert the
+assertions when the activation half parsed. That is the convention working: the gap had a
+failing-on-purpose test, so closing it turned the test red instead of leaving it silently
+stale. Inverting it was mechanical.
+
+One trap in the inversion, worth recording: the old finder located the ability by its ROOT
+action (`draw_card`). Once the parse is correct the root is a `sequential`, so the finder
+stops matching and the inverted test fails with a `None` that looks like a missing field
+rather than a stale lookup. Find the ability by the SHAPE that must exist — two legs,
+second is `draw_card` — never by the shape the gap left behind.
+
 ### Still open (deliberately not done)
 
 - **The 9 count entry points in `ability/condition/card.rs` still overlap

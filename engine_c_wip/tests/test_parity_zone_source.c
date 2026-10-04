@@ -256,7 +256,45 @@ static int revealed_has(const TestGame *tg, int cid)
 
 static int pending(TestGame *tg) { return test_has_pending_choice(tg); }
 static const char *pending_kind(TestGame *tg) { return test_pending_choice_type(tg); }
-static int pending_seat(TestGame *tg) { return rb_get_pending_choice_player_id(&tg->state); }
+/* Who must answer the pending choice -- a thin wrapper over the PRODUCTION
+ * function, `rb_gsc_can_player_act` (src/core/game_state_core.c:261-283), which
+ * is the C fold of Rust `can_player_act` (mod.rs:495-573), the function the
+ * Rust twins of these cases actually exercise.
+ *
+ * Why not the bare getter: `rb_get_pending_choice_player_id` is a fold of Rust's
+ * `get_pending_choice_player_id` (abilities.rs:2457-2469), a bare
+ * `current_entry().and_then(|e| e.choice_player_id)` with NO fallback. That is
+ * faithful only because in Rust an effect always runs with a live queue entry --
+ * `QueueState::PayingCost { entry_index }` /
+ * `QueueState::ExecutingEffect { entry_index }` -- so the entry's universal
+ * default (queue.rs:354-361) has already stamped it.
+ *
+ * The C has one shape Rust does not, and ability_queue.c:507-522 names it: an
+ * ability can resolve with NO entry at all (engine.c parks `ab.effect` in
+ * `queue.deferred` and skips the inline run exactly when the ability raises a
+ * prompt). MEASURED, with the getter instrumented, on the Umi Q176 blind-reveal
+ * prompts: `state=1 auto=0 cur=0 n=0` -- no entry exists, so the getter
+ * correctly answers None and the whole answer has to come from the Choice's own
+ * `target_player_id`. `rb_gsc_can_player_act` already does exactly that: it
+ * reads the stamp first and falls through to the Choice-embedded arm when the
+ * stamp is absent. So the harness asks the production question and reports the
+ * seat, instead of asserting half of it.
+ *
+ * Measured cost of the alternative: minting a dummy entry from `rb_emit_choice`
+ * for the empty-queue shape -- which is what Rust's Idle branch
+ * (queue.rs:367-409) does -- was tried, and it is WRONG here. `queue_mint_dummy_entry`
+ * assigns `queue.cur = idx` (ability_queue.c:489), so the minted entry becomes
+ * current and every gate written as `cur < n_entries` starts answering yes for a
+ * resolution that has no entry. That cost 10 lines in parity_sequential
+ * (G1/G3/G4/G5 + g_basic_swap_one_niji / g_non_niji_not_offered /
+ * g_two_niji_choose_one) and was reverted. */
+static int pending_seat(TestGame *tg)
+{
+    if (!rb_has_pending_choice(&tg->state)) return -1;
+    if (rb_gsc_can_player_act(&tg->state, 0)) return 0;
+    if (rb_gsc_can_player_act(&tg->state, 1)) return 1;
+    return -1;
+}
 
 static void pick(TestGame *tg, int idx)
 {

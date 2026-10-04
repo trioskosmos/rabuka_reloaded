@@ -2147,14 +2147,31 @@ static void j_activator_not_in_success_zone_does_nothing(void)
     CHECK_EQ(need_of(&tg, high, H00), -2,
              "CONTROL: with the activator in the success zone the effect applies");
 
-    /* Now move it to the LIVE zone and re-evaluate: 「自分の成功ライブカード
-     * 置き場にあるかぎり」 is no longer satisfied. */
-    tg.state.p[0].success.n = 0;
-    test_add_to_live(&tg, act);
-    rb_recalc_constants(&tg.state);
-    CHECK_EQ(tg.state.p[0].success.n, 0, "the success zone really is empty");
-    CHECK_EQ(need_of(&tg, high, H00), 0,
-             "activator in the LIVE zone -> the as-long-as gate is off -> 0");
+    /* Move it to the LIVE zone and re-evaluate. 「自分の成功ライブカード置き場に
+     * あるかぎり」 is no longer satisfied, and the card is STILL one of the four
+     * bags E1 scans (modifiers.rs:2232-2237 includes live_card_zone), so this is
+     * the shape that decides whether the CONDITION gate works at all.
+     *
+     * The second board is built from scratch rather than mutated, because
+     * `rb_recalc_constants` alone does NOT withdraw a modify_required_hearts
+     * contribution -- see j_as_long_as_expiration_on_zone_exit for the proof and
+     * the Rust lines. Measuring the zero on a board that never held the modifier
+     * is the only way this assertion can distinguish "the gate is off" from "the
+     * modifier is still there". */
+    {
+        static TestGame tg2;
+        int act2 = mid(&tg2, J_ACTIVATE);
+        int high2 = mid(&tg2, J_HIGH);
+        if (!ident(&tg2, act2, J_ACTIVATE)) return;
+        if (!ident(&tg2, high2, J_HIGH)) return;
+        if (!rh_wired(&tg2, act2)) return;
+        test_add_to_live(&tg2, act2);
+        test_add_to_live(&tg2, high2);
+        rb_recalc_constants(&tg2.state);
+        CHECK_EQ(tg2.state.p[0].success.n, 0, "the success zone really is empty");
+        CHECK_EQ(need_of(&tg2, high2, H00), 0,
+                 "activator in the LIVE zone -> the as-long-as gate is off -> 0");
+    }
 }
 
 static void j_no_live_cards_no_crash(void)
@@ -2218,9 +2235,50 @@ static void j_as_long_as_expiration_on_zone_exit(void)
     CHECK_EQ(need_of(&tg, high, H00), -2, "before removal -> -2");
     tg.state.p[0].success.n = 0;
     rb_recalc_constants(&tg.state);
-    CHECK_EQ(need_of(&tg, high, H00), 0,
-             "after the activator leaves the success zone -> 0 (as-long-as "
-             "expiry; the first assertion is this test's own control)");
+
+    /* This assertion USED to read 0 here and was RED. It is now -2, and -2 is
+     * what Rust does, because the expiry is not E1's to perform. Measured, with
+     * E1 instrumented in the snapshot build:
+     *
+     *   [E1DBG] cid=2639 pl=0 cond_met=0 action=modify_required_hearts
+     *
+     * — the CONDITION gate does close (that half is
+     * j_activator_not_in_success_zone's job), so nothing is re-applied. What
+     * survives is the value E1 applied on the previous pass, because the only
+     * place `need_heart_modifiers` is ever withdrawn is
+     *
+     *   engine/src/core/game_state/modifiers.rs:2148
+     *       self.mods.need_heart_modifiers.clear();
+     *
+     * inside `evaluate_success_zone_constant_abilities` (E3, :2145-2150). E1's
+     * own prologue withdraws only the three `success_zone_*_bonuses` ledgers
+     * (:2200-2214) and `recalculate_constants` reaches E1 at :1398 without ever
+     * clearing this map — `commit_constant_results` (:518) republishes blade,
+     * score, heart and global_need_heart, not need_heart. So
+     * `recalculate_constants` twice with the activator in between is -2 in Rust
+     * too, and an assertion of 0 encoded a rule the oracle does not have.
+     *
+     * The three legs below pin the real mechanism instead, which is strictly
+     * more than the old pair asserted: a value that must NOT silently become 0,
+     * the E3 path that DOES withdraw it, and the Rust twin of that path. */
+    CHECK_EQ(need_of(&tg, high, H00), -2,
+             "rb_recalc_constants alone does NOT withdraw it: modifiers.rs:2148 "
+             "is the only need_heart_modifiers.clear() in the engine");
+    {
+        /* Rust modifiers.rs:2145-2150 --
+         *     pub fn evaluate_success_zone_constant_abilities(&mut self) {
+         *         self.mods.need_heart_modifiers.clear();
+         *         self.evaluate_success_zone_constant_modifiers();
+         *     }
+         * The C fold is rb_evaluate_success_zone_constant_abilities
+         * (modifiers.c), which src/turn/triggers.c:31 declares file-scope for
+         * exactly this reason; rabuka.h does not export it. */
+        extern void rb_evaluate_success_zone_constant_abilities(GameState *g);
+        rb_evaluate_success_zone_constant_abilities(&tg.state);
+        CHECK_EQ(need_of(&tg, high, H00), 0,
+                 "the E3 path (modifiers.rs:2145-2150) is what expires it, and "
+                 "it also re-applies nothing: the activator is out of the bag");
+    }
 }
 
 static void j_p1_activator_does_not_affect_p2(void)

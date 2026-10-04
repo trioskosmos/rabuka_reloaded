@@ -423,6 +423,120 @@ fn live_start_with_under_energy_grants_one_heart01() {
     );
 }
 
+/// The negative the positive above cannot see.
+///
+/// 「自分のステージにエネルギーカードが下にあるメンバーがいる場合」 names a member with
+/// energy UNDER it. Its parse is a `comparison_condition` carrying only `location`,
+/// `resource_type` and `card_type` — no `count` and no `operator`. A missing operator
+/// reads as `>=`, so with nothing to compare against the comparison is `count >= 0`,
+/// which every board satisfies. That is the same tautology shape that made
+/// `PL!-pb2-021-N`'s 自動 fire every turn; here it would hand 歩夢 a heart01 on every
+/// LiveStart whether or not a single energy card was ever placed.
+///
+/// The positive cannot detect it: it passes identically under a working condition and
+/// under a vacuous one. Only a board with NO energy under any member separates them.
+#[test]
+fn live_start_without_under_energy_grants_no_heart01() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ayumu = game.id("PL!N-bp5-013-N");
+    let filler_live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, ayumu, -1];
+    game.state.player1.hand.cards.push(filler_live);
+    seed_deck(&mut game);
+    game.give_energy(3);
+    // No `place_energy_under` — the premise is an empty under-card set.
+    assert_eq!(
+        game.state.player1.stage.get_under_cards(MemberArea::Center).len(),
+        0,
+        "premise: no energy card is under the centre member"
+    );
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(filler_live);
+    advance_to_live_start(&mut game);
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(ayumu, rabuka_engine::card::HeartColor::Heart01);
+    assert_eq!(
+        heart, 0,
+        "「…下にあるメンバーがいる場合」 is false when nothing is under anyone, so \
+         「ライブ終了時まで、heart01を得る」 must not run. A heart here means the \
+         condition is `count >= 0` and the gate is not a gate."
+    );
+}
+
+/// The parse must stay discriminating — this is the tautology guard.
+///
+/// Three faults stacked on this clause before it was fixed, and only the third is visible
+/// from the state:
+///   * 「〜がいる」 is existence, but nothing set an operator, and `compare_counts` reads a
+///     missing operator as `>=` — `count >= 0`, true on every board;
+///   * `card_type` was the card BENEATH the member rather than the subject of 「いる」;
+///   * `resource_type: energy` short-circuits the count to the energy-zone length without
+///     reading `location`, so the clause asked about the energy zone, not the stage.
+///
+/// The state assertions above cannot see any of this: they all pass under a tautology.
+/// Only the shape pins it.
+#[test]
+fn the_under_energy_clause_parses_as_a_discriminating_existence_check() {
+    let db = load_real_database();
+    let game = TestGame::new(db);
+    let ayumu = game.id("PL!N-bp5-013-N");
+    let eff = {
+        let owned = game
+            .db
+            .get_card(ayumu)
+            .unwrap()
+            .resolved_abilities()
+            .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
+            .expect("Ayumu has a ライブ開始時 ability");
+        owned
+            .effect
+            .as_ref()
+            .map(|e| e.clone())
+            .expect("ライブ開始時 ability has an effect")
+    };
+    let cond = eff.condition.as_deref().expect("the gate is a condition");
+
+    assert_eq!(
+        cond.get_count(),
+        Some(1),
+        "「〜がいる」 is EXISTENCE: at least one member. Without a count the comparator \
+         has nothing to compare against"
+    );
+    assert_eq!(
+        cond.get_operator(),
+        Some(">="),
+        "without an operator `compare_counts` defaults to >= and the clause becomes \
+         `count >= 0` — true for every board, which is what made her gain a heart every \
+         LiveStart regardless of the under-cards"
+    );
+    assert_eq!(
+        cond.get_card_type(),
+        Some(rabuka_engine::card::ConditionCardType::MemberCard),
+        "the subject of 「いる」 is the MEMBER. It was `energy_card`, which counts a \
+         different set from the one the clause is about"
+    );
+    assert_eq!(
+        cond.get_location(),
+        Some("stage"),
+        "the members are looked for on the stage"
+    );
+    assert_eq!(
+        cond.get_member_has_resource_under(),
+        Some(true),
+        "the qualifying fact is that the named card is BENEATH the member, which no \
+         `Location` expresses — `under_member` means the ACTIVATING card's under-cards"
+    );
+    assert_eq!(
+        cond.get_resource_type(),
+        Some("energy"),
+        "…and the card that must be beneath is an energy card"
+    );
+}
+
 // ====================================================================
 // PL!N-PR-026-PR 天王寺璃奈 (cost ~15) — Debut: place member under; gains LiveSuccess
 // ====================================================================

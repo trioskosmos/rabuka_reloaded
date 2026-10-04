@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-03T02:58:51.962165",
+  "generated_at": "2026-10-05T02:42:19.134254",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "61970a60",
+  "engine_commit": "5ce311e6",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -14033,26 +14033,36 @@
         "type": "reveal"
       },
       "effect": {
+        "type": "sequential",
         "text": "自分の成功ライブカード置き場にあるカードを1枚手札に加える。そうしたとき、これにより公開したカードを自分の成功ライブカード置き場に置く",
-        "condition": {
-          "text": "自分の成功ライブカード置き場にあるカードを1枚手札に加える。そうしたとき",
-          "target": "self",
-          "location": "success_live_card_zone",
-          "locations": [
-            "success_live_card_zone",
-            "hand"
-          ],
-          "card_type": "live_card",
-          "count": 1,
-          "type": "location_condition",
-          "operator": "="
-        },
-        "source": "selected_cards",
-        "destination": "success_live_zone",
-        "card_type": "live_card",
-        "target": "self",
-        "action": "move_cards",
-        "count": 1
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "自分の成功ライブカード置き場にあるカードを1枚手札に加える",
+            "source": "success_live_zone",
+            "destination": "hand",
+            "count": 1,
+            "card_type": "live_card",
+            "target": "self",
+            "action": "move_cards"
+          },
+          {
+            "text": "これにより公開したカードを自分の成功ライブカード置き場に置く",
+            "source": "selected_cards",
+            "destination": "success_live_zone",
+            "card_type": "live_card",
+            "target": "self",
+            "action": "move_cards",
+            "count": 1,
+            "condition": {
+              "type": "card_count_condition",
+              "source": "preceding_moved",
+              "count": 1,
+              "operator": ">=",
+              "text": "そうしたとき"
+            }
+          }
+        ]
       }
     },
     {
@@ -14273,23 +14283,31 @@
       "cost": null,
       "effect": {
         "text": "相手のステージにいるウェイト状態のメンバーを3人までアクティブにしてもよい。そうしたとき、これによりアクティブにしたメンバー1人につき、カードを1枚引く",
-        "condition": {
-          "text": "相手のステージにいるウェイト状態のメンバーを3人までアクティブにしてもよい。そうしたとき",
-          "type": "state_condition",
-          "state": "wait",
-          "target": "opponent",
-          "location": "stage",
-          "card_type": "member_card",
-          "count": 1,
-          "operator": ">="
-        },
-        "count": 1,
-        "action": "draw_card",
-        "source": "deck",
-        "destination": "hand",
-        "per_unit": true,
-        "per_unit_count": 1,
-        "per_unit_type": "人"
+        "action": "sequential",
+        "conditional": true,
+        "actions": [
+          {
+            "text": "相手のステージにいるウェイト状態のメンバーを3人までアクティブにしてもよい。",
+            "source": "stage",
+            "state_change": "active",
+            "count": 3,
+            "card_type": "member_card",
+            "target": "opponent",
+            "max": true,
+            "action": "change_state",
+            "optional": true
+          },
+          {
+            "text": "これによりアクティブにしたメンバー1人につき、カードを1枚引く",
+            "count": 1,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand",
+            "per_unit": true,
+            "per_unit_count": 1,
+            "per_unit_type": "人"
+          }
+        ]
       }
     },
     {
@@ -33173,12 +33191,15 @@
       "effect": {
         "text": "自分のステージにエネルギーカードが下にあるメンバーがいる場合、ライブ終了時まで、{{heart_01.png|heart01}}を得る",
         "condition": {
-          "text": "自分のステージにエネルギーカードが下にあるメンバーがいる場合",
-          "target": "self",
+          "type": "card_count_condition",
+          "count": 1,
+          "operator": ">=",
           "location": "stage",
+          "card_type": "member_card",
           "resource_type": "energy",
-          "card_type": "energy_card",
-          "type": "comparison_condition"
+          "member_has_resource_under": true,
+          "text": "自分のステージにエネルギーカードが下にあるメンバーがいる場合",
+          "target": "self"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -38347,12 +38368,18 @@
         "count": 1,
         "trigger_type": "each_time",
         "condition": {
+          "type": "movement_condition",
           "text": "カードの効果によって自分のエネルギー置き場にエネルギーカードが置かれる",
+          "trigger_event": {
+            "type": "energy_placed",
+            "tense": "past",
+            "energy_placed": true
+          },
+          "movement": "moves",
           "target": "self",
           "location": "energy_zone",
           "resource_type": "energy",
-          "card_type": "energy_card",
-          "type": "comparison_condition"
+          "card_type": "energy_card"
         },
         "parenthetical": [
           "相手のカードの効果でも発動する。"

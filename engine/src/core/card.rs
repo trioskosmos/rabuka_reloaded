@@ -3125,6 +3125,18 @@ pub struct ConditionCommon {
     pub all: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub all_areas: Option<bool>,
+    /// 「…がすべて『X』」 — EVERY card the clause is about must be in one of the
+    /// listed groups, not merely one of them.
+    ///
+    /// This lives on `ConditionCommon`, not on the `Group` variant, because the
+    /// clause reaches conditions the engine types by WHERE it looks rather than by
+    /// WHAT it counts. `PL!-pb2-037-L`'s first branch is a `revealed_cards`
+    /// `location_condition`: on the `Group` variant the 「すべて」 was dropped at
+    /// decode, the branch silently degraded to an ANY test, and a reveal of one
+    /// Printemps plus one BiBi member wrongly qualified. `get_all_members` is the
+    /// only reader, so nothing else moves.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub all_members: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub baton_touch_trigger: Option<bool>,
     #[cfg_attr(feature = "serde_support", serde(default))]
@@ -3271,6 +3283,17 @@ pub struct ConditionCommon {
     /// GameState::cards_paid_cost_this_turn.
     /// PL!-pb2-021-N.
     pub paid_cost_this_turn: Option<bool>,
+    /// 「自分のステージに<card>が下にあるメンバーがいる場合」 — count the members in
+    /// `location` that have a card of `resource_type` BENEATH them, rather than counting
+    /// either the members or the resource directly. PL!-pb5-013-N 上原歩夢.
+    ///
+    /// A flag on ConditionCommon rather than a `Location` variant because the counted set
+    /// is the stage and the qualifier is a property of each card in it: `under_member`
+    /// resolves to the ACTIVATING card's under-cards (「このメンバーの下」), which is a
+    /// different clause — 中須かすみ `PL!N-pb1-002-P＋` — while this one is existential
+    /// over every member.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub member_has_resource_under: Option<bool>,
 }
 
 /// The distinct Condition type as a serde internally-tagged enum.
@@ -3347,7 +3370,6 @@ pub enum Condition {
     Group {
         #[cfg_attr(feature = "serde_support", serde(flatten))]
         common: Box<ConditionCommon>,
-        all_members: Option<bool>,
     },
 
     #[cfg_attr(feature = "serde_support", serde(rename = "appearance_condition"))]
@@ -4134,16 +4156,15 @@ impl Condition {
         }
     }
 
+    /// 「すべて『X』」 — every card the clause covers is in one of `group_names`.
+    ///
+    /// Read through `common()` so it is available on EVERY variant, not just
+    /// `Group`: the clause is emitted on whichever variant matches where the text
+    /// looks, and `PL!-pb2-037-L` puts it on a `revealed_cards`
+    /// `location_condition`. On the `Group` variant alone that branch lost the
+    /// marker at decode and degraded to an ANY test.
     pub fn get_all_members(&self) -> Option<bool> {
-        // NOTE: `all_members` is a field of the GROUP VARIANT, not of
-        // ConditionCommon, so a `location_condition` cannot carry it. That is not
-        // hypothetical: PL!-pb2-037-L's first branch is a `revealed_cards` location
-        // condition, so the 「すべて」 on that branch is dropped at decode. Moving the
-        // field onto ConditionCommon is the real fix and would wire every variant.
-        match self {
-            Condition::Group { all_members, .. } => *all_members,
-            _ => None,
-        }
+        self.common().and_then(|c| c.all_members)
     }
 
     /// Per-turn activation history. Mirrors the EffectFilter field: the members were
@@ -4158,6 +4179,12 @@ impl Condition {
     /// every condition variant, not just one.
     pub fn get_paid_cost_this_turn(&self) -> Option<bool> {
         self.common().and_then(|c| c.paid_cost_this_turn)
+    }
+
+    /// 「〜が下にあるメンバーがいる」 — count members in `location` carrying a card of
+    /// `resource_type` beneath them. PL!-pb5-013-N 上原歩夢.
+    pub fn get_member_has_resource_under(&self) -> Option<bool> {
+        self.common().and_then(|c| c.member_has_resource_under)
     }
 
     pub fn get_comparison_target(&self) -> Option<ComparisonTarget> {

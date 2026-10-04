@@ -175,13 +175,137 @@ static const char *choice_kind_wire(RbChoiceKind kind)
     }
 }
 
-static void append_pending_choice(Buffer *b, const GameState *state)
+/* Rust core/game_state/abilities.rs:2559-2568, the `choice_player_id` key --
+       let raw_pid = entry.choice_player_id.as_ref().unwrap_or(&entry.player_id);
+       let normalized = match raw_pid.as_str() {
+           "player1" => "p1", "player2" => "p2", _ => raw_pid.as_str() };
+
+   Defined in src/core/game_state_abilities.c, NOT here, on purpose: the Makefile
+   links src/web_server.o only into $(WEB_TARGET) (Makefile:100-102) and not into
+   OBJ_LIB, so a symbol defined here cannot be reached from any tests/test_*.c
+   binary — the routing this key carries would be unobservable from a suite.
+   game_state_abilities.c IS in OBJ_LIB. Declared locally for the same reason and
+   with the same precedent as rb_check_effect_position in src/turn/triggers.c:6-8.
+
+   THE C EMITTED NO SUCH KEY AT ALL before this: `pending_choice` carried
+   `kind`, `zone`, `target`, `card_type`, `count`, `allow_skip` and an INTEGER
+   `actor`, and nothing named the routed seat. Rust's web client depends on the
+   key twice over -- web_server.rs:1240-1249 drops the ENTIRE pending_choice
+   when `choice_player_id` is missing or names anybody but the requester
+   ("defensive: never leak opponent choices"), and pvp_player_can_act
+   (web_server.rs:1151) gates the answer endpoint on the same field. The C has
+   neither, so the routed seat reached the client only as an int. */
+const char *rb_wire_pending_choice_player_id(const GameState *g);
+
+/* ORPHANED LOGIC O2 — Rust's choice-ability CONTEXT.
+ *
+ * Rust builds this object in `inject_choice_ability_context`
+ * (core/game_state/abilities.rs:2483-...) and `get_pending_choice_json`
+ * (abilities.rs:2475-2480) MERGES it into the pending_choice object before the
+ * object reaches the client, so the UI can show WHICH card and WHICH ability is
+ * asking. That is `card_no` / `ability_text` / `card_name` / `card_id`, and it is
+ * built for every choice in the game, not gated on any ability.
+ *
+ * Until now the C's actual wire -- `append_pending_choice` below -- never called
+ * it: it emitted only count / allow_skip / actor, plus the choice_player_id key a
+ * peer added. So `rb_inject_choice_ability_context` had ZERO production callers
+ * and the C web UI could not tell the player what it was being asked about. MEASURED
+ * with nm over all 49 OBJ_LIB objects: defined in game_state_abilities.o,
+ * referenced by no object.
+ *
+ * Declared here, not in include/rabuka.h, on purpose: the Makefile links
+ * src/web_server.o ONLY into $(WEB_TARGET) (Makefile:101-102) and not into
+ * OBJ_LIB, so a prototype in the shared header would be the second declaration of
+ * a symbol no suite binary can link against. Same file-scope declaration the
+ * choice_player_id reader above already uses, and the same precedent as
+ * rb_check_effect_position at src/turn/triggers.c:6-8.
+ *
+ * ⚠ THE ESCAPING CAVEAT, STATED BECAUSE IT IS REAL: the producer builds its
+ * object with snprintf("%s") on raw card text, so a value containing '"' or a
+ * newline is not escaped in the buffer this file is handed. Rather than splice
+ * that buffer into the response verbatim -- which would emit invalid JSON for
+ * such a card and break the WHOLE /state payload, not just the choice -- the two
+ * helpers below pull each member out and re-emit it through json_string(), which
+ * escapes properly. The producer is in src/core/game_state_abilities.c, which is
+ * not this file's to edit; escaping at the producer is the proper fix and is
+ * reported as a cross-file request. */
+void rb_inject_choice_ability_context(GameState *g, char *json_buf, size_t buf_sz);
+
+/* Read one `"key":"<value>"` member out of the object
+ * rb_inject_choice_ability_context built. The producer does not escape, so the
+ * value runs to the next '"' that is immediately followed by ',' or '}' -- the
+ * two bytes that can only be the member separator or the object's own close. A
+ * truncated buffer has neither and yields the empty string, which is the safe
+ * direction: a missing display string, never a malformed response. */
+static void json_injected_string(Buffer *b, const char *obj, const char *key)
+{
+    char needle[64];
+    char scratch[1024];
+    snprintf(needle, sizeof(needle), "\"%s\":\"", key);
+    const char *p = obj && *obj ? strstr(obj, needle) : NULL;
+    if (!p) { json_string(b, ""); return; }
+    p += strlen(needle);
+    const char *end = p;
+    while (end[0] && !(end[0] == '"' && (end[1] == ',' || end[1] == '}'))) end++;
+    size_t n = (size_t)(end - p);
+    if (n >= sizeof scratch) n = sizeof scratch - 1;
+    memcpy(scratch, p, n);
+    scratch[n] = '\0';
+    json_string(b, scratch);
+}
+
+/* The integer member, read straight out of the same buffer. */
+static int json_injected_int(const char *obj, const char *key)
+{
+    char needle[64];
+    snprintf(needle, sizeof(needle), "\"%s\":", key);
+    const char *p = obj && *obj ? strstr(obj, needle) : NULL;
+    return p ? atoi(p + strlen(needle)) : 0;
+}
+
+/* Rust engine/src/game/web_server.rs:1240-1249, the seat-leak filter, applied to
+ * the C's pending_choice before it is written:
+ *
+ *     if let Some(ref pending) = display.pending_choice {
+ *         let cpid = pending.get("choice_player_id").and_then(|v| v.as_str());
+ *         let requester_str = if requester_player_id == 0 { "p1" } else { "p2" };
+ *         match cpid {
+ *             Some(cpid) if cpid == requester_str => {}
+ *             _ => { display.pending_choice = None; }
+ *         }
+ *     }
+ *
+ * Two cases, both dropping the WHOLE object: the key is missing (Rust's comment
+ * there is "defensive: never leak opponent choices") and the key names anybody
+ * but the requester. The C had no such filter, so a prompt routed to the
+ * opponent -- queue.rs:346-352, effects/choice.rs choice_maker, live.rs:1577 --
+ * was serialised to the other seat's client in full. */
+static int pending_choice_is_for_requester(const GameState *state, int requester)
+{
+    const char *cpid = rb_wire_pending_choice_player_id(state);
+    const char *want = (requester == 0) ? "p1" : "p2";
+    if (!cpid || !*cpid) return 0;
+    return strcmp(cpid, want) == 0;
+}
+
+static void append_pending_choice(Buffer *b, const GameState *state, int requester)
 {
     const RbChoice *choice = rb_get_pending_choice(state);
     if (!state || !rb_has_pending_choice(state) || !choice) {
         buffer_put(b, "null");
         return;
     }
+    /* web_server.rs:1240-1249 -- drop the whole object when the routed seat is
+       missing or is not the requester. Placed BEFORE anything is written, so a
+       dropped choice leaks nothing at all: not the zone, not the card type, not
+       the ability text. */
+    if (!pending_choice_is_for_requester(state, requester)) {
+        buffer_put(b, "null");
+        return;
+    }
+    char ctx[4096];
+    ctx[0] = '\0';
+    rb_inject_choice_ability_context((GameState *)state, ctx, sizeof ctx);
     buffer_put(b, "{\"kind\":");
     json_string(b, choice_kind_wire(choice->kind));
     buffer_put(b, ",\"zone\":");
@@ -192,21 +316,45 @@ static void append_pending_choice(Buffer *b, const GameState *state)
     json_string(b, choice->card_type);
     buffer_putf(b, ",\"count\":%d,\"allow_skip\":%s,\"actor\":%d",
                 choice->count, choice->allow_skip ? "true" : "false", choice->actor);
+    /* Rust injects the key through inject_choice_ability_context, which
+       get_pending_choice_json (abilities.rs:2475-2480) merges into the choice
+       object BEFORE it reaches the client. Emitted last here so the pre-existing
+       field order is byte-identical and only one key is added. */
+    buffer_put(b, ",\"choice_player_id\":");
+    json_string(b, rb_wire_pending_choice_player_id(state));
+    /* ── O2: the rest of Rust's injected object, merged flat ──────────────────
+       abilities.rs:2483-... puts card_no / ability_text / card_name / card_id in
+       the SAME object, and get_pending_choice_json merges the whole thing, so
+       these four are siblings of choice_player_id, not a nested sub-object.
+       They are what lets the UI answer "which card, which ability". */
+    buffer_put(b, ",\"card_no\":");
+    json_injected_string(b, ctx, "card_no");
+    buffer_put(b, ",\"ability_text\":");
+    json_injected_string(b, ctx, "ability_text");
+    buffer_put(b, ",\"card_name\":");
+    json_injected_string(b, ctx, "card_name");
+    buffer_putf(b, ",\"card_id\":%d", json_injected_int(ctx, "card_id"));
     buffer_put(b, "}");
 }
 
 static int serialize_state(Sandbox *s, Buffer *b) {
     RbGeneratedActionList actions = rb_generate_action_candidates(&s->state);
+    /* The seat this payload is rendered FOR. It was a literal 0 in the
+       ui_config below; it is now a named value used by BOTH the ui_config and
+       the pending_choice seat-leak filter (web_server.rs:1240-1249), so the
+       perspective the client is told about and the perspective the choice is
+       filtered against cannot drift apart. */
+    const int requester_player_id = 0;
     buffer_put(b, "{\"state_id\":\"c-"); buffer_putf(b, "%d", s->version); buffer_put(b, "\",\"frame_counter\":"); buffer_putf(b, "%d", s->version);
     buffer_put(b, ",\"turn\":"); buffer_putf(b, "%d", s->state.turn);
     buffer_put(b, ",\"phase\":"); json_string(b, phase_wire_name(&s->state));
     buffer_put(b, ",\"mode\":\"sandbox\",\"game_over\":"); buffer_put(b, s->state.winner >= 0 ? "true" : "false");
     buffer_put(b, ",\"active_player\":"); buffer_putf(b, "%d", s->state.active + 1);
     buffer_put(b, ",\"winner\":"); if (s->state.winner < 0) buffer_put(b, "null"); else buffer_putf(b, "%d", s->state.winner);
-    buffer_put(b, ",\"pending_choice\":"); append_pending_choice(b, &s->state);
+    buffer_put(b, ",\"pending_choice\":"); append_pending_choice(b, &s->state, requester_player_id);
     buffer_put(b, ",\"player1\":"); append_player(b, &s->state.p[0]); buffer_put(b, ",\"player2\":"); append_player(b, &s->state.p[1]);
     buffer_put(b, ",\"legal_actions\":["); for (int i = 0; i < actions.count; i++) { if (i) buffer_put(b, ","); append_action(b, &actions.actions[i], i); } buffer_put(b, "]");
-    buffer_put(b, ",\"ui_config\":{\"perspective_player\":0,\"current_lang\":\"jp\"}}");
+    buffer_put(b, ",\"ui_config\":{\"perspective_player\":"); buffer_putf(b, "%d", requester_player_id); buffer_put(b, ",\"current_lang\":\"jp\"}}");
     rb_free(actions.actions); return 1;
 }
 static void send_http(int fd, const char *status, const char *type, const char *body, size_t len) {
@@ -707,6 +855,35 @@ int rb_web_server_run(const char *host, int port, const char *web_root, const ch
 #ifdef _WIN32
     WSADATA wsa; if (WSAStartup(MAKEWORD(2, 2), &wsa)) return 1;
 #endif
+    /* ── ORPHANED LOGIC D3: rb_ability_debug_set's production caller ──────────
+       Rust engine/src/game/web_server.rs:3652-3655, the first statement of
+       `run_web_server_with_ngrok`:
+
+           // Enable structured verdict items in the in-game rule log when RABUKA_RULE_LOG=1
+           if std::env::var("RABUKA_RULE_LOG").as_deref() == Ok("1") {
+               crate::ability::debug::set_debug(true);
+           }
+
+       MEASURED (nm -f posix over all 49 OBJ_LIB objects): `rb_ability_debug_set`
+       (src/ability/debug.c:12) had NO caller anywhere in src/ -- its only 23
+       callers are tests/, every one of them behind a getenv of its own name. So
+       the C engine could not switch ability tracing on at all, and the whole of
+       debug.c's buffered trace was dead outside the suite binaries.
+
+       Rust's is the ONE production writer, so this is the faithful call site and
+       not an added feature: the same env var, the same "1" comparison, the same
+       one-shot-at-startup placement. Placed before rb_load so a rule log that
+       fails to open is still visible, exactly as Rust has it before its card
+       database load at :3659-3660.
+
+       ⛔ NOT DONE, AND NOT AN OMISSION: nothing else in the C reads an env var
+       for this. Rust's other ability-debug reader is
+       ABILITY_DEBUG_BATON_TOUCH (engine/src/ability/condition/state.rs:617),
+       a SEPARATE flag with its own accessor, so it is not this call's business. */
+    {
+        const char *rl = getenv("RABUKA_RULE_LOG");
+        if (rl && strcmp(rl, "1") == 0) rb_ability_debug_set(1);
+    }
     if (rb_load(data_dir) != 0) return 1;
     Sandbox *s = (Sandbox *)calloc(1, sizeof(Sandbox)); if (!s) return 1; make_test_deck(s);
     SOCKET server = socket(AF_INET, SOCK_STREAM, 0); int yes = 1; setsockopt(server, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof(yes));

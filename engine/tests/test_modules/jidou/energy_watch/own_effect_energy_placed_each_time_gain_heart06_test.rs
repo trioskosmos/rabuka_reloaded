@@ -9,18 +9,38 @@ use rabuka_engine::card::HeartColor;
 // (相手のカードの効果でも発動する。)
 //
 // Stage card (member). each_time auto ability.
-// trigger_condition: comparison_condition
-//   location: "energy_zone", resource_type: "energy",
-//   card_type: "energy_card"
-// Condition: compares count of energy cards ≥ 0.
-// Effect: gain_resource(heart06, duration=live_end)
 //
-// The scan gate at abilities.rs checks for push_movement_event energy events,
-// but trigger_auto_abilities_for_player called directly in tests
-// bypasses that gate.  In real gameplay the gate prevents
-// re-enqueue between effects.  Tests must place an energy card
-// in the zone so the default comparison (≥ 1, or ≥ 0 with an
-// explicit operator) passes.
+// # The condition used to be a tautology, and this file used to confess it
+//
+// The parse was `comparison_condition { location: energy_zone, resource_type: energy,
+// card_type: energy_card }` with **no operator and no count**. `compare_counts` reads a
+// missing operator as `>=`, so it evaluated as `count >= 0` — true on every board. The
+// header of this file used to say exactly that ("Condition: compares count of energy
+// cards >= 0") and told every reader to seed an energy card in the fixture "so the
+// default comparison passes", because a positive cannot tell a working condition from a
+// vacuous one.
+//
+// What actually gated her was never the condition: it was the `each_time` movement-event
+// scan guard at `core/game_state/abilities.rs`, whose clause is keyed on the condition
+// being `Condition::Comparison` **specifically** — so it stopped applying the moment the
+// parse became honest.
+//
+// The parse is now a `movement_condition` with `trigger_event { type: energy_placed,
+// tense: past, energy_placed: true }`, identical in shape to its sibling
+// `PL!SP-bp5-004-P` (`〜置き場にエネルギーが置かれたとき`). Two details were needed, both in
+// `parser.py::_try_movement`:
+//   * the rule accepted only past-tense 「置**かれた**」, and 「たび」 is habitual-present, so
+//     「置**かれる**たび」 — the same event in the other tense — was excluded and fell through
+//     to the generic extractor. The exclusion was deliberate and is now reversed, with the
+//     reason recorded at the rule;
+//   * the `energy_placed: true` flag was set by a regex requiring 「エネルギーが」, while this
+//     card writes 「エネルギーカード**が**」.
+//
+// The flag is load-bearing, not decorative: without it the engine reads a `moves`
+// condition with no energy check as an AREA-MOVE watcher and demands an area move that
+// never happens, so she under-fires instead of over-firing. The four state tests below
+// caught precisely that — which is the argument for changing a parse on the strength of a
+// real test rather than a shape argument.
 // ═══════════════════════════════════════════════════════════════
 
 fn setup_hazuki(game: &mut TestGame) -> i16 {
@@ -124,5 +144,59 @@ fn hazuki_energy_phase_no_effect_flag() {
         heart06_mod(&v, hazuki),
         0,
         "Hazuki should NOT trigger when energy placed by phase action, not a card effect"
+    );
+}
+
+/// The parse must stay an EVENT, not a zone state — the tautology guard.
+///
+/// The clause's whole content is 「カードの効果によって自分のエネルギー置き場に
+/// エネルギーカードが**置かれるたび**」. Parsed as a zone-occupancy check it cannot tell
+/// 「energy is in my zone」 — which the energy phase satisfies on its own — from 「each time
+/// a card effect puts energy there」, and the operator-less form of that check is true on
+/// every board. All four state tests above pass identically under either reading, so only
+/// the shape separates them.
+#[test]
+fn the_energy_clause_parses_as_an_event_not_a_zone_state() {
+    let db = load_real_database();
+    let game = TestGame::new(db);
+    let hazuki = game.id("PL!SP-bp4-016-N");
+    let eff = game
+        .db
+        .get_card(hazuki)
+        .unwrap()
+        .resolved_abilities()
+        .find(|a| a.triggers.as_deref() == Some("自動"))
+        .and_then(|a| a.effect.as_ref().map(|e| e.clone()))
+        .expect("自動 ability has an effect");
+    let cond = eff.condition.as_deref().expect("the gate is a condition");
+
+    assert!(
+        matches!(cond, rabuka_engine::card::Condition::Movement { .. }),
+        "the clause must be a Movement condition. It used to be a Comparison with no \
+         operator and no count, which `compare_counts` reads as `count >= 0` — true on \
+         every board — and which the `each_time` scan guard at \
+         `core/game_state/abilities.rs` keys on by type. That gate was the only thing \
+         deciding her fate; the condition was decoration."
+    );
+    assert_eq!(
+        cond.get_movement(),
+        Some("moves"),
+        "「〜が置かれるたび」 is an event the trigger scan consumes, not a count over a zone"
+    );
+    assert_eq!(
+        cond.get_self_effect_only(),
+        None,
+        "「カードの効果によって」 — any card, not 「自分のカード」. Her parenthetical \
+         「(相手のカードの効果でも発動する)」 is the printed form of that, and the opponent \
+         positive above is what holds the engine to it"
+    );
+    assert_eq!(
+        cond.get_location(),
+        Some("energy_zone"),
+        "the placement is into the ENERGY ZONE — which the old comparison read as \
+         「do I have energy?」, something the energy phase alone satisfies. Note that the \
+         `energy_placed: true` marker rides on `trigger_event`, which is where the engine \
+         reads it from (`condition.get_energy_placed().or_else(trigger_event)`); it is not \
+         readable off the condition, so the type assertion above is the guard that matters."
     );
 }

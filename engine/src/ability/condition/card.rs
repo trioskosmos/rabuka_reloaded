@@ -9,6 +9,22 @@ use crate::card::{
 };
 use crate::core::constants::CountCast;
 use crate::{HashMap, HashSet};
+
+/// Every colour `get_heart_modifier` can be keyed by, in one place.
+///
+/// `check_original_heart_filter` sums ability-granted hearts over all of them on every
+/// call; the list lived inline as an array literal, which meant the set of colours this
+/// reads was invisible at the point where anyone would want to check it.
+const ORIGINAL_HEART_COLORS: [HeartColor; 8] = [
+    HeartColor::Heart01,
+    HeartColor::Heart02,
+    HeartColor::Heart03,
+    HeartColor::Heart04,
+    HeartColor::Heart05,
+    HeartColor::Heart06,
+    HeartColor::Heart00,
+    HeartColor::All,
+];
 #[cfg(feature = "no_std")]
 use alloc::{
     borrow::ToOwned,
@@ -745,6 +761,16 @@ impl<'a> ConditionContext<'a> {
         if let Some(v) = self.evaluate_check_self_condition(condition) {
             return v;
         }
+        // 「〜がすべて『X』」 is emitted on whichever variant matches where the text
+        // looks, so this variant has to honour it as well as `Group` does — the
+        // marker used to be dropped here at decode, which turned 「すべて」 into
+        // "at least one" on exactly the clauses that name a zone rather than a
+        // group. A zone this helper does not enumerate falls through untouched.
+        if condition.get_all_members().unwrap_or(false) {
+            if let Some(verdict) = self.evaluate_all_members_condition(condition) {
+                return verdict;
+            }
+        }
         if let Some(locs) = condition.get_locations() {
             if locs.len() >= 2 {
                 if condition.get_target() == Some("both")
@@ -1300,20 +1326,10 @@ impl<'a> ConditionContext<'a> {
         }
         let base_hearts = card.total_hearts();
         let mut current_hearts = base_hearts;
-        use crate::card::HeartColor;
-        for color in [
-            HeartColor::Heart01,
-            HeartColor::Heart02,
-            HeartColor::Heart03,
-            HeartColor::Heart04,
-            HeartColor::Heart05,
-            HeartColor::Heart06,
-            HeartColor::Heart00,
-            HeartColor::All,
-        ] {
+        for color in ORIGINAL_HEART_COLORS {
             let modifier = self.game_state.mods.get_heart_modifier(card_id, color);
             if modifier > 0 {
-                        current_hearts += modifier.u8_count();
+                current_hearts += modifier.u8_count();
             }
         }
         let verdict = compare_counts(Some(op), current_hearts, base_hearts);
@@ -1469,61 +1485,110 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
+    /// 「〜がすべて『X』」 — EVERY card the clause covers is in one of the listed
+    /// groups. Returns `None` when the condition does not carry `all_members`, so
+    /// the caller can fall through to its ordinary path.
+    ///
+    /// Shared by `evaluate_group_condition` and `evaluate_location_condition`,
+    /// because the marker is not a property of either variant: the parser emits it
+    /// on whichever variant matches where the text looks, and `PL!-pb2-037-L`'s
+    /// three-way 「すべて『Printemps』か…」 lands two branches on `Group` and one on
+    /// `Location`. Handling it in only one of them made the same 「すべて」 mean two
+    /// different things inside a single `or`.
+    pub(crate) fn evaluate_all_members_condition(&self, condition: &Condition) -> Option<bool> {
+        if !condition.get_all_members().unwrap_or(false) {
+            return None;
+        }
+        let location = condition.get_location().unwrap_or("");
+        let target = condition.get_target().unwrap_or("self");
+        let player = self.resolve_condition_player(target);
+        // "…のみがいる" — every card in the zone must belong to ONE of the listed
+        // groups (e.g. 『Aqours』か『SaintSnow』). The group list is an OR: a card
+        // matches if it is in ANY listed group, not just the first.
+        let groups: Vec<String> = condition
+            .get_group_names()
+            .map(|g| g.to_vec())
+            .unwrap_or_default();
+        let card_db = &self.game_state.card_database;
+        let matches = |id: i16| {
+            groups.is_empty()
+                || groups
+                    .iter()
+                    .any(|g| crate::ability::util::card_matches_group_str(card_db, id, Some(g)))
+        };
+        // 「2人の『μ's』のメンバーのみがいる」 is a COUNT as well as a group test:
+        // exactly two, all of them μ's. The all_members branch below only ever
+        // asked "are they all in the group", so one member and three members both
+        // satisfied it. That went unnoticed because PL!-pb2-038-L — the card that
+        // needs it — had no working code path at all, so its negatives passed
+        // vacuously. With an explicit `count` and no operator the reading is
+        // equality; an operator, if present, still governs.
+        let exact_count = match (condition.get_count(), condition.get_operator()) {
+            (Some(n), None) => Some(u8::try_from(n).unwrap_or(0)),
+            _ => None,
+        };
+        let count_ok = |cards: &[i16]| match exact_count {
+            Some(want) => cards.len() == usize::from(want),
+            None => true,
+        };
+        let zone = Zone::from_str(location);
+        let cards: Vec<i16> = match zone {
+            Some(Zone::Stage) => player
+                .stage
+                .stage
+                .iter()
+                .copied()
+                .filter(|&id| id != -1)
+                .collect(),
+            Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
+            Some(Zone::SuccessLiveZone) => player.success_live_card_zone.cards.to_vec(),
+            // The yell reveal is GAME-level shared state, not a player zone, so it
+            // cannot be reached through `player`. `PL!-pb2-037-L` gates on
+            // 「エールにより公開された自分のメンバーカードがすべて『Printemps』」 and
+            // its lily white / BiBi branches are `group_condition`s over
+            // `revealed_cards`; without this arm they fell through to `_ => false`
+            // and could never match at any reveal size.
+            //
+            // `card_type` selects which revealed cards the 「すべて」 is ABOUT, not a
+            // second filter stacked on the group test: the clause counts the revealed
+            // MEMBERS, so a revealed live card must not count against a group that
+            // every revealed member happens to satisfy.
+            Some(Zone::RevealedCards) => {
+                let card_type = condition.get_card_type().map(|ct| ct.as_str());
+                self.game_state
+                    .revealed_cards
+                    .iter()
+                    .copied()
+                    .filter(|&id| {
+                        card_type
+                            .is_none_or(|ct| util::card_matches_type(card_db, id, Some(ct)))
+                    })
+                    .collect()
+            }
+            // An unhandled zone is not a pass and not a fail here: `None` lets the
+            // caller take its own path rather than silently answering for it.
+            _ => return None,
+        };
+        let verdict = count_ok(&cards) && cards.iter().all(|&id| matches(id));
+        log::debug!(
+            "[GROUP_ALL_MEMBERS] zone={:?} card_type={:?} n={} groups={:?} verdict={}",
+            location,
+            condition.get_card_type().map(|ct| ct.as_str()),
+            cards.len(),
+            groups,
+            verdict
+        );
+        Some(verdict)
+    }
+
     pub(crate) fn evaluate_group_condition(&self, condition: &Condition) -> bool {
         if condition.get_all_members().unwrap_or(false) {
-            let location = condition.get_location().unwrap_or("");
-            let target = condition.get_target().unwrap_or("self");
-            let player = self.resolve_condition_player(target);
-            // "…のみがいる" — every card in the zone must belong to ONE of the
-            // listed groups (e.g. 『Aqours』か『SaintSnow』). The group list is an
-            // OR: a card matches if it is in ANY listed group, not just the first.
-            let groups: Vec<String> = condition
-                .get_group_names()
-                .map(|g| g.to_vec())
-                .unwrap_or_default();
-            let card_db = &self.game_state.card_database;
-            let matches = |id: i16| {
-                groups.is_empty()
-                    || groups
-                        .iter()
-                        .any(|g| crate::ability::util::card_matches_group_str(card_db, id, Some(g)))
-            };
-            // 「2人の『μ's』のメンバーのみがいる」 is a COUNT as well as a group test:
-            // exactly two, all of them μ's. The all_members branch below only ever
-            // asked "are they all in the group", so one member and three members both
-            // satisfied it. That went unnoticed because PL!-pb2-038-L — the card that
-            // needs it — had no working code path at all, so its negatives passed
-            // vacuously. With an explicit `count` and no operator the reading is
-            // equality; an operator, if present, still governs.
-            let exact_count = match (condition.get_count(), condition.get_operator()) {
-                (Some(n), None) => Some(u8::try_from(n).unwrap_or(0)),
-                _ => None,
-            };
-            let count_ok = |cards: &[i16]| match exact_count {
-                Some(want) => cards.len() == usize::from(want),
-                None => true,
-            };
-            match Zone::from_str(location) {
-                Some(Zone::Stage) => {
-                    let cards: Vec<i16> = player
-                        .stage
-                        .stage
-                        .iter()
-                        .copied()
-                        .filter(|&id| id != -1)
-                        .collect();
-                    return count_ok(&cards) && cards.iter().all(|&id| matches(id));
-                }
-                Some(Zone::LiveCardZone) => {
-                    let cards: Vec<i16> = player.live_card_zone.cards.to_vec();
-                    return count_ok(&cards) && cards.iter().all(|&id| matches(id));
-                }
-                Some(Zone::SuccessLiveZone) => {
-                    let cards: Vec<i16> = player.success_live_card_zone.cards.to_vec();
-                    return count_ok(&cards) && cards.iter().all(|&id| matches(id));
-                }
-                _ => return false,
-            }
+            // `unwrap_or(false)`: an `all_members` over a zone this helper does not
+            // enumerate has always answered false on the Group path. Falling through
+            // to the ordinary count path instead would silently start passing.
+            return self
+                .evaluate_all_members_condition(condition)
+                .unwrap_or(false);
         }
         let g_target = condition.get_target().unwrap_or("self");
         let g_player = self.resolve_condition_player(g_target);
@@ -2514,15 +2579,48 @@ impl<'a> ConditionContext<'a> {
             );
         }
 
-        let actual = self.resolve_zone_card_count(
-            condition,
-            location,
-            hc,
-            is_both,
-            player,
-            card_type,
-            group_names,
-        );
+        // 「自分のステージにエネルギーカードが下にあるメンバーがいる場合」
+// (PL!N-bp5-013-N 上原歩夢) — the counted set is MEMBERS, and each one is kept only
+// if the named card sits beneath it. Overriding `actual` here rather than adding a
+// dispatch arm means the clause reuses the ordinary operator/threshold comparison
+// below, so 「〜がいる」 is `>= 1` and a future 「N人以上」 needs no second path.
+//
+// This cannot be expressed as a `Location`, and the reason is worth keeping: `under_member`
+// resolves to the ACTIVATING card's under-cards (「このメンバーの下」 — 中須かすみ
+// `PL!N-pb1-002-P＋`), while this clause is existential over EVERY member on the stage.
+let actual = if condition.get_member_has_resource_under() == Some(true) {
+            let card_db = &self.game_state.card_database;
+            // `resource_type` names the resource; the under-cards are real cards, so map
+            // it to the card type they are. Only `energy` reaches here today, and an
+            // unknown token falls back to energy_card rather than counting any card.
+            let want_card_type = match condition.get_resource_type().unwrap_or("energy") {
+                "live_card" => "live_card",
+                _ => "energy_card",
+            };
+            let n = player
+                .stage
+                .stage
+                .iter()
+                .enumerate()
+                .filter(|&(_, &id)| id != -1)
+                .filter(|&(idx, _)| {
+                    player.stage.under_cards[idx]
+                        .iter()
+                        .any(|&cid| util::card_matches_type(card_db, cid, Some(want_card_type)))
+                })
+                .count();
+            let n = u8::try_from(n).unwrap_or(u8::MAX);
+            log::debug!(
+                "[UNDER_MEMBER_EXISTS] location={:?} want={} members_with_under={} threshold={}",
+                location,
+                want_card_type,
+                n,
+                count
+            );
+            n
+        } else {
+            self.resolve_zone_card_count(condition, location, hc, is_both, player, card_type, group_names)
+        };
         // Comparison target (e.g. "自分のエネルギーが相手より2枚以上多い"):
         // self is `count` more than the opponent → self_count >= opp_count + count.
         // When comparison_target is opponent, the effective comparison is the
@@ -4103,6 +4201,13 @@ pub(crate) fn count_cards_with_filters(
         if resource_type == Some("surplus_heart") {
             return self.count_surplus_heart(condition, target);
         }
+        // NOTE: 「自分のステージにエネルギーカードが下にあるメンバーがいる場合」
+        // (PL!N-bp5-013-N) also carries `resource_type: energy`, and the branch below
+        // short-circuits to the energy-zone length without reading `location` — which is
+        // exactly the misreading that made the clause ask 「do I have energy?」 instead of
+        // 「does anyone on my stage have energy beneath them?」. It is handled in
+        // `resolve_zone_card_count`, which is where a `card_count_condition` is actually
+        // counted; this function is not on that path.
         if resource_type == Some("energy") {
             let player = self.resolve_condition_player(target);
             let count = player.energy_zone.cards.len().u8_count();

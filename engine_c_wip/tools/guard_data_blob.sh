@@ -9,6 +9,16 @@
 # observed at 726649 bytes against a canonical 726831, and a plain `make` copied
 # that truncated blob straight over the good copy in src/ without a word.
 #
+# ⚠ 2026-10-04: 726649 AND 726831 ARE BOTH HISTORICAL. The canonical pair was
+# 726671 bytes / sha256 32fa1a69c0ba9bc2 after the layer-3 regen, and the pin
+# that guards it lives in the Makefile (STRINGS_BYTES / STRINGS_SHA256, passed in
+# as arguments below) -- this script holds no pin of its own and must not grow one.
+# THE HAZARD IS THE PIN, NOT THIS SCRIPT: correcting that pin while gen_data.c
+# still held stale offsets would have manufactured a byte splice. Always run
+# `bash tools/regen_all.sh` FIRST and move the pin in the same change.
+# tests/test_artifacts_consistent.c section 6 independently fails if the
+# committed tables and the blob they index come from different generator runs.
+#
 # Because the interned string pool is UNSEPARATED, a truncated table is NOT a
 # build error. It is a silent byte splice of two neighbouring entries:
 #

@@ -2299,13 +2299,6 @@ pub(crate) fn live_set_plan(gs: &GameState, db: &CardDatabase) -> Vec<usize> {
     let is_second = gs.current_phase == Phase::LiveCardSetSecondAttacker;
     let opp_committed = !opp.live_card_zone.cards.is_empty();
     let floor = live_reliability_floor(gs, me);
-    // Opponent-commitment response model. Binary switch, no coefficient: the
-    // payoff table is worth ±1, not a fitted number. `V7_RESPONSE=0` restores
-    // today's "safest single life, opponent ignored" behaviour.
-    let response_model = std::env::var("V7_RESPONSE")
-        .as_deref()
-        .map(|value| value != "0")
-        .unwrap_or(true);
 
     let mut desired: Vec<usize> = Vec::new();
 

@@ -15,6 +15,32 @@ int rb_check_effect_position(const char *effect_pos, int card_position);
    NOT static in modifiers.c, so no change there is required to call it. */
 void rb_recalculate_constant_cost_modifiers(GameState *g);
 
+/* E1, ported in src/core/modifiers.c (Rust
+   evaluate_success_zone_constant_modifiers, modifiers.rs:2188-2305). Also not
+   yet surfaced in rabuka.h, so it is declared here for the same reason and with
+   the same precedent as rb_recalculate_constant_cost_modifiers above. It is NOT
+   static in modifiers.c, so no change there is required to call it. */
+void rb_evaluate_success_zone_constant_modifiers(GameState *g);
+
+/* E3 + E4, ported in src/core/modifiers.c (Rust
+ *   evaluate_success_zone_constant_abilities  modifiers.rs:2147-2150
+ *   restore_performance_need_heart_modifiers   modifiers.rs:2159-2182).
+ * Like E1 above, neither is surfaced in rabuka.h, so they are declared locally
+ * for the same reason and with the same precedent. Neither is static in
+ * modifiers.c, so no change there is required to call them. */
+void rb_evaluate_success_zone_constant_abilities(GameState *g);
+void rb_restore_performance_need_heart_modifiers(GameState *g);
+
+/* src/ability/effects/rules.c:2291 rb_rules_cannot_live_player — the reader for
+   `RbRulesState::cannot_live_players[2]`, written by the `cannot_live` arm of
+   rb_rules_execute_restriction (rules.c:1922-1925) and folded to Rust's per-turn
+   set by the turn stamp in the same file. Defined but not yet surfaced in
+   rabuka.h, so it is declared here for the same reason and with the same
+   precedent as rb_check_effect_position and
+   rb_recalculate_constant_cost_modifiers above. It is NOT static in rules.c, so
+   no change there is required to call it. */
+int rb_rules_cannot_live_player(GameState *g, int pl);
+
 /* Defined below, next to the faithful live-success port; every scan that
    reproduces a Rust `check_effect_position` gate needs it. */
 static const char *effect_activation_position_any(const AbilityEffect *e);
@@ -276,6 +302,38 @@ int rb_trigger_debut(GameState *g, int pl, int card_id) {
 
 int rb_trigger_live_start(GameState *g, int pl) {
     if (!g || pl < 0 || pl > 1) return 0;
+    /* ── Q68: ライブ開始時 IS UNUSABLE FOR A 「ライブできない」 PLAYER ─────────
+       THIS GATE IS A DELIBERATE DIVERGENCE FROM RUST, and the card text is what
+       both sides are measured against.
+
+       cards/cards.json, FAQ Q68 (2025.02.07), on PL!HS-bp2-014-N /
+       PL!SP-bp1-001-P / PL!SP-bp1-001-R:
+         「『ライブできない』状態のプレイヤーは、ライブカードセットフェイズで
+           ライブカード置き場に手札のカードを裏向きで置くことはできますが、
+           パフォーマンスフェイズで表向きにしたカードの中にライブカードが
+           あったとしても、そのライブカードを含めて控え室に置きます。その結果、
+           ライブカード置き場にライブカードが置かれていないため、ライブは行われません。
+           （ライブ開始時の能力は使えず、エールも行いません）」
+       Three requirements, and this gate is (b) of them: the abilities are
+       UNUSABLE. Rust does not honour it -- engine/src/turn/trigger_scan.rs:186-212
+       `trigger_live_start_abilities` gates only on is_trigger_suppressed (:195)
+       and, for the second attacker, on an empty live-card zone (:207-212), and
+       never consults `cannot_live_players` anywhere in the file. Rust reads that
+       set for the first time at phases.rs:351, i.e. AFTER this scan (phases.rs:
+       245-246) and inside the yell, where live.rs:2053-2055 discards the live
+       cards. So Rust fires a cannot_live player's ライブ開始時 and then throws
+       their live cards away. No compiled Rust test adjudicates it:
+       engine/tests/.../pvp_room_test.rs is the only oracle for the sibling
+       field and does not compile (build.rs:90 EXCLUDED_MODULES).
+
+       The C does not inherit that. The writer (rules.c:1922-1925) and the
+       per-turn fold (rules.c rb_rules_cannot_live_player) are already in place,
+       so this is the one line that makes the set load-bearing.
+
+       Placement: before the suppression test, because both are side-effect-free
+       early returns and Rust's order between them is unobservable. It is NOT
+       placed after the empty-live-zone guard, which is Rust's own last gate. */
+    if (rb_rules_cannot_live_player(g, pl)) return 0;
     if (rb_is_trigger_suppressed(g, pl, "live_start")) return 0;
     /* Rust trigger_scan.rs:202-212 --
          let player = ...;
@@ -508,6 +566,46 @@ int rb_trigger_live_success(GameState *g, int pl) {
         fprintf(stderr, "[LIVE_SUCCESS_TRIGGER_ENTER] pl=%d state=%d pending=%d cur=%d n=%d\n",
                 pl, g->queue.state, g->queue.has_pending, g->queue.cur, g->queue.n_entries);
     if (!g || pl < 0 || pl > 1) return 0;
+
+    /* E3 + E4 -- engine/src/turn/trigger_scan.rs:357-365, the FIRST two
+     * statements of Rust's trigger_live_success_abilities:
+     *
+     *     pub fn trigger_live_success_abilities(game_state: &mut GameState, player_id: &str) {
+     *         // Evaluate constant modify_required_hearts abilities on cards in the
+     *         // success_live_card_zone before checking live success conditions.
+     *         game_state.evaluate_success_zone_constant_abilities();
+     *
+     *         // Restore performance-time need_heart_modifiers that were cleared above.
+     *         // This preserves modifications from live_start triggers and other non-constant
+     *         // sources, ensuring should_trigger_live_success uses the correct requirements.
+     *         game_state.restore_performance_need_heart_modifiers();
+     *
+     *         ...
+     *         if !game_state.should_trigger_live_success(..) { return; }
+     *
+     * ORDER IS LOAD-BEARING AND PUTS THEM BEFORE THE GATE: Rust evaluates and
+     * restores first and only then tests should_trigger_live_success, which in Rust
+     * re-reads the need_heart table (:372-378). So the pair must sit between the
+     * NULL/bounds guard above and the rb_should_trigger_live_success call below --
+     * moving them after the gate would skip the re-evaluation the gate is supposed
+     * to be reading.
+     *
+     * E3 is the ONLY withdrawal of a plain `modify_required_hearts` need_heart
+     * grant anywhere in the tree. Rust has no ledger for that path -- the
+     * constant_need_heart prologue in rb_recalc_constants is
+     * `modify_required_hearts_global`'s ledger (Rust constant_global_need_heart,
+     * game_modifiers.rs:194), a different action -- so E1's need_heart arm
+     * (sz_apply_effect -> rb_execute_modify_required_hearts) writes
+     * mods.need_heart and nothing ever takes it back. Rust's
+     * `need_heart_modifiers.clear()` at modifiers.rs:2148 is the withdraw, and it
+     * runs only from these two live-flow sites.
+     *
+     * NOT wired into rb_recalc_constants, deliberately: Rust's
+     * recalculate_constants calls E1 (modifiers.rs:1398), never E3, so a clear
+     * there would be a rule Rust does not have. */
+    rb_evaluate_success_zone_constant_abilities(g);
+    rb_restore_performance_need_heart_modifiers(g);
+
     if (!rb_should_trigger_live_success(g, pl)) return 0;
     if (rb_is_trigger_suppressed(g, pl, "live_success")) return 0;
 
@@ -840,6 +938,33 @@ static void apply_constant_effect(GameState *g, int pl, int host_cid,
            could never match a live card and silently no-op'd. */
         const char *ms_target = e->target ? e->target : NULL;
         if (ms_target && !strcmp(ms_target, "live_total")) {
+            /* card_on_stage() is NOT a semantic gate here -- it is Rust's
+               `belongs_to_p1` ROUTING test, verbatim:
+
+                   if effect.target_any() == Some("live_total") {
+                       let belongs_to_p1 =
+                           self.player1.stage.stage.contains(&card_id);
+                       if belongs_to_p1 { p1_constant_score_bonus += sv; }
+                       else            { p2_constant_score_bonus += sv; }
+                   } else { *exp_score.entry(card_id).or_insert(0) += sv; }
+                                     -- modifiers.rs:1048-1058
+
+               Since rb_recalc_constants' scan is now STAGE-ONLY (see the zone
+               collection above), every card reaching this line is on `pl`'s
+               stage by construction and the test is always true. It was NOT
+               always true before that narrowing: the scan also walked
+               g->p[pl].success and g->p[pl].live, so 「ライブの合計スコアを+1する」
+               was rejected outright for the 27 constant nodes that carry it
+               (measured MS_TARGET_FIELD_LIVE_TOTAL 27; `target` is a TYPED
+               field, not an extra -- tools/census_e1_exact.c). Those are now
+               served by rb_evaluate_success_zone_constant_modifiers, whose
+               live_total arm (modifiers.rs:2510-2525) keys off the zone index
+               and has no membership test, which is exactly Rust's E1.
+
+               DO NOT delete the guard thinking it is a bug: with the scan
+               narrowed it is vacuous, and removing it would make a card that
+               somehow reached this path credit `pl` unconditionally, diverging
+               from the belongs_to_p1 routing above. */
             if (card_on_stage(g, pl, host_cid)) {
                 if (pl == 0 && total_p1) *total_p1 = (int16_t)(*total_p1 + cnt);
                 if (pl == 1 && total_p2) *total_p2 = (int16_t)(*total_p2 + cnt);
@@ -1376,23 +1501,34 @@ void rb_recalc_constants(GameState *g) {
     }
 
     for (int pl = 0; pl < 2; pl++) {
-        int zone_cids[RB_STAGE_SIZE + RB_MAX_LIVE_CARDS * 2];
-        int is_stage[RB_STAGE_SIZE + RB_MAX_LIVE_CARDS * 2];
+        /* STAGE ONLY -- Rust's main constant loop draws its entries from
+           collect_reusable_constant_stage_effect_ids (modifiers.rs:453-455),
+           which chains player1.stage.stage + player2.stage.stage and nothing
+           else. The success and live-card bags are a SEPARATE scan, Rust's
+           evaluate_success_zone_constant_modifiers (modifiers.rs:2232-2237),
+           now ported as rb_evaluate_success_zone_constant_modifiers in
+           src/core/modifiers.c and called at the tail of this function.
+
+           This loop used to walk all three zone kinds and push them through
+           apply_constant_effect, which conflated the two Rust functions. That
+           was not merely a duplicate: it applied the WIDER action set of
+           apply_constant_effect (gain_ability and friends, plus the
+           activation_position and ability-invalidation gates) to cards Rust
+           routes only through E1's FOUR arms (modifiers.rs:2326/:2343/:2487/
+           :2573, with `_ => {}` for the rest), and it banked the result in the
+           constant_* ledgers instead of the success_zone_* ones, so nothing
+           could withdraw it correctly. Both loops scanning the same cards
+           would also double every grant. 220 constant effect nodes are
+           affected, measured per-action in tools/census_e1_exact.c -- 1
+           modify_required_hearts, 176 gain_resource, 29 modify_score,
+           14 sequential. */
+        int zone_cids[RB_STAGE_SIZE];
+        int is_stage[RB_STAGE_SIZE];
         int zn = 0;
         for (int s = 0; s < RB_STAGE_SIZE; s++) {
             if (g->p[pl].stage[s] == RB_EMPTY_SLOT) continue;
             zone_cids[zn] = g->p[pl].stage[s];
             is_stage[zn++] = 1;
-        }
-        for (int s = 0; s < g->p[pl].success.n; s++) {
-            if (g->p[pl].success.cards[s] == RB_EMPTY_SLOT) continue;
-            zone_cids[zn] = g->p[pl].success.cards[s];
-            is_stage[zn++] = 0;
-        }
-        for (int s = 0; s < g->p[pl].live.n; s++) {
-            if (g->p[pl].live.cards[s] == RB_EMPTY_SLOT) continue;
-            zone_cids[zn] = g->p[pl].live.cards[s];
-            is_stage[zn++] = 0;
         }
 
         for (int z = 0; z < zn; z++) {
@@ -1564,6 +1700,28 @@ void rb_recalc_constants(GameState *g) {
 
     g->mods.p1_constant_total_score_bonus = total_p1;
     g->mods.p2_constant_total_score_bonus = total_p2;
+
+    /* engine/src/core/game_state/modifiers.rs:1396-1400 -- the second of the
+       two constant scans, and the LAST statement before refresh_yell_sources:
+
+           // Evaluate constant abilities from success live card zone (e.g. Love wing bell)
+           tdbg!("RC:14 SUCCESS_ZONE");
+           self.evaluate_success_zone_constant_modifiers();
+           tdbg!("RC:14b SUCCESS_ZONE_DONE");
+           self.refresh_yell_sources();
+
+       It has to sit HERE, after the p1/p2 assignment above, because E1's
+       live_total arm (modifiers.rs:2510-2525) ADDS to those two fields rather
+       than assigning them; Rust gets that ordering from commit_constant_results
+       (:1375) running before :1398. Calling it earlier would have the total
+       overwritten a few lines down.
+
+       This is the call that makes success_zone_blade_bonuses /
+       success_zone_heart_bonuses / success_zone_score_bonuses live; before it
+       they were 0 writers / 0 readers and a previous live's success-zone bonus
+       could not be withdrawn. */
+    rb_evaluate_success_zone_constant_modifiers(g);
+
     rb_refresh_yell_sources(g);
 }
 

@@ -47,6 +47,7 @@ const RECOVERABLE: &str = "PL!-pb2-003-PP"; // 南 ことり
 struct Ran {
     game: TestGame,
     waited_draw: bool,
+    all_heart: i16,
 }
 
 /// Put `zone` in the success live card zone, run ライブ開始時, and report whether the
@@ -102,7 +103,15 @@ fn run(zone: &[&str], waitroom: &[&str]) -> Ran {
         guard += 1;
     }
     let waited_draw = game.state.player1.waitroom.cards.len() < waitroom_before;
-    Ran { game, waited_draw }
+    // The 全ブレード clause grants a HEART, not a score — `HeartColor::All`, stored as a
+    // card modifier on the activating member. Reading `p1_constant_total_score_bonus`
+    // for that clause measures the wrong field and always reads 0.
+    let all_heart = game.state.mods.get_heart_modifier(honoka, rabuka_engine::card::HeartColor::All);
+    Ran {
+        game,
+        waited_draw,
+        all_heart,
+    }
 }
 
 /// THE test. A ドロー card in the zone recovers exactly one 『μ's』 card to hand.
@@ -150,17 +159,65 @@ fn a_draw_card_in_the_zone_recovers_one_mus_card_to_hand() {
 /// the ドロー clause behaves differently — see
 /// `a_draw_card_in_the_zone_recovers_one_mus_card_to_hand`, which does fire — so the three
 /// clauses are demonstrably not interchangeable.
+/// The 全ブレード clause grants a heart — this used to read as "nothing measurable".
+///
+/// 「ALLブレードを持つカードがある場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る」
+///
+/// The old version of this test looped over both non-ドロー clauses and asserted
+/// `p1_constant_total_score_bonus == 0` for each, then concluded from the flat result that
+/// neither clause did anything and named two candidate causes. **Both were wrong on this
+/// clause, for a reason that had nothing to do with the engine:** the 全ブレード clause
+/// grants a HEART, so the score field measures nothing by construction. Reading
+/// `mods.get_heart_modifier(高坂穂乃果, HeartColor::All)` — the colour the effect stores,
+/// via `add_heart_modifier_with_trace(..., HeartColor::All, ...)` — gives **1**. The clause
+/// had been working the whole time.
+///
+/// Worth keeping as the lesson rather than the fix: a "measured, not asserted" test still
+/// only measures what its author chose to read, and a flat zero reads as a defect until
+/// someone checks that the field belongs to the effect at all.
 #[test]
-fn the_score_and_all_blade_clauses_produce_nothing_measurable_yet() {
-    for (zone, label) in [(SCORE_ICON, "スコア"), (BALL_ICON, "総合ブレード")] {
-        let out = run(&[zone], &[]);
-        assert_eq!(
-            out.game.state.mods.p1_constant_total_score_bonus,
-            0,
-            "MEASURED, not asserted as correct: a {label} card in the 成功ライブカード置き場 grants nothing \\
-             observable here. This test records the value; it does not claim it is right"
-        );
-    }
+fn an_all_blade_card_in_the_zone_grants_one_all_heart() {
+    let out = run(&[BALL_ICON], &[]);
+    assert_eq!(
+        out.all_heart, 1,
+        "全ブレードを持つカードがある場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る — \
+         one HeartColor::All on the activating member"
+    );
+    assert_eq!(
+        out.game.state.mods.p1_constant_total_score_bonus, 0,
+        "and this clause is NOT the score one: the zone holds no スコア card, so the \
+         live-total bonus must not be granted. The three clauses are independent."
+    );
+}
+
+/// The スコア clause gains a 常時, which this harness cannot observe — and that is the
+/// remaining half of the old "produces nothing" claim.
+///
+/// 「スコアを持つカードがある場合、ライブ終了時まで、「常時 ライブの合計スコアを＋１する。」
+/// を得る」
+///
+/// Unlike the 全ブレード clause this one really does read 0, and for the reason the old
+/// comment guessed at: the gain is a registered 常時, and only a constant scan applies it.
+/// `run()` drives a bare `trigger_auto_ability` with no live in progress, so nothing ever
+/// re-derives the constant — an explicit `recalculate_constants()` does not change it
+/// either. This is the "harness does not stand up a live" candidate, and unlike its
+/// sibling it is the one that holds.
+///
+/// So the value is still recorded rather than asserted as correct, but for the stated
+/// reason instead of a two-way guess. Closing it needs a test that stands up a live and
+/// then reads `p1_constant_total_score_bonus`; that is a different harness, and writing it
+/// by bolting a live onto `run()` would change what every other test in this file measures.
+#[test]
+fn the_score_clause_gains_a_constant_this_harness_never_scans() {
+    let out = run(&[SCORE_ICON], &[]);
+    assert_eq!(
+        out.game.state.mods.p1_constant_total_score_bonus,
+        0,
+        "RECORDED, with the reason now known: the gain is a 常時 that only a constant \
+         scan applies, and `run()` never establishes a live, so nothing re-derives it. \
+         This is NOT evidence the clause is broken — the ドロー and 全ブレード clauses in \
+         this same file both fire."
+    );
 }
 
 /// A card with none of the three icons lights up nothing.

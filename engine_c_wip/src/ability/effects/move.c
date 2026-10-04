@@ -1829,7 +1829,48 @@ int rb_move_resolve_source_revealed_cards(GameState *g, int actor, AbilityEffect
                                            int count, int is_all, int is_max,
                                            int *out_ids, int max) {
     if (!g || !out_ids) return 0;
-    int take_count = is_all ? g->n_revealed : (count < g->n_revealed ? count : g->n_revealed);
+
+    /* move/mod.rs:1580-1594 -- the PER-PLAYER cheer buffer is the primary
+     * source, and it is DRAINED, not read:
+     *
+     *     let cheer_is_empty = if c.use_p2 { p2.is_empty() } else { p1.is_empty() };
+     *     let cards: Vec<i16> = if !cheer_is_empty {
+     *         let cbuf = core::mem::take(cheer_buf);          // n -> 0
+     *         gs.revealed_cards.retain(|id| !cbuf.contains(id));
+     *         cbuf.to_vec()
+     *     } else { ...zone-filtered revealed_cards, owned-by-player only... };
+     *
+     * `use_p2` has no C member on RbCardFilter, so the seat comes from `actor`,
+     * which is the same value every other resolver in this file uses for "whose
+     * cards". Rust's own fallback branch comment (mod.rs:1596-1599) is the reason
+     * this matters: `revealed_cards` is ONE global pool, so reading it without
+     * the buffer exposes the other performer's yell. REACHABILITY: 32 corpus
+     * nodes carry `source:"revealed_cards"` (measured on cards/abilities.json).
+     *
+     * Two residual differences from Rust, both stated rather than hidden:
+     *  - Rust takes the WHOLE buffer or none of it (`cards.len() > count` ->
+     *    prompt, else return `cards`); this port keeps the existing
+     *    take-the-last-`actual_take`-of-the-matching-set drain, which agrees
+     *    whenever `count >= n_pool` and returns a prefix otherwise.
+     *  - Rust removes the taken ids from the ACTIVE player's hand
+     *    (mod.rs:1653-1659); the caller of this function already owns the
+     *    hand-removal half, so this does not duplicate it. */
+    int cheer_cap = (int)(sizeof(g->player1_cheer_revealed_cards) /
+                          sizeof(g->player1_cheer_revealed_cards[0]));
+    int *cheer_buf = (actor == 1) ? g->player2_cheer_revealed_cards
+                                  : g->player1_cheer_revealed_cards;
+    int *n_cheer_p = (actor == 1) ? &g->n_player2_cheer_revealed_cards
+                                  : &g->n_player1_cheer_revealed_cards;
+    int cheer[8];
+    int n_cheer = 0;
+    if (*n_cheer_p > 0) {
+        n_cheer = *n_cheer_p > cheer_cap ? cheer_cap : *n_cheer_p;
+        memcpy(cheer, cheer_buf, (size_t)n_cheer * sizeof(int));
+    }
+    const int *pool = (n_cheer > 0) ? cheer : g->revealed_cards;
+    int n_pool      = (n_cheer > 0) ? n_cheer : g->n_revealed;
+
+    int take_count = is_all ? n_pool : (count < n_pool ? count : n_pool);
     int can_skip = is_max || e->is_optional;
     RbCardFilter filter;
     memset(&filter, 0, sizeof(filter));
@@ -1848,8 +1889,8 @@ int rb_move_resolve_source_revealed_cards(GameState *g, int actor, AbilityEffect
 
     int matching[RB_MAX_ZONE];
     int nm = 0;
-    for (int i = 0; i < g->n_revealed && nm < max; i++) {
-        int cid = g->revealed_cards[i];
+    for (int i = 0; i < n_pool && nm < max; i++) {
+        int cid = pool[i];
         if (!rb_matching_ids(&filter, &cid, 1, &matching[nm], max - nm)) continue;
         nm++;
     }
@@ -1861,11 +1902,31 @@ int rb_move_resolve_source_revealed_cards(GameState *g, int actor, AbilityEffect
     int actual_take = take_count < nm ? take_count : nm;
     int taken[RB_MAX_ZONE];
     int nt = 0;
-    for (int i = actual_take - 1; i >= 0; i--) {
-        int cid = g->revealed_cards[i];
-        for (int j = i; j < g->n_revealed - 1; j++) g->revealed_cards[j] = g->revealed_cards[j + 1];
-        g->n_revealed--;
-        taken[nt++] = cid;
+    if (n_cheer > 0) {
+        /* mod.rs:1591-1593 -- mem::take the buffer and retain the ids out of the
+         * global pool, so the cards leave BOTH lists in one step. */
+        for (int i = actual_take - 1; i >= 0; i--) {
+            int cid = cheer[i];
+            int w = 0;
+            for (int j = 0; j < *n_cheer_p; j++)
+                if (cheer_buf[j] != cid) cheer_buf[w++] = cheer_buf[j];
+            *n_cheer_p = w;
+            for (int j = 0; j < g->n_revealed; j++)
+                if (g->revealed_cards[j] == cid) {
+                    for (int k = j; k < g->n_revealed - 1; k++)
+                        g->revealed_cards[k] = g->revealed_cards[k + 1];
+                    g->n_revealed--;
+                    break;
+                }
+            taken[nt++] = cid;
+        }
+    } else {
+        for (int i = actual_take - 1; i >= 0; i--) {
+            int cid = g->revealed_cards[i];
+            for (int j = i; j < g->n_revealed - 1; j++) g->revealed_cards[j] = g->revealed_cards[j + 1];
+            g->n_revealed--;
+            taken[nt++] = cid;
+        }
     }
     for (int i = 0; i < nt && i < max; i++) out_ids[i] = taken[i];
     return nt;

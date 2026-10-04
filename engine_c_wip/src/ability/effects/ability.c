@@ -76,16 +76,47 @@ _Static_assert(RBKA_NUM_ABILITIES_C > 0,
 _Static_assert(RBKA_NUM_ABILITIES_C <= 0xFFFFu,
                "generated ability count exceeds the u16 range RbAbilityRef.idx can address");
 
+/* ── DEAD-GROUP TOMBSTONE (2026-10-04). Five exported AbilityRef members that
+ * have ZERO callers in src/ and ZERO in tests/.
+ *
+ * Full per-function adjudication: engine_c_wip/CENSUS_dupes2.md §9 rows 10-14.
+ * Grouped verdict: DEAD-CORRECT — every body is a faithful twin of a Rust
+ * accessor over the SAME u16 index, so there is nothing to fix and nothing to
+ * wire. The Rust item and the line range read for each are recorded per row.
+ *
+ *   rb_ability_ref_index     -> AbilityRef::index      (ability_store.rs)
+ *   rb_ability_ref_idx       -> AbilityRef::idx        (the field, by value —
+ *                               this is what Rust's derived Copy hands out)
+ *   rb_ability_ref_decode    -> AbilityRef::decode     (ability_store.rs:87-95)
+ *   rb_ability_ref_to_arc    -> AbilityRef::to_arc     (legacy alias of resolve)
+ *   rb_ability_ref_cache_size -> NO RUST TWIN. Rust exposes no cache-size
+ *                               accessor; see the note on that body below.
+ *
+ * REACHABILITY, re-measured on THIS tree at the moment of landing rather than
+ * inherited from the census: each of the five names occurs at its own definition
+ * plus its rabuka.h prototype, plus — for decode and idx only — mentions inside
+ * prose in this file. No call site exists anywhere in src/ or tests/.
+ *
+ * WHY KEPT RATHER THAN DELETED, which is the judgement call the census defers:
+ * rb_ability_ref_flush and rb_ability_ref_flush_slot WERE deleted from this file
+ * on 2026-10-02 (see the note above rb_ability_ref_cache_size) because a cache
+ * flush can dangle every pointer rb_ability_ref_resolve() has already handed
+ * out. None of these five can do that — three are pure accessors over a u16 and
+ * cache_size is read-only — so the reason that killed the other two does not
+ * apply. Deleting them would remove the header's twins of a LIVE Rust type and
+ * re-open this exact question on the next census. Keep, do not wire, do not
+ * re-litigate. */
+
 /* ── RbAbilityRef constructors / accessors ────────────────────────────── */
 
-/* Mirror AbilityRef::index(u16) -> Self. */
+/* Mirror AbilityRef::index(u16) -> Self. Dead, see the group tombstone above. */
 RbAbilityRef rb_ability_ref_index(uint16_t idx) {
     RbAbilityRef r;
     r.idx = idx;
     return r;
 }
 
-/* Mirror AbilityRef::idx(&self) -> u16. */
+/* Mirror AbilityRef::idx(&self) -> u16. Dead, see the group tombstone above. */
 uint16_t rb_ability_ref_idx(const RbAbilityRef *ref) {
     return ref ? ref->idx : 0;
 }
@@ -269,7 +300,8 @@ const Ability *rb_ability_ref_resolve(const RbAbilityRef *ref) {
    predicate resolve() uses, so the two entry points cannot disagree about
    which indices exist. Unlike resolve() this does NOT consult the cache:
    Rust's decode() is also cache-free and hands back an owned Ability, which is
-   what lets the caller write it into caller-owned storage. */
+   what lets the caller write it into caller-owned storage.
+   Dead, see the group tombstone above. */
 int rb_ability_ref_decode(const RbAbilityRef *ref, Ability *out) {
     if (!ref || !out) return 0;
     uint16_t idx = ref->idx;
@@ -287,7 +319,7 @@ int rb_ability_ref_decode(const RbAbilityRef *ref, Ability *out) {
 /* Mirror AbilityRef::to_arc(&self) -> Arc<Ability>.
 
    Legacy alias: delegates to rb_ability_ref_resolve(). Returns the same
-   cached pointer as resolve(). */
+   cached pointer as resolve(). Dead, see the group tombstone above. */
 const Ability *rb_ability_ref_to_arc(const RbAbilityRef *ref) {
     return rb_ability_ref_resolve(ref);
 }
@@ -336,7 +368,7 @@ const Ability *rb_ability_ref_to_arc(const RbAbilityRef *ref) {
 /* Return the number of currently-populated cache slots. (Diagnostic.)
    Read-only: it cannot invalidate a pointer handed out by resolve(). Has no
    Rust twin — Rust exposes no cache-size accessor — so it is a C-only
-   diagnostic, kept because it is inert. */
+   diagnostic, kept because it is inert. Dead, see the group tombstone above. */
 int rb_ability_ref_cache_size(void) {
     ability_cache_ensure_init();
     int n = 0;

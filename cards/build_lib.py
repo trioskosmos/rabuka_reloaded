@@ -84,6 +84,11 @@ def compress_with_header(data: bytes, magic: bytes, version: int = 1) -> bytes:
     return zlib.compress(header + data, level=9)
 
 
+# Top-level manifest keys that no single writer owns, so a rebuild must carry
+# them forward instead of dropping them. See write_generation_manifest().
+PRESERVED_MANIFEST_KEYS = ("c_artifacts",)
+
+
 def write_generation_manifest(
     build_dir: Path,
     schema: str,
@@ -96,7 +101,30 @@ def write_generation_manifest(
     bin_name: str,
     extra: dict = None,
 ) -> None:
-    """Write generation_manifest.json for reproducibility."""
+    """Write generation_manifest.json for reproducibility.
+
+    PRESERVES KEYS THIS FUNCTION DOES NOT OWN (2026-10-04).
+
+    Two writers share this one path -- compile_abilities.py and compile_cards.py
+    -- and each used to build the dict from scratch and write it over whatever
+    was there. That silently deleted the top-level `c_artifacts` block, the
+    only cross-engine provenance record in the tree: the digest of the COMMITTED
+    C tables (gen_data.c / bytecode_blob.c / src/abilities_strings.bin). Its own
+    comment warned that the next compile_abilities.py run would delete it, and it
+    did, which left the C's generation unverifiable against the Rust one.
+
+    A rebuild therefore now merges: keys named in PRESERVED_MANIFEST_KEYS are
+    read from the existing manifest and carried forward. `output` is still
+    replaced wholesale, because it describes the run that just happened.
+
+    This only preserves the RECORD. It cannot tell whether the record is still
+    true, and preserving a stale record silently is its own hazard -- so the
+    consumer fails loudly on disagreement instead:
+    engine_c_wip/tests/test_artifacts_consistent.c compares every c_artifacts
+    field against the values compiled into gen_data.c and against the canonical
+    blob in cards/build/. Absent block, stale block, and disagreeing block are
+    all FAILs there, never "cannot cross-check, assume fine".
+    """
     git_hash = "unknown"
     try:
         import subprocess
@@ -131,7 +159,24 @@ def write_generation_manifest(
     if extra:
         manifest["output"].update(extra)
 
-    (build_dir / "generation_manifest.json").write_text(
+    # ── carry forward the keys this function does not own ──────────────────
+    # See the docstring. A missing or unparseable existing manifest is not an
+    # error here: this is a rebuild, and the record simply starts fresh. The
+    # harness is what turns "no record" into a FAIL, so staying quiet here is
+    # correct -- raising would make a first-ever build impossible.
+    man_path = build_dir / "generation_manifest.json"
+    if man_path.exists():
+        try:
+            prev = json.loads(man_path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            prev = {}
+        if isinstance(prev, dict):
+            for k in PRESERVED_MANIFEST_KEYS:
+                if k in prev and k not in manifest:
+                    manifest[k] = prev[k]
+                    print(f"  manifest: preserved '{k}' from the previous manifest")
+
+    man_path.write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
 

@@ -1045,17 +1045,44 @@ def _apply_rule_fields(rule, text: str, result: Dict[str, Any]) -> None:
 class _TextRule:
     """The shared text-match contract behind the declarative rule dataclasses.
 
-    ActionRule, EffectPattern and ConditionPattern all declare the same five
-    matcher fields — `match`, `match_any`, `match_all`, `exclude`,
-    `exclude_any` — and each used to inline its own copy of the `text_matches`
-    keyword call. Three copies of that call is three places for the contract to
-    drift, so it lives here and the subclasses say only what they do with a hit.
+    `ActionRule`, `EffectPattern` and `ConditionPattern` each used to declare the same
+    five matcher fields — `match`, `match_any`, `match_all`, `exclude`, `exclude_any` —
+    and each inlined its own copy of the `text_matches` keyword call. Three copies of that
+    call is three places for the contract to drift, so it lives here.
 
-    The subclasses keep their own field lists on purpose: ConditionPattern is
-    constructed positionally as `ConditionPattern(name, tier, handler)`, so its
-    field order is part of its call API and cannot be inherited from a base
-    whose defaulted matcher fields would sort ahead of it.
+    **How much of it each class actually declares is now measured, not assumed.** An
+    `ast` pass over every registration in `parser.py` gives:
+
+    | class | sites | `match` | `match_any` | `match_all` | `exclude` | `exclude_any` |
+    |---|---|---|---|---|---|---|
+    | `ActionRule` | 82 | 23 | 11 | 9 | 4 | 1 |
+    | `EffectPattern` | 81 | 5 | 0 | 2 | 0 | 0 |
+    | `ConditionPattern` | 44 | 0 | 0 | 0 | 0 | 0 |
+
+    Only `ActionRule` uses the full contract. `EffectPattern` declares the two it uses and
+    inherits the rest empty from `text_matches`' defaults; `ConditionPattern` declares none
+    of them and does not call `matches_text` at all. An empty clause is vacuously satisfied
+    (`not "" or …`), so a declared-but-unused field is not a default — it is a field that
+    cannot change behaviour while reading as though it could.
+
+    `ConditionPattern` keeps its own field order on purpose: it is constructed positionally
+    as `ConditionPattern(name, tier, handler)`, so `name`, `tier`, `handler` must stay
+    ahead of any inherited defaulted matcher fields.
+
+    The five are declared HERE as class-level defaults rather than on every subclass. That
+    is what lets a subclass declare only the subset it uses — `EffectPattern` declares two,
+    `ConditionPattern` none — without `matches_text` needing a `getattr` to paper over the
+    gap. `text_matches` only ever READS them (an empty clause is vacuously satisfied), so
+    a shared mutable default is not a hazard; and because they are plain class attributes
+    rather than dataclass fields, a misspelled field name on a subclass still raises
+    `AttributeError` instead of silently reading a default.
     """
+
+    match: str = ""
+    match_any: List[str] = []
+    match_all: List[str] = []
+    exclude: str = ""
+    exclude_any: List[str] = []
 
     def matches_text(self, text: str) -> bool:
         """True when `text` satisfies this rule's match/match_*/exclude fields."""
@@ -1141,11 +1168,13 @@ class EffectPattern(_TextRule):
     """
 
     action: str
+    # Only `match` and `match_all` are live here — measured with `ast`: 5 and 2
+    # registrations respectively. `match_any`, `exclude` and `exclude_any` are declared
+    # by `_TextRule`'s contract but passed ZERO times for this class, so they are not
+    # redeclared; `matches_text` gets them as empty from `text_matches`' own defaults,
+    # which contributes nothing (an empty clause is vacuously satisfied).
     match: str = ""
-    match_any: List[str] = field(default_factory=list)
     match_all: List[str] = field(default_factory=list)
-    exclude: str = ""
-    exclude_any: List[str] = field(default_factory=list)
     defaults: Dict[str, Any] = field(default_factory=dict)
     extract: Dict[str, str] = field(default_factory=dict)
     condition: Optional[Callable] = None
@@ -1175,22 +1204,36 @@ class EffectPattern(_TextRule):
 
 @dataclass
 class ConditionPattern(_TextRule):
+    """Declarative condition rule: a named, tier-ordered text → condition dict.
+
+    Constructed positionally as `ConditionPattern(name, tier, handler)` — that is the
+    call API for all 37 positional sites, so `name`, `tier`, `handler` must stay first
+    and cannot be reordered.
+
+    **It deliberately does NOT carry the five matcher fields its siblings do.** Measured
+    with `ast` over every call site: 44 registrations, and `match` / `match_any` /
+    `match_all` / `exclude` / `exclude_any` are passed **zero** times. The class
+    inherited them from `_TextRule`, which made five fields on every instance read as
+    though they were live. They were not: `text_matches` with all five empty is
+    `(not "" or …) and …` — vacuously `True` — so `matches_text()` could not reject
+    anything, and the `if not self.matches_text(text): return None` guard in `__call__`
+    was unreachable dead code rather than a filter.
+
+    `condition` and `setter` ARE live (3 sites each) and stay. A rule with no `handler`
+    still gates on `condition` before applying `setter`.
+    """
+
     name: str = ""
     tier: int = 0
     handler: Optional[Callable] = None
-    match: str = ""
-    match_any: List[str] = field(default_factory=list)
-    match_all: List[str] = field(default_factory=list)
-    exclude: str = ""
-    exclude_any: List[str] = field(default_factory=list)
     condition: Optional[Callable] = None
     setter: Optional[Callable] = None
 
     def __call__(self, text: str, ctx: Optional[dict] = None) -> Optional[Dict]:
         if self.handler is not None:
             return self.handler(text)
-        if not self.matches_text(text):
-            return None
+        # No matcher to run: see the class docstring for the measurement. The guard that
+        # used to live here was provably always-true.
         if self.condition and not self.condition(text):
             return None
         result: Dict = {"text": text}

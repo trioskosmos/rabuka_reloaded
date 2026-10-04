@@ -7,6 +7,31 @@
    the definition sits far below, beside the other display-projection helpers. */
 void rb_enrich_from_applications(GameState *g);
 
+/* E3 + E4, ported in src/core/modifiers.c (Rust
+ *   evaluate_success_zone_constant_abilities  modifiers.rs:2147-2150
+ *   restore_performance_need_heart_modifiers   modifiers.rs:2159-2182).
+ * Like rb_enrich_from_applications above, neither is surfaced in rabuka.h, so
+ * they are declared locally for the same reason and with the same precedent.
+ * Neither is static in modifiers.c, so no change there is required. */
+void rb_evaluate_success_zone_constant_abilities(GameState *g);
+void rb_restore_performance_need_heart_modifiers(GameState *g);
+
+/* src/ability/ability_queue.c:184. include/rabuka.h exports the `const`
+ * rb_queue_get_entry (rabuka.h:3496) but NOT this mutator, so the same
+ * file-scope extern pattern is used rather than editing main's header. Rust's
+ * counterpart is AbilityQueue::current_entry_mut (queue.rs:234-242), and
+ * rb_try_take_success_zone_choice below needs it to reproduce live.rs:1576-1578. */
+extern RbQueueEntry *rb_queue_current_entry_mut(GameState *g);
+
+/* E4's PRODUCER side. Rust captures the flattening at the head of
+ * execute_performance_phase (phases.rs:320-333) and hands it to build_snapshot
+ * at the push (phases.rs:621-632). The C fuses build_snapshot into
+ * rb_perform_live, so the capture is taken here, in phase.c, at the same
+ * position in the phase, and read back at the push. Defined in src/turn/phase.c
+ * and not surfaced in rabuka.h, for the same reason as above. */
+int         rb_perf_nhm_count(void);
+const RbPerfNeedHeartMod *rb_perf_nhm_at(int i);
+
 /* The exported per-card allocation entry points (rb_bt_search, rb_try_phase4,
    rb_try_all_distribution) live at the BOTTOM of this file, next to
    rb_try_surplus_compositions / rb_card_ok_with_wildcard, so that they can
@@ -676,6 +701,39 @@ int rb_perform_live(GameState *g, int pl){
         do_yell(g, pl, yell_cards, &n_yell, blade_hearts, &note_icons);
         for (int i = 0; i < n_yell && i < RB_MAX_REVEALED_CARDS; i++)
             g->revealed_cards[g->n_revealed++] = yell_cards[i];
+        /* phases.rs:405-408 -- the PERFORMER's cheer buffer, a second list
+         * holding the same ids:
+         *
+         *     let cheer_buf = game_state.cheer_revealed_cards_mut(&performer_id);
+         *     for cid in &revealed_ids { cheer_buf.push(*cid); }
+         *
+         * `cheer_revealed_cards_mut` (mod.rs:931-940) picks the buffer by
+         * comparing against `player1.id`, so `pl` (the performing seat) is the
+         * selector. This is the producer half of a pair whose two consumers are
+         * `resolve_source_revealed_cards` (move/mod.rs:1580-1594, reachable on
+         * the 32 corpus nodes carrying `source:"revealed_cards"`) and
+         * `revealed_count` (dynamic_count.rs:159-163, reachable on the **29** nodes
+         * carrying `dynamic_count.reference:"previous_reveal"` — measured against
+         * cards/abilities.json, 46 dynamic_count nodes total). Both of those read
+         * the buffer IN PREFERENCE to `revealed_cards`, and `revealed_cards` is a
+         * single global pool shared by both performers, so without the buffer both
+         * consumers see the opponent's yell.
+         *
+         * Capacity: the C array is `int[8]` (rabuka.h:1587/:1589) and Rust's is a
+         * `SmallVec<[i16;8]>` that spills, so a yell of more than 8 cards keeps
+         * the first 8 here and loses the tail. Resizing would move
+         * `sizeof(GameState)`, which is pinned at 1 090 264 B by
+         * tests/test_harness_self.c A4; recorded rather than silently accepted. */
+        {
+            int *cbuf = (pl == 1) ? g->player2_cheer_revealed_cards
+                                  : g->player1_cheer_revealed_cards;
+            int *ncbuf = (pl == 1) ? &g->n_player2_cheer_revealed_cards
+                                   : &g->n_player1_cheer_revealed_cards;
+            int cap = (int)(sizeof(g->player1_cheer_revealed_cards) /
+                            sizeof(g->player1_cheer_revealed_cards[0]));
+            for (int i = 0; i < n_yell; i++)
+                if (*ncbuf < cap) cbuf[(*ncbuf)++] = yell_cards[i];
+        }
         g->yell_occurred = n_yell > 0;
         int queued = rb_queue_yell_auto_abilities(g, pl);
         fprintf(stderr, "[YELL_PERFORM] queued=%d entries=%d state=%d occurred=%d revealed=%d\n",
@@ -735,6 +793,34 @@ int rb_perform_live(GameState *g, int pl){
         s->total_score=live_score; s->success=passed;
         s->surplus_hearts = surplus;
         s->note_icons = note_icons;
+        /* E4's PRODUCER SIDE, second half. Rust phases.rs:621-632
+         *
+         *     let snap = crate::turn::live::build_snapshot(turn, &perf_player_id,
+         *         perf_data, &game_state.card_database, note_icons, &nhm_flat,
+         *         mc, bd, tas);
+         *     game_state.push_performance_snapshot(snap);
+         *
+         * and live.rs:3179 stores it verbatim:
+         *
+         *     performance_need_heart_modifiers: performance_need_heart_modifiers.to_vec(),
+         *
+         * `nhm_flat` is the WHOLESALE FLATTENING of mods.need_heart_modifiers taken
+         * at the head of the performance window (phases.rs:320-333) -- not a delta,
+         * not a per-card list -- and this block IS the C's build_snapshot (see the
+         * comment below on the C fusing the push into rb_perform_live), so it is
+         * the correct and only place to store it. The capture itself lives in
+         * phase.c at Rust's position; this is the store.
+         *
+         * Until this, RbLiveSnapshot.performance_need_heart_modifiers[] and its
+         * counter (rabuka.h:1375-1376) had 0 writers, which is why
+         * rb_restore_performance_need_heart_modifiers was a correctly-shaped no-op. */
+        {
+            int n_nhm = rb_perf_nhm_count();
+            if (n_nhm > RB_MAX_PERF_NEED_HEART_MODS) n_nhm = RB_MAX_PERF_NEED_HEART_MODS;
+            for (int i = 0; i < n_nhm; i++)
+                s->performance_need_heart_modifiers[i] = *rb_perf_nhm_at(i);
+            s->n_performance_need_heart_modifiers = n_nhm;
+        }
         for(int i=0;i<P->live.n && i<RB_MAX_LIVE_CARDS;i++) s->live_passed[i]=passed ? live_passed[i] : 0;
         /* phases.rs:583 — enrich_from_applications runs after check_live_success
            and BEFORE build_snapshot / push_performance_snapshot, which is exactly
@@ -1356,6 +1442,49 @@ int rb_try_take_success_zone_choice(GameState *g, int won, int must_skip,
     if(n_filtered == 0) return 0;
     rb_emit_choice(g, player_pl, RB_CHOICE_SELECT_CARD, "live_card_zone", "live_card",
                    1, 0, "select_live_success");
+    /* live.rs:1570-1579 is TWO statements and the second is the load-bearing one:
+     *
+     *     game_state.ability_queue.pause_for_choice(choice);
+     *     if let Some(entry) = game_state.ability_queue.current_entry_mut() {
+     *         entry.choice_player_id = Some(player_id.to_string());
+     *     }
+     *
+     * It stamps the ANSWERING player onto whatever entry is current --
+     * *including the dummy entry `pause_for_choice` mints on the Idle branch*
+     * (queue.rs:367-409, whose `player_id` is ""). That is what makes
+     * `get_pending_choice_player_id` (abilities.rs:2457-2469) answer for this seat
+     * on a fresh queue: it is a bare `.and_then(|e| e.choice_player_id)` with no
+     * fallback, so without the statement the prompt reaches it UNSTAMPED and
+     * `rb_gsc_can_player_act` cannot say who may answer. The old C line here wrote
+     * `g->queue.pending.actor` -- the FLAT choice's field, which the getter does
+     * not read at all.
+     *
+     * Rust's second statement has NO "is empty" guard, so it overwrites the
+     * universal default the pause just wrote (queue.rs:354-361): the ANSWERING
+     * seat wins even when the entry's owner is the other player.
+     *
+     * `current_entry_mut` (src/ability/ability_queue.c:184-190) is the mutator
+     * this needs; include/rabuka.h exports only the `const` rb_queue_get_entry
+     * (rabuka.h:3496), so it is declared file-scope above with the same precedent
+     * as rb_restore_performance_need_heart_modifiers. The token is spelled
+     * "p1"/"p2" literally -- NOT test_seat_id(), which lives in src/test_game.c
+     * and is not linked into $(WEB_TARGET).
+     *
+     * When there is NO entry yet (the queue is empty -- rb_emit_choice's own
+     * `n_entries == 0` branch now mints Rust's dummy and stamps it from
+     * `ch.actor`, choice.c:5716-5734), so this `if` is just the live-entry case
+     * and the two paths agree. It must NOT mint here: `queue_mint_dummy_entry`
+     * assigns `queue.cur = idx` (ability_queue.c:489), so minting over a
+     * non-empty queue would orphan every entry behind `cur` and the resume would
+     * read the dummy's `card_id == -1`. That was measured -- doing it here cost
+     * 10 lines in parity_sequential (G1/G3/G4/G5 + g_*_niji_*) before it was
+     * moved into rb_emit_choice's empty-queue branch. */
+    {
+        RbQueueEntry *ce = rb_queue_current_entry_mut(g);
+        if (ce)
+            snprintf(ce->choice_player_id, sizeof(ce->choice_player_id),
+                     "%s", player_pl == 1 ? "p2" : "p1");
+    }
     g->queue.pending.actor = player_pl;
     g->queue.pending.n_filtered_indices = n_filtered;
     for(int i=0;i<n_filtered;i++) g->queue.pending.filtered_indices[i] = filtered[i];
@@ -1445,6 +1574,64 @@ int rb_try_create_success_replacement_choice(GameState *g, int card_id, int play
     if(n_filtered == 0) return 0;
     rb_emit_choice(g, player_pl, RB_CHOICE_SELECT_CARD, "discard", "live_card",
                    1, 1, "success_replacement");
+    /* live.rs:1775-1783 is the same TWO-statement shape as
+     * `pause_success_zone_choice`, but stamps FOUR fields rather than one:
+     *
+     *     game_state.ability_queue.pause_for_choice(choice);
+     *     if let Some(entry) = game_state.ability_queue.current_entry_mut() {
+     *         entry.card_id  = Some(card_id);
+     *         entry.player_id = player_id.to_string();
+     *         entry.choice_player_id = Some(player_id.to_string());
+     *         entry.card_no = card.card_no;
+     *     }
+     *
+     * Rust runs the second statement UNCONDITIONALLY (no "is empty" guard), so it
+     * overwrites the universal default the pause just wrote (queue.rs:354-361):
+     * the ANSWERING seat wins even when the entry's owner is the other player.
+     * `get_pending_choice_player_id` (abilities.rs:2457-2469) is a bare
+     * `current_entry().and_then(|e| e.choice_player_id)` with no fallback, so the
+     * prompt reached it UNSTAMPED and it answered None where Rust answered
+     * Some("player1")/Some("player2"). The old C line `g->queue.actor = player_pl`
+     * did not help: that is the MOVING seat, and this getter deliberately does not
+     * read it (see the note above rb_get_pending_choice_player_id).
+     *
+     * This statement must NOT mint an entry: `queue_mint_dummy_entry` assigns
+     * `queue.cur = idx` (ability_queue.c:489), so minting over a non-empty queue
+     * orphans every entry behind `cur`. Measured: minting here cost 10 lines in
+     * parity_sequential (G1/G3/G4/G5 + g_*_niji_*) before it was moved into
+     * rb_emit_choice's empty-queue branch (choice.c:5716-5734), which is the only
+     * place a dummy is safe because there is nothing to orphan.
+     *
+     * `target` keeps its C spelling "success_replacement": Rust spells this the
+     * other way round (`target_player_id("self")` at live.rs:1773 plus a separate
+     * `pending_success_replacement_card_id`), and the C's resume handler keys on
+     * the literal (src/ability/choice.c:5136). Changing it would break the resume
+     * half of this same pair.
+     *
+     * The token is "p1"/"p2", the canonicalisation build_ability_queue_entry
+     * already applies to player_id (src/core/game_state_abilities.c:1849-1857);
+     * NOT test_seat_id(), which is not linked into $(WEB_TARGET).
+     *
+     * live.rs:1780-1782 -- `entry.card_no = card.card_no` is NOT ported and NOT
+     * landsable as written: RbQueueEntry (include/rabuka.h:1001-1041) has no
+     * `card_no` member, and adding one grows GameState past the 1 090 264 B pinned
+     * by tests/test_harness_self.c A4. It is safe to leave out: Rust reads
+     * `entry.card_no` only on the describe/trace path, and the C's describe layers
+     * take the card id and decode on demand. `choice_route_raw` is deliberately
+     * NOT borrowed for it -- that field carries Rust's `ChoiceRoute::Raw` and is
+     * matched on the "position_change:opponent:" prefix by queue.rs:340-345, so a
+     * card number written there would silently re-route an opponent movement
+     * choice. */
+    {
+        RbQueueEntry *ce = rb_queue_current_entry_mut(g);
+        if (ce) {
+            ce->card_id = card_id;
+            snprintf(ce->player_id, sizeof(ce->player_id), "%s",
+                     player_pl == 1 ? "p2" : "p1");
+            snprintf(ce->choice_player_id, sizeof(ce->choice_player_id), "%s",
+                     player_pl == 1 ? "p2" : "p1");
+        }
+    }
     g->queue.actor = player_pl;
     g->queue.pending.actor = player_pl;
     g->queue.resume_actor = player_pl;
@@ -2138,6 +2325,31 @@ void rb_execute_live_victory_determination(GameState *g) {
         return;
     }
     rb_apply_deferred_reyell(g);
+
+    /* E3 + E4 -- engine/src/turn/live.rs:1323-1329, the head of Rust's
+     * execute_live_victory_determination:
+     *
+     *     pub fn execute_live_victory_determination(game_state: &mut GameState) {
+     *         Self::apply_deferred_reyell(game_state);
+     *         game_state.evaluate_success_zone_constant_abilities();
+     *         game_state.restore_performance_need_heart_modifiers();
+     *
+     *         Self::rebuild_stage_hearts_with_yell(game_state);
+     *
+     * So the pair sits BETWEEN apply_deferred_reyell and rebuild_stage_hearts_
+     * with_yell, and it is unconditional -- Rust reaches it on every
+     * determination, before anything reads the need_heart table.
+     *
+     * E3's clear is what makes 「…自分の成功ライブカード置き場にあるかぎり」 a
+     * real as-long-as: it withdraws the whole need_heart table, including the
+     * grant E1 made for a success-zone card that has since left the success zone
+     * (no other site can withdraw it -- see triggers.c for why), and E4 then puts
+     * back only what the performance snapshots recorded, so a ライブ開始時-sourced
+     * requirement survives the clear. Both facts are required together; neither
+     * half is correct alone. */
+    rb_evaluate_success_zone_constant_abilities(g);
+    rb_restore_performance_need_heart_modifiers(g);
+
     rb_rebuild_stage_hearts_with_yell(g);
     rb_record_pretrigger_live_results(g);
 

@@ -9,41 +9,47 @@
 //! In English: if the member cards the yell revealed are ALL Printemps, or ALL lily
 //! white, or ALL BiBi, take one member card from the reveal to hand.
 //!
-//! # The parser fix this file pins
+//! # The clause, and what it takes to evaluate it
 //!
-//! The clause is a three-way **ALL**-of-one-group choice, not "is any revealed member
-//! in one of these groups". The 「すべて」 had been dropped from every branch, leaving
-//! three bare group tests — an ANY reading, so a reveal mixing Printemps and BiBi would
-//! have qualified. `all_members` is now set on the branches that can carry it, and
-//! the MIXED case below is the discriminating test: under the old parse it would have
-//! passed, and under the correct one it must not.
+//! Three-way ALL-of-one-group. 「すべて」 is load-bearing on every branch: 「a
+//! Printemps member **and** a BiBi member were revealed」 is not 「すべて『Printemps』」,
+//! so a mixed reveal must take nothing.
 //!
-//! # What is broken, precisely
+//! Two engine faults made that false in both directions, and each one alone would
+//! have hidden the other. Both are fixed; the negatives below are what pins them.
 //!
-//! The positive fires for a SINGLE revealed member and fails for two or more.
-//! `a_single_member_of_one_group_qualifies_but_two_do_not` is the evidence: one
-//! Printemps member is taken, two Printemps members are not, with the group held
-//! constant. So the gate is not "the condition never matches" — it matches at one card
-//! and stops matching past it.
+//! 1. **`all_members` did not survive on a non-Group condition.** The marker was a
+//!    field of the `Group` variant only, so branch 1 — which the parser types as a
+//!    `revealed_cards` `location_condition` — lost it at decode and silently became
+//!    an ANY test. `PL!-pb2-037-L` is the card that exposed it, and the same 「すべて」
+//! then meant two different things inside one `or`: ALL on branches 2 and 3, "at
+//!    least one" on branch 1. Fixed by moving the field onto `ConditionCommon`, which
+//!    is what `docs/PBLL02_ABILITY_REVIEW.md` §8.3 item 20 named as the real fix.
+//! 2. **`evaluate_group_condition`'s `all_members` branch had no `revealed_cards`
+//!    arm.** Its zone dispatch covered Stage / LiveCardZone / SuccessLiveZone and
+//!    answered `false` for everything else, so branches 2 and 3 could never match at
+//!    any reveal size — not even two cards of their own group.
 //!
-//! This header used to say the opposite — that "nothing is taken in any of the three
-//! positive cases", and that "the four negatives below are therefore VACUOUS". Both
-//! were wrong, and the second consequence was serious: it mislabelled which negatives
-//! could fail. A negative whose positive analogue fires is real evidence. The
-//! negatives that pair with the two-and-more cases ARE vacuous; the one that pairs with
-//! the single-card case is not.
+//! # What this file previously claimed, and why it was wrong
 //!
-//! The three `open_gap_*` tests assert the CURRENT (broken) behaviour on purpose —
-//! they are a baseline, not a specification. They were previously named `*_qualifies*`
-//! and `all_printemps_qualifies_and_the_member_is_taken`, i.e. named for the behaviour
-//! the card is supposed to have while asserting the opposite. That mismatch is worse
-//! than an absent test: names said covered, assertions said broken, and the suite was
-//! green either way.
+//! It carried three `open_gap_*` tests asserting that nothing is taken for two
+//! Printemps, two lily white, and two BiBi members, and a fourth test recording that
+//! ONE member is taken while TWO are not. None of that was an engine defect.
 //!
-//! Structural note, and the likely cause: `all_members` is a field of the GROUP VARIANT,
-//! not of `ConditionCommon`, so the first branch — a `revealed_cards` LOCATION
-//! condition — cannot carry the 「すべて」 at all. That predicts trouble exactly where
-//! the count exceeds one.
+//! The helper ended in `drain_auto_ability_choices()`, which only answers
+//! `Choice::SelectAutoAbility` and breaks on anything else. 「1枚」 out of a multi-card
+//! reveal raises a `Select 1 card from revealed cards` prompt
+//! (`move/mod.rs`: `take_count < matching.len()` → prompt), so the helper left it
+//! standing and the card did nothing — while the ONE-card case took the `Exact` path
+//! with no prompt at all and appeared to work. That count-shaped asymmetry is what the
+//! file read as "the gate matches at one card and stops matching past it", and it is
+//! the shape of a plausible engine bug that does not exist.
+//!
+//! It is the trap `docs/PBLL02_ABILITY_REVIEW.md` §8.22 records: *read the state you
+//! are measuring before you answer it*. A third of the fault was the fixture — the
+//! lily white constant was `PL!-pb1-029-SRL`, which is a **ライブ** card, not a member.
+//! A reveal of two of them has no member in it at all, so that case could never have
+//! tested 「すべて『lily white』」. Every fixture here now asserts its own group.
 
 use crate::helpers::*;
 use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
@@ -52,26 +58,44 @@ use rabuka_engine::turn::TurnEngine;
 
 const SPRING: &str = "PL!-pb2-037-L";
 const FILLER: &str = "PL!-sd1-010-SD";
-/// One member per μ's unit, plus one that is not μ's.
+/// One member per μ's unit, plus one that is not μ's. All ability-free, so nothing
+/// but the ability under test can contribute.
 const P: &str = "PL!-bp6-017-N"; // 小泉花陽, Printemps
-const LW: &str = "PL!-pb1-029-SRL"; // 知らないLove, lily white
+const LW: &str = "PL!-pb2-034-N"; // 東條 希, lily white
 const BB: &str = "PL!-pb2-002-PP"; // 絢瀬絵里, BiBi
 const NON_MUS: &str = "PL!S-bp5-012-N"; // 松浦果南, AZALEA
 
-fn fill_decks(game: &mut TestGame) {
+/// Succeed the live with `revealed` as the yell's reveal and return the revealed
+/// member that reached hand, if any.
+///
+/// Every prompt the ability raises is answered with `drain_choices_strict`. The
+/// `SelectCard` in the allow-list is not a convenience — it is the point: 「1枚」 out
+/// of a multi-card reveal is a real choice, and a helper that does not answer it
+/// measures its own silence. See the header.
+fn taken_member(revealed: &[&str]) -> Option<String> {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
     let f = game.id(FILLER);
     for _ in 0..20 {
         game.state.player1.main_deck.cards.push(f);
         game.state.player2.main_deck.cards.push(f);
     }
-}
 
-/// Succeed the live with `revealed` as the yell's reveal, and report whether a member
-/// reached hand.
-fn hand_gained_with(revealed: &[&str]) -> bool {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    fill_decks(&mut game);
+    // Pin every fixture before staging it. A wrong constant is silent — the number
+    // resolves, the card exists, and the resulting failure reads as a deep engine
+    // bug (docs/PBLL02_ABILITY_REVIEW.md §8.11).
+    for (card_no, group) in [(P, "Printemps"), (LW, "lily white"), (BB, "BiBi")] {
+        let id = game.id(card_no);
+        game.assert_card_identity(id, card_no);
+        assert!(
+            game.db.get_card(id).is_some_and(|c| c.is_member()),
+            "{card_no} must be a メンバー — the clause is about 公開された自分のメンバーカード"
+        );
+        game.assert_card_in_group(id, group, "revealed-member fixture");
+    }
+    let non_mus = game.id(NON_MUS);
+    game.assert_card_identity(non_mus, NON_MUS);
+    game.assert_card_in_group(non_mus, "AZALEA", "the non-μ's control must NOT match");
 
     let spring = game.id(SPRING);
     game.assert_card_identity(spring, SPRING);
@@ -87,117 +111,126 @@ fn hand_gained_with(revealed: &[&str]) -> bool {
     game.state.current_phase = Phase::LiveVictoryDetermination;
     TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
     game.state.process_pending_auto_abilities("p1");
-    let _ = game.drain_auto_ability_choices();
+    game.drain_choices_strict(&["SelectAutoAbility", "SelectCard"], &[0]);
 
-    // The taken card is the one that is a member and is no longer in the reveal.
     game.state
         .player1
         .hand
         .cards
         .iter()
-        .any(|id| game.db.get_card(*id).is_some_and(|c| c.is_member()))
+        .filter_map(|id| game.db.get_card(*id))
+        .find(|c| c.is_member())
+        .map(|c| c.card_no.to_string())
 }
 
-/// OPEN GAP — the name this test used to carry said "qualifies_and_the_member_is_taken",
-/// which is the exact opposite of what it asserts. Nothing is taken.
-///
-/// Kept as a negative because that is the current behaviour, but the mismatch was the
-/// dangerous part: a reader scanning test names saw three branches covered and a member
-/// being taken, and the suite was green. The bug was invisible from either side.
-#[test]
-fn open_gap_all_printemps_takes_nothing() {
-    assert!(
-        !hand_gained_with(&[P, P]),
-        "OPEN GAP: two Printemps members revealed must take one to hand; nothing is taken"
-    );
+fn takes_one(revealed: &[&str]) -> bool {
+    taken_member(revealed).is_some()
 }
 
+/// All three branches of the three-way 「すべて…のいずれか」 choice, at the size
+/// that raises a prompt. Two cards of one group is the case the old file called a
+/// defect; it is the plain reading of the card.
 #[test]
-fn open_gap_all_lily_white_takes_nothing() {
-    assert!(
-        !hand_gained_with(&[LW, LW]),
-        "OPEN GAP: all lily white is the second branch of the three-way choice"
+fn all_printemps_takes_one() {
+    assert_eq!(
+        taken_member(&[P, P]).as_deref(),
+        Some(P),
+        "two Printemps members revealed is すべて『Printemps』, so one of them is taken"
     );
 }
 
 #[test]
-fn open_gap_all_bibi_takes_nothing() {
-    assert!(
-        !hand_gained_with(&[BB, BB]),
-        "OPEN GAP: all BiBi is the third branch of the three-way choice"
+fn all_lily_white_takes_one() {
+    assert_eq!(
+        taken_member(&[LW, LW]).as_deref(),
+        Some(LW),
+        "すべて『lily white』 is the second branch. This case needs a lily white \
+         MEMBER: the constant this replaced was a ライブ card, so the reveal held \
+         no member and the branch had nothing to act on"
     );
 }
 
-/// The asymmetry that makes the gap diagnosable: ONE member of a group is taken,
-/// TWO are not.
-///
-/// This is the only positive in the file that actually fires, and it is what proves the
-/// three `open_gap_*` tests above are a real defect rather than a uniformly dead path.
-/// Whatever gates the two-card case is not "the condition never matches" — it matches
-/// fine at one card. So the failure is in how the ALL reading scales past a single
-/// card, which is exactly where the header's structural note predicts trouble:
-/// `all_members` lives on the GROUP variant, so the first branch — a `revealed_cards`
-/// LOCATION condition — has nowhere to carry 「すべて」.
-///
-/// Before this test the file claimed the positive "never fires in any of the three
-/// cases", which this contradicts.
 #[test]
-fn a_single_member_of_one_group_qualifies_but_two_do_not() {
-    assert!(
-        hand_gained_with(&[P]),
-        "one Printemps member is all Printemps, and it IS taken — this is the positive \
-         that works"
-    );
-    assert!(
-        !hand_gained_with(&[P, P]),
-        "but TWO Printemps members are not taken, even though they are equally 'all \
-         Printemps'. The count is the variable, not the group."
+fn all_bibi_takes_one() {
+    assert_eq!(
+        taken_member(&[BB, BB]).as_deref(),
+        Some(BB),
+        "すべて『BiBi』 is the third branch"
     );
 }
 
-/// VACUOUS while the positive never fires (see the header), and the discriminating
-/// case for the 「すべて」 fix once it does.
+/// One card of one group. 「すべて」 over a single card is satisfied by that card, so
+/// this must work — and it takes the `Exact` path with no prompt, which is why the
+/// old helper appeared to work here and nowhere else.
+#[test]
+fn a_single_member_of_one_group_qualifies() {
+    assert_eq!(
+        taken_member(&[P]).as_deref(),
+        Some(P),
+        "one Printemps member is all Printemps"
+    );
+}
+
+/// THE discriminating case for 「すべて」.
 ///
-/// THE test. Two different μ's units is not 「すべて…のいずれか」 — the reveal is not
-/// all of ONE group. Under the pre-fix parse (ANY) this would have passed.
+/// Two different μ's units is not 「すべて『Printemps』か、すべて『lily white』か、
+/// すべて『BiBi』のいずれか」 — the reveal is not all of ONE group. Under the dropped-
+/// marker bug this wrongly took a card, because branch 1 had degraded to "at least
+/// one Printemps member".
 #[test]
 fn two_different_mus_units_do_not_qualify() {
-    assert!(
-        !hand_gained_with(&[P, BB]),
-        "すべて『Printemps』か、すべて『lily white』か、すべて『BiBi』のいずれか — a \
-         Printemps member and a BiBi member together are NOT all of one group, so \
-         nothing is taken. Under an ANY reading of the clause this would wrongly pass."
+    assert_eq!(
+        taken_member(&[P, BB]),
+        None,
+        "a Printemps member and a BiBi member together are NOT all of one group"
     );
 }
 
 #[test]
 fn a_non_mus_member_does_not_qualify() {
-    assert!(
-        !hand_gained_with(&[NON_MUS, NON_MUS]),
+    assert_eq!(
+        taken_member(&[NON_MUS, NON_MUS]),
+        None,
         "neither Printemps, lily white nor BiBi — a reveal of one other group is out \
          of scope of all three branches"
     );
 }
 
-/// Nothing member-shaped revealed → nothing to take.
-#[test]
-fn no_revealed_members_takes_nothing() {
-    assert!(
-        !hand_gained_with(&[]),
-        "no reveal at all, so the condition is unmet and there is nothing to take"
-    );
-}
-
-/// A reveal mixing a μ's group and a non-μ's one is not all-of-anything.
+/// A μ's group and a non-μ's one is not all-of-anything, and it must fail for the
+/// same reason as the μ's/μ's mix rather than by escaping on the group test alone.
 #[test]
 fn a_mus_and_a_non_mus_member_do_not_qualify() {
-    assert!(
-        !hand_gained_with(&[P, NON_MUS]),
+    assert_eq!(
+        taken_member(&[P, NON_MUS]),
+        None,
         "the reveal is not all of one μ's group"
     );
 }
 
+/// Nothing member-shaped revealed, so there is nothing to take.
+///
+/// This does NOT settle how an empty reveal reads against 「すべて…のいずれか」 — a
+/// universal is vacuously true over an empty set, which is the reading the repo
+/// already uses for 「〜のみ」 (`an_empty_own_stage_satisfies_bibi_only_vacuously`).
+/// What is settled here is only that no member can reach hand. Whether the
+/// CONDITION passes is still an open ruling; see
+/// `docs/PBLL02_ABILITY_REVIEW.md` §8.3 item 3.
+#[test]
+fn no_revealed_members_takes_nothing() {
+    assert_eq!(
+        taken_member(&[]),
+        None,
+        "no member was revealed, so there is nothing the clause could take"
+    );
+}
+
 /// The parse: three branches, each carrying the ALL marker.
+///
+/// This asserted `vec![false, true, true]` — branch 1 losing the marker because
+/// `all_members` was a field of the `Group` variant and branch 1 is a
+/// `location_condition`. It was a faithful pin of a defect, kept visible on purpose.
+/// The marker now lives on `ConditionCommon`, so all three carry it and the shapes
+/// are consistent.
 #[test]
 fn every_branch_carries_the_all_marker() {
     let db = load_real_database();
@@ -222,14 +255,63 @@ fn every_branch_carries_the_all_marker() {
         .iter()
         .map(|b| b.get_all_members() == Some(true))
         .collect();
-    // Branches 2 and 3 are group_conditions and carry the marker. Branch 1 is a
-    // revealed_cards LOCATION condition, and all_members is a field of the GROUP
-    // VARIANT, so the marker cannot be carried there at all — it is dropped at
-    // decode. Two of three survive, and the first is the structurally wrong shape.
     assert_eq!(
         carried,
-        vec![false, true, true],
-        "「すべて」 survives on the two group_conditions and is structurally \
-         uncarryable on the location_condition (see the note on get_all_members)"
+        vec![true, true, true],
+        "「すべて」 must mean the same thing on all three branches. It used to be \
+         dropped on the location_condition, which is what made branch 1 an ANY test"
+    );
+}
+
+/// Prompt shape, which is what the old file misread as a count-dependent defect.
+///
+/// 「1枚」 is a choice whenever the reveal holds more than one member, and the engine
+/// takes the only candidate without asking when it holds exactly one. Both halves
+/// are asserted because the difference between them is the whole reason the old
+/// helper looked like it had found an engine bug.
+#[test]
+fn one_candidate_is_taken_without_a_prompt_and_two_are_a_choice() {
+    let run = |revealed: &[&str]| {
+        let db = load_real_database();
+        let mut game = TestGame::new(db);
+        let f = game.id(FILLER);
+        for _ in 0..20 {
+            game.state.player1.main_deck.cards.push(f);
+            game.state.player2.main_deck.cards.push(f);
+        }
+        game.state.player1.live_card_zone.cards.push(game.id(SPRING));
+        for c in revealed {
+            game.state.revealed_cards.push(game.id(c));
+        }
+        let mut h = BaseHeart { hearts: HeartMap::new() };
+        h.hearts.insert(HeartColor::Heart00, 20);
+        game.state.player1.stage_hearts = Some(h);
+        game.state.current_phase = Phase::LiveVictoryDetermination;
+        TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+        game.state.process_pending_auto_abilities("p1");
+        game
+    };
+
+    let one = run(&[P]);
+    assert!(
+        !one.has_pending_choice(),
+        "one qualifying member is the Exact path — taken with no prompt"
+    );
+    assert_eq!(
+        one.state.player1.hand.cards.len(),
+        1,
+        "and it did reach hand"
+    );
+
+    let mut two = run(&[P, P]);
+    assert!(
+        two.has_pending_choice(),
+        "「1枚」 out of two candidates is a real choice and must be offered"
+    );
+    two.drain_choices_strict(&["SelectCard"], &[0]);
+    assert_eq!(
+        two.state.player1.hand.cards.len(),
+        1,
+        "answering it takes exactly one"
     );
 }

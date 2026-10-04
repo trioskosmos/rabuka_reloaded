@@ -4693,9 +4693,73 @@ const RbChoice *rb_get_pending_choice(const GameState *g) {
     if (!g || !g->queue.has_pending) return NULL;
     return &g->queue.pending;
 }
+/* Rust engine/src/core/game_state/abilities.rs:2457-2469 --
+       pub fn get_pending_choice_player_id(&self) -> Option<String> {
+           if self.pending_loop_protocol.is_some() { ...the other seat... }
+           self.ability_queue
+               .current_entry()
+               .and_then(|e| e.choice_player_id.as_ref().cloned())
+       }
+
+   THE CURRENT ENTRY'S OWN STAMP, WITH NO FALLBACK. Three properties, all of
+   them load-bearing:
+
+   (1) NO fallback to entry.player_id. The universal default at
+       engine/src/ability/queue.rs:354-360 already copied the owner's token
+       into choice_player_id at PAUSE time, so reading that one field
+       reproduces Rust exactly. A player_id fallback here would invent a seat
+       for an entry that was never paused, where Rust reads None.
+
+   (2) current_entry() is None for Idle and for WaitingForAutoAbilityChoice
+       (engine/src/ability/queue.rs:234-242). That is the gate
+       rb_queue_current_entry_mut (src/ability/ability_queue.c:184-190)
+       already spells out, reused here rather than re-derived -- including the
+       auto-ability prompt, which parks a choice with NO entry behind it and so
+       must fall through to can_player_act's Choice-embedded arm.
+
+   (3) the player1/player2 normalisation of engine/src/core/game_state/mod.rs
+       :506-511 -- the same mapping as seat_of_token in src/test_game.c and as
+       build_ability_queue_entry (src/core/game_state_abilities.c:1849-1857).
+
+   WHAT THIS REPLACED, AND WHY IT WAS WRONG: the body returned g->queue.actor.
+   ability_queue.c:593 and :605 set that to g->active DELIBERATELY -- the
+   reasoning at :584-592 is sound and is untouched by this change -- and this
+   file has twenty further writers of queue.actor that mean something else
+   again (:2565 and :2591 store `actor_pending` and `actor_pending ^ 1`). So
+   the old body answered out of a field whose only claim to agree with Rust was
+   its name. Its one production consumer, rb_gsc_can_player_act
+   (src/core/game_state_core.c:261-283), whose own comment calls pending
+   choices "authoritative", therefore named the ACTIVE seat on exactly the
+   prompts the redirect at queue.rs:335-352 exists to redirect.
+
+   `has_pending` STAYS a guard, because that is the shape every Rust call site
+   has: match_runner.rs:429-455 and mod.rs:498-505 both sit inside a
+   has_pending_choice() test, so no Rust program can observe the difference
+   between "no choice pending" and "the getter answered anyway".
+
+   RESIDUAL, AND MEASURED TO BE UNREACHABLE: Rust's Some(token) that names no
+   seat makes can_player_act return false for BOTH seats, whereas -1 here falls
+   through to the Choice-embedded arm. The token domain closes that gap:
+   build_ability_queue_entry canonicalises entry.player_id to "p1"/"p2" before
+   anything is stamped from it, the redirect at ability_queue.c:572-573 writes
+   the literals "p1"/"p2", and the dummy entry of queue.rs:367-409 takes NULL.
+   So choice_player_id is only ever "p1", "p2" or "".
+
+   Rust's OTHER arm -- pending_loop_protocol -- has no counterpart here:
+   VERIFIED-NOOP, 0 struct fields and 0 readers (AUDIT_core_state.md:739
+   records the protocol pair ABSENT). */
 int rb_get_pending_choice_player_id(const GameState *g) {
     if (!g || !g->queue.has_pending) return -1;
-    return g->queue.actor;
+    if (g->queue.state == RB_QUEUE_IDLE) return -1;                       // queue.rs:240
+    if (g->queue.state == RB_QUEUE_AWAITING_CHOICE && g->queue.auto_ability)
+        return -1;                                                        // queue.rs:240
+    if (g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return -1; // no entry
+    const RbQueueEntry *e = &g->queue.entries[g->queue.cur];
+    const char *pid = e->choice_player_id;
+    if (!pid[0]) return -1;                                               // Rust: None
+    if (!strcmp(pid, "p1") || !strcmp(pid, "player1")) return 0;          // mod.rs:506-511
+    if (!strcmp(pid, "p2") || !strcmp(pid, "player2")) return 1;
+    return -1;
 }
 void rb_clear_pending_choice(GameState *g) {
     if (!g) return;
