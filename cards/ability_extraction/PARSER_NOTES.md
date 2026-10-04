@@ -367,9 +367,39 @@ second is `draw_card` — never by the shape the gap left behind.
   dispatchers over shared player resolution, multi-zone fan-out and zone
   dispatch. Merging them changes which dispatcher evaluates a given condition,
   so it needs characterization pins per condition shape.
-- **`ConditionPattern`'s declarative fields are unused**: all 36 rows pass only
-  `handler=`; the `match`/`match_any`/`exclude` half of `_TextRule` is dead
-  weight on that class.
+- **`ConditionPattern`'s declarative fields were unused — DONE 2026-10-04.** This entry
+  said "all 36 rows pass only `handler=`"; measured with `ast` over every call site it is
+  **44 registrations, and `match` / `match_any` / `match_all` / `exclude` / `exclude_any`
+  are passed ZERO times.** They were also inert, not merely unused: `text_matches` with all
+  five empty is `(not "" or …) and …`, vacuously `True`, so the
+  `if not self.matches_text(text): return None` guard in `__call__` could not reject
+  anything. Five fields on every instance read as though they were live.
+  `ConditionPattern` no longer declares them and no longer calls `matches_text`.
+
+  The same `ast` pass over the other two classes is what stopped this being a
+  wrong "delete the lot" edit:
+
+  | class | sites | `match` | `match_any` | `match_all` | `exclude` | `exclude_any` |
+  |---|---|---|---|---|---|---|
+  | `ActionRule` | 82 | 23 | 11 | 9 | 4 | 1 |
+  | `EffectPattern` | 81 | 5 | 0 | 2 | 0 | 0 |
+  | `ConditionPattern` | 44 | 0 | 0 | 0 | 0 | 0 |
+
+  So `EffectPattern` keeps `match` and `match_all` and loses the other three, and
+  `ActionRule` is untouched. **Re-run the measurement before extending this**: it is three
+  numbers, and it is the only thing that distinguishes a dead field from a live one.
+
+  The five now live as class-level defaults on `_TextRule` rather than being redeclared
+  per subclass. That is what lets a subclass declare a subset without `matches_text`
+  needing a `getattr` to paper over the gap — and because they are plain class attributes
+  rather than dataclass fields, a misspelled field name on a subclass still raises
+  `AttributeError` instead of silently reading a default. (It has to be this way: making
+  them dataclass fields on the base would sort them ahead of `ConditionPattern`'s
+  positional `name, tier, handler`, which is its call API at 37 sites.)
+
+  Output-neutral, proven the usual way: regenerate, then diff per ability. 985 → 985,
+  0 added, 0 removed, and the only changed entries are the four cards fixed earlier the
+  same day (星空凛, 矢澤にこ, 上原歩夢, 葉月恋).
 - **Engine:** `owning_effect` / `answering_effect` and the
   `pending_choice_owner` snapshot (2026-09-28) remove the guess at the three
   answer sites. Still open: the sites that read `current_effect` outright with

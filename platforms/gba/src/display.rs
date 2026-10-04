@@ -159,6 +159,26 @@ pub struct Display<'a> {
     /// Scroll offset of the Actions view, following the `>` cursor so long
     /// action lists scroll fully instead of clipping past 9 rows.
     action_offset: usize,
+    /// Which screen last pushed art, so a switch can prime agb's sprite pins.
+    screen: Screen,
+    /// Frames of art suppression left after a screen switch. See
+    /// [`Display::enter_screen`].
+    priming: u8,
+}
+
+/// The sprite-art "screens". Two consecutive renders on the same `Screen`
+/// share a cache generation; a change means the old screen's placements are
+/// about to be replaced wholesale.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Screen {
+    /// No card art at all (mode select, deck select, title).
+    None,
+    /// Full-screen buffered text + queued menu cards.
+    Menu,
+    /// The detail portrait view (one very large placement).
+    Detail,
+    /// The live board.
+    Board,
 }
 
 /// One queued card image for the next [`Display::swap_buffers`].
@@ -194,6 +214,8 @@ struct CachedPlacement {
     /// `vrams.len()` is a part count, not a byte count 窶・the sizes differ per
     /// kind (stage is 4 parts, live is 1). Budgeting needs the real bytes.
     bytes: usize,
+    /// Where this placement was last drawn, for `diag-trace` reporting only.
+    last_at: (i32, i32),
 }
 
 /// OBJ VRAM budget for cached card art.
@@ -578,6 +600,8 @@ impl CardSpriteCache {
         flipped: bool,
         dimmed: bool,
         rot_ccw: bool,
+        px: i32,
+        py: i32,
         twin_tag: Option<&str>,
     ) -> Option<&[SpriteVram]> {
         // Box dims are part of the key: the board stage box (48px, with the
@@ -629,9 +653,11 @@ impl CardSpriteCache {
                 self.twin_buf.clear();
                 write_placement_key(&mut self.twin_buf, tt, card_no, box_w, box_h, dimmed);
                 // Miss path only: clone the twin key out to end the buffer
-                // borrow before mutating the map.
+                // borrow before mutating the map. Goes through `drop_key` so
+                // `vram_bytes` stays truthful -- a bare `remove` here leaked
+                // the twin's bytes into the counter forever.
                 let twin: String = self.twin_buf.as_str().into();
-                self.sprites.remove(&twin);
+                self.drop_key(&twin);
             }
             if self.sprites.len() >= SPRITE_CACHE_CAP {
                 dlog!(
@@ -693,8 +719,33 @@ impl CardSpriteCache {
                     vrams,
                     last_used: self.frame,
                     bytes: cost,
+                    last_at: (px, py),
                 },
             );
+        }
+        // `diag-trace`: report a placement only when it moves. In steady state
+        // the same card sits in the same slot every frame, so this fires on
+        // screen switches and on anything that drags a card to a new slot --
+        // which is exactly the "card drawn across several stage slots"
+        // signature. Logging every frame would also stall the run, since
+        // `agb::println!` blocks on the mGBA debug port per character.
+        #[cfg(feature = "diag-trace")]
+        if let Some(p) = self.sprites.get_mut(self.key_buf.as_str()) {
+            if p.last_at != (px, py) {
+                p.last_at = (px, py);
+                agb::println!(
+                    "[place] {} {} {} {} -> {},{} dim={} rot={} vram={}",
+                    tag,
+                    card_no,
+                    p.vrams.len(),
+                    box_w,
+                    px,
+                    py,
+                    dimmed,
+                    rot_ccw,
+                    self.vram_bytes
+                );
+            }
         }
         // Both shared borrows of disjoint fields 窶・no clone needed.
         self.sprites
@@ -709,7 +760,15 @@ impl CardSpriteCache {
     /// about whether the art fits in VRAM.
     fn evict_over_cap(&mut self, cap: usize) {
         while self.sprites.len() > cap {
-            let Some(oldest) = self.sprites.values().map(|p| p.last_used).min() else {
+            // Same live-placement guard as `evict_for`: never free a tile
+            // block that the frame being built already queued objects for.
+            let Some(oldest) = self
+                .sprites
+                .values()
+                .filter(|p| p.last_used < self.frame)
+                .map(|p| p.last_used)
+                .min()
+            else {
                 return;
             };
             self.sprites.retain(|_, p| p.last_used > oldest);
@@ -728,19 +787,55 @@ impl CardSpriteCache {
     /// again next frame.
     fn evict_for(&mut self, need: usize, keep: &str) -> bool {
         while self.vram_bytes + need > SPRITE_VRAM_BUDGET {
+            // Never consider a placement stamped with the frame being built.
+            // `push_card` has already queued `Object`s into `active_sprites`
+            // for it, and agb frees a sprite's tile block as soon as the last
+            // `SpriteVram` reference drops -- so evicting here would hand the
+            // same VRAM to the next upload while the queued objects still draw
+            // it. The card then renders in slots it was never placed in, which
+            // is what "one card is split across several stage slots" looked
+            // like. If only live placements remain we cannot make room, and
+            // the caller drops the card instead of corrupting the frame.
             let Some(oldest) = self
                 .sprites
                 .iter()
-                .filter(|(k, _)| k.as_str() != keep)
+                .filter(|(k, p)| k.as_str() != keep && p.last_used < self.frame)
                 .map(|(_, p)| p.last_used)
                 .min()
             else {
                 return false;
             };
-            self.sprites.retain(|k, p| k == keep || p.last_used > oldest);
+            self.sprites
+                .retain(|k, p| k == keep || p.last_used > oldest);
             self.recount_bytes();
         }
         true
+    }
+
+    /// Drop one placement by key, keeping `vram_bytes` exact. Returns true if
+    /// it was dropped.
+    ///
+    /// Refuses while the placement is live in the frame being built (same
+    /// reasoning as [`CardSpriteCache::evict_for`]). Callers on the miss path
+    /// used to call `HashMap::remove` directly, which freed the VRAM without
+    /// ever decrementing `vram_bytes` -- the counter only ever grew, so
+    /// `evict_for` progressively over-evicted and eventually could not make
+    /// room at all, which is how whole rows of art went blank after the first
+    /// mulligan.
+    fn drop_key(&mut self, key: &str) -> bool {
+        match self.sprites.get(key) {
+            Some(p) if p.last_used < self.frame => {
+                self.sprites.remove(key);
+                self.recount_bytes();
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Bytes of OBJ tile VRAM this cache currently accounts for.
+    fn vram_bytes(&self) -> usize {
+        self.vram_bytes
     }
 
     /// Recompute the cached byte total. Only runs on the transition paths
@@ -1041,7 +1136,43 @@ impl<'a> Display<'a> {
             sprite_cache,
             active_sprites: Vec::new(),
             action_offset: 0,
+            screen: Screen::None,
+            priming: 0,
         }
+    }
+
+    /// Note which screen is about to push art, and prime agb's sprite pins
+    /// when that screen changes.
+    ///
+    /// agb keeps the previous frame's sprites alive until the *second*
+    /// `gfx.frame()` after they were shown (`Oam::frame` swaps them into
+    /// `previous_frame_sprites` and only drops them a frame later). OBJ VRAM
+    /// is 32KB, of which agb's bump allocator can ever reach 32,704 bytes, and
+    /// a full board already wants ~30KB -- so on a switch the outgoing screen's
+    /// tiles are still pinned while the incoming screen uploads, and every
+    /// `try_to_vram` fails. That is what blanked the board right after the
+    /// mulligan: the uploads returned `Err`, `upload_part` yielded `None`, and
+    /// the slot simply went empty.
+    ///
+    /// Two art-free frames are enough. Frame 1 of the new screen drops the
+    /// outgoing screen's stale pins; frame 2's `gfx.frame()` frees the last of
+    /// them, so the frame after that builds against a completely empty
+    /// allocator.
+    ///
+    /// Switches where the outgoing screen held nothing (board -> actions, or
+    /// any menu -> menu) skip priming entirely, so the common moves never cost
+    /// a blank frame.
+    fn enter_screen(&mut self, screen: Screen) {
+        if self.screen == screen {
+            return;
+        }
+        let pinned = self.sprite_cache.vram_bytes();
+        if pinned > 0 {
+            self.sprite_cache.clear();
+            self.priming = 2;
+            dlog!("screen switch: priming art, {}B was pinned", pinned);
+        }
+        self.screen = screen;
     }
 
     pub fn clear(&mut self) {
@@ -1345,11 +1476,21 @@ impl<'a> Display<'a> {
         }
         self.ui_front.show(&mut f);
         f.commit();
+        // One priming frame is spent per `gfx.frame()` above, so the outgoing
+        // screen's pins are gone by the time the next frame builds. See
+        // `enter_screen`.
+        if self.priming > 0 {
+            self.priming -= 1;
+        }
     }
 
     /// Push all sprite parts of one card placement into `active_sprites`.
     /// `tiles` is the baked 8bpp grid (`grid_w` x `grid_h` tiles); the art is
     /// centred in the `box_w` x `box_h` px box at (`px`, `py`).
+    ///
+    /// Returns `false` when nothing was drawn (art disabled, priming frame, or
+    /// no room in OBJ VRAM) so the caller can degrade to the card number
+    /// instead of leaving the slot blank.
     #[allow(clippy::too_many_arguments)]
     fn push_card(
         &mut self,
@@ -1366,7 +1507,7 @@ impl<'a> Display<'a> {
         flipped: bool,
         dimmed: bool,
         rot_ccw: bool,
-    ) {
+    ) -> bool {
         // Board stage twins share art but never show together; name the
         // other so a miss evicts it first (no room for both).
         let twin_tag: Option<&str> = match tag {
@@ -1375,13 +1516,20 @@ impl<'a> Display<'a> {
             _ => None,
         };
         if !crate::diag::art_enabled() {
-            return;
+            return false;
+        }
+        // Priming frame after a screen switch: agb still pins the outgoing
+        // screen's tiles, so any upload here would fail anyway. Skip the
+        // allocation entirely and report success so the caller does not paint
+        // a card number over a slot that is merely mid-transition.
+        if self.priming > 0 {
+            return true;
         }
         // Disjoint fields: the cache borrow and the sprite-list push coexist
         // with no intermediate Vec clone.
         match self.sprite_cache.get_or_upload(
             tag, card_no, tiles, grid_w, grid_h, box_w, box_h, parts, flipped,
-            dimmed, rot_ccw, twin_tag,
+            dimmed, rot_ccw, px, py, twin_tag,
         ) {
             Some(vrams) => {
                 for (vram, &(_, dx, dy)) in vrams.iter().zip(parts.iter()) {
@@ -1401,9 +1549,11 @@ impl<'a> Display<'a> {
                     obj.set_priority(SPRITE_PRIO);
                     self.active_sprites.push(obj);
                 }
+                true
             }
             None => {
                 dlog!("dropping card {} (no sprite VRAM)", card_no);
+                false
             }
         }
     }
@@ -1412,6 +1562,7 @@ impl<'a> Display<'a> {
     /// and the front text/UI layer.
     pub fn render_board_frame(&mut self, frame: &BoardFrame) {
         self.last = self.buf.clone();
+        self.enter_screen(Screen::Board);
         // Detail portraits are large (9 parts); evict them before the board
         // re-uploads so the two never share the 32KB OBJ VRAM budget.
         self.sprite_cache.evict_prefix("detail:");
@@ -1575,7 +1726,7 @@ impl<'a> Display<'a> {
         // holds one entry (or two, for the flipped opponent row) and the win
         // is handed straight back as VRAM headroom.
         let key_card_no = if slot.hidden { "" } else { card_no };
-        self.push_card(
+let drawn = self.push_card(
             tag,
             key_card_no,
             tiles,
@@ -1590,6 +1741,19 @@ impl<'a> Display<'a> {
             false,
             rot_ccw,
         );
+        // A slot that could not get art still has to say something; a blank
+        // box is indistinguishable from "no card here".
+        if !drawn {
+            Self::blit_line(
+                &mut self.ui_front,
+                font_ts,
+                icon_ts,
+                e,
+                card_no,
+                x,
+                y + kind.rows() / 2,
+            );
+        }
         if slot.actionable {
             let (bx, by) = Self::badge_tile(x, y, kind, flipped);
             // Stage badges sit one tile in on the nudged edge tile; the
@@ -1637,6 +1801,7 @@ impl<'a> Display<'a> {
     /// scrolls fully instead of clipping the selected row away.
     pub fn render_action_text(&mut self) {
         self.last = self.buf.clone();
+        self.enter_screen(Screen::None);
         self.gfx.set_background_palette(15, text_pal());
         let font_ts = unsafe { TileSet::new(&FONT_TILES.0, TileFormat::FourBpp) };
         let icon_ts = unsafe { TileSet::new(&TEXTICON_TILES.0, TileFormat::FourBpp) };
@@ -1700,6 +1865,7 @@ impl<'a> Display<'a> {
     /// the old BG path no palette reload (and no backdrop flash) is needed.
     pub fn render_card_detail(&mut self, art: Option<&CardArt>, lines: &[String], scroll: usize) {
         self.last = self.buf.clone();
+        self.enter_screen(Screen::Detail);
         // Board sprites would share the 32KB OBJ budget with the 9-part
         // portrait 窶・evict everything EXCEPT this card's portrait, so
         // scrolling (same art, new offset) is a cache hit with no re-upload.
@@ -1822,6 +1988,7 @@ impl<'a> Display<'a> {
             return;
         }
         self.last = self.buf.clone();
+        self.enter_screen(Screen::Menu);
 
         // Bank 15 holds TEXT_PALETTE (white text on dark blue). The detail
         // view overwrites bank 15, so restore it here.
@@ -1872,7 +2039,7 @@ impl<'a> Display<'a> {
                 // Menu boxes are exactly the queued tile size (choice grid
                 // cards have no wait-gap, unlike board stage slots).
                 let (box_w, box_h) = ((q.cols * 8) as usize, (q.rows * 8) as usize);
-                self.push_card(
+                let drawn = self.push_card(
                     kind.tag(),
                     &q.card_no,
                     front.tiles,
@@ -1887,6 +2054,9 @@ impl<'a> Display<'a> {
                     q.dimmed,
                     false,
                 );
+                if !drawn {
+                    Self::blit_line(&mut self.ui_front, &font_ts, &icon_ts, e, &q.card_no, q.x, q.y);
+                }
                 if q.selected {
                     // Gold edge badge on top-right of card, drawn after
                     // dimming so the cursor stays visible. The nudged tile

@@ -42,7 +42,72 @@ struct AbilityTriggerContext {
     triggering_member_id: Option<i16>,
 }
 
+/// Where an AUTO scan found a card, and whose it is.
+///
+/// The moved-card branch of the AUTO scan used to answer "is it on a board?" with four
+/// `Vec::contains` calls and then "who owns it?" with ten more — and four of those ten
+/// re-tested zones the first four had already ruled out. A card is in exactly ONE place,
+/// so the whole question is a single pass, and the answer drives both decisions at once:
+/// on-stage and on-live cards are scanned by their own dedicated loops, and everything
+/// else must belong to the player being scanned.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AutoScanZone {
+    /// On a stage — the stage loop owns it.
+    Stage(&'static str),
+    /// In a live card zone — the live loop owns it.
+    Live(&'static str),
+    /// In a hand, energy zone or 控え室 — the moved-card loop owns it.
+    OffBoard(&'static str),
+    /// In no zone this scan can see.
+    Unknown,
+}
+
+impl AutoScanZone {
+    /// True when a dedicated loop already covers this card, so the moved-card loop must
+    /// skip it.
+    fn is_scanned_elsewhere(self) -> bool {
+        matches!(self, AutoScanZone::Stage(_) | AutoScanZone::Live(_))
+    }
+
+    /// The owning player's short id, when the card is the moved-card loop's to scan.
+    fn off_board_owner(self) -> Option<&'static str> {
+        match self {
+            AutoScanZone::OffBoard(p) => Some(p),
+            _ => None,
+        }
+    }
+}
+
 impl GameState {
+    /// Classify `card_id` in one pass over both players' relevant zones.
+    ///
+    /// Order is deliberate and matches the old short-circuit behaviour: stage first, then
+    /// live, then the off-board zones, because a card on stage was reported as `Stage`
+    /// before ownership was ever considered. Within a zone class, p1 is tested first so a
+    /// card that somehow sits in both seats' zones still resolves the way the old
+    /// `is_p1`-before-`is_p2` ordering did.
+    fn auto_scan_zone(&self, card_id: i16) -> AutoScanZone {
+        for (player, id) in [(&self.player1, "p1"), (&self.player2, "p2")] {
+            if player.stage.stage.contains(&card_id) {
+                return AutoScanZone::Stage(id);
+            }
+        }
+        for (player, id) in [(&self.player1, "p1"), (&self.player2, "p2")] {
+            if player.live_card_zone.cards.contains(&card_id) {
+                return AutoScanZone::Live(id);
+            }
+        }
+        for (player, id) in [(&self.player1, "p1"), (&self.player2, "p2")] {
+            if player.hand.cards.contains(&card_id)
+                || player.energy_zone.cards.contains(&card_id)
+                || player.waitroom.cards.contains(&card_id)
+            {
+                return AutoScanZone::OffBoard(id);
+            }
+        }
+        AutoScanZone::Unknown
+    }
+
     fn stage_card_ids(&self) -> impl Iterator<Item = i16> + '_ {
         self.player1
             .stage
@@ -626,8 +691,34 @@ impl GameState {
                 if card_id == -1 {
                     continue;
                 }
+                // Whole-card skip. 1439 of the pool's 1574 members carry no 自動 at all,
+                // and this loop runs 4x per card play; without the index every one of
+                // them had its whole ability list resolved to discover that.
+                let auto_indices = self.card_database.auto_ability_indices(card_id);
+                if auto_indices.is_empty() {
+                    continue;
+                }
                 if let Some(card) = self.card_database.get_card(card_id) {
-                    for (ability_idx, ar) in card.abilities.iter().enumerate() {
+                    // Only the abilities that ARE 自動. Previously this walked every
+                    // ability and string-compared its trigger, which is the innermost
+                    // comparison of the engine's hottest scan.
+                    for &ability_idx in auto_indices {
+                        let ability_idx = ability_idx as usize;
+                        // Bounds-checked. The index list is built at load, and the release
+                        // bench hit `len 0, index 0` here — a card reached the scan with a
+                        // shorter ability list than the one it was indexed from. The 4173-test
+                        // debug suite never built that shape, so this is not belt-and-braces:
+                        // it is the only thing between that state and a panic in a shipped
+                        // binary.
+                        let Some(ar) = card.abilities.get(ability_idx) else {
+                            log::debug!(
+                                "[AUTO_INDEX] card={} idx={} out of range (len={})",
+                                card_id,
+                                ability_idx,
+                                card.abilities.len()
+                            );
+                            continue;
+                        };
                         let ability = ar.resolve();
                         if !crate::zones::check_effect_position(
                             ability
@@ -710,23 +801,6 @@ impl GameState {
                                             continue;
                                         }
                                     }
-                                    // Heuristic guard: each_time abilities whose
-                                    // condition is a comparison on energy_zone must
-                                    // also require energy was placed by a card effect
-                                    // (the flag is consumed after every TAS scan to
-                                    // prevent re-triggering on stale comparisons
-                                    // like "energy_zone >= 0" during phase-based
-                                    // energy placement).
-                                    if effect.trigger_type_any() == Some("each_time")
-                                        && matches!(
-                                            condition.as_ref(),
-                                            crate::card::Condition::Comparison { .. }
-                                        )
-                                        && condition.get_location() == Some("energy_zone")
-                                        && !self.last_energy_placed_by_effect()
-                                    {
-                                        continue;
-                                    }
                                 }
                                 // §9.7.2.1: Compute trigger multiplicity before
                                 // the effect block closes -- condition and effect
@@ -758,8 +832,7 @@ impl GameState {
                             }
                             // Re-scan guard: skip re-enqueueing the exact auto
                             // ability that just completed (numeric key).
-                            let num_key =
-            (card_id.u32_count() << 16) | ability_idx.u32_count();
+                            let num_key = (card_id.u32_count() << 16) | ability_idx.u32_count();
                             // Marker-carrying watchers (「対戦相手のカードの
                             // 効果でも発動する。」) watching AREA MOVES are
                             // armed by the push_movement_event hook when their
@@ -802,13 +875,26 @@ impl GameState {
             }
             // Also scan live cards for AUTO abilities
             for &card_id in &live_ids {
+                // Same index as the stage loop: only 8 live cards in the pool carry a
+                // 自動, so a resolved live card almost never has one to find.
+                let auto_indices = self.card_database.auto_ability_indices(card_id);
+                if auto_indices.is_empty() {
+                    continue;
+                }
                 if let Some(card) = self.card_database.get_card(card_id) {
-                    for (ability_idx, ar) in card.abilities.iter().enumerate() {
+                    for &ability_idx in auto_indices {
+                        let ability_idx = ability_idx as usize;
+                        // Bounds-checked, same reason as the stage loop above.
+                        let Some(ar) = card.abilities.get(ability_idx) else {
+                            log::debug!(
+                                "[AUTO_INDEX] live card={} idx={} out of range (len={})",
+                                card_id,
+                                ability_idx,
+                                card.abilities.len()
+                            );
+                            continue;
+                        };
                         let ability = ar.resolve();
-                        if ability
-                            .triggers
-                            .as_ref()
-                            .is_some_and(|t| &**t == crate::triggers::AUTO)
                         {
                             // Resolution-watchers (「…能力が解決したとき」) arm ONLY
                             // via the post-resolution hook; a board-state scan
@@ -822,12 +908,12 @@ impl GameState {
                             }
                             if let Some(ref effect) = ability.effect {
                                 // Live card scan -- uses the same event-based
-                                // condition check as the stage loop, without its
-                                // debug log. Deliberately NOT shared with the
-                                // stage site: evaluating a condition needs
-                                // `&mut self`, which the surrounding card borrow
-                                // forbids, so it has to be inlined at each site.
-                                if let Some(ref condition) = effect.condition {
+                                    // condition check as the stage loop, without its
+                                    // debug log. Deliberately NOT shared with the
+                                    // stage site: evaluating a condition needs
+                                    // `&mut self`, which the surrounding card borrow
+                                    // forbids, so it has to be inlined at each site.
+                                    if let Some(ref condition) = effect.condition {
                                     if Self::condition_is_event_based(condition) {
                                         let saved_activating = self.activating_card;
                                         self.activating_card = Some(card_id);
@@ -854,8 +940,7 @@ impl GameState {
                             }) {
                                 continue;
                             }
-                            let num_key =
-            (card_id.u32_count() << 16) | ability_idx.u32_count();
+                            let num_key = (card_id.u32_count() << 16) | ability_idx.u32_count();
                             // Same batch-scoped re-scan guard as the stage loop.
                             if !Self::claim_batch_slot(
                                 &mut self.this_batch_triggered_ability_ids,
@@ -875,35 +960,22 @@ impl GameState {
             // Only enqueue for the card's actual owner (not the scanner).
             // Skip cards already on stage or in live zone (scanned separately).
             for &moved_card_id in moved_cards {
-                if self.player1.stage.stage.contains(&moved_card_id)
-                    || self.player1.live_card_zone.cards.contains(&moved_card_id)
-                    || self.player2.stage.stage.contains(&moved_card_id)
-                    || self.player2.live_card_zone.cards.contains(&moved_card_id)
-                {
+                // ONE pass answers both questions this used to ask with fourteen linear
+                // scans: is the card already covered by the stage or live loop, and whose
+                // is it if not. Four of the old ownership checks re-tested zones the skip
+                // test had already ruled out.
+                let zone = self.auto_scan_zone(moved_card_id);
+                if zone.is_scanned_elsewhere() {
                     continue;
                 }
+                // Only enqueue for the card's actual owner (not the scanner).
+                match zone.off_board_owner() {
+                    // can't determine owner, skip
+                    None => continue,
+                    Some(owner) if owner != player_id_clone => continue,
+                    Some(_) => {}
+                }
                 if let Some(card) = self.card_database.get_card(moved_card_id) {
-                    // Determine card owner by zone membership
-                    let is_p1 = self.player1.stage.stage.contains(&moved_card_id)
-                        || self.player1.hand.cards.contains(&moved_card_id)
-                        || self.player1.live_card_zone.cards.contains(&moved_card_id)
-                        || self.player1.energy_zone.cards.contains(&moved_card_id)
-                        || self.player1.waitroom.cards.contains(&moved_card_id);
-                    let is_p2 = self.player2.stage.stage.contains(&moved_card_id)
-                        || self.player2.hand.cards.contains(&moved_card_id)
-                        || self.player2.live_card_zone.cards.contains(&moved_card_id)
-                        || self.player2.energy_zone.cards.contains(&moved_card_id)
-                        || self.player2.waitroom.cards.contains(&moved_card_id);
-                    let card_owner = if is_p1 {
-                        "p1"
-                    } else if is_p2 {
-                        "p2"
-                    } else {
-                        continue; // can't determine owner, skip
-                    };
-                    if card_owner != player_id_clone {
-                        continue; // card belongs to a different player
-                    }
                     for (ability_idx, ar) in card.abilities.iter().enumerate() {
                         let ability = ar.resolve();
                         if ability
@@ -933,7 +1005,8 @@ impl GameState {
                                     }
                                 }
                             }
-                            let num_key =             (moved_card_id.u32_count() << 16) | ability_idx.u32_count();
+                            let num_key =
+                (moved_card_id.u32_count() << 16) | ability_idx.u32_count();
                             // Same batch-scoped re-scan guard as the stage loop.
                             if skip_this_card_auto_key == Some(num_key)
                                 && just_completed_batch_matches
@@ -956,8 +1029,7 @@ impl GameState {
         let mut cached_card_id = None;
         let mut cached_card_no = String::new();
         for (card_id, ability_idx, _stage_card_id) in abilities_to_trigger {
-            let num_key =
-            (card_id.u32_count() << 16) | ability_idx.u32_count();
+            let num_key = (card_id.u32_count() << 16) | ability_idx.u32_count();
             if !self.this_batch_triggered_ability_ids.contains(&num_key) {
                 self.this_batch_triggered_ability_ids.push(num_key);
             }
@@ -1874,6 +1946,19 @@ fn trigger_auto_ability_by_index_refs(
     pub fn process_pending_auto_abilities(&mut self, raw_player_id: &str) {
         #[cfg(not(feature = "no_std"))]
         let _timer = crate::timer::Timer::start("trig::process_pending");
+        // Nothing queued means nothing to resolve. This function is reached ~3.8x per
+        // action (every phase boundary, every gate re-check, every resume) and the
+        // overwhelming majority of those calls find an empty queue — each one otherwise
+        // entered `process_player_abilities_depth` TWICE, walked its re-entry loop, and
+        // ran `clear_completed` over nothing.
+        //
+        // Both `process_player_abilities` calls are no-ops on an empty queue: the
+        // depth-first loop finds no available index, and `clear_completed` has nothing to
+        // clear. So this is behaviour-preserving, not a shortcut past work.
+        if self.ability_queue.is_empty() {
+            log::trace!("[QUEUE_SCAN] raw={} empty queue, nothing to settle", raw_player_id);
+            return;
+        }
         let active_player_id = match raw_player_id {
             "player1" => "p1",
             "player2" => "p2",

@@ -238,3 +238,44 @@ engine_c_wip/src/core/generated/*.o
 engine_c_wip/src/**/*.o
 
 engine_c_wip/debug_eli.exe
+
+# tools/decklog — this tool has two halves: scripts that GO GET deck data from
+# decklog.bushiroad.com, and scripts that ANALYSE what was harvested. Only the
+# analysis half is tracked (analyze_combos.py, analyze_meta.py, one_deck.py and
+# README.md); the acquisition half and every artefact it produces are ignored.
+# The split is by role, not by a file list — a new acquisition script or a new
+# harvest output should be added below, never above.
+#
+# WHY ignore rather than commit: raw/ was 1000 verbatim API responses (20 MB) and
+# sample/ another 302 files (10 MB) of other players' deck lists. The endpoint is
+# anonymous, so a fresh scrape reproduces them exactly — they are not fixtures and
+# nothing in the repo reads them at build or test time. Committing them would add
+# ~30 MB of third-party deck lists to history for zero reproducibility gain, which
+# is also what README.md "Notes" warns against redistributing.
+
+# Acquisition half: the scripts that fetch the data. scrape_decklog.py downloads
+# deck recipes (README "How it works"); export_codes_browser.js harvests the
+# search-result deck codes from a logged-in browser session (README "Getting deck
+# codes"), which is the only gated step and needs no credentials in-repo.
+tools/decklog/scrape_decklog.py
+tools/decklog/export_codes_browser.js
+
+# Harvested data — regenerable by re-running the scraper.
+tools/decklog/codes.txt
+tools/decklog/decks.jsonl
+tools/decklog/decks.txt
+tools/decklog/decklog_import.txt
+tools/decklog/search_meta.jsonl
+tools/decklog/search_meta_partial_*.jsonl
+tools/decklog/sample_codes.txt
+tools/decklog/search_meta_sample.jsonl
+tools/decklog/raw/
+tools/decklog/sample/
+
+# Analysis OUTPUTS of analyze_combos.py, whose --out-dir defaults to
+# tools/decklog/analysis. Tracked scripts, untracked results — same rule as the
+# regenerable cards/ability_docs_scripts reports further up. Each run writes
+# analysis_report.txt, combos.jsonl, deduped_decks.txt and unique_combos.txt;
+# analysis_smoke/ is the same set from a reduced-input smoke run.
+tools/decklog/analysis/
+tools/decklog/analysis_smoke/

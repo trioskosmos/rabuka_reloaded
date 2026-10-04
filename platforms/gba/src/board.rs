@@ -223,6 +223,20 @@ impl Board {
         for i in 0..STAGE_SIZE {
             p2_stage[i] = stage_slot(you.stage.stage[i]);
             p1_stage[i] = stage_slot(me.stage.stage[i]);
+            // `diag-trace`: the raw slot contents, so a duplicate card number
+            // across two slots can be attributed to the game state rather than
+            // to the renderer.
+            #[cfg(feature = "diag-trace")]
+            agb::println!(
+                "[stg] t={} p2[{}]={}={} p1[{}]={}={}",
+                gs.turn_number,
+                i,
+                you.stage.stage[i],
+                p2_stage[i].card_no.unwrap_or("-"),
+                i,
+                me.stage.stage[i],
+                p1_stage[i].card_no.unwrap_or("-")
+            );
         }
         for s in p2_stage.iter_mut() {
             s.actionable = is_actionable(&s.card_no);
@@ -328,8 +342,17 @@ impl Board {
         // per-frame iteration + String churn — see git history if the text
         // panes ever need them back.
         BoardFrame {
+            // `Phase`'s `Display` (not `Debug`): agb's 4bpp BG tile pool holds
+            // only 512 regular + 510 affine tiles -- 1,022 slots, 255 glyphs at
+            // 2x2 tiles each -- and `VRAM_MANAGER.gc()` runs at commit, so a
+            // frame and its successor must both fit. `{:?}` spelled the variant
+            // out ("FirstAttackerPerformance"), which alone pulled in 14 glyphs
+            // that appear nowhere else, and every distinct glyph costs 4
+            // resident tiles. Long enough and the pool runs dry and agb panics
+            // with "Ran out of video RAM for tiles". `Display` is "Perform
+            // (1st)": ~5 glyphs, all already in the font's ASCII range.
             header: format!(
-                "T{} {:?} {}",
+                "T{} {} {}",
                 gs.turn_number,
                 gs.current_phase,
                 if me.id == gs.player1.id { "P1>" } else { "P2>" }

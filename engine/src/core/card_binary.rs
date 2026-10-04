@@ -375,6 +375,34 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
         }
     }
 
+    let auto_abilities = cards
+        .iter()
+        .filter_map(|(id, c)| {
+            let indices: Vec<u16> = c
+                .abilities
+                .iter()
+                .enumerate()
+                .filter(|(_, ar)| ar.resolve().triggers.as_deref() == Some(crate::triggers::AUTO))
+                .map(|(i, _)| i as u16)
+                .collect();
+            if indices.is_empty() {
+                None
+            } else {
+                Some((*id, indices))
+            }
+        })
+        .collect();
+
+    let constant_cards = cards
+        .iter()
+        .filter(|(_, c)| {
+            c.abilities
+                .iter()
+                .any(|ar| ar.resolve().triggers.as_deref() == Some(crate::triggers::CONSTANT))
+        })
+        .map(|(id, _)| *id)
+        .collect();
+
     super::card::CardDatabase {
         normalized_no_to_id: card_no_to_id
             .keys()
@@ -382,6 +410,8 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
             .collect(),
         cards,
         card_no_to_id,
+        auto_abilities,
+        constant_cards,
         next_id,
     }
 }

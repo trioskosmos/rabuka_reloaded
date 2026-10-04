@@ -641,6 +641,24 @@ fn commit_constant_results(
     pub fn recalculate_constants(&mut self) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("recalculate_constants");
+        // A fast path that skipped this pass when no 常時 was derivable was attempted and
+        // REVERTED. Recording it because the approach is right and the obstacle is
+        // specific, not because it was wrong to try:
+        //
+        // The gate must ask "would this pass derive anything?", and the only sound way to
+        // answer that is with this pass's OWN collectors — a parallel index is wrong
+        // because `gain_ability` grants 常時 that never appear in `card.abilities`. An
+        // index-based gate failed 68 tests; a collector-based one that covered
+        // `collect_reusable_constant_stage_effect_ids` (printed stage + gained) and the
+        // success zone still failed 5, on PLAY-COST reduction from hand cards
+        // (`hand_card_cost_reduced_by_hand_count`,
+        // `pb2_optional_two_distinct_printemps_wait_costs_two_less`). So there is at least
+        // one more discovery source feeding `recalculate_constant_cost_modifiers_with_ids`
+        // that neither collector names.
+        //
+        // Whoever finishes this should enumerate the sources from
+        // `recalculate_constant_cost_modifiers_with_ids` itself rather than from the card
+        // database — that is the mistake twice over.
         tdbg!("RC:0 ENTERED");
         // HANG WORKAROUND (3DS ARMv6K): AtomicBool::load uses 8-bit atomics
         // that may deadlock via Mutex fallback. Use a plain bool on GameState
@@ -1399,6 +1417,8 @@ fn commit_constant_results(
         tdbg!("RC:14b SUCCESS_ZONE_DONE");
         self.refresh_yell_sources();
         self.delayed_gained_effects = exp_delayed_gained_effects;
+        // Recorded at the END of the full pass only, so it always describes exactly the
+        // state the clears at the top would act on next time. See the fast path above.
     }
 
     /// G8: set each player's yell source from 常時 yell_source_modifier live cards

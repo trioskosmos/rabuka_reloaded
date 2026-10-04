@@ -204,6 +204,9 @@ pub struct GameState {
     pub scratch_entry_positions: HashMap<i16, Option<u8>>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_constant_effect_ids: Vec<(i16, usize)>,
+    /// Did the last FULL `recalculate_constants` pass register any 常時-derived modifier?
+    /// Read only by that function's fast path; never used for gameplay decisions.
+    pub constants_registered: bool,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub ability_invalidations: SmallVec<[AbilityInvalidation; 4]>,
     pub replacement_effects: SmallVec<[ReplacementEffect; 2]>,
@@ -635,6 +638,9 @@ impl GameState {
             scratch_exp_heart: HashMap::default(),
             scratch_entry_positions: HashMap::default(),
             scratch_constant_effect_ids: Vec::new(),
+        // See recalculate_constants fast path: false until a full pass has run with a
+        // 常時 actually in play.
+        constants_registered: false,
             ability_invalidations: SmallVec::new(),
              replacement_effects: SmallVec::new(),
 
