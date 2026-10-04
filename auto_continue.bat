@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 15,
     [string]$WindowTitle = "",
-    [string]$Message = "read abilities.json and their tests one by one manually no overviews. understand the engine parser and tests and improve them as needed so it looks planned rather than slapped together ad hoc actually do the work not just talk about plans"
+    [string]$Message = "now keep doing this finding issues a/b testing and making it faster and improve code while you are at it. don't be lazy fully audit the full rust engine for potential speed ups. not just a little, not automatic overview bullshit, manually comb through the code. "
 )
 
 Add-Type -AssemblyName System.Windows.Forms

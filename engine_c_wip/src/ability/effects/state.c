@@ -2037,10 +2037,23 @@ static int s_state_filter_matches(GameState *g, const AbilityEffect *e, int card
 
 /* ── Ported from engine/src/core/card.rs (Card impl block) ──────────────── */
 
-/* Mirror Card::total_hearts (card.rs:4194-4202) — sum base_heart, and fall
+/* Mirror Card::total_hearts (card.rs:4453-4461) — sum base_heart, and fall
    back to need_heart ONLY when the card has no base_heart section. Blade and
    need hearts are never folded in (Q149/Q172: 「ハートの総数」 counts the
-   member's basic hearts plus ability-granted ones, not blade/need hearts). */
+   member's basic hearts plus ability-granted ones, not blade/need hearts).
+
+   CITATION CORRECTION 2026-10-05: this comment (and the two sibling copies at
+   ability/condition.c and ability/util.c) cited `card.rs:4194-4202`. The real
+   `pub fn total_hearts` body is card.rs:4453-4461 — 4194 and 4263 land in
+   unrelated card methods, and so does 4370-4379 (that range is the
+   surplus-heart per-colour loop, `card.rs:4360-4388`). Verified by locating
+   the single `pub fn total_hearts` in engine/src/core/card.rs.
+
+   SEMANTICS UNCHANGED, and deliberately still a DUPLICATE rather than a
+   consolidation: the three copies agree on the shape above, which is what
+   tests/test_parity_dead_twins.c pins. Consolidating is not provably safe
+   here because two of the three live in translation units this batch does not
+   own (see BLOCKED-ON in the batch report). */
 int rb_card_total_hearts(const Card *c) {
     if (!c) return 0;
     int total = 0;

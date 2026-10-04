@@ -2185,7 +2185,15 @@ static void nozomi_reorder(TestGame *tg, const int *order)
     }
     drain_skip(tg, 4);
 
-    expect_pending(!&tg->state,
+    /* `!&tg->state` here was `!(address of a struct)`, i.e. a CONSTANT 0
+       (gcc: "the comparison will always evaluate as 'true' for the address of
+       'state' will never be NULL", -Waddress), so this assertion could never
+       pass and was reporting a FAILURE on every one of the six nozomi cases
+       regardless of engine state. It means "no prompt is left open once the
+       last looked-at card is placed", which is `rb_has_pending_choice` -- the
+       form every other expect_pending in this file uses. Assert what Rust
+       asserts, which is also what the neighbouring cases assert. */
+    expect_pending(!rb_has_pending_choice(&tg->state),
           "nozomi: the final remaining card needs no choice");
     int deck_exp[5] = { cards[order[0]], cards[order[1]], cards[order[2]],
                         cards[3], cards[4] };

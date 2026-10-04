@@ -58,7 +58,7 @@ LDFLAGS ?= -Wl,--stack,33554432
 # own UI in platforms/*/src). Do not remove it from SRC/OBJ_LIB on the grounds
 # that nothing calls it: a file no compiler sees is not a port, it is a guess.
 # Exercised by tests/test_choice_renderer.c.
-SRC     := src/ability/enums.c src/ability/types.c src/ability/vm.c src/ability/condition.c src/ability/choice.c src/ability/ability_queue.c src/ability/dynamic_count.c src/ability/util.c src/ability/cost.c src/ability/compound.c src/ability/resolver.c src/ability/effects/executor.c src/ability/effects/ability_effects.c src/ability/effects/custom.c src/ability/effects/move.c src/ability/effects/move_missing.c src/ability/effects/rules.c src/ability/effects/look.c src/ability/effects/state.c src/ability/effects/ability.c src/ability/effects/misc.c src/ability/effects/draw.c src/ability/effects/score.c src/ability/log.c src/ability/debug.c src/ability/abilities_gen.c src/ability/describe.c src/ability/choice_renderer.c src/game/deck_parser.c src/game/deck_builder.c src/game/game_setup.c src/core/card.c src/core/data.c src/core/alloc.c src/core/game_state_core.c src/core/modifiers.c src/core/stats_pipeline.c src/core/game_state_abilities.c src/core/tracking.c src/core/zones.c src/bytecode_data.c src/core/generated/bytecode_blob.c src/core/generated/gen_data.c src/core/gen_data_rom.c src/turn/phase.c src/turn/live.c src/turn/triggers.c src/engine.c src/test_game.c src/main.c
+SRC     := src/ability/enums.c src/ability/types.c src/ability/vm.c src/ability/condition.c src/ability/choice.c src/ability/ability_queue.c src/ability/dynamic_count.c src/ability/util.c src/ability/cost.c src/ability/compound.c src/ability/resolver.c src/ability/effects/executor.c src/ability/effects/ability_effects.c src/ability/effects/custom.c src/ability/effects/move.c src/ability/effects/move_missing.c src/ability/effects/rules.c src/ability/effects/look.c src/ability/effects/state.c src/ability/effects/ability.c src/ability/effects/misc.c src/ability/effects/draw.c src/ability/effects/score.c src/ability/log.c src/ability/debug.c src/ability/abilities_gen.c src/ability/describe.c src/ability/choice_renderer.c src/game/deck_parser.c src/game/deck_builder.c src/game/game_setup.c src/core/card.c src/core/data.c src/core/alloc.c src/core/game_state_core.c src/core/modifiers.c src/core/stats_pipeline.c src/core/game_state_abilities.c src/core/tracking.c src/core/zones.c src/bytecode_data.c src/core/generated/bytecode_blob.c src/core/generated/gen_data.c src/core/gen_data_rom.c src/turn/phase.c src/turn/live.c src/turn/triggers.c src/engine.c src/test_game.c src/web_server.c src/main.c
 OBJ     := $(SRC:.c=.o)
 # library objects (everything except main, so tests can supply their own main)
 OBJ_LIB := src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o
@@ -104,6 +104,37 @@ $(WEB_TARGET): $(OBJ_LIB)
 regen: data
 	python3 tools/gen_from_rs.py ../cards/build/abilities_gen.rs
 	python3 tools/gen_bytecode.py
+	$(MAKE) --no-print-directory regen-check
+
+# ── REGEN DRIFT GATE ────────────────────────────────────────────────────────
+# `regen` above rewrites gen_data.c, and that silently moves numbers that are
+# pinned in OTHER files -- and nothing checked that the pins moved with them, so
+# the only symptom was a red harness self-test hours later complaining about
+# STACK BUDGET (tests/test_harness_self.c section A4) in a change that had
+# touched no header at all.
+#
+# `make regen-check` runs after any regeneration and names the number that
+# moved. It MEASURES sizeof(GameState) by compiling a throwaway TU against the
+# live header rather than trusting a comment, and it cross-checks:
+#     sizeof(GameState)          == RB_GAMESTATE_BYTES_PINNED (tests/ A4)
+#     RBKA_STRINGS_TABLE_LEN     == STRINGS_BYTES (this Makefile)
+#     src/abilities_strings.bin  == RBKA_STRINGS_TABLE_LEN
+#     RBKA_STRINGS_FNV count     == RBKA_NUM_STRING_OFFSETS - 1
+#     the sizeof note above       == the measured value
+# Every one of those pins must move in the SAME change as the regen.
+#
+# NOTE, because the obvious guess here is wrong: RBKA_NUM_STRING_OFFSETS does
+# NOT change sizeof(GameState). STRINGS_OFFSETS is `extern const uint32_t *`
+# (a .rodata pointer, include/rabuka.h:408) and no GameState field is sized by
+# the string count -- every large array in GameState is a fixed literal. What
+# moves sizeof(GameState) is a change to include/rabuka.h. So this gate
+# deliberately does NOT assert a string-count/sizeof coupling, which would have
+# fired on every healthy regeneration. tools/regen_check.py documents this in
+# full.
+.PHONY: regen-check
+regen-check:
+	@python3 tools/regen_check.py --root . --makefile Makefile \
+	    --harness tests/test_harness_self.c
 
 # Card data blobs the test binaries load via rb_load("src"). Produced by the
 # pure-Python generators in cards/; regenerated here so a clean checkout can
@@ -451,10 +482,58 @@ $(VERDICT): $(VERDICT_SRC)
 .PHONY: verdict
 verdict: $(VERDICT)
 
+# ── THE DATA-INSTALL GATE IS A PARAMETER, NOT A HARDCODED PREREQUISITE ───────
+# t-run used to name `data` here directly, which meant the install gate was
+# welded to the ONLY way to build and run a suite. While upstream is mid-regen
+# the guard correctly REFUSES (cards/build is a newer generation than the one
+# src/core/generated/gen_data.c was compiled against), and that refusal took
+# `make t`, `make t-run` and `make run-all-tests` -- i.e. every agent's
+# measurement path -- down tree-wide.
+#
+# GATE_DEP ?= data keeps the DEFAULT identical: `make t T=<stem>` still installs
+# and still refuses on a non-canonical blob, with no gate weakened anywhere.
+# `make t-nogate` overrides it to the empty string, which drops the prerequisite
+# list entry entirely. A command-line assignment (`GATE_DEP=`) counts as DEFINED
+# for ?=, so the override sticks, and it rides along to the sub-makes through
+# MAKEFLAGS -- see the t-nogate rule below, which is the whole escape hatch.
+#
+# It is safe because NOBODY COPIES ANYTHING on that path. src/ is already
+# self-consistent -- MEASURED 2026-10-04 at HEAD c9da256e, by compiling a
+# throwaway TU that includes gen_data.c and prints the sizes:
+#     RBKA_STRINGS_TABLE_LEN   726671  == the blob in src/abilities_strings.bin
+#     RBKA_NUM_STRING_OFFSETS  6033    == sizeof(RBKA_STRINGS_OFFSETS)/4
+#     RBKA_STRINGS_FNV         6032    == NUM_STRING_OFFSETS - 1
+#     RBKA_BYTECODE_LEN        98782   (bytecode_blob.c:4)
+# so `make all` already compiles and links against exactly these bytes. The
+# escape hatch runs the SAME link command on the SAME objects; the only thing it
+# declines to do is overwrite a good tree with a mismatched generation.
+GATE_DEP ?= data
+
 .PHONY: t-run
-t-run: $(OBJ_LIB) data $(VERDICT)
+t-run: $(OBJ_LIB) $(GATE_DEP) $(VERDICT)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET)_t_$(T) $(OBJ_LIB) tests/test_$(T).c
 	./$(VERDICT) ./$(TARGET)_t_$(T) $(T)
+
+# MEASUREMENT ESCAPE HATCH:  make t-nogate T=<stem>
+#
+# `data`, `verify-data`, `all`, `warnings-audit`, `warnings-audit-test` and
+# `check-suite-names` are deliberately NOT touched by this, and neither is the
+# gate on `t` itself.
+#
+# It delegates to `t` with GATE_DEP blanked rather than restating the recipe.
+# That is the whole point: `t` carries ~40 lines of suite-name resolution
+# (SUITE_RENAMES / SUITE_GAPS / SUITE_ABSENT, the dangling-rename check, the
+# no-such-suite message) and it has ALREADY been near-broken twice by copying
+# it. One rule, one recipe, two entry points -- so the resolution logic cannot
+# drift out of agreement with itself, and every message it prints (including
+# "make suite-names") stays true for this path too.
+.PHONY: t-nogate
+t-nogate:
+	@echo "make t-nogate: running T=$(T) WITHOUT the \`make data\` install gate."
+	@echo "  This is a MEASUREMENT path, not a ship path: no gate is weakened and"
+	@echo "  nothing is copied, because src/ already matches gen_data.c. If the"
+	@echo "  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh"
+	$(MAKE) --no-print-directory t GATE_DEP=
 
 # Build + run every tests/test_*.c that has a main(). Logs land in tests/*.log.
 #

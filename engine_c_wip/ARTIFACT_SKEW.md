@@ -311,3 +311,84 @@ So §8.7 is *stale data + regen + a third party's concurrent edits* vs *canonica
 precisely — stated rather than guessed. What survives inspection: all 6 newly-red suites fail on generation-specific
 constants or on ability 327, regen-attributable by reading the assertion; the 4 improvements are **not** individually
 attributable. Settling it needs both corpora re-run on a quiescent tree (2 × ~11 min).
+---
+
+## 2026-10-04 -- MEASUREMENT UNBLOCKED: `make t-nogate` + guard at the second splice site
+
+**HEAD MEASURED `c9da256e5470d2fe4a47dff7daf2bb231f968e57`.** Hash sweep, two reads 12 s apart, all
+STABLE pre-edit: `Makefile` `C3309517B2169B21`, `guard_data_blob.sh` `0F41D37FBCB4B545`, `pack.py`
+`2097F1119B1DD44B`, `regen_all.sh` `56E7817CC109F838`. `Makefile` profiled first: **LF-only** (880 LF /
+0 CRLF), **no BOM** -- both preserved. Disk **12.63 GB free** throughout; `warnings-audit` neither run nor
+trusted, nothing of anyone else's deleted; only my own `Temp/kilo/mk2/`. No `.o`/`rb_engine*` left
+(`make clean` last; the tree held **0** of each before I started). No `cargo`, no git writes, no
+PowerShell rewriting of any file.
+
+### 1. `make t-nogate T=<stem>` -- escape hatch. No gate weakened.
+
+`t:` -> `t-run: $(OBJ_LIB) data`, and `data` correctly refuses while `cards/build` (726742) is newer than
+the generation `src/` + `gen_data.c` were compiled against (726671) -- taking `make t`, every agent's
+measurement path, down tree-wide.
+
+**A PARAMETER, not a second copy.** `GATE_DEP ?= data`; `t-run: $(OBJ_LIB) $(GATE_DEP) $(VERDICT)`.
+Default is byte-for-byte the old behaviour. `t-nogate` delegates and does NOT restate `t:`'s ~40 lines of
+suite-name resolution: `$(MAKE) --no-print-directory t GATE_DEP=`. A command-line assignment counts as
+*defined* for `?=`, and reaches the inner `t-run` via `MAKEFLAGS`. One rule, one recipe, two entry points.
+`data`, `verify-data`, `all`, `web`, `warnings-audit`, `warnings-audit-test`, `check-suite-names`
+untouched.
+
+**Proof it weakens nothing (measured).** `make t T=mechanics` still **exits 2** with `DATA GUARD:
+REFUSING ... 726742 bytes, not the canonical 726671` -- gate armed as before. And `t-nogate` **copied
+nothing**: the guard still reports `dest src/abilities_strings.bin 726671` afterwards.
+
+**Proof it runs clean.** `make clean && make t-nogate T=mechanics` -> exit 0, **0 `^FAIL`** (no colon,
+case-sensitive), `PASSED: mechanics [exit=0, 0 result line(s)]`; `T=harness_self` also green.
+`artifacts_consistent` is RED with 3 `FAIL` -- the known 726671-vs-726742 skew, not this change.
+Delegation keeps both guards: bogus name -> `NO SUCH SUITE` exit 2; empty `T=` -> exit 2, neither paying a
+full link.
+
+### 2. Clean-tree link: ALREADY FIXED; the peer's report is STALE. `Makefile:154-155` CONFIRMED.
+
+`src/web_server.c` exists; `src/web_server.o` **is** in `OBJ_LIB` (Makefile:64); `WEB_TARGET` lists
+`$(OBJ_LIB)` **once** (101-102), no duplicate -- so the report does not reproduce, and the clean-tree
+`t-nogate T=mechanics` above IS the proof it had to build that object. `make all` exit 0, `make web` exit 0.
+Line 154-155 is separately accurate: `abilities_strings.bin` has been seen at exactly
+**726649, 726831, 726671, 726742**, and 726742 is what `cards/build` holds now -- hence the refusal.
+
+⚠ **ONE STALE COMMENT, NOT EDITED -- needs main's call.** `Makefile:874-879` (in `clean:`) still says
+*"src/web_server.o is deliberately NOT in SRC or OBJ_LIB"*, which is **false** since the fix. The
+`rm -f src/web_server.o` on 880 is still correct. Fixing the prose is a non-additive edit to main's
+change, so it is reported, not done.
+
+### 3. `pack.py` guarded -- and it is NOT at `cards/pack.py`.
+
+It is **`platforms/genesis/c/pack.py`** (no `cards/pack.py` exists in the repo). Its 48-62 are the
+described site: `nums` from `gen_data.c`, `abstr` from disk; slicing mismatched generations raises nothing
+-- it byte-splices. That is the 494-abilities (2026-09-30) / 1408-string-refs (2026-10-01) failure mode,
+previously unguarded. Now REFUSES (exit 1, no `--force`, repairs nothing) on: blob length !=
+`RBKA_STRINGS_TABLE_LEN`; `nums[0] != 0`; any **decrease**; last offset != table length; FNV count !=
+`NUM_STRING_OFFSETS - 1`. Tests derived from measurement: 6033 entries, `nums[0]=0`, `nums[-1]=726671`,
+**0 decreases** and exactly **1 zero-length interval** (a legal empty string) -- so ordering is
+non-decreasing, not strictly-increasing; a strict test would have failed a good tree. Writes go through
+`write_atomic()` (temp + `os.replace` + `fsync`), and **all verification precedes any write**.
+**Proof it fires** (fixtures; live tree untouched) -- **5/5**: byte-exact -> exit 0, writes `abstr_gen.bin`
+(732703 B / 6032 strings); blob 61 B short -> exit 1 *"disagree on the table length"*; blob 71 B long ->
+exit 1; offsets backwards -> exit 1 *"out of order"*; FNV off by one -> exit 1. Nothing written on refusal.
+
+### 4. Regen coupling guarded -- and the coupling in the brief is NOT REAL.
+
+**`make regen-check`** (new, also appended to `regen`) compiles a throwaway TU against the live header to
+**measure** `sizeof(GameState)`, then cross-checks six couplings. ⚠ **`RBKA_NUM_STRING_OFFSETS` does NOT
+change `sizeof(GameState)`**: `STRINGS_OFFSETS` is `extern const uint32_t *STRINGS_OFFSETS`
+(`include/rabuka.h:408`) -- a `.rodata` **pointer**, not a struct member -- and that macro appears nowhere
+in the header. Every large array in `GameState` is a fixed literal (64, 32, 48, 4096-tombstoned). What
+moves `sizeof(GameState)` is a change to `include/rabuka.h`. A guard asserting the string-count/sizeof
+link would have fired on every *healthy* regeneration, so the gate checks the real couplings. All six ok
+on the live tree: `sizeof(GameState)` measured **1090264** == `RB_GAMESTATE_BYTES_PINNED`;
+`RBKA_STRINGS_TABLE_LEN` 726671 == `STRINGS_BYTES` 726671; blob on disk 726671 == table; offsets 6033
+entries; FNV 6032 == 6033-1; `Makefile` sizeof note 1090264 == measured. **PASSED, exit 0** -- so §A4 and
+the `Makefile:3` note are correct now and need no move.
+
+**Proof it fires** (fixture copies; live tree never edited) -- **6/6**: unmodified -> exit 0; §A4 stale by
+one field -> exit 1 *"move the pin in test_harness_self.c AND the sizeof note ... in the SAME change"*;
+`STRINGS_BYTES` stale -> exit 1; sizeof note drifted to old 1195720 -> exit 1; harness pin contradicting
+the Makefile -> exit 1; caller pin disagreeing with the file -> exit 1, **both** discrepancies named.

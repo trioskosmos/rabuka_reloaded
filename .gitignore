@@ -271,6 +271,12 @@ tools/decklog/sample_codes.txt
 tools/decklog/search_meta_sample.jsonl
 tools/decklog/raw/
 tools/decklog/sample/
+# Per-deck HTML derived from raw/ by --html-dir. Same data as raw/, in the shape
+# decklog's own view page renders, so web_ui/deck_converter.html can paste it.
+tools/decklog/html/
+# Session material and the dedicated Chrome profile used by login.py / harvest_all.py.
+tools/decklog/.session.json
+tools/decklog/.chrome-profile/
 
 # Analysis OUTPUTS of analyze_combos.py, whose --out-dir defaults to
 # tools/decklog/analysis. Tracked scripts, untracked results — same rule as the

@@ -1,4 +1,4 @@
-﻿//! `GameState`: the whole mutable game, plus the operations on it.
+//! `GameState`: the whole mutable game, plus the operations on it.
 //!
 //! This file holds the state itself and the accessors. The `impl GameState`
 //! blocks that DO something to it are split across three real submodules (they
@@ -204,9 +204,12 @@ pub struct GameState {
     pub scratch_entry_positions: HashMap<i16, Option<u8>>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_constant_effect_ids: Vec<(i16, usize)>,
-    /// Did the last FULL `recalculate_constants` pass register any 常時-derived modifier?
-    /// Read only by that function's fast path; never used for gameplay decisions.
-    pub constants_registered: bool,
+    /// Set by settle_single_player_state while it is advancing automatic phases, so
+    /// dvance_phase can skip its per-phase check_timing; the settle loop then runs
+    /// ONE validation at the decision point instead. See the record in
+    /// game_setup::settle_single_player_state.
+    #[cfg_attr(feature = "serde_support", serde(skip))]
+    pub suppress_settle_check_timing: bool,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub ability_invalidations: SmallVec<[AbilityInvalidation; 4]>,
     pub replacement_effects: SmallVec<[ReplacementEffect; 2]>,
@@ -638,9 +641,8 @@ impl GameState {
             scratch_exp_heart: HashMap::default(),
             scratch_entry_positions: HashMap::default(),
             scratch_constant_effect_ids: Vec::new(),
-        // See recalculate_constants fast path: false until a full pass has run with a
+        suppress_settle_check_timing: false,
         // 常時 actually in play.
-        constants_registered: false,
             ability_invalidations: SmallVec::new(),
              replacement_effects: SmallVec::new(),
 

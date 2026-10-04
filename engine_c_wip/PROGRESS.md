@@ -199,6 +199,26 @@ Agents must not translate these. They are not part of the C engine's behavior.
 >   (self-contained, closes a real information leak), and only then decide whether
 >   the `CardDisplay`/`GameStateDisplay` structs are wanted as a schema.
 
+> ### ⛔ RE-CONFIRMED INDEPENDENTLY at `c9da256`, 2026-10-04 — bot OUT stands; three details above are corrected
+> The **decision** in (1) was re-derived from scratch and is **unchanged: `engine/src/bot/**` is OUT of scope.** The
+> decisive question — *is any bot module a dependency of engine code the C actually ports?* — had never been
+> answered; it is now, and the answer is **no**. Evidence in `RUST_ORACLE_REPAIR.md`, appendix. The corrections
+> that matter here:
+> * **Size was wrong again.** `engine/src/bot/` is **22 567 lines / 26 files**, not 21 561; `engine/src/bin/` is
+>   **12 283 lines / 27 files**, not ~6.4k; `engine/src` overall is **121 766 lines / 162 files**.
+> * **The `crate::core::stats_pipeline` blocker does not exist.** `core/stats_pipeline.rs` (10 270 B) has **zero**
+>   occurrences of `bot`, `Lcg` or `TurnEngine`. Likewise `rng::Lcg` is used by **11 `src/bin/` files and zero
+>   library modules**, and the ported `turn/*` modules contain no bot reference and no `Lcg`. The "independently
+>   blocked" argument above rests on a premise that is **not reproducible**; the OUT decision nevertheless stands
+>   on the stronger direct evidence — no engine→bot edge among ported modules.
+> * **The one remaining real edge is `bot/observation.rs` (892 lines, 1 module)** — `PublicObservation`, imported
+>   only by `game/replay.rs:1`, which is Rust-only (no `replay.c` in `src/`, `web_server.c` CLEAN of replay,
+>   `tests/replay.c:12` still says *"Future: load tests/fixtures/"*). **If the C ever implements replay, this one
+>   module comes with it.** Everything else in `bot/` stays out.
+> * Revisit triggers are recorded verbatim in `RUST_ORACLE_REPAIR.md` §1.4 — only if the C ports
+>   `game/replay.rs` or `game/display.rs`, or `web_server.c` grows a replay-import route, or `tests/replay.c`
+>   starts loading committed JSON fixtures from a Rust binary.
+
 ### Wave order (do these in sequence; do not just fan out forever)
 1. **Integration wave.** Many worktrees were created from a stale baseline and carry
    large unrelated diffs. Reduce every useful branch to `engine_c_wip`-only changes

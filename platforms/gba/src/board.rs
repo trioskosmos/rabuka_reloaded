@@ -223,20 +223,6 @@ impl Board {
         for i in 0..STAGE_SIZE {
             p2_stage[i] = stage_slot(you.stage.stage[i]);
             p1_stage[i] = stage_slot(me.stage.stage[i]);
-            // `diag-trace`: the raw slot contents, so a duplicate card number
-            // across two slots can be attributed to the game state rather than
-            // to the renderer.
-            #[cfg(feature = "diag-trace")]
-            agb::println!(
-                "[stg] t={} p2[{}]={}={} p1[{}]={}={}",
-                gs.turn_number,
-                i,
-                you.stage.stage[i],
-                p2_stage[i].card_no.unwrap_or("-"),
-                i,
-                me.stage.stage[i],
-                p1_stage[i].card_no.unwrap_or("-")
-            );
         }
         for s in p2_stage.iter_mut() {
             s.actionable = is_actionable(&s.card_no);

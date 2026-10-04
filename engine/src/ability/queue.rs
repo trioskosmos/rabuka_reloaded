@@ -1,4 +1,4 @@
-﻿use crate::Arc;
+use crate::Arc;
 
 use smallvec::SmallVec;
 
@@ -303,7 +303,10 @@ impl AbilityQueue {
                 };
                 return true;
             }
-            self.current_index += 1;
+            // Saturating: `current_index` is a `u8`, and a random-policy playout over
+            // many decks reached 255 entries. Wrapping to 0 here would restart the scan
+            // forever; saturating stops it.
+            self.current_index = self.current_index.saturating_add(1);
         }
         false
     }
@@ -447,7 +450,9 @@ entry_index: u8::try_from(idx).unwrap(),
             _ => {}
         }
         self.state = QueueState::Idle;
-        self.current_index += 1;
+        // Saturating: `current_index` is a `u8`, and a random-policy playout over many
+        // decks reached 255 entries.
+        self.current_index = self.current_index.saturating_add(1);
     }
 
     /// Skip remaining abilities for a specific card (e.g., after optional cost skip)
@@ -604,9 +609,26 @@ entry_index: u8::try_from(idx).unwrap(),
     /// Set the current index to a specific entry without reordering the queue
     /// (unlike promote_entry_by_abs which removes/inserts). Used by depth-first
     /// drain loops to process newly-queued entries in-place.
-    pub fn set_current_entry(&mut self, absolute: usize) {
+pub fn set_current_entry(&mut self, absolute: usize) {
         if absolute < self.entries.len() {
-            self.current_index = u8::try_from(absolute).unwrap();
+            // `current_index` is a `u8`, so the queue can only ADDRESS 256 entries.
+            // A random-policy playout over many decks reached 256 and panicked here
+            // (`TryFromIntError(PosOverflow)`) with all 4173 tests green — nothing
+            // builds a queue that deep.
+            //
+            // Saturating rather than unwrapping: below the limit this is identical, and
+            // above it the engine degrades to the last addressable entry and says so
+            // instead of dying in a shipped binary. The real fix is widening
+            // `current_index` and the entries' `entry_index` to `usize`, which reaches
+            // the chooser payload and the web JSON.
+            self.current_index = u8::try_from(absolute).unwrap_or_else(|_| {
+                log::error!(
+                    "[QUEUE_CAP] set_current_entry({absolute}) with {} entries: \
+                     current_index is a u8 and saturates at 255. Widen the index type.",
+                    self.entries.len()
+                );
+                u8::MAX
+            });
         }
     }
 

@@ -10,6 +10,7 @@ use agb::display::object::{
     DynamicSprite256, Object, PaletteMulti, PaletteVramMulti, Size, SpriteVram,
 };
 use agb::display::{busy_wait_for_vblank, Graphics, Palette16, Priority, Rgb15, Rgb};
+use agb::ExternalAllocator;
 
 use crate::board::{BoardFrame, Slot};
 use crate::card_art_gen::{CardArt, CardFront, BACK_FRONT, BOARD_UI, CARD_ART, CARD_FRONTS, LIVE_FRONTS, MASTER_PAL, STAGE_FRONTS, WAITED_FRONTS, lz77_decompress_wram};
@@ -106,15 +107,26 @@ const DETAIL_PX: (usize, usize) = (96, 144);
 /// Sprite tilings per card box: (hardware size, x-offset, y-offset) in px.
 /// Every entry is a legal GBA sprite size; gutters (sprite area outside the
 /// card box) are filled with palette index 0 = transparent.
+///
+/// These are sized to the *art*, not to the box. Every OBJ tile is 64 bytes
+/// (8bpp), so a part that is wider than the pixels it actually carries is pure
+/// waste against agb's 32KB ceiling -- and OBJ VRAM is the binding constraint
+/// for the whole board, so the waste is what forces evictions and blank slots.
+///
+///  * hand: art is 24x32 = 3 tile columns. Two 16px parts covered 32 columns,
+///    so a quarter of every hand card was transparent padding. 1024B -> 768B.
+///  * live: art is 22x16 = 3 tile columns. The single 32px part carried 9
+///    empty columns. 1024B -> 384B, and 12 slots are live on screen at once.
 const HAND_PARTS: &[(Size, usize, usize)] =
-    &[(Size::S16x32, 0, 0), (Size::S16x32, 16, 0)];
+    &[(Size::S16x32, 0, 0), (Size::S8x32, 16, 0)];
 const STAGE_PARTS: &[(Size, usize, usize)] = &[
     (Size::S32x32, 0, 0),
     (Size::S16x32, 32, 0),
     (Size::S32x16, 0, 32),
     (Size::S16x16, 32, 32),
 ];
-const LIVE_PARTS: &[(Size, usize, usize)] = &[(Size::S32x16, 0, 0)];
+const LIVE_PARTS: &[(Size, usize, usize)] =
+    &[(Size::S16x16, 0, 0), (Size::S8x16, 16, 0)];
 // NOTE: waited art (32x24) is centred inside the slot's own box tiling via
 // ox/oy, so it needs no dedicated parts table.
 const DETAIL_PARTS: &[(Size, usize, usize)] = &[
@@ -491,10 +503,34 @@ impl CardSpriteCache {
         let ox = (box_w as i32 - rw as i32) / 2;
         let oy = (box_h as i32 - rh as i32) / 2;
         let (sw, sh) = size.to_width_height();
-        let mut sprite = DynamicSprite256::new(size);
+        // Stage the rasterised part in EWRAM, not agb's default IWRAM arena.
+        //
+        // `DynamicSprite256::new` allocates its pixel buffer from
+        // `InternalAllocator`, whose whole arena is IWRAM minus whatever agb's
+        // own `.iwram` section (IRQ handlers, VBlank/DMA, panic renderer) already
+        // occupies -- 32KB total, shared with the BIOS interrupt stack at the
+        // very top. A single stage part needs 1,024B and a detail part 2,048B,
+        // so once that arena is nearly full `new` hits its
+        // `.expect("should be able to allocate sprite buffer")` and the panic
+        // path dies in the panic renderer itself: the machine faults writing
+        // through a garbage pointer and ends up executing from 0x040007F4.
+        // That was the "crashes immediately or right after the mulligan"
+        // symptom, and it is invisible with `diag-noart` because that build
+        // never reaches this line.
+        //
+        // `ExternalAllocator` is the same arena agb's global allocator uses
+        // (256KB of EWRAM), and it returns a `Result` instead of panicking, so
+        // genuine exhaustion now drops one card instead of killing the game.
+        let mut sprite = match DynamicSprite256::try_new_in(size, ExternalAllocator) {
+            Ok(s) => s,
+            Err(_) => {
+                dlog!("no EWRAM for {}B sprite staging", size.size_bytes_256());
+                return None;
+            }
+        };
         // Gutters (sprite area outside the card box) must be index 0 =
         // transparent. clear() it explicitly: `new` does not guarantee
-        // zero-fill, and stale IWRAM here reads as confetti.
+        // zero-fill, and stale buffer contents here read as confetti.
         sprite.clear(0);
         for sy in 0..sh {
             for sx in 0..sw {

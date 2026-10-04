@@ -1008,6 +1008,22 @@ fn real_main() -> Result<(), String> {
         }
         rabuka_engine::timer::print_results();
     }
+    {
+        // The `recalculate_constants` fast path is measured by HOW OFTEN IT FIRES, not by
+        // wall clock: the gate itself does work on every call, so a low skip rate makes the
+        // optimisation a net loss, and only the ratio shows that.
+        let (skips, fulls) = rabuka_engine::core::runtime_flags::constant_recalc_counts();
+        let total = skips + fulls;
+        if total > 0 {
+            println!(
+                "SIM_BENCH_RECALC total={} skip={} ({:.1}%) full={}",
+                total,
+                skips,
+                100.0 * skips as f64 / total as f64,
+                fulls
+            );
+        }
+    }
 
     println!(
         "\nSIM_BENCH_SUMMARY policy={} seed={} games={} decks={} repeat={} jobs={} total_secs={:.3} mean_gps={:.3} mean_aps={:.1} total_actions={}",

@@ -409,6 +409,22 @@ pub fn is_live_card_set_phase(game_state: &GameState) -> bool {
 /// This is identical to the logic used by web_server.rs.
 pub fn settle_single_player_state(game_state: &mut GameState) {
     let mut iters = 0u32;
+    // Suppress the per-phase `check_timing` and run ONE full validation when the settle
+    // reaches a decision point.
+    //
+    // `advance_phase` ends each of its five phase arms with `check_timing`, a full state
+    // re-derivation (every 常時 condition re-evaluated + a full ability-queue settle).
+    // Each arm genuinely changed state — the comments at those call sites say so — so the
+    // work is not redundant in isolation. It is redundant in SEQUENCE: `advance_phase` is
+    // measured at ~2.8 calls per action from this loop, so one action validates the whole
+    // board two to three times before anything is decided, and each pass re-derives from
+    // the same cards.
+    //
+    // Gated by `RABUKA_AB_SETTLE_CHECK_TIMING=off` because the arms' comments assert the
+    // constants must be fresh at each boundary; if that is genuinely required rather than
+    // merely conventional, the suite says so and the flag turns it off.
+    let batched = crate::core::runtime_flags::ab_flag("settle_check_timing");
+    game_state.suppress_settle_check_timing = batched;
     loop {
         iters += 1;
         if iters > 500 {
@@ -426,6 +442,12 @@ pub fn settle_single_player_state(game_state: &mut GameState) {
         } else {
             break;
         }
+    }
+    game_state.suppress_settle_check_timing = false;
+    if batched {
+        // The single validation the loop's per-phase calls were standing in for, run at
+        // the point the game actually stops and a human (or a bot) has to decide.
+        crate::turn::TurnEngine::check_timing(game_state);
     }
 }
 

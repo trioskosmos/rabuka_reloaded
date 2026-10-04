@@ -3176,6 +3176,70 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
         return 0;
     }
 
+    /* Whether a prompt was ALREADY open when the effect was about to run --
+     * Rust cannot conflate the two, this C can. See the note on the
+     * `!pending_before_effect` term below. */
+    int pending_before_effect = rb_has_pending_choice(g);
+
+    /* resolver.rs:1207-1210, the FIRST of the two `cost_paid` writes, the one
+     * that is NOT gated on `ability.cost`, and the one this port was missing:
+     *
+     *     if !cost_already_paid {
+     *         if let Some(entry) = gs.ability_queue.current_entry_mut() {
+     *             entry.cost_paid = true;
+     *         }
+     *         ... the weakened use-limit record ...
+     *     }
+     *
+     * It lives INSIDE run_ability_effect's pending arm, so `ability.cost.is_some()`
+     * is NOT part of its condition -- the other write, resolver.rs:1368-1373, is
+     * the one that carries that term, and it sits BEFORE the effect runs and so
+     * cannot fire for a prompt the EFFECT raised.
+     *
+     * This is the line the deck-order re-fire was waiting on, and its absence is
+     * why every attempted fix on that defect was net zero:
+     *
+     *   - `is_paid` at resolver.rs:1237-1241 reads `entry.cost_paid`. With this
+     *     write missing, that read was 0 for a costless ability, so the
+     *     `effect_started` stamp never landed.
+     *   - rb_drain_ability_queue then scanned the entry with
+     *     `started=0 completed=0` and RE-EXECUTED the whole sequential, raising a
+     *     SECOND deck-order prompt over cards already placed on the deck.
+     *   - MEASURED on parity_search_reorder's six nozomi cases
+     *     (PL!-bp6-016-N, ライブ成功時「デッキの上からカードを3枚見る。それらを
+     *     好きな順番でデッキの上に置く。」, the needs_order arm at
+     *     move/mod.rs:3139-3149): two `begin`s per case,
+     *     `the looked_at pool is emptied (got 3 expected 0)` x6, and a deck
+     *     missing the three cards the first prompt had already put there.
+     *
+     * The ability has NO cost of its own (the ライブ成功時 text is the whole
+     * `ability` string; the member's play cost is not part of it), so the
+     * cost-gated write at resolver.rs:1368-1373 can never fire for it --
+     * which is why an `is_paid`-faithful stamp ALONE measured as a no-op, and
+     * why stamping the entry UNCONDITIONALLY was the wrong shape: Rust's
+     * condition really is `!cost_already_paid`, and that term is load-bearing
+     * (a cost already paid on an earlier pass must not re-stamp).
+     *
+     * Placement is Rust's: inside the `!cost_already_paid` block that also
+     * carries the weakened use-limit record, i.e. before the effect runs. Rust
+     * writes through `current_entry_mut()`; `entry` is that same entry here
+     * (g->queue.cur is published before this function is entered) and
+     * rb_execute_effect_ex has not run yet, so nothing can have re-entered the
+     * queue and moved it.
+     *
+     * `!pending_before_effect` is the C's stand-in for a structural fact Rust has
+     * and the C does not: handle_pending_choice (resolver.rs:1375) returns Ok(())
+     * while the COST's own prompt is open, so run_ability_effect — and with it
+     * this whole :1201-1248 tail — is never reached on that path. The C has ONE
+     * `if (rb_has_pending_choice(g))` arm covering both, so a cost prompt and an
+     * effect prompt have to be told apart by hand. MEASURED without this term:
+     * parity_cce_gaps 88 -> 110, twenty-two new failures, every one of them an
+     * ability whose COST opens the prompt (wait-state member selection, discard
+     * costs, retrieve-a-live costs) whose effect then never ran because
+     * effect_started had been stamped on the cost-side entry. */
+    if (!pending_before_effect && !cost_already_paid)
+        entry->cost_paid = 1;
+
     if (ab->effect) {
         if (!rb_can_activate_effect(g, actor, ab->effect, cid)) {
             rb_free_ability(ab);
@@ -3222,6 +3286,53 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
             !(ab->effect && ab->effect->is_optional)) {
             rb_record_ability_use(g, cid, aidx);
             entry->use_limit_recorded = 1;
+        }
+        /* resolver.rs:1234-1246, verbatim — the stamp that makes the re-fire
+         * impossible, and the reason the two writes above are not one:
+         *
+         *     // Mark effect as started when a pending choice comes from effect
+         *     // execution (not cost). This prevents RWC from re-entering the
+         *     // ability after the effect's choice resolves.
+         *     let is_paid = cost_already_paid
+         *         || gs.ability_queue.current_entry().is_some_and(|e| e.cost_paid);
+         *     if is_paid {
+         *         if let Some(entry) = gs.ability_queue.current_entry_mut() {
+         *             entry.effect_started = true;
+         *         }
+         *     }
+         *
+         * Both terms read, so this depends on the `cost_paid = true` write at
+         * resolver.rs:1207-1210 above; neither line alone is enough, which is
+         * exactly why every earlier attempt at this defect was net zero:
+         *   - with only this stamp, `is_paid` was false for a costless ability
+         *     (entry.cost_paid still 0);
+         *   - with only the cost_paid write, nothing consumed it.
+         *
+         * The `is_paid` GATE is Rust's and is load-bearing: a prompt raised
+         * while the COST is still being paid must leave the entry un-stamped,
+         * because the answer path has to re-enter and run the effect then. An
+         * unconditional stamp here is a large measured regression (it stamps the
+         * cost-side entries too), and `pca_resolve_entry` is the site the drain's
+         * own twin at ability_queue.c:1667-1670 does NOT cover: the drain reaches
+         * that copy only when IT executed the effect, this arm is reached when
+         * pca_process_current_ability did.
+         *
+         * MEASURED effect of adding both, parity_search_reorder's six nozomi
+         * cases (PL!-bp6-016-N): `the looked_at pool is emptied (got 3 expected
+         * 0)` x6 -> 0, and the deck-order assertion 6x -> 0. What the stamp
+         * prevents, concretely: rb_resolver_clear_choice_state_and_resume
+         * (choice.c:445-451) ends in rb_drain_ability_queue, which used to scan
+         * the entry with `started=0 completed=0` and RE-EXECUTE the whole
+         * sequential — a SECOND deck-order prompt over cards already on the deck.
+         *
+         * The entry is re-derived from `g->queue.cur` rather than through the
+         * `entry` pointer, for the reason ability_queue.c:1060-1070 gives:
+         * rb_execute_effect_ex may re-enter the queue, and Rust's
+         * `current_entry_mut()` is exactly that indirection. */
+        if (cost_already_paid || entry->cost_paid) {
+            int ci = g->queue.cur;
+            if (ci >= 0 && ci < g->queue.n_entries)
+                g->queue.entries[ci].effect_started = 1;
         }
         rb_free_ability(ab);
         return 1;
