@@ -95,7 +95,17 @@ static void fatal_handler(int sig)
             g_shared->name[i] = g_case_name[i];
         g_shared->name[i] = 0;
     }
-    _exit(0);
+    /* Twin of tests/test_audit_actions.c's fatal_handler. `_exit(0)` made a
+     * CRASH a normal exit: `WIFSIGNALED(status)` in the parent was false and the
+     * child looked clean to every status-based reader. This suite's own
+     * `stage_first_empty_is_centre_first` child has crashed exactly once (the
+     * nondeterministic SIGSEGV recorded in PARITY_CHECKLIST.md H3) -- with an
+     * exit status of 0, so nothing outside the shared counters could tell.
+     * Restore the default disposition and re-raise; the wait status and the
+     * shared counters then agree and a crash can never read as a pass. */
+    signal(sig, SIG_DFL);
+    raise(sig);
+    _exit(128 + sig);
 }
 
 /* Variadic on purpose: a two-argument CHECK(cond, "a" "b") silently splits the
@@ -475,10 +485,109 @@ static void test_place_empty_destination(TestGame *tg)
                  "waitroom and returns true");
 }
 
-/* =========================================================================
- * LAYER 3 -- CAPACITY. Rust's zones are SmallVecs with no ceiling; the C's are
- * fixed RbBag arrays. This layer measures the two against each other.
- * ====================================================================== */
+/* GREEN. `rb_stage_first_empty` (src/core/zones.c) must reproduce
+   util::stage_first_empty (engine/src/ability/util.rs:2541-2551) EXACTLY,
+   including the probe order:
+ *
+ *     if stage[1] == -1 { Some(1) }        // CENTRE
+ *     else if stage[0] == -1 { Some(0) }   // LEFT
+ *     else if stage[2] == -1 { Some(2) }   // RIGHT
+ *     else { None }
+ *
+ * The C used to scan slots 0,1,2, so it answered LEFT whenever the left and the
+ * centre were both empty. That is a different SLOT, not a different order of
+ * the same slot, and it is the slot a placement lands in. Corpus reach: 10
+ * abilities with `destination:"stage"`, 8 with `"empty_area"` and 7 with
+ * `"same_area"` all reach a stage-placement arm, plus turn/phase.c's single-baton
+ * area default. */
+static void test_stage_first_empty_is_centre_first(TestGame *tg)
+{
+    (void)tg;
+    const int E = RB_EMPTY_SLOT;
+
+    int all_empty[RB_STAGE_SIZE];
+    for (int i = 0; i < RB_STAGE_SIZE; i++) all_empty[i] = E;
+    CHECK(rb_stage_first_empty(all_empty) == 1,
+          "an empty stage answers CENTRE (util.rs:2542 `stage[1] == -1 -> Some(1)`), "
+          "not LEFT: the C scanned 0,1,2");
+
+    int left_taken[RB_STAGE_SIZE] = { 11, E, E };
+    CHECK(rb_stage_first_empty(left_taken) == 1,
+          "left occupied + centre empty answers CENTRE (util.rs:2542 still first)");
+
+    int centre_taken[RB_STAGE_SIZE] = { E, 22, E };
+    CHECK(rb_stage_first_empty(centre_taken) == 0,
+          "centre occupied + left empty answers LEFT (util.rs:2543), skipping the "
+          "empty right: the probe is ORDERED, not a search for any vacancy");
+
+    int only_right[RB_STAGE_SIZE] = { 11, 22, E };
+    CHECK(rb_stage_first_empty(only_right) == 2,
+          "left AND centre occupied answers RIGHT (util.rs:2544), the last arm");
+
+    int full[RB_STAGE_SIZE] = { 11, 22, 33 };
+    CHECK(rb_stage_first_empty(full) == -1,
+          "a full stage answers -1, which is Rust's `None` (util.rs:2549)");
+
+    CHECK(rb_stage_first_empty(NULL) == -1,
+          "a null stage array is refused rather than dereferenced");
+}
+
+/* GREEN, end-to-end. The same rule reached through the production caller
+ * `rb_place_card_in_zone` (src/ability/util.c:1142-1143), whose
+ * `zone == "stage" || zone == "empty_area"` arm is Rust's
+ * `Some(Zone::Stage) | Some(Zone::EmptyArea)` arm (util.rs:2442-2456) and calls
+ * stage_first_empty at util.rs:2447. `vacated_area` is Rust's
+ * `Option<usize>::None`, which the C spells -1. */
+static void test_place_stage_lands_in_the_centre(TestGame *tg)
+{
+    load_fixtures(tg);
+
+    /* Both arms share one Rust match arm, so both must land centre-first. */
+    const char *arms[2] = { "stage", "empty_area" };
+    for (int a = 0; a < 2; a++) {
+        clear_seat(tg, 0);
+        int cid = test_id(tg, MEMBER_NO);
+        CHECK(cid >= 0, "%s: fixture %s resolves", arms[a], MEMBER_NO);
+        if (cid < 0) continue;
+
+        int before = test_total_card_count(tg);
+        /* Park the card in the source bag so the census can see the transfer. */
+        test_add_to_discard(tg, cid);
+        rb_remove_card_from_zone(&tg->state, 0, cid, "discard");
+        int staged = rb_place_card_in_zone(&tg->state, 0, cid, arms[a], -1);
+        int after = test_total_card_count(tg);
+
+        RbPlayer *P = &tg->state.p[0];
+        CHECK(staged == 1, "%s: placement returns true (util.rs:2455)", arms[a]);
+        CHECK(P->stage[1] == cid,
+              "%s with no vacated area lands in the CENTRE (util.rs:2447 + :2542); "
+              "left is still empty (left=%d)", arms[a], P->stage[0]);
+        CHECK(P->stage[0] == RB_EMPTY_SLOT && P->stage[2] == RB_EMPTY_SLOT,
+              "%s: no other stage slot is touched", arms[a]);
+        CHECK(after == before + 1,
+              "%s: the card is on the board, not destroyed (census %d -> %d)",
+              arms[a], before, after);
+    }
+
+    /* A named vacated area still wins over the probe: Rust consults
+     * `vacated_stage_area` first (util.rs:2443-2446 is the Stage arm's own
+     * empty_slots/is_max pair; the first-empty probe at :2447 only runs when
+     * `stage_first_empty` is reached, and the C's `vacated_area >= 0` arm is the
+     * SameArea contract at util.c:1212-1217). Left must stay reachable. */
+    clear_seat(tg, 0);
+    int cid2 = test_id(tg, LIVE_NO);
+    if (cid2 >= 0) {
+        test_add_to_discard(tg, cid2);
+        rb_remove_card_from_zone(&tg->state, 0, cid2, "discard");
+        rb_place_card_in_zone(&tg->state, 0, cid2, "same_area", 0);
+        CHECK(tg->state.p[0].stage[0] == cid2,
+              "an explicitly vacated LEFT area is still honoured "
+              "(util.rs:2492-2495 same_area arm), so the centre-first probe does "
+              "not override a named area");
+    }
+}
+
+
 
 /* GREEN. Rust LiveCardZone::can_place_card (zones.rs:518-521) is `true`
  * unconditionally -- no capacity rule at all. The limit that DOES exist is in
@@ -532,28 +641,63 @@ static void test_success_zone_fourth_card_survives(TestGame *tg)
           before, test_total_card_count(tg));
 }
 
-/* GREEN. Rust Player::refresh copies the WHOLE waitroom into the deck; the C
- * RbBag is capped at RB_MAX_ZONE and the old body cleared discard.n
- * unconditionally after copying only as many cards as fitted. Reaching that cap
- * needs a 512-card deck, which no real deck holds (60 cards: see
- * engine/src/bot/neural.rs:200, main_deck_size / 60.0), so this asserts the
- * conservation law on an ordinary refresh rather than by filling the bag. */
+/* GREEN. Rust Player::refresh (player.rs:636) guards a CONJUNCTION --
+    `if self.main_deck.is_empty() && !self.waitroom.cards.is_empty()` -- and
+    both halves are load-bearing. The C body tested only the second, so it
+    spliced the waitroom into a deck that still had cards; because Rule 10.2.3
+    appends to the BOTTOM, that silently reorders a live deck. Both Rust arms are
+    asserted here, which is strictly MORE than the previous version of this case
+    (it asserted only the waitroom-empty half, with a 20-card deck present, i.e.
+    the diverging answer). Reaching the RbBag cap needs a 512-card deck, which no
+    real deck holds (60 cards: engine/src/bot/neural.rs:200), so the conservation
+    law is asserted on an ordinary refresh rather than by filling the bag. */
 static void test_refresh_conserves_cards(TestGame *tg)
 {
     load_fixtures(tg);
     clear_seat(tg, 0);
     RbPlayer *P = &tg->state.p[0];
-    for (int i = 0; i < 20; i++) { test_add_to_discard(tg, g_member);
-                                  test_add_to_deck_pl(tg, 0, g_live); }
+    /* ARM 1 (Rust player.rs:636, both halves true): deck EMPTY + waitroom full
+     * -> the whole waitroom crosses, deck_refreshed_this_turn is set. */
+    for (int i = 0; i < 20; i++) test_add_to_discard(tg, g_member);
     int before = test_total_card_count(tg);
+    CHECK(P->deck.n == 0, "arm 1 precondition: the main deck is EMPTY");
     CHECK(rb_zone_refresh(&tg->state, 0) == 1,
-          "refresh returns 1 with a non-empty waitroom");
-    CHECK(P->discard.n == 0, "an ordinary refresh empties the waitroom (%d left)",
-          P->discard.n);
+          "arm 1: refresh returns 1 with an empty deck and a non-empty waitroom");
+    CHECK(P->discard.n == 0, "arm 1: an ordinary refresh empties the waitroom "
+          "(%d left)", P->discard.n);
+    CHECK(P->deck_refreshed_this_turn == 1,
+          "arm 1: deck_refreshed_this_turn is set (player.rs:644)");
     CHECK(test_total_card_count(tg) == before,
-          "refresh conserves the census (%d -> %d); the old body cleared "
+          "arm 1: refresh conserves the census (%d -> %d); the old body cleared "
           "discard.n unconditionally after copying only what fitted",
           before, test_total_card_count(tg));
+
+    /* ARM 2 (Rust player.rs:636, FIRST half false): deck NON-empty + waitroom
+     * full -> Rust's guard fails and refresh is a NO-OP. This is the arm the old
+     * C body got wrong: it returned 1 and spliced 20 waitroom cards into a deck
+     * that already had 20. */
+    clear_seat(tg, 0);
+    for (int i = 0; i < 20; i++) { test_add_to_discard(tg, g_member);
+                                   test_add_to_deck_pl(tg, 0, g_live); }
+    before = test_total_card_count(tg);
+    int deck_before = P->deck.n, wait_before = P->discard.n;
+    CHECK(rb_zone_refresh(&tg->state, 0) == 0,
+          "arm 2: refresh is a NO-OP while the main deck is non-empty "
+          "(Rust player.rs:636 requires main_deck.is_empty())");
+    CHECK(P->deck.n == deck_before && P->discard.n == wait_before,
+          "arm 2: neither zone changed (deck %d->%d, waitroom %d->%d); the old "
+          "body spliced %d waitroom cards under %d live cards",
+          deck_before, P->deck.n, wait_before, P->discard.n,
+          wait_before, deck_before);
+    CHECK(test_total_card_count(tg) == before,
+          "arm 2: the census is unchanged (%d -> %d)", before,
+          test_total_card_count(tg));
+
+    /* ARM 3 (Rust player.rs:636, SECOND half false): deck empty + waitroom empty
+     * -> no-op. */
+    clear_seat(tg, 0);
+    CHECK(rb_zone_refresh(&tg->state, 0) == 0,
+          "arm 3: refresh is a NO-OP when the waitroom is empty");
 }
 
 /* GREEN. rb_zone_invariant advertised "under_cards mirror" and checked neither.
@@ -924,7 +1068,7 @@ static void run_case(const Case *c)
         failures   = 0;
         rb_card_copy_pool_reset();
 
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         c->fn(&tg);
         g_shared->assertions = assertions;
@@ -952,17 +1096,26 @@ static void run_case(const Case *c)
         }
         fprintf(stderr, "FAIL: %s: fatal %s (%d) in child after %d assertion(s)\n",
                 c->name, nm, g_shared->signal, g_shared->assertions);
+        printf("CRASH: %s (%s in child)\n", c->name, nm);
         failures++; assertions++;
         return;
     }
     if (!g_shared->exited_ok) {
         fprintf(stderr, "FAIL: %s: child terminated abnormally (wait status %d) "
                         "after %d assertion(s)\n", c->name, status, g_shared->assertions);
+        printf("CRASH: %s (abnormal child exit)\n", c->name);
         failures++; assertions++;
         return;
     }
 
     int failed = g_shared->failures > 0;
+    /* The corpus verdict, in the shape every other FORK suite prints. Additive:
+     * the `== <name>: ...` lines below keep this suite's own classification and
+     * red-pinned bookkeeping. Before this, a case that failed printed only the
+     * FAIL assertion lines and an `== ...` line no `^FAILED` scanner matched, so
+     * the suite looked like it had zero failed tests. */
+    printf(failed ? "FAILED: %s\n" : "ok: %s\n", c->name);
+    fflush(stdout);
     if (!c->red_pinned && failed) {
         printf("== %s: GREEN case FAILED -> %s\n", c->name, c->classification);
     } else if (c->red_pinned && !failed) {
@@ -974,6 +1127,244 @@ static void run_case(const Case *c)
         printf("== %s: RED as pinned -> %s (%d failing assertion(s))\n",
                c->name, c->classification, g_shared->failures);
     }
+}
+
+/* GREEN. ExclusionZone::add_card (zones.rs:1038-1041) is a bare
+   `cards.push(card_id)` with NO membership guard. The C twin opened with a scan
+   and returned early on a duplicate; Rust does not. Asserted because the two
+   now agree, and because `exclusion_zone` being 0 of the 985 corpus zone
+   strings means no verdict can detect a regression here on its own. */
+static void test_exclusion_zone_twice_is_two_cards(TestGame *tg)
+{
+    load_fixtures(tg);
+    clear_seat(tg, 0);
+    int g_excl = test_id(tg, ENERGY_NO);
+    CHECK(g_excl >= 0, "exclusion fixture %s resolves", ENERGY_NO);
+    if (g_excl < 0) return;
+    tg->state.exclusion_zone.n = 0;
+    rb_exclusion_add(&tg->state, g_excl);
+    rb_exclusion_add(&tg->state, g_excl);
+    CHECK(tg->state.exclusion_zone.n == 2,
+          "exclusion_zone holds BOTH pushes (%d) -- Rust zones.rs:1040 pushes "
+          "unconditionally; the old C dedup scan returned early and held 1",
+          tg->state.exclusion_zone.n);
+}
+
+/* GREEN. The live-score heart gate (zones.rs:577-597) delegates to
+   check_heart_requirement (core/card.rs:4360-4403). The C had a SECOND, weaker
+   private copy (the old `local_check_heart_req`), which is now deleted in favour
+   of the real port `rb_check_heart_requirement` (state.c:1991). Two of the three
+   cases below are ones the private copy got WRONG; if a future edit reintroduces
+   a private copy these turn red again. */
+static void test_live_score_heart_gate_matches_rust(TestGame *tg)
+{
+    load_fixtures(tg);
+    clear_seat(tg, 0);
+    RbPlayer *P = &tg->state.p[0];
+    /* The `All` bucket is index 7. Rust iterates need.hearts, whose keys include
+       HeartColor::All (card.rs:4377), so an All-bucket requirement IS checked.
+       The old private loop ran `for(c=1;c<7;c++)` and never looked at index 7,
+       so it answered "satisfied" for a card needing hearts the player cannot
+       supply. */
+    int need_all[8]   = {0,0,0,0,0,0,0,2};
+    int no_red[8]     = {0,0,0,0,0,0,0,0};
+    CHECK(!rb_check_heart_requirement(need_all, no_red),
+          "an All-bucket (index 7) requirement of 2 with nothing supplied is "
+          "NOT satisfied (card.rs:4377-4384 iterates All; the old private copy "
+          "skipped index 7 entirely and answered yes)");
+
+    /* Heart00 (\"heartless\") is the leftover/wildcard arm (card.rs:4392-4401).
+       The old private copy had no `remaining` table at all and so could not
+       evaluate it. need 2 heartless, and the only supplied hearts are two BLUE
+       (index 4) that no requirement consumes. */
+    int need_h00[8]   = {2,0,0,0,0,0,0,0};
+    int two_blue[8]   = {0,0,0,0,2,0,0,0};
+    CHECK(rb_check_heart_requirement(need_h00, two_blue),
+          "2 heartless is satisfied by 2 unclaimed blue hearts (card.rs:4392-4401 "
+          "leftover_sum); the old private copy never tracked `remaining`");
+
+    /* An EMPTY need short-circuits to true BEFORE `provided` is consulted
+       (card.rs:4361-4363) -- and that short-circuit lives in the CALLER, not in
+       rb_check_heart_requirement, because the C port's NULL guard IS Rust's
+       caller-level `else { false }` for a NON-empty need with no stage hearts
+       (zones.rs:592-594). Both halves are asserted, through the exported gate
+       (rb_live_calculate_score) so neither is checked against a contract it
+       does not have. */
+    int need_none[8]  = {0,0,0,0,0,0,0,0};
+    CHECK(!rb_check_heart_requirement(need_none, NULL),
+          "rb_check_heart_requirement refuses a NULL `provided`; that guard is "
+          "Rust zones.rs:592-594 (`else { false }`), NOT card.rs:4361-4363 -- the "
+          "empty-need short-circuit has to be the CALLER's, so the exported gate "
+          "is what has to be right");
+    CHECK(rb_check_heart_requirement(need_none, no_red),
+          "an EMPTY requirement is satisfied by an empty stage "
+          "(card.rs:4361-4363: need.hearts.is_empty() -> true)");
+
+    /* Through the exported twin: with stage_hearts == NULL a live card scores 0
+       (Rust's else-false arm, zones.rs:592-594), and with a stage table that
+       DOES satisfy its printed need it scores. The stage table is built from the
+       card's own decoded need, so the second call cannot pass for an unrelated
+       reason. */
+    {
+        int g_lv2 = test_id(tg, LIVE_NO);
+        Card c2; int need2[8] = {0}, prov[8] = {0};
+        if (g_lv2 >= 0 && rb_decode_card_by_index((uint32_t)g_lv2, &c2)) {
+            rb_effective_need_heart(&tg->state, g_lv2, need2);
+            int any = 0;
+            for (int i = 0; i < 8; i++) { if (need2[i] > 0) any = 1; prov[i] = need2[i]; }
+            CHECK(any, "fixture %s decodes a non-empty need_heart, so the "
+                  "empty-stage path below is a real branch", LIVE_NO);
+            tg->state.p[0].live.n = 0;
+            rb_live_add_card(&tg->state.p[0], g_lv2);
+            int s_null = rb_live_calculate_score(&tg->state, 0, 0, NULL, 0);
+            CHECK(s_null == 0,
+                  "a live card WITH a need_heart scores 0 when the stage provides "
+                  "nothing (Rust zones.rs:592-594 else-false); got %d", s_null);
+            int s_ok = rb_live_calculate_score(&tg->state, 0, 0, prov, 0);
+            CHECK(s_ok > 0,
+                  "the same card scores once the stage provides exactly its "
+                  "printed need; got %d", s_ok);
+            /* One heart short of its own requirement -> 0 again. */
+            int short_by_one = 0, ci;
+            for (ci = 0; ci < 8; ci++) if (prov[ci] > 0) { prov[ci]--; short_by_one = 1; break; }
+            if (short_by_one) {
+                int s_short = rb_live_calculate_score(&tg->state, 0, 0, prov, 0);
+                CHECK(s_short == 0,
+                      "one heart short of the printed need the card scores 0; "
+                      "got %d", s_short);
+            }
+            tg->state.p[0].live.n = 0;
+            rb_free_card(&c2);
+        }
+    }
+
+    /* CORPUS FACT, pinned so the short-circuit stays visible: every live card in
+       cards.json carries a need_heart, so LiveCardZone::calculate_live_score's
+       empty-need short-circuit (zones.rs:578-579) is never reached by a PRINTED
+       requirement -- only by one a modifier empties. Recorded rather than
+       asserted vacuously. */
+    {
+        int no_need = 0, has_need = 0;
+        uint32_t n = rb_num_cards();
+        for (uint32_t i = 0; i < n; i++) {
+            Card c3;
+            if (!rb_decode_card_by_index(i, &c3)) continue;
+            if (!rb_card_is_live((int)i)) { rb_free_card(&c3); continue; }
+            if (c3.num_need == 0) no_need++; else has_need++;
+            rb_free_card(&c3);
+        }
+        CHECK(no_need == 0 && has_need > 0,
+              "corpus fact: %d live cards carry a need_heart and %d carry none, so "
+              "the empty-need short-circuit is reachable only through a modifier "
+              "(either way the gate delegates to the one port)", has_need, no_need);
+    }
+    (void)P;
+}
+
+/* GREEN. Corpus zone-string coverage, measured 2026-10-03 over all 985 unique
+   abilities in cards/abilities.json. The tally: 2674 zone-valued string
+   occurrences under the 30 zone-valued keys (zone / source / destination /
+   location / ...), across 25 distinct values. 24 of those 25 are zone
+   NAMES and all 24 are accepted by BOTH Rust tables
+   (ability/enums.rs:89-122 Zone::from_str and core/types.rs:765-796
+   ZoneId::from_str); the 25th, "activating_card" x1, is not a zone at all.
+   The C must resolve all 24 and must reproduce each Rust table's exact answer,
+   including the two that a naive shared table would get wrong
+   ("energy_zone" -> Energy, and the Japanese stage spelling). */
+static void test_corpus_zone_string_coverage(TestGame *tg)
+{
+    (void)tg;
+    static const struct { const char *s; RbZoneId z; int n; } CORPUS[] = {
+        /* value, ZoneId, corpus occurrence count (all 985 abilities) */
+        { "hand",                    RB_ZONEID_HAND,                    759 },
+        { "discard",                 RB_ZONEID_DISCARD,                 502 },
+        { "stage",                   RB_ZONEID_STAGE,                   455 },
+        { "energy_zone",             RB_ZONEID_ENERGY,                  185 },
+        { "deck_top",                RB_ZONEID_DECK_TOP,                157 },
+        { "deck",                    RB_ZONEID_DECK,                    144 },
+        { "revealed_cards",          RB_ZONEID_REVEALED_CARDS,           92 },
+        { "success_live_card_zone",  RB_ZONEID_SUCCESS_LIVE_ZONE,        81 },
+        { "energy_deck",             RB_ZONEID_ENERGY_DECK,              52 },
+        { "preceding_moved",         RB_ZONEID_PRECEDING_MOVED,         44 },
+        { "under_member",            RB_ZONEID_UNDER_MEMBER,            42 },
+        { "deck_bottom",             RB_ZONEID_DECK_BOTTOM,             38 },
+        { "live_card_zone",          RB_ZONEID_LIVE_CARD_ZONE,          37 },
+        { "success_live_zone",       RB_ZONEID_SUCCESS_LIVE_ZONE,        28 },
+        { "selected_cards",          RB_ZONEID_SELECTED_CARDS,          14 },
+        { "looked_at",               RB_ZONEID_LOOKED_AT,               10 },
+        { "empty_area",              RB_ZONEID_EMPTY_AREA,               9 },
+        { "same_area",               RB_ZONEID_SAME_AREA,                9 },
+        { "those_cards",             RB_ZONEID_THOSE_CARDS,              7 },
+        { "deck_top_or_bottom",      RB_ZONEID_DECK_TOP_OR_BOTTOM,       3 },
+        { "looked_at_remaining",     RB_ZONEID_LOOKED_AT_REMAINING,      2 },
+        { "front",                   RB_ZONEID_FRONT,                    1 },
+        { "recently_moved",          RB_ZONEID_RECENTLY_MOVED,           1 }
+    };
+    /* The one Japanese spelling in the corpus (1 occurrence, a `location` field).
+       Rust's ZoneId::from_str accepts it (types.rs:767 `"stage" | "\xE3\x82\xB9\xE3\x83\x86\xE3\x83\xBC\xE3\x82\xB8"`, i.e.
+       the stage spelling) and serde accepts it as a `Location` alias
+       (core/card.rs, Stage). Spelled as escapes, like the binding below it. */
+    const char *jp = "\xE3\x82\xB9\xE3\x83\x86\xE3\x83\xBC\xE3\x82\xB8";
+
+    int total = 0;
+    for (unsigned i = 0; i < sizeof CORPUS / sizeof CORPUS[0]; i++) {
+        RbZoneId got = rb_zone_id_from_str(CORPUS[i].s);
+        CHECK(got == CORPUS[i].z,
+              "corpus zone string \"%s\" (x%d) -> %s, matching Rust "
+              "(ability/enums.rs:89-122 / types.rs:765-796)",
+              CORPUS[i].s, CORPUS[i].n, rb_zone_id_as_str(CORPUS[i].z));
+        total += CORPUS[i].n;
+    }
+    CHECK(rb_zone_id_from_str(jp) == RB_ZONEID_STAGE,
+          "the one Japanese corpus zone string -> Stage (types.rs:767)");
+    total += 1;
+    CHECK(total == 2673,
+          "the tally adds up: 2674 zone-valued occurrences minus the single "
+          "non-zone value \"activating_card\" (got %d)", total);
+    /* And the one value that is NOT a zone must NOT resolve to a zone. */
+    CHECK(rb_zone_id_from_str("activating_card") == RB_ZONEID_UNKNOWN,
+          "\"activating_card\" (1 occurrence, a `location` field that names a "
+          "card role, not a zone) resolves to Unknown -- Rust's `_` arm");
+    /* No other corpus zone string may silently fall through: these are the ones
+       Rust DOES accept that the corpus never uses, asserted so the table cannot
+       lose a row without a verdict moving. */
+    CHECK(rb_zone_id_from_str("under") == RB_ZONEID_UNDER_MEMBER,
+          "\"under\" -> UnderMember (types.rs:782 alias arm)");
+    CHECK(rb_zone_id_from_str("resolution_zone") == RB_ZONEID_RESOLUTION,
+          "\"resolution_zone\" -> Resolution (types.rs:792 alias arm)");
+    CHECK(rb_zone_id_from_str("waitroom") == RB_ZONEID_WAITROOM,
+          "\"waitroom\" -> Waitroom (its own variant, not folded onto Discard)");
+}
+
+/* GREEN. `rb_zone_of_str` (src/engine.c:145, NOT this audit's file) narrows the
+   29-variant RbZoneId to the 8-value RbZone, and two spellings have no RbZone
+   partner. Pinned here because the CORPUS USES BOTH: `energy_deck` x52 and
+   `deck_bottom` x38. The refusal is CORRECT -- Rust has separate Energy/EnergyDeck
+   and Deck/DeckTop/DeckBottom variants (enums.rs:49-55, :108-112) and
+   place_card_in_zone arms them separately (util.rs:2457-2475), so folding them
+   would claim "top" for a bottom insert / move cards between two bags. What is
+   asserted is that the two callers that MUST tell them apart still own a
+   dedicated string arm, so the refusal cannot send a real card to the hand
+   catch-all. `deck_top` x157 folds onto RB_ZONE_DECK because that IS DeckTop's
+   rule (insert at idx, default 0 = top; util.rs:2457-2463). */
+static void test_zone_of_str_deck_bottom_and_energy_deck(TestGame *tg)
+{
+    (void)tg;
+    RbZone z;
+    CHECK(rb_zone_of_str("deck_top", &z) == 1 && z == RB_ZONE_DECK,
+          "rb_zone_of_str(\"deck_top\") -> RB_ZONE_DECK: the caller's top insert "
+          "IS DeckTop's rule (util.rs:2457-2463)");
+    CHECK(rb_zone_of_str("deck_bottom", &z) == 0,
+          "rb_zone_of_str(\"deck_bottom\") -> 0 (38 corpus occurrences): refusing "
+          "is correct, RB_ZONE_DECK would claim \"top\" for a bottom insert");
+    CHECK(rb_zone_of_str("energy_deck", &z) == 0,
+          "rb_zone_of_str(\"energy_deck\") -> 0 (52 corpus occurrences): "
+          "refusing is correct, RB_ZONE_ENERGY is a different bag");
+    CHECK(rb_zone_of_str("hand", &z) == 1 && z == RB_ZONE_HAND,
+          "control: rb_zone_of_str resolves a spellable zone");
+    CHECK(rb_zone_of_str("nonexistent_zone", &z) == 0,
+          "rb_zone_of_str refuses an unmapped spelling -> the caller's hand "
+          "fallback, which is Rust's `place_card_in_zone` catch-all (util.rs:2530)");
 }
 
 int main(void)
@@ -1044,7 +1435,21 @@ int main(void)
           test_success_zone_fourth_card_survives, 0,
           "src/core/zones.c fix: rb_success_add no longer caps at 3 and deletes" },
         { "refresh_conserves_cards",    test_refresh_conserves_cards,    0,
-          "src/core/zones.c fix: rb_zone_refresh no longer truncates the waitroom" },
+          "src/core/zones.c fix: rb_zone_refresh keeps the whole waitroom AND "
+          "Rust's main-deck-empty precondition (player.rs:636)" },
+        { "exclusion_zone_twice_is_two_cards", test_exclusion_zone_twice_is_two_cards, 0,
+          "src/core/zones.c fix: ExclusionZone::add_card pushes unconditionally "
+          "(zones.rs:1040); the invented dedup guard is gone" },
+        { "live_score_heart_gate_matches_rust", test_live_score_heart_gate_matches_rust, 0,
+          "src/core/zones.c fix: the live-score heart gate calls the ONE port of "
+          "check_heart_requirement (state.c:1991); the private weaker copy is gone" },
+        { "corpus_zone_string_coverage", test_corpus_zone_string_coverage, 0,
+          "all 24 zone strings the 985 abilities use resolve exactly as Rust does "
+          "(ability/enums.rs:89-122, types.rs:765-796)" },
+        { "zone_of_str_deck_bottom_and_energy_deck",
+          test_zone_of_str_deck_bottom_and_energy_deck, 0,
+          "src/engine.c:145 pin: energy_deck x52 and deck_bottom x38 have no "
+          "RbZone partner, and that refusal is the correct answer" },
         { "zone_invariant_sees_orphan_under_cards",
           test_zone_invariant_sees_orphan_under_cards, 0,
           "src/core/zones.c fix: rb_zone_invariant checks the invariant it claims" },
@@ -1053,6 +1458,16 @@ int main(void)
         { "hand_zone_is_unbounded_like_rust", test_hand_zone_is_unbounded_like_rust, 1,
           "CAPACITY GAP (rabuka.h RB_MAX_HAND, not owned by this audit): Rust's "
           "hand is an unbounded SmallVec" },
+        { "stage_first_empty_is_centre_first",
+          test_stage_first_empty_is_centre_first, 0,
+          "src/core/zones.c fix: rb_stage_first_empty reproduces "
+          "util::stage_first_empty's CENTRE-first probe (util.rs:2541-2551); the "
+          "old ascending 0,1,2 scan put the card in LEFT" },
+        { "place_stage_lands_in_the_centre",
+          test_place_stage_lands_in_the_centre, 0,
+          "src/core/zones.c fix, reached through rb_place_card_in_zone's "
+          "stage/empty_area arm (util.rs:2442-2456): a placement with no named "
+          "vacated area lands CENTRE, and a named area is still honoured" },
         { "card_record_field_population", test_card_record_field_population, 0,
           "every decoded Card field is populated on this path, and the two that "
           "are deferred are asserted as deferred" },

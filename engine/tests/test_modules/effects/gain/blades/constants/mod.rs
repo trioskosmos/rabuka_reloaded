@@ -9,6 +9,7 @@ pub mod constant_ability_edge_cases_test;
 pub mod distinct_stage_costs_constant_blade_test;
 pub mod energy_count_and_stage_cost_constant_blade_test;
 pub mod exact_energy_gain_pl_pr_021_pr_test;
+pub mod hasunosora_constant_cost_gated_non_sweets_bouquet_blades_test;
 pub mod higher_cost_member_pl_hs_bp2_002_r_plus_test;
 pub mod lone_member_constant_blade_branches_test;
 pub mod opponent_energy_ahead_constant_blades_test;

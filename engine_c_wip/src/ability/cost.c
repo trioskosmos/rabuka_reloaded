@@ -121,6 +121,121 @@ static int eff_int(const AbilityEffect *e, const char *k, int dflt) {
     if (!v || !*v) return dflt;
     return atoi(v);
 }
+
+/* ── cost_card_type_any -- Rust `cost.card_type_any()` ────────────────────────
+   `card_type` is a TYPED field, not a raw string. Rust:
+     effect_decoder_gen.rs `"card_type" => { ek.card_type = bc.read_card_type_value(); .. }`
+     read_card_type_value is `CardType::from_card_str(get_string(idx)?)`, and
+     core/card.rs `from_card_str` has exactly three arms with the miss arm
+     `_ => None` (core/card.rs:50-57), so `AbilityEffect::card_type` is
+     `Option<CardType>` and the raw spelling CANNOT survive the decode.
+     `as_card_str` (core/card.rs:58-64) returns "member_card" / "live_card" /
+     "energy_card" -- byte-for-byte what `card_type_field` already holds.
+
+   THE BUG THIS REPLACES: all TEN cost handlers in this file read
+   `eff_extra(<cost>, "card_type")`, and vm.c's decode arm for `card_type`
+   (vm.c:1098-1112) `continue`s after writing the STRUCT FIELD, so the extras
+   table never holds a `card_type` at all. Measured with the engine's own
+   decoder over the whole corpus: `extra_present = 0` at all three of the sites
+   the census could classify by kind (pay_cost_inner/Reveal 27 cost nodes,
+   pay_cost_move_cards 459, pay_cost_change_state 124) and 0 of the 3465 effect
+   nodes. Every one of those filters therefore answered "no card_type", i.e. it
+   was INERT, while 23 Reveal / 113 move_cards / 124 change_state cost nodes DO
+   carry a real one in `card_type_field`.
+
+   The vm.c note records the same thing from the producer's side: the extras
+   fallback that core/card.c:959 and dynamic_count.c:655 still read
+   (`card_type_field[0] ? field : fx_extra(e, "card_type")`) is already dead and
+   stays dead, because Rust drops the raw string too. */
+static const char *cost_card_type_any(const AbilityEffect *e) {
+    return (e && e->card_type_field[0]) ? e->card_type_field : NULL;
+}
+
+/* ── cost_distinct_type -- Rust `cost.distinct_any()` ────────────────────────
+   core/card.rs:1977-1979:
+       pub fn distinct_any(&self) -> Option<DistinctType> {
+           self.kind.as_deref()?.filter()?.distinct.as_deref().copied()
+       }
+   and core/card.rs:2809-2816:
+       pub enum DistinctType {
+           #[serde(rename = "card_name")] CardName,
+           #[serde(rename = "true")]      True,
+           #[serde(rename = "distinct")]  Distinct,
+       }
+   The serde renames are LOWERCASE and they are what the wire carries, so the
+   comparison is against "card_name" / "true" / "distinct". util.rs:2827-2832
+   then asks only whether any of the three is set:
+       matches!(distinct,
+           Some(DistinctType::CardName) | Some(DistinctType::True)
+                                    | Some(DistinctType::Distinct)) */
+static RbDistinctType cost_distinct_type(const AbilityEffect *e) {
+    const char *d = e ? eff_extra(e, "distinct") : NULL;
+    if (!d) return RB_DISTINCT_NONE;
+    if (!strcmp(d, "card_name")) return RB_DISTINCT_CARDNAME;
+    if (!strcmp(d, "true"))     return RB_DISTINCT_TRUE;
+    if (!strcmp(d, "distinct")) return RB_DISTINCT_DISTINCT;
+    return RB_DISTINCT_NONE;
+}
+
+/* ── cost_dedupe_indices_by_name ──
+   Rust, the LAST statement of hand_cost_matching_indices
+   (engine/src/ability/cost/handlers.rs:476-480):
+       let indices = if crate::ability::util::distinct_should_dedupe(cost.distinct_any()) {
+           crate::ability::util::dedupe_by_normalized_name(
+               &indices, |&i| pl.hand.cards[i], card_db)
+       } else { indices };
+
+   Two details matter and both are easy to get wrong:
+     - it dedupes the CANDIDATE SET, not the selection, so the duplicate print is
+       never OFFERED (the Rust comment says so explicitly: "Deduping the
+       CANDIDATE SET (rather than filtering after the selection) also means the
+       duplicate is never offered, so the player cannot select it");
+     - the key is the card's NORMALIZED NAME at that index, so two PRINTS of one
+       character collapse to the first index -- 「名前の異なる」 compares names,
+       not card numbers. util.c's rb_dedupe_by_normalized_name takes CARD IDS and
+       therefore returns "the first index of every distinct id", which is a
+       different answer; the loop below is over INDICES, which is what Rust does.
+       The normalizer is rb_card_normalize_name, the already-exported twin of
+       `CardDatabase::normalize_name` (core/card.rs:675-685: drop every
+       whitespace character), not util.c's file-static rb_norm_ws -- that one only
+       drops ASCII whitespace and is a weaker normalizer than Rust's.
+   util.c's rb_distinct_should_dedupe is the shared predicate (it is already
+   exported) so the three spellings stay in ONE place. */
+static int cost_dedupe_indices_by_name(const RbPlayer *P, const int *idx, int n,
+                                       int *out, int max) {
+    char seen[RB_MAX_HAND][256];
+    int  nseen = 0;
+    int  m = 0;
+    for (int i = 0; i < n && m < max; i++) {
+        int k = idx[i];
+        int keep = 1;
+        if (k >= 0 && k < P->hand.n) {
+            Card c;
+            if (rb_decode_card_by_index((uint32_t)P->hand.cards[k], &c)) {
+                if (c.name) {
+                    char nm[256];
+                    rb_card_normalize_name(c.name, nm, sizeof nm);
+                    int dup = 0;
+                    for (int s = 0; s < nseen; s++)
+                        if (!strcmp(seen[s], nm)) { dup = 1; break; }
+                    if (dup) keep = 0;
+                    else if (nseen < RB_MAX_HAND) {
+                        size_t l = strlen(nm);
+                        if (l >= sizeof seen[0]) l = sizeof seen[0] - 1;
+                        memcpy(seen[nseen], nm, l);
+                        seen[nseen][l] = '\0';
+                        nseen++;
+                    }
+                }
+                rb_free_card(&c);
+            }
+            /* util.rs:2185-2187 -- `.unwrap_or(true)`: a card missing from the
+             * database is KEPT, not dropped. */
+        }
+        if (keep) out[m++] = idx[i];
+    }
+    return m;
+}
 /* ── energy_count_any() ──
    The Rust decoder folds BOTH wire keys "energy_count" and "energy" onto the
    single field `energy_count` (engine/src/ability/effect_decoder_gen.rs:164
@@ -350,7 +465,7 @@ static void cost_join_csv(char *out, size_t outsz, const char *csv, const char *
 static void cost_filter_desc(const AbilityEffect *cost, int ja, char *out, size_t outsz) {
     char parts[8][192];
     int np = 0;
-    const char *ct = eff_extra(cost, "card_type");
+    const char *ct = cost_card_type_any(cost);
     if (ct && *ct && np < 8) {
         snprintf(parts[np], sizeof parts[0], "%s",
                  ja ? cost_card_type_label_ja(ct) : cost_card_type_label(ct));
@@ -795,7 +910,7 @@ static int validate_leaf_cost_for(const GameState *g, int actor,
         if (sc && !strcmp(sc, "wait")) {
             const char *target = cost->target ? cost->target : "self";
             int exclude_self = eff_bool(cost, "exclude_self", 0);
-            const char *card_type = eff_extra(cost, "card_type");
+            const char *card_type = cost_card_type_any(cost);
             const char *group_names = eff_extra(cost, "group_names");
             int self_cost = eff_bool(cost, "self_cost", 0);
             int pos[RB_STAGE_SIZE];
@@ -894,7 +1009,7 @@ static int offer_same_unit_cost(GameState *g, int actor, const AbilityEffect *co
     int tp = rb_resolve_target_player(g, target);
     int tpl = (tp >= 0) ? tp : actor;
     const RbPlayer *P = &g->p[tpl];
-    const char *card_type = eff_extra(cost, "card_type");
+    const char *card_type = cost_card_type_any(cost);
     RbCardFilter filter;
     rb_effect_filter_subset(cost, &filter);
     /* handlers.rs:662 `filter.card_type = card_type_owned.as_deref()` —
@@ -992,7 +1107,7 @@ static int check_zone_cost_availability(GameState *g, int actor,
     int tp = rb_resolve_target_player(g, target);
     int tpl = (tp >= 0) ? tp : actor;
     const RbPlayer *P = &g->p[tpl];
-    const char *card_type = eff_extra(cost, "card_type");
+    const char *card_type = cost_card_type_any(cost);
     RbCardFilter filter;
     rb_effect_filter_subset(cost, &filter);
     /* handlers.rs:727-728 — the cost's own card_type and cost_limit replace
@@ -1048,7 +1163,7 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
        prompt the player sees carries count 0. The `> 0` form turned that
        clamped zero back into 1, so a free cost asked for a card. */
     int count = rb_effect_count_or(cost, 1);
-    const char *card_type = eff_extra(cost, "card_type");
+    const char *card_type = cost_card_type_any(cost);
     int optional = cost->is_optional;
     const char *target = cost->target ? cost->target : "self";
     int tp = rb_resolve_target_player(g, target);
@@ -1131,6 +1246,22 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
         pending->kind = RB_CHOICE_SELECT_TARGET;
         snprintf(pending->description, sizeof(pending->description),
                  "Discard entire hand (%d cards)?", hand_len);
+        /* W2b. This prompt IS Rust's `Choice::SelectTarget { target:
+           "pay_cost_all:discard_all" }` (cost/handlers.rs:378-388) and the target IS
+           the routing key: choice.rs:2816-2818 dispatches on
+           `SelectTargetKind::from_str(target)`, and enums.rs:705 spells it with a
+           COLON. The C set `kind` and left `target` all-zero, so BOTH dispatchers
+           (choice.c:5037 on `pending.target`, choice.c:3837 on `tgt`) had nothing to
+           match and `rb_handle_pay_cost_all_discard` was unreachable for the 2
+           corpus nodes measured by `make w-census`
+           (PL!N-bp5-021-N and PL!N-bp5-028-L, ability #0 each).
+           BLOCKED-ON choice.c:5037 / :3837 routes through
+           `rb_select_target_kind_from_str`, which is exact -- so this producer MUST
+           land with them or the routing fix stays inert.
+           `pending` was memset two lines above, so this writes into a known-empty
+           64-byte field; `sizeof(pending->target)` is the correct bound. */
+        snprintf(pending->target, sizeof(pending->target), "%s",
+                 "pay_cost_all:discard_all");
         pending->allow_skip = is_optional;
         pending->route = RB_ROUTE_OPTIONAL_COST;
         g->queue.has_pending = 1;
@@ -1209,6 +1340,30 @@ static int pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cos
                     if (!card_matches_any_character(cid, chars)) match = 0;
                 if (match) matching_indices[n_matching++] = i;
             }
+        }
+
+        /* handlers.rs:476-480, the last statement of hand_cost_matching_indices
+         * before it returns `(indices, is_same_group_name)`:
+         *     let indices = if distinct_should_dedupe(cost.distinct_any()) {
+         *         dedupe_by_normalized_name(&indices, |&i| pl.hand.cards[i], card_db)
+         *     } else { indices };
+         * It runs on BOTH branches (Rust applies it to the whole `indices`, not
+         * to the else-arm only), so it is placed after the if/else here too.
+         * REACHABILITY (measured with the engine's own decoder over the corpus):
+         * 2 of the 901 decoded cost nodes carry `distinct`, and both are exactly
+         * this shape -- move_cards { source: hand, count: 3, optional: true,
+         * distinct: "card_name", group_names: <X>, destination: discard }, i.e.
+         * 「手札の名前の異なる『<X>』のメンバーカードを3枚控え室に置いてもよい」
+         * (PL!-pb2-018-P＋ and its -R＋ sibling). The checklist's older "0 of 138
+         * costs carry distinct" counted only TOP-LEVEL costs; the nodes live on
+         * the abilities' costs and the count over all decoded cost nodes is 2. */
+        if (rb_distinct_should_dedupe(cost_distinct_type(cost)) && n_matching > 1) {
+            int deduped[RB_MAX_HAND];
+            int n_deduped = cost_dedupe_indices_by_name(P, matching_indices,
+                                                        n_matching, deduped,
+                                                        RB_MAX_HAND);
+            for (int i = 0; i < n_deduped; i++) matching_indices[i] = deduped[i];
+            n_matching = n_deduped;
         }
 
         int is_optional = (optional || is_any_number) && !is_activation;
@@ -1367,7 +1522,7 @@ static int pay_cost_change_state(GameState *g, int actor, const AbilityEffect *c
     int optional = cost->is_optional;
     int count = cost->count > 0 ? cost->count : 1;
     int exclude_self = eff_bool(cost, "exclude_self", 0);
-    const char *card_type = eff_extra(cost, "card_type");
+    const char *card_type = cost_card_type_any(cost);
     const char *group_names = eff_extra(cost, "group_names");
     int self_cost = eff_bool(cost, "self_cost", 0);
     int tp = rb_resolve_target_player(g, target);
@@ -1668,7 +1823,7 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
     if (cost_is_reveal(cost)) {
         const char *source = cost->source ? cost->source : "hand";
         const char *target = cost->target ? cost->target : "self";
-        const char *card_type = eff_extra(cost, "card_type");
+        const char *card_type = cost_card_type_any(cost);
         int tp = rb_resolve_target_player(g, target);
         int tpl = (tp >= 0) ? tp : actor;
         RbPlayer *P = &g->p[tpl];
@@ -2053,7 +2208,7 @@ int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect
                 int tpl = (tp >= 0) ? tp : actor;
                 int ccount = rb_effect_count_or(cost, 1);
                 int exclude_self = eff_bool(cost, "exclude_self", 0);
-                const char *c_card_type = eff_extra(cost, "card_type");
+                const char *c_card_type = cost_card_type_any(cost);
                 const char *c_groups = eff_extra(cost, "group_names");
                 int pos[RB_STAGE_SIZE];
                 int n = get_change_state_candidates(g, tpl, tgt, c_card_type,
@@ -2325,7 +2480,7 @@ static int cr_reduction_matches(const AbilityEffect *e, int card_id, const Card 
     const char *limit = cr_eff_extra(e, "cost_limit");
     if (limit && card->cost != atoi(limit)) return 0;
     if (!rb_cost_threshold_met(card, e)) return 0;
-    const char *ct = cr_eff_extra(e, "card_type");
+    const char *ct = cost_card_type_any(e);
     if (ct && strcmp(ct, "member_card") != 0) return 0;
     const char *af = cr_eff_extra(e, "ability_filter");
     if (af && !strcmp(af, "no_ability") && rb_card_num_abilities((uint32_t)card_id) > 0)
@@ -2444,7 +2599,7 @@ static int cr_scan_one_effect(const AbilityEffect *eff, int target_id,
     const char *limit = cr_eff_extra(eff, "cost_limit");
     if (limit && target_card->cost != atoi(limit)) return -1;
     if (!rb_cost_threshold_met(target_card, eff)) return -1;
-    const char *ct = cr_eff_extra(eff, "card_type");
+    const char *ct = cost_card_type_any(eff);
     if (ct && strcmp(ct, "member_card") != 0) return -1;
     const char *af = cr_eff_extra(eff, "ability_filter");
     if (af && !strcmp(af, "no_ability") &&

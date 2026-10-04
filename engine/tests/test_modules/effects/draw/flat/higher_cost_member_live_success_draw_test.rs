@@ -60,6 +60,72 @@ fn pb1013_equal_or_lower_cost_members_do_not_draw() {
     }
 }
 
+/// 「自分のステージに」 — a higher-cost member on the OPPONENT's stage does not count.
+///
+/// The clause carries `target: "self"`, and every other test here varies only the
+/// COST of the ally, never its side. A condition resolved against the wrong stage
+/// passes the existing two tests unchanged: the higher-cost member is on p1's stage
+/// in both, and the equal/lower cases are rejected on cost before the side matters.
+///
+/// 「このメンバーよりコストが高い」 is about 小鈴's own board. A 15-cost member facing
+/// her is irrelevant to it.
+#[test]
+fn pb1013_higher_cost_member_on_the_opponents_stage_does_not_draw() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let me = game.id("PL!HS-pb1-013-R"); // cost 9
+    let theirs = game.id(HIGHER_COST_MEMBER); // cost 15
+    let undrawn = game.new_id(FILLER);
+    game.state.player1.stage.stage[1] = me;
+    game.state.player2.stage.stage[1] = theirs;
+    game.state.player1.main_deck.cards.push(undrawn);
+    let hand_before = game.state.player1.hand.cards.len();
+    let deck_before = game.state.player1.main_deck.cards.len();
+
+    fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "「自分のステージに」 — the qualifying member is on the opponent's stage"
+    );
+    assert_eq!(game.state.player1.main_deck.cards.len(), deck_before);
+    assert!(game.state.player1.main_deck.cards.contains(&undrawn));
+}
+
+/// 小鈴 alone cannot satisfy her own condition.
+///
+/// 「このメンバーよりコストが高い」 — higher than THIS member, and this member is on
+/// her own stage at her own cost. A strict `>` already excludes her, which is why the
+/// existing equal-cost test passes and this one is nearly free.
+///
+/// It is pinned anyway because it is the case a future loosening breaks first: change
+/// the operator to `>=` and the host satisfies her own clause with nobody else on the
+/// board, and every test here that also stages an ally still passes. This one does not.
+#[test]
+fn pb1013_the_host_alone_cannot_satisfy_her_own_condition() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let me = game.id("PL!HS-pb1-013-R");
+    let undrawn = game.new_id(FILLER);
+    game.state.player1.stage.stage[1] = me;
+    game.state.player1.main_deck.cards.push(undrawn);
+    let hand_before = game.state.player1.hand.cards.len();
+
+    fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&undrawn),
+        "小鈴 is not 「コストが高い」 relative to herself, so her own presence is not a \
+         reason to draw"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "and nothing is drawn"
+    );
+}
+
 fn trigger_kosuzu_live_start() -> (TestGame, [i16; 4]) {
     let mut game = TestGame::new(load_real_database());
     let kosuzu = game.id("PL!HS-pb1-013-R");

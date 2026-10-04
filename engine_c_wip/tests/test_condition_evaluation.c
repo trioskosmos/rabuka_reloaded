@@ -3,11 +3,30 @@
 #include <stdio.h>
 #include <string.h>
 
+/* ── per-test verdict layer (see test_parity_integration.c for the rationale):
+ * a FLAT suite's FAIL lines name an assertion, never a test, so this suite
+ * reported no per-test verdict and its FAIL lines were unattributable. This
+ * adds exactly one `FAILED: <test body>` per failing test body, in the shape
+ * every FORK suite prints. No assertion is added, removed or relaxed. */
+static const char *g_flat_failed[512];
+static int g_flat_failed_n;
+static void flat_verdict_failed(const char *fn)
+{
+    for (int i = 0; i < g_flat_failed_n; i++)
+        if (g_flat_failed[i] == fn) return;
+    if (g_flat_failed_n >= 512) return;
+    g_flat_failed[g_flat_failed_n++] = fn;
+    printf("FAILED: %s\n", fn);
+    fflush(stdout);
+}
+#define FLAT_VERDICT() flat_verdict_failed(__func__)
+
 static int failures;
 
 #define CHECK(condition, message) do { \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -19,6 +38,7 @@ static int failures;
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -72,7 +92,7 @@ static CondValue condition_string_value(char *value) {
 }
 
 static void temporal_tracking_and_nested_conditions(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int host = test_id(&game, "PL!SP-pb1-001-R");
 
@@ -107,7 +127,7 @@ static void temporal_tracking_and_nested_conditions(void) {
 }
 
 static void pending_choice_requests_snapshot(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     game.state.queue.snapshot_requested = 0;
     rb_resolver_store_pending_choice(&game.state);
@@ -158,7 +178,7 @@ static int snapshot_has_score_source(const TestGame *game) {
 }
 
 static void opponent_cost_self_higher_scores_in_snapshot(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int nonfiction = test_id(&game, "PL!SP-bp4-024-L");
@@ -187,7 +207,7 @@ static void opponent_cost_self_higher_scores_in_snapshot(void) {
 }
 
 static void opponent_cost_self_lower_no_score_in_snapshot(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int nonfiction = test_id(&game, "PL!SP-bp4-024-L");
@@ -216,7 +236,7 @@ static void opponent_cost_self_lower_no_score_in_snapshot(void) {
 }
 
 static void left_side_heart_meets_threshold_gains_blade(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int nonfiction = test_id(&game, "PL!SP-bp4-024-L");
@@ -254,7 +274,7 @@ static void left_side_heart_meets_threshold_gains_blade(void) {
 }
 
 static void left_side_heart_below_ignores_center_high(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int nonfiction = test_id(&game, "PL!SP-bp4-024-L");
@@ -286,7 +306,7 @@ static void left_side_heart_below_ignores_center_high(void) {
 }
 
 static void blade_goes_to_stage_member_not_live_card(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int nonfiction = test_id(&game, "PL!SP-bp4-024-L");
@@ -320,7 +340,7 @@ static void blade_goes_to_stage_member_not_live_card(void) {
 }
 
 static void both_players_get_own_live_start_effects(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int p1_card = test_id(&game, "PL!SP-bp4-024-L");

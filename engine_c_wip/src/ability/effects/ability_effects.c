@@ -504,14 +504,64 @@ static int copy_source_ability(GameState *g, int target_card, const Ability *sou
     return 1;
 }
 
-int rb_translated_execute_gain_ability_from_source(GameState *g, int actor,
-                                                    AbilityEffect *effect,
-                                                    int host_cid)
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THE SINGLE IMPLEMENTATION OF execute_gain_ability_from_source.
+ *
+ * This file used to hold TWO live twins of one Rust function,
+ * engine/src/ability/effects/ability_ops.rs:593-700, and they DIVERGED:
+ *
+ *   ability_effects.c  rb_translated_execute_gain_ability_from_source
+ *       reached from executor.c:476 (the ActionType::GainAbilityFromSource
+ *       dispatch, dispatch.rs:169-171).
+ *   ability.c          rb_gain_ability_from_source
+ *       reached from turn/triggers.c:1181, i.e. the CONSTANT (常時) effect scan
+ *       that mirrors core/game_state/modifiers.rs:1148-1176.
+ *
+ * Rust has ONE function reached from both. The two C copies had drifted on four
+ * points, and every one of them is a wrong-value bug waiting for a card that
+ * carries the relevant field:
+ *
+ *  1. trigger_filter. Rust iterates the LIST:
+ *       ability_ops.rs:679-681
+ *         filters.iter().any(|f| ability.triggers.as_ref()
+ *           .is_some_and(|t| t.contains(f.as_str()) || f.contains(t.as_str())))
+ *     ability_effects.c's trigger_filter_matches splits the CSV on ',' and tests
+ *     each token — faithful. ability.c's compared the WHOLE comma-joined string
+ *     against the whole trigger string with two strstr calls, so a two-token
+ *     filter matched only abilities whose trigger happened to contain the
+ *     literal "起動,ライブ成功時". One-token filters (the whole corpus, see the
+ *     measurement below) hid it.
+ *  2. Who owns the activating card. Rust (ability_ops.rs:624-632) looks the card
+ *     up in player1.stage, then player2.stage, and RETURNS if neither has it.
+ *     ability.c searched g->p[actor].stage; ability_effects.c used
+ *     rb_owner_of_card. The two disagree whenever the controller is not the
+ *     card's owner.
+ *  3. The under-card filter. Rust (ability_ops.rs:663-676) applies card_type,
+ *     cost_limit+cost_limit_operator (defaulting to "<=", :656-659) and
+ *     group_names-as-a-LIST (:665-671). ability.c built one RbCardFilter through
+ *     rb_effect_filter_subset and called rb_count_matching_filter, which resolves
+ *     group_names through util.c's single-name check_group — so a multi-name
+ *     group list behaved differently on the two paths.
+ *  4. The tail. ability_effects.c logged [[log_gain_ability_from_source:N]] and
+ *     called rb_recalc_constants; ability.c did neither. The recalc must NOT be
+ *     on the constant path: modifiers.rs:1148 runs the 常時 scan from inside
+ *     recalculate_constants itself, so calling it back re-enters the scan.
+ *
+ * MEASURED over the 985-ability corpus (decode-level, every effect-valued field
+ * of every ability): `gain_ability_from_source` appears on 2 nodes, both with a
+ * SINGLE-token trigger_filter — "起動" (under a group_names=Liella! node) and
+ * "ライブ成功時" (cost_limit=9 cost_limit_operator="<=", group_names=虹ヶ咲). So
+ * points 1-3 are corpus-inert today and the two twins agreed on all real cards;
+ * point 4 is load-bearing and is preserved by keeping the recalc in the executor
+ * wrapper only. Collapsing them means the next card that widens any of these
+ * fields cannot disagree with itself.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+int rb_ability_gain_from_source_core(GameState *g, int actor,
+                                      AbilityEffect *effect, int host_cid)
 {
     if (!g || !effect) return 0;
     int target_card = g->activating_card >= 0 ? g->activating_card : host_cid;
     if (target_card < 0) return 0;
-    fprintf(stderr, "[DBG_FROM_SRC] actor=%d target=%d host=%d ct=%s cost_limit=%s op=%s group=%s tf=%s n=%d\n", actor, target_card, host_cid, effect->card_type_field[0]?effect->card_type_field:"-", effect_extra(effect,"cost_limit")?:"-", effect_extra(effect,"cost_limit_operator")?:"-", effect_extra(effect,"group_names")?:"-", effect_extra(effect,"trigger_filter")?:"-", g->n_selected_cards);
     while (rb_card_num_gained_abilities(g, target_card) > 0)
         rb_remove_gained_ability(g, target_card, 0);
 
@@ -538,14 +588,6 @@ int rb_translated_execute_gain_ability_from_source(GameState *g, int actor,
     RbBag *under = &g->p[owner].under_cards[area];
     for (int i = 0; i < under->n; i++) {
         int source_card = under->cards[i];
-        fprintf(stderr, "[DBG_SRC] i=%d src=%d type_ok=%d cost_ok=%d group_ok=%d n_und=%d\n", i, source_card,
-                (!card_type || rb_card_matches_type(source_card, card_type)),
-                (cost_limit < 0 || rb_card_matches_cost_limit(source_card, cost_limit, cost_op)),
-                /* ability_ops.rs:665-671 —
-               `if let Some(groups) = effect.group_names_any() { if !groups
-               .iter().any(|g| card_matches_group_str(&card_db, id, Some(g)))
-               { return false } }` — the WHOLE list, any entry. */
-                (!group || ae_group_matches_csv_any(source_card, group)), under->n);
         if (source_card < 0) continue;
         if (card_type && !rb_card_matches_type(source_card, card_type)) continue;
         if (cost_limit >= 0 && !rb_card_matches_cost_limit(source_card, cost_limit, cost_op)) continue;
@@ -554,12 +596,24 @@ int rb_translated_execute_gain_ability_from_source(GameState *g, int actor,
         for (int a = 0; a < count; a++) {
             Ability source;
             if (!rb_decode_card_ability((uint32_t)source_card, a, &source)) continue;
-            fprintf(stderr, "[DBG_ABIL] a=%d trig=%s tf_ok=%d\n", a, source.triggers?source.triggers:"-", trigger_filter_matches(&source, trigger_filter));
             if (trigger_filter_matches(&source, trigger_filter))
                 copied += copy_source_ability(g, target_card, &source);
             rb_free_ability(&source);
         }
     }
+    return copied;
+}
+
+/* The executor-dispatch twin: dispatch.rs:169-171 ->
+ *   ActionType::GainAbilityFromSource => resolver.execute_gain_ability_from_source(gs, effect)
+ * plus the tail that belongs to the RESOLUTION and not to the 常時 scan:
+ * ability_ops.rs:702-707 push the rule log and :685-687
+ * `gs.recalculate_constants()`. */
+int rb_translated_execute_gain_ability_from_source(GameState *g, int actor,
+                                                    AbilityEffect *effect,
+                                                    int host_cid)
+{
+    int copied = rb_ability_gain_from_source_core(g, actor, effect, host_cid);
     if (copied) {
         char line[128];
         snprintf(line, sizeof(line), "[[log_gain_ability_from_source:%d]]", copied);

@@ -23,6 +23,7 @@ static int assertions;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -35,6 +36,7 @@ static int assertions;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -221,7 +223,7 @@ static void test_operation_split(void)
     if (!e) { CHECK(0, "PL!SP-bp5-026-L ab#0 decodes"); return; }
 
     {   /* add accumulates */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, live);
         tg.state.activating_card = live;
         rb_execute_modify_score(&tg.state, 0, e);
@@ -231,7 +233,7 @@ static void test_operation_split(void)
     }
     {   /* set writes the set component only, so it is idempotent
            (game_modifiers.rs:384 set_score_modifier assigns, it does not add) */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, live);
         tg.state.activating_card = live;
         SynthEffect s; synth(&s, NULL, 0);
@@ -258,7 +260,7 @@ static void test_operation_split(void)
     }
     {   /* set must SET even for a self-target: the old C port routed self_target
            through rb_mods_add_score, so a second set would reach 8. */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, live);
         tg.state.activating_card = live;
         SynthEffect s; synth(&s, NULL, 0);
@@ -283,7 +285,7 @@ static void test_operation_split(void)
         CHECK_EQ(score_of(&tg, live), 1, "operation=remove subtracts from the modifier");
     }
     {   /* unknown operation yields delta 0 (score.rs:305 `_ => 0i16`) */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, live);
         tg.state.activating_card = live;
         rb_execute_modify_score(&tg.state, 0, e);
@@ -324,7 +326,7 @@ static void test_per_unit_stage_group_and_heart_threshold(void)
                  "LOVER: 1 Liella! member with >=4 hearts -> +1 (need_heart_total honoured)");
     }
     {   /* no qualifying member -> 0 */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, lover);
         tg.state.activating_card = lover;
         tg.state.p[0].stage[1] = keke;
@@ -342,7 +344,7 @@ static void test_per_unit_stage_group_and_heart_threshold(void)
                  "LOVER: a non-Liella! high-heart member is excluded by the group filter");
     }
     {   /* the value scales with the unit count, not the recipient count */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, lover);
         tg.state.activating_card = lover;
         tg.state.p[0].stage[0] = kanon;
@@ -362,7 +364,7 @@ static void test_per_unit_stage_group_and_heart_threshold(void)
         CHECK_EQ(score_of(&tg, lover), 3, "LOVER: 3 qualifying members -> +3");
     }
     {   /* the recipients are still the self-target only */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, lover);
         tg.state.activating_card = lover;
         tg.state.p[0].stage[0] = kanon;
@@ -396,7 +398,7 @@ static void test_per_unit_distinct_group_member(void)
                  "Link to the FUTURE: 3 distinct 蓮ノ空 members -> +6 (2 each)");
     }
     {   /* one member -> +2 */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, link);
         tg.state.activating_card = link;
         tg.state.p[0].stage[1] = test_id(&tg, "PL!HS-bp1-001-R");
@@ -411,7 +413,7 @@ static void test_per_unit_distinct_group_member(void)
         CHECK_EQ(score_of(&tg, link), 0, "Link to the FUTURE: empty stage -> +0");
     }
     {   /* the SAME member three times counts once (distinct card_name) */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, link);
         tg.state.activating_card = link;
         tg.state.p[0].stage[0] = test_id(&tg, "PL!HS-bp1-001-R");
@@ -447,7 +449,7 @@ static void test_per_unit_heart_colors(void)
     if (!e) { CHECK(0, "Solitude Rain ab#0 decodes"); return; }
 
     {   /* one member carrying 3 distinct colours -> +3 */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, rain);
         tg.state.activating_card = rain;
         tg.state.p[0].stage[0] = ayumu;
@@ -466,7 +468,7 @@ static void test_per_unit_heart_colors(void)
                  "Solitude Rain: a second member adds only its unseen colour -> +4");
     }
     {   /* heart04 is shared, heart05 is new */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, rain);
         tg.state.activating_card = rain;
         tg.state.p[0].stage[0] = ayumu;
@@ -485,7 +487,7 @@ static void test_per_unit_heart_colors(void)
                  "Solitude Rain: a non-虹ヶ咲 stage member contributes no colour unit");
     }
     {   /* an empty stage contributes nothing */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, rain);
         tg.state.activating_card = rain;
         rb_execute_modify_score(&tg.state, 0, e);
@@ -511,7 +513,7 @@ static void test_self_target_and_candidate_pool(void)
     CHECK(e->target == NULL, "AWOKE carries no target field, so target_name() defaults to self");
 
     {   /* in the live zone -> receives */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, awake);
         tg.state.activating_card = awake;
         rb_execute_modify_score(&tg.state, 0, e);
@@ -527,7 +529,7 @@ static void test_self_target_and_candidate_pool(void)
     }
     {   /* heart_colors on the effect is a CONDITION predicate, not a recipient
            filter: AWOKE lists heart01..06 yet must still receive its own +1. */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, awake);
         tg.state.activating_card = awake;
         int other = test_id(&tg, "PL!HS-bp1-001-R");
@@ -560,7 +562,7 @@ static void test_self_target_and_candidate_pool(void)
         CHECK_EQ(score_of(&tg, m1), 1, "global add reaches a stage member");
     }
     {   /* a global add with no activating card still scores the board */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         int l1 = test_id(&tg, "PL!-sd1-020-SD");
         test_add_to_live(&tg, l1);
         SynthEffect s; synth(&s, "self", 0);
@@ -631,7 +633,7 @@ static void test_live_total_bonus(void)
         CHECK_EQ(live_total_bonus(&tg, 0), 0, "P2's live_total bonus does not leak into P1");
     }
     {   /* set on live_total also ACCUMULATES (score.rs:142-146) */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, test_id(&tg, "PL!-sd1-020-SD"));
         rb_execute_modify_score(&tg.state, 0, e);
         CHECK_EQ(live_total_bonus(&tg, 0), 1, "live_total baseline before the set-op probe");
@@ -684,7 +686,7 @@ static void test_live_total_floor_min_zero(void)
         CHECK_EQ(live_total_bonus(&tg, 0), 0, "三船栞子 2+-surplus branch: -1 lands on 0");
     }
     {   /* with no live cards the floor clamps the -1 exactly to 0 */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         rb_execute_modify_score(&tg.state, 0, add_e);
         CHECK_EQ(live_total_bonus(&tg, 0), 1, "三船栞子 add applies with an empty live zone");
         rb_execute_modify_score(&tg.state, 0, rem_e);
@@ -705,7 +707,7 @@ static void test_live_total_floor_min_zero(void)
                  "without score_floor a live_total remove is free to go negative");
     }
     {   /* a live base total lets the -1 through unclamped */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         int l = test_id(&tg, "PL!S-pb1-021-L");   /* printed score 1 */
         test_add_to_live(&tg, l);
         SynthEffect s; synth(&s, "live_total", 0);
@@ -725,7 +727,7 @@ static void test_live_total_floor_min_zero(void)
 
 static void test_per_card_floor(void)
 {
-    TestGame tg; test_game_new(&tg); bare_board(&tg);
+static    TestGame tg; test_game_new(&tg); bare_board(&tg);
     int l1 = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_live(&tg, l1);
     tg.state.activating_card = l1;
@@ -759,7 +761,7 @@ static void test_per_card_floor(void)
         CHECK_EQ(score_of(&tg2, x), 0, "score_floor=0 blocks the same remove as effect_constraint=min:0");
     }
     {   /* without a floor the remove is allowed through */
-        TestGame tg2; test_game_new(&tg2); bare_board(&tg2);
+static        TestGame tg2; test_game_new(&tg2); bare_board(&tg2);
         int x = test_id(&tg2, "PL!-sd1-020-SD");
         test_add_to_live(&tg2, x);
         tg2.state.activating_card = x;
@@ -782,7 +784,7 @@ static void test_target_resolution(void)
     synth_set(&base, 1, "operation", "add");
 
     {   /* P1 acts, P2's live card is the recipient */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         int p1l = test_id(&tg, "PL!-sd1-020-SD");
         int p2l = test_new_id(&tg, "PL!-sd1-020-SD");
         test_add_to_live(&tg, p1l);
@@ -806,7 +808,7 @@ static void test_target_resolution(void)
         CHECK_EQ(score_of(&tg, p2l), 0, "target=opponent leaves P2's own live card alone");
     }
     {   /* self follows the acting player */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         int p1l = test_id(&tg, "PL!-sd1-020-SD");
         int p2l = test_new_id(&tg, "PL!-sd1-020-SD");
         test_add_to_live(&tg, p1l);
@@ -886,7 +888,7 @@ static void test_per_unit_count_and_cap(void)
     }
     /* exclude_self drops the activating member from the per-unit count. */
     {
-        TestGame tg2; test_game_new(&tg2); bare_board(&tg2);
+static        TestGame tg2; test_game_new(&tg2); bare_board(&tg2);
         int member = test_id(&tg2, "PL!SP-sd1-001-SD");
         int lv = test_id(&tg2, "PL!-sd1-020-SD");
         test_add_to_live(&tg2, lv);
@@ -940,7 +942,7 @@ static void test_conditional_activation(void)
                  "center cost 11 > opponent center cost 4 -> condition holds");
     }
     {   /* P1 cost 4 < P2 cost 11 -> the condition fails */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, nonfic);
         test_add_to_hand(&tg, filler);
         tg.state.activating_card = nonfic;
@@ -968,7 +970,7 @@ static void test_conditional_activation(void)
     AbilityEffect *e2 = ability_effect(one, 0, &ab2);
     if (!e2) { CHECK(0, "PL!SP-bp5-026-L ab#0 decodes"); return; }
     {
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, one);
         test_add_to_hand(&tg, test_id(&tg, "PL!-sd1-010-SD"));
         tg.state.activating_card = one;
@@ -980,7 +982,7 @@ static void test_conditional_activation(void)
         CHECK_EQ(score_of(&tg, one), 1, "Let's be ONE then scores +1 on its own card");
     }
     {
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, one);
         test_add_to_hand(&tg, test_id(&tg, "PL!-sd1-010-SD"));
         tg.state.activating_card = one;

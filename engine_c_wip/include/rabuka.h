@@ -235,8 +235,38 @@ typedef struct {
     uint8_t         delayed_cannot_active[RB_MAX_CARD_IDS]; /* remaining turns */
     /* constant-derived attribution (cleared on recalc) */
     int16_t         constant_blade[RB_MAX_CARD_IDS];
-    int16_t         constant_score[RB_MAX_CARD_IDS];
-    int16_t         constant_cost[RB_MAX_CARD_IDS];
+int16_t         constant_score[RB_MAX_CARD_IDS];
+int16_t         constant_cost[RB_MAX_CARD_IDS];
+/* Success-zone bonus ledgers — Rust GameModifiers (game_modifiers.rs:244/247/250).
+ * These are what makes E1 `evaluate_success_zone_constant_modifiers`
+ * (modifiers.rs:2188) portable: its withdraw-then-reapply ledger needs to know
+ * what it previously contributed, and without these it cannot.
+ *
+ * CORRECTION 2026-10-04 (field census). The previous text here read "They are
+ * NOT cosmetic: Rust CLEARS and re-applies them on every live
+ * (modifiers.rs:2194-2212), so in C a previous live's success-zone bonus can leak
+ * into the next one." The leak warning is TRUE; the framing around it was false,
+ * because it read as though the ledgers were live here. They are NOT: all three
+ * are 0 writers / 0 readers in the C. Rust's live use is exact and local to ONE
+ * function that has no C twin at all —
+ * `evaluate_success_zone_constant_modifiers` takes each ledger with
+ * `core::mem::take` (modifiers.rs:2200 / :2204 / :2211) and immediately withdraws
+ * what it finds through `remove_blade_modifier` / `remove_heart_modifier` /
+ * `remove_score_modifier` (:2201-2214). Outside that function the only other
+ * mention of the three is a `log::debug!` inequality test (:2293-2302), so the
+ * ledgers are load-bearing *for E1* and for nothing else.
+ * Reachability: 214 constant effect nodes on member cards carry one of E1's four
+ * actions. Mirrors `constant_cost` in shape. APPENDED, never inserted.
+ * BLOCKED-ON: src/core/modifiers.c — port
+ * `evaluate_success_zone_constant_modifiers` (Rust modifiers.rs:2188-2305) with
+ * this take/withdraw/reapply prologue, and call it at the tail of
+ * `rb_recalc_constants` (the modifiers.rs:1398 position). Until that lands these
+ * three arrays stay 0W/0R and E1/E2 stay blocked, exactly as
+ * PARITY_CHECKLIST.md items E1/E2 record. The header half of E1's blocker is
+ * therefore ALREADY DONE — the stale text above used to ask for these lines. */
+int16_t         success_zone_blade_bonuses[RB_MAX_CARD_IDS];
+int16_t         success_zone_heart_bonuses[RB_MAX_CARD_IDS][8];
+int16_t         success_zone_score_bonuses[RB_MAX_CARD_IDS];
     int16_t         constant_heart[RB_MAX_CARD_IDS][8];  /* per-color, cleared on recalc */
     int16_t         constant_need_heart[RB_MAX_CARD_IDS][8];
     /* Per-player live TOTAL score bonus (Rust game_modifiers.rs
@@ -303,7 +333,10 @@ void rb_mods_clear_cost_set(RbMods *m, int card_id);
 /* remove a previously-added delta (mirror remove_*_modifier) */
 void rb_mods_remove_blade(RbMods *m, int card_id, int delta);
 void rb_mods_remove_heart(RbMods *m, int card_id, int color, int delta);
-void rb_mods_remove_need_heart(RbMods *m, int card_id, int color, int delta);
+/* rb_mods_remove_need_heart was DELETED 2026-10-03. Rust has NO
+ * remove_need_heart_modifier anywhere in engine/src (0 hits); the faithful form
+ * is rb_mods_add_need_heart(cid, color, -delta) per game_state/modifiers.rs:615-619.
+ * Do NOT re-add this declaration - there is no definition. */
 void rb_mods_remove_score(RbMods *m, int card_id, int delta);
 void rb_mods_remove_cost(RbMods *m, int card_id, int delta);
 /* heart_override / heart_copy / blade_type / heart_color_multiplier
@@ -1281,13 +1314,15 @@ typedef struct {
     const char *card_no;         /* owned by the snapshot */
     int         is_wait;         /* mods.orientation[cid]==Wait, live.rs:1886-89 */
     uint8_t     transform_delta[8];
-    /* spare / base_score_total / card_bonus_total are written by Rust's
-     * finalize_snapshot_fields (live.rs:709-809) and read by
-     * enrich_from_applications (live.rs:3034-3100). The C had NO fields for
-     * them, which is why rb_enrich_from_applications is empty and unwireable. */
-    int         spare;
-    int         base_score_total;
-    int         card_bonus_total;
+    /* CORRECTED 2026-10-02. `spare` / `base_score_total` / `card_bonus_total` were
+     * briefly added HERE, which is WRONG: they are not per-member. Rust's shapes are
+     *   PerformanceSnapshot.base_score_total : u8      (types.rs:498)
+     *   PerformanceSnapshot.card_bonus_total : u8      (types.rs:500)
+     *   LiveCardResult.spare                : [u8; 8] (types.rs:512)
+     * i.e. the first two are per-SNAPSHOT and the third is per-LIVE-CARD. As members
+     * of RbMemberContribution no faithful body could write them, and they would read
+     * as covered when they were not. They now live on RbLiveSnapshot as
+     * base_score_total / card_bonus_total / live_spare[]. */
 } RbMemberContribution;
 
 typedef struct {
@@ -1339,6 +1374,28 @@ typedef struct {
      * ported or restoring is a no-op. */
     RbPerfNeedHeartMod performance_need_heart_modifiers[RB_MAX_PERF_NEED_HEART_MODS];
     int n_performance_need_heart_modifiers;
+    /* TOMBSTONE 2026-10-04 (field census): `base_score_total`, `card_bonus_total`
+   and `live_spare[RB_MAX_LIVE_CARDS][8]` are DELETED. All three were 0 writers
+   and 0 readers, and the note they carried was RIGHT about Rust and was still
+   the wrong reason to keep them: they are WRITE-ONLY IN RUST, so a C producer
+   would have had nothing to feed.
+     `PerformanceSnapshot.base_score_total` (core/types.rs:498) and
+     `.card_bonus_total` (:500) are written once, in `finalize_snapshot_fields`
+     (turn/live.rs:771-782), and read NOWHERE in engine/src -- not by the
+     condition evaluator, not by the live-success check, not by the display
+     projection. The only readers anywhere are the characterisation test
+     tests/test_modules/characterization/performance_snapshot_audit_test.rs:82/144.
+     `LiveCardResult.spare` (types.rs:512) is written at live.rs:733-741 and
+     initialised empty at live.rs:3153; a search of all of engine/src finds the
+     identifier `spare` only in those two places and in unrelated bot-local
+     variables. Nothing consumes it.
+   So all three existed "for the web/JSON surface" (the old comment's words) while
+   the web surface in the C reads `live_score_detail` / `surplus_per_color`, which
+   are live. The superseded note asked src/turn/live.c for the three bodies "three
+   lines each"; those three lines would have written values no consumer in either
+   engine can observe, which is precisely the "producer for something nobody
+   consumes" defect this census set out to remove. `member_contributions` below is a
+   DIFFERENT case and is live -- see its own comment. */
     /* Rust LivePerformanceData.member_contributions (types.rs:515-531), built by
      * build_member_contributions (live.rs:1844-1915) which returns a Vec that
      * .iter_mut().find(|m| m.source_id == app.target_card_id) walks in
@@ -1428,7 +1485,20 @@ typedef struct {
 typedef struct {
     int card_id;
     int position;
+    /* Rust PositionChangeEvent.old_area / old_position, needed by the
+     * `area_direction:"from"` condition arm (2 corpus nodes). Added 2026-10-04:
+     * without it the "from" direction cannot be evaluated at all, because the C
+     * only recorded the DESTINATION. APPENDED - never inserted; see the note on
+     * field order above GameState. */
+    int old_position;
 } RbPositionChangeEvent;
+
+/* Rust GameState.rule_log capacity: LOG_BOUND_RULE = 500 (mod.rs:1602-1606),
+ * newest-kept. Defined HERE, before GameState, because GameState's rule_log
+ * member is sized by them - a #define after the struct is a compile error. */
+#define RB_GSC_RULE_LOG_MAX 500
+/* A Vec<String> needs the strings, not just a count. */
+#define RB_GSC_RULE_LOG_LINE_MAX 256
 
 typedef struct GameState {
      RbPlayer p[2];
@@ -1447,7 +1517,16 @@ typedef struct GameState {
     int      live_set_limit_reduction[2];
     int      yell_count_mod[2];   /* per-player modify_yell_count delta (live.c do_yell) */
     int      activating_card;     /* currently resolving card id (mirrors gs.activating_card) */
-    int      pending_energy_payment; /* optional energy payment count (resolver-local) */
+    /* TOMBSTONE 2026-10-04 (field census): `pending_energy_payment` is DELETED.
+   It had 0 writers and 0 readers tree-wide. The behaviour it claimed to hold
+   is ALREADY LIVE and lives somewhere else: Rust's twin is NOT on GameState at
+   all but on the resolver -- `AbilityResolver.awaiting.energy_payment: Option<u8>`
+   (engine/src/ability/resolver.rs:198), written at effects/energy.rs:568 and
+   cleared at ability/cost/handlers.rs:1404 / :1427 / :1676. The C carries that
+   state as the file-static `s_pending_energy_payment` in src/ability/cost.c
+   (:25 declared, :2083 read, :1774 / :2053 cleared), which is LIVE. A GameState
+   member was therefore never a twin of anything: it was a second, unwritten
+   copy of a resolver-local that already exists. */
     int16_t  last_cost_waited_members[RB_STAGE_SIZE]; /* members put to wait by last cost */
     int      n_last_cost_waited_members;
     char     yell_source[2][16];   /* per-player modify_yell_source override (live.c do_yell) */
@@ -1480,13 +1559,54 @@ typedef struct GameState {
     int  cards_activated_this_turn[RB_MAX_CARD_IDS];
     int  n_cards_activated_this_turn;
     /* cheer_revealed_cards / _mut (mod.rs:931, :1037) are SmallVec<[i16;8]>;
-     * produced at phases.rs:405, consumed at move/mod.rs:1583. */
+     * produced at phases.rs:405, consumed at move/mod.rs:1583.
+     * STILL 0 writers / 0 readers (field census 2026-10-04) — kept, not deleted,
+     * because Rust reads them for real: `cheer_revealed_cards_mut` fills the
+     * performer's buffer at turn/phases.rs:405-408, and TWO in-scope consumers
+     * read it — `resolve_source_revealed_cards` (ability/effects/move/mod.rs:1580-1621,
+     * which DRAINS the buffer and falls back to a zone-filtered `revealed_cards`
+     * only when it is empty) and `revealed_count` (ability/dynamic_count.rs:159-180,
+     * the `count_type == "revealed_cards"` arm). So this is a missing twin, not a
+     * phantom. All three legs are located:
+     *   PRODUCER  src/turn/live.c:676-679 — immediately after the `g->revealed_cards`
+     *            push (the twin of phases.rs:396-398) and before
+     *            `g->yell_occurred = n_yell > 0;` (the twin of phases.rs:421), append
+     *            each `yell_cards[i]` to the performer's cheer buffer by seat.
+     *            `set_cheer_count_by_id` (phases.rs:409) is the same site and its C
+     *            twin `rb_gsc_set_cheer_count_by_id` already exists
+     *            (src/core/game_state_core.c:423) but has no caller.
+     *   CONSUMER 1 src/ability/effects/move.c:1780 `rb_move_resolve_source_revealed_cards`
+     *            — add the `cheer_is_empty` branch ahead of the :1783-1807 filter loop.
+     *   CONSUMER 2 src/ability/dynamic_count.c:681 — the C comment there states the C
+     *            "does not maintain a separate cheer pool, so step 1 always falls
+     *            through"; that is the gap, and closing it needs this field.
+     * BLOCKED-ON: src/ability/effects/move.c:1780 AND
+     *   src/ability/dynamic_count.c:683 — both consumers. The producer site
+     *   (src/turn/live.c:676-679) is MINE and is deliberately NOT landed alone:
+     *   a producer with no consumer is the same defect wearing a different hat. */
     int  player1_cheer_revealed_cards[8];
     int  n_player1_cheer_revealed_cards;
     int  player2_cheer_revealed_cards[8];
     int  n_player2_cheer_revealed_cards;
     /* push_revealed_cost_card (mod.rs:1091-1110); callers handlers.rs:1286,
-     * choice.rs:1673,1928. Cost-reveal provenance. */
+     * choice.rs:1673,1928. Cost-reveal provenance.
+     * STILL 0 writers / 0 readers (field census 2026-10-04) — kept, not deleted,
+     * because Rust reads it for real in FOUR in-scope places:
+     * `remove_revealed_cost_card` (core/game_state/modifiers.rs:2055-2059) and
+     * `remove_from_source_hands` (:2080-2082), both of which are E5/E6 and are
+     * themselves blocked on this producer; `choice.rs:3377` (`.last()`); and
+     * `move/mod.rs:368 / :1831 / :1955` (`.iter()` / `.contains()`).
+     * BLOCKED-ON: src/ability/cost.c — port `GameState::push_revealed_cost_card`
+     *   (core/game_state/mod.rs:1091-1110: set semantics, newest-last, bounded) and
+     *   call it from the twin of ability/cost/handlers.rs:1286. Second producer site:
+     *   src/ability/choice.c at the twins of ability/choice.rs:1673 and :1928 (that
+     *   file is contested by a re-fire fix). Readers to wire once produced:
+     *   src/ability/effects/move.c at the twins of move/mod.rs:368 / :1831 / :1955,
+     *   and src/core/modifiers.c at :2055 / :2080 for E5/E6.
+     * Note Rust also drops the parallel `revealed_cost_card_meta[index]` in this
+     *   push (mod.rs:1101-1109) and C has no field for it — same shape as
+     *   `revealed_card_meta`, already recorded above `clear_revealed_cards`. It is
+     *   display-only in Rust, so it is NOT part of the port. */
     int  revealed_cost_cards[RB_MAX_ZONE];
     int  n_revealed_cost_cards;
 
@@ -1513,8 +1633,18 @@ typedef struct GameState {
     int      n_position_change_events;
     int      selected_cards[RB_MAX_RECENTLY_MOVED]; /* cards chosen by a select_cards/select/look_and_select choice */
     int      n_selected_cards;
-    int      assignment[RB_MAX_RECENTLY_MOVED]; /* distinct-name assignment for alt-cost (phases.rs) */
-    int      n_assignment;
+    /* TOMBSTONE 2026-10-04 (field census): `assignment[]` + `n_assignment` are
+   DELETED. 0 writers, 0 readers, and -- unlike the rest of this group -- no
+   Rust member either: a whole-tree search of engine/src + engine/tests finds
+   ZERO occurrences of an `assignment` field or accessor. Rust's alt-cost solver
+   never puts the chosen assignment on the state either: `find_distinct_assignment_k`
+   (turn/phases.rs:1603-1629) returns `Option<Vec<i16>>` by value, and the C's
+   faithful twin `rb_find_distinct_assignment_k` (src/turn/phase.c:1090-1105)
+   writes into a CALLER-SUPPLIED `out[]` and returns the count. So the value
+   never lives on GameState in either engine and the member was reading as
+   coverage for a buffer that provably cannot be filled from anywhere.
+   NB `n_assignment` is distinct from `ptc_card`/`ptc_hand`/`ptc_area`, which are
+   the live play-time-alt-cost context and DO have readers. */
      int      live_success[2];
      int      live_score[2];
      int      live_batch_mode;
@@ -1586,6 +1716,14 @@ typedef struct GameState {
     int      mulligan_done[2];     /* per-player mulligan done flag */
     int      live_set_player;
     RbBag    resolution;             /* resolution zone (temp holding) */
+    /* Rust ResolutionZone.owners (core/game_state/mod.rs), the half of the zone
+     * that says WHO yelled each card. check_invalid_resolution_zone
+     * (game_state_core.c) returns each card to its yeller; without this the C
+     * assumes the active seat, so a P2 yell card lands in P1's waitroom -
+     * already observable, counted inside parity_draw_flat and parity_sequential.
+     * Parallel array, index-aligned with `resolution`. */
+    uint8_t  resolution_owners[RB_MAX_ZONE];
+    int      n_resolution_owners;
     RbBag    exclusion_zone;         /* cards excluded from the game */
      RbTempEffect temp_effects[RB_MAX_TEMP_EFFECTS];
      int      n_temp_effects;
@@ -1607,7 +1745,20 @@ typedef struct GameState {
     int      n_replacement_effects;
     /* ── tracking.rs (ported) ── */
     int      turn1_abilities_played[64]; int n_turn1_abilities_played;
-    int      turn2_abilities_played[64]; int n_turn2_abilities_played;
+    /* TOMBSTONE 2026-10-04 (field census): `turn2_abilities_played[64]` is DELETED
+   (0 writers, 0 readers). Rust does not have a live turn-2 ledger either:
+   `GameState.turn2_abilities_played` (core/game_state/mod.rs:132) is only
+   initialised (:609) and cleared (core/game_state/tracking.rs:8) -- there is NO
+   push site in engine/src -- and its only reader is the display projection
+   `game/display.rs:1928-1929`, i.e. T8 Q2 read-only projection, OUT OF SCOPE.
+   So this is WRITE-ONLY in Rust as well as in C: a twin of nothing.
+   `n_turn2_abilities_played` is KEPT because src/core/tracking.c:41 still
+   writes it and that file is another agent's; it remains 1 writer / 0 readers.
+   BLOCKED-ON: src/core/tracking.c:41 -- delete `g->n_turn2_abilities_played = 0;`
+   once this array deletion has landed everywhere. Keeping the counter is
+   harmless (it is never read) but it is the shape the census warns about: a
+   writer maintaining a length for a buffer nothing fills. */
+    int      n_turn2_abilities_played;
     int      player1_cheer_blade_heart_count;
     int      player2_cheer_blade_heart_count;
     RbBag    last_resolution_cards_p1;
@@ -1624,9 +1775,27 @@ typedef struct GameState {
     int      baton_touch_replaced_member_cost; /* -1 = None */
     int      baton_touch_replaced_member_id;  /* -1 = None */
     int      baton_touch_arriving_card_id; /* -1 = None */
-    int      areas_placed_this_turn[16]; int n_areas_placed_this_turn;
+    /* TOMBSTONE 2026-10-04 (field census): `areas_placed_this_turn[16]` is DELETED
+   (0 writers, 0 readers). Rust's twin is `GameState.areas_placed_this_turn:
+   SmallVec<[String; 8]>` (mod.rs:156), initialised at :622 and cleared by
+   `clear_area_placement_tracking` (core/game_state/modifiers.rs:1701-1703) --
+   and nothing else in engine/src touches it: no push site, no condition or
+   effect reads it. Its ONLY reader is `game/display.rs:1849` (T8 Q2, OUT OF
+   SCOPE). So the C member was a 0W/0R twin of a Rust field that is itself
+   write-nothing/read-for-display.
+   `n_areas_placed_this_turn` is KEPT (src/core/tracking.c:21 writes it, that
+   file is another agent's); it stays 1 writer / 0 readers.
+   BLOCKED-ON: src/core/tracking.c:21 -- delete the line. */
+    int      n_areas_placed_this_turn;
     int      cards_appeared_this_turn[64]; int n_cards_appeared_this_turn;
-    int      auto_ability_trigger_counts[32]; int n_auto_ability_trigger_counts;
+    /* TOMBSTONE 2026-10-04 (field census): `auto_ability_trigger_counts[32]` is
+   DELETED (0 writers, 0 readers). Rust's twin (mod.rs:154 `HashMap<CardId, u8>`)
+   is initialised at :621 and cleared by `clear_auto_ability_trigger_tracking`
+   (modifiers.rs:1729-1731) and nothing else: no push site in engine/src, no
+   gameplay reader. Sole reader is `game/display.rs:1885-1886` (T8 Q2, OUT OF
+   SCOPE). `n_auto_ability_trigger_counts` is KEPT (src/core/tracking.c:10
+   writes it). BLOCKED-ON: src/core/tracking.c:10 -- delete the line. */
+    int      n_auto_ability_trigger_counts;
     int      position_change_occurred_this_turn;
     int      formation_change_occurred_this_turn;
     int      opponent_live_success_this_turn;
@@ -1645,7 +1814,17 @@ typedef struct GameState {
     /* ── temporal-condition tracking (mirrors GameState.has_card_moved_this_turn /
         debut_count_this_turn; position_change_occurred_this_turn already declared above) ── */
     int      moved_this_turn[RB_MAX_CARD_IDS]; /* per-card: moved during current turn */
-    int      energy_placed_this_turn[2];       /* energy placed by player this turn */
+    /* TOMBSTONE 2026-10-04 (field census): `energy_placed_this_turn[2]` is DELETED
+   (0 writers, 0 readers) and has NO Rust member at all -- zero occurrences of
+   the identifier anywhere in engine/src or engine/tests. The per-player energy
+   fact Rust actually keeps is not an array but a pair of accessors on GameState:
+   `last_energy_placed_by_effect()` / `last_energy_placed_by_player()`
+   (core/game_state/mod.rs:1015 / :1024), consumed at turn/actions/mod.rs:1504
+   and at the each_time scan (game_state/abilities.rs:1842, :2268). Those have
+   their own C members and are tracked separately -- note they are currently
+   0-WRITER/10-reader and 0-WRITER/2-reader in the C, which is the NEXT defect in
+   this family and is reported, not fixed here, because their writers live under
+   src/ability/effects/ and that directory is another agent's. */
     int      debut_count_this_turn[2];         /* members debuted this turn per player */
     /* auto_event_mask[pl] — bitmask of auto/event triggers that occurred since the
         last trigger_auto_abilities_for_player scan (mirrors Rust's per-event
@@ -1687,7 +1866,16 @@ typedef struct GameState {
     int      gained_card_ids[64];          /* card_id for each gained-ability slot */
     Ability  gained_card_abilities[64][4]; /* up to 4 gained abilities per slot */
     int      gained_card_n[64];            /* count of gained abilities per slot */
-    int      n_gained_cards;               /* number of distinct cards with gains */
+    /* TOMBSTONE 2026-10-04 (field census): `n_gained_cards` is DELETED (0 writers,
+   0 readers) and has no Rust member either -- zero occurrences in engine/src or
+   engine/tests. The distinct-card count is implicit in both engines and does not
+   need a counter: Rust keys `gained_card_abilities` by CardId in a HashMap and
+   keeps `gained_card_ids` index-aligned with it (mod.rs:183-184); the C uses the
+   `-1` EMPTY-SLOT SENTINEL in `gained_card_ids[64]` and scans the whole array
+   (src/core/game_state_abilities.c:165, :173-175 find/claim the slot;
+   src/core/modifiers.c:1670-1677 walks it). `gained_card_n[i]` is the per-slot
+   ability count and is live (5 writers / 10 readers). A separate slot count was a
+   third, unread, parallel bookkeeping of something the sentinel already answers. */
     RbAbilityInvalidation ability_invalidations[RB_MAX_ABILITY_INVALIDATIONS];
     int      n_ability_invalidations;
     /* ── entry-accessor keep-alive ring (use-after-free fix) ──
@@ -1752,6 +1940,55 @@ typedef struct GameState {
     int      card_appearance_source_card[32];   /* card_no index per entry */
     uint8_t  card_appearance_source_zone[32];   /* RbZone the card debuted from */
     int      n_card_appearance_source;
+
+    /* Rust GameState.rule_log: Vec<String> (core/game_state/mod.rs:605),
+     * bounded by LOG_BOUND_RULE = 500, newest-kept (mod.rs:1602-1606). This is a
+     * buffer SEPARATE from the 32-slot condition-verdict ring, which drops on
+     * overflow - routing the rule log into that ring makes the two logs destroy
+     * each other's entries and keeps nine rb_gsc_* functions unroutable.
+     * RB_GSC_RULE_LOG_MAX alone is not enough: it is a count, and a Vec<String>
+     * needs the strings. APPENDED, never inserted - see the note above on why
+     * field order is load-bearing. */
+    char     rule_log[RB_GSC_RULE_LOG_MAX][RB_GSC_RULE_LOG_LINE_MAX];
+    uint16_t rule_log_len[RB_GSC_RULE_LOG_MAX];
+    int      n_rule_log;
+
+    /* Rust LiveCardZone.face_up. Rust evicts a wrongly-set member AFTER the live
+     * (actions/mod.rs:1733); the C evicted BEFORE. SHAPE CORRECTED 2026-10-03:
+     * Rust's face_up is ONE FLAG PER ZONE (core/zones.rs:501), not per card —
+     * `add_card(card_id, _face_up)` DISCARDS its per-card flag (zones.rs:1038),
+     * so no per-card value exists to store. Hence [2], indexed by SEAT.
+     * Declaring it [RB_MAX_LIVE_CARDS] invited per-card writes that Rust cannot
+     * produce. ORDERING also matters: the flag must be written BEFORE
+     * rb_check_timing (Rust phases.rs:343 writes, :349 checks) — writing it
+     * afterwards silently does nothing. */
+    uint8_t  live_face_up[2];   /* per SEAT */
+
+    /* TOMBSTONE 2026-10-04 (field census): `constant_need_heart_global[4096][8]`
+   and `constant_need_heart_global_set[4096][8]` are DELETED -- 98 304 bytes, the
+   single largest dead allocation in GameState. Both were 0 writers and 0 readers,
+   and the claim in the old comment above them was FALSE on two counts, both
+   hand-proven:
+     (1) "consumed by modify_required_hearts_global which is reachable from 3
+         abilities" -- there are NO consumers. The C's
+         `modify_required_hearts_global` (src/turn/triggers.c:954 CONSTANT arm,
+         src/ability/effects/executor.c:222 effect arm) applies the amount DIRECTLY
+         to each live card and never reads a ledger; Rust's does the same and does
+         not read `constant_global_need_heart` either.
+     (2) the member was on the WRONG STRUCT. Rust's twin is
+         `GameModifiers.constant_global_need_heart` (core/game_modifiers.rs:194),
+         i.e. on `mods`, not on GameState.
+   Rust's gameplay life for the ledger is a take/compare/reapply inside
+   `recalculate_constants` (core/game_state/modifiers.rs:613-626) whose only net
+   effect is to re-establish `mods.need_heart_modifiers`, which the C already
+   tracks through `mods.constant_need_heart` (the Per-player live TOTAL block
+   below) -- that member is live and untouched. Rust's only READER of the field is
+   the display projection `game/display.rs:1984-1986` (T8 Q2, OUT OF SCOPE), so
+   the field is WRITE-ONLY in Rust too.
+   Offset note: these were the LAST two members, so deleting them changes
+   `sizeof(GameState)` and nothing else -- no later field shifts. The pin in
+   tests/test_harness_self.c section A4 and the Makefile:3 figure moved in the
+   same change (measured, not estimated). */
 } GameState;
 
 /* ── Tracking (engine/src/core/game_state/tracking.rs) ── */
@@ -2167,9 +2404,17 @@ void rb_effect_look_and_select(GameState *g, int actor, AbilityEffect *e);
 int  rb_looked_at_pool(int pl, int *out_ids, int max);
 void rb_gain_ability(GameState *g, int actor, AbilityEffect *e);
 void rb_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e, int host_cid);
-void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e);
+/* ⛔ 2026-10-04: six DECLARATIONS WITH NO DEFINITION were DELETED from this
+ * header - rb_invalidate_ability, rb_activate_ability_effect,
+ * rb_effect_modify_hearts, rb_cost_clear_deferred, rb_execute_effect_via_registry,
+ * rb_translated_execute_custom_effect. Their bodies were deleted on 2026-10-02 and
+ * the prototypes outlived them, so any caller was a LINK ERROR surfacing as a
+ * linker complaint in unrelated code. Verified: zero callers tree-wide; every
+ * remaining mention is a DELETED tombstone comment in the owning .c. Do NOT
+ * re-add without reading CENSUS_wiring.md. A prototype with no definition is
+ * worse than neither. (rb_load_rom is NOT one of these: its declaration is correctly
+ * wrapped in the same #ifdef RB_ROM_STRINGS as its definition.) */
 void rb_suppress_ability_trigger(GameState *g, int actor, AbilityEffect *e, int host_cid);
-void rb_activate_ability_effect(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_tick_gained(GameState *g);
 int  card_matches_card_type_filter(int card_idx, const char *filter);
 void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
@@ -2191,7 +2436,8 @@ void rb_effect_specify_heart_color(GameState *g, int actor, AbilityEffect *e, in
 void rb_effect_set_cost_to_use(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_effect_all_blade_timing(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_effect_activation_cost(GameState *g, int actor, AbilityEffect *e, int host_cid);
-void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
+/* rb_effect_modify_hearts: declaration DELETED 2026-10-04 (body gone since
+   2026-10-02). See the block note above rb_suppress_ability_trigger. */
 void rb_effect_energy_placement(GameState *g, int actor, AbilityEffect *e);
 void rb_effect_energy_state_change(GameState *g, int actor, AbilityEffect *e);
 void rb_util_push_temporary_effect(GameState *g, const char *effect_type,
@@ -2580,6 +2826,9 @@ void rb_waitroom_remove_card(RbPlayer *player, int card_id);
 void rb_success_add(RbPlayer *player, int card_id);
 int  rb_success_len(const RbPlayer *player);
 void rb_resolution_add(GameState *g, int card_id);
+/* Owner-recording form. `rb_resolution_add` keeps calling this with owner = the
+ * active seat so existing behaviour is unchanged until an owner is threaded. */
+void rb_resolution_add_for_owner(GameState *g, int card_id, int owner);
 int  rb_resolution_clear(GameState *g, int *out, int max);
 int  rb_resolution_len(const GameState *g);
 void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zone, int causer, int target);
@@ -2619,7 +2868,13 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice);
 int rb_pay_cost(GameState *g, int actor, const AbilityEffect *cost);
 int rb_validate_cost(const GameState *g, int actor, const AbilityEffect *cost);
 int rb_pay_deferred_costs(GameState *g, int actor, const AbilityEffect *cost);
-void rb_cost_clear_deferred(GameState *g);
+void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e);
+void rb_activate_ability_effect(GameState *g, int actor, AbilityEffect *e, int host_cid);
+void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
+int rb_execute_effect_via_registry(GameState *g, int actor, AbilityEffect *effect, int host_cid);
+int rb_translated_execute_custom_effect(GameState *g, int actor, AbilityEffect *effect, const char *action_str);
+/* rb_cost_clear_deferred: declaration DELETED 2026-10-04 (body gone since
+   2026-10-02). See the block note above rb_suppress_ability_trigger. */
 int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect *cost, int pay);
 int rb_handle_pay_cost_all_discard(GameState *g, int actor, const char *selected);
 int rb_cost_has_skip_prompt(const AbilityEffect *cost);
@@ -3157,14 +3412,14 @@ RbLookAndSelectStep rb_look_and_select_step_finalize(const char *destination, co
 int rb_executor_has_executor(const char *action);
 int rb_executor_is_structural(const char *action);
 int rb_executor_execute(GameState *g, int actor, AbilityEffect *effect, int host_cid);
-int rb_execute_effect_via_registry(GameState *g, int actor, AbilityEffect *effect, int host_cid);
+/* rb_execute_effect_via_registry: declaration DELETED 2026-10-04 (body gone
+   since 2026-10-02). See the block note above rb_suppress_ability_trigger. */
 int rb_translated_execute_gain_ability_effect(GameState *g, int actor, AbilityEffect *effect, int host_cid);
 int rb_translated_execute_activate_ability(GameState *g, int actor, AbilityEffect *effect, int host_cid);
 int rb_translated_execute_invalidate_ability(GameState *g, int actor, AbilityEffect *effect);
 int rb_translated_execute_suppress_ability_trigger(GameState *g, int actor, AbilityEffect *effect);
 int rb_translated_execute_set_card_identity_effect(GameState *g, int actor, AbilityEffect *effect, int host_cid);
 int rb_translated_execute_gain_ability_from_source(GameState *g, int actor, AbilityEffect *effect, int host_cid);
-int rb_translated_execute_custom_effect(GameState *g, int actor, AbilityEffect *effect, const char *action_str);
 int rb_execute_custom_effect(GameState *g, int actor, AbilityEffect *effect, const char *action_str);
 
 /* ── Ability description renderer (engine/src/ability/describe.rs) ─────────
@@ -3470,8 +3725,135 @@ int rb_card_has_draw_icon(const Card *c);
  * SEPARATE from the 32-slot condition-verdict ring, which drops on overflow.
  * Bound LOG_BOUND_RULE, newest-kept (mod.rs:1602-1606); desktop default 500.
  * Nine functions in core/game_state_core.c are unroutable until this exists -
- * routing them into the verdict ring would evict condition verdicts. */
-#define RB_GSC_RULE_LOG_MAX 500
+ * routing them into the verdict ring would evict condition verdicts.
+ * The capacity macros live BEFORE GameState, next to RbPositionChangeEvent. */
+
+/* ── game_state_core.c public surface (core/game_state/mod.rs) ────────────────
+ * 45 declarations that were implemented and COMPILING in game_state_core.c with
+ * no prototype anywhere. Only ONE of the 53 rb_gsc_* symbols was declared in this
+ * header, and 6 more had callers only because a caller hand-wrote a local extern
+ * (game/game_setup.c:208) - so the file compiled by accident rather than by
+ * contract. Signatures are verbatim from game_state_core.c. Audit: AUDIT_core_state.md §7. */
+
+/* RbGscTurnPhase (was game_state_core.c:93-97), MOVED HERE 2026-10-03 so the
+ * rb_gsc_current_turn_phase prototype below has a visible type; the local typedef
+ * was deleted in the same change, the same pattern as RbGscZoneSnapshot.
+ * Deliberately NOT stored as a GameState field: it is fully derivable from
+ * g->phase + g->first_attacker + g->second_attacker, and storing it would create a
+ * second source of truth that can disagree with the phase machine.
+ * RB_PHASE_RPS covers the RPS->first-attacker step, with g->rps_winner holding the
+ * outcome. The mapping is total: every C phase has a Rust counterpart. */
+typedef enum {
+    RB_GSC_TP_FIRST_ATTACKER_NORMAL = 0,
+    RB_GSC_TP_SECOND_ATTACKER_NORMAL,
+    RB_GSC_TP_LIVE
+} RbGscTurnPhase;
+
+/* ---- seat identity (game_state_core.c:144-180) ---- */
+int         rb_gsc_first_attacker_index(const GameState *g);
+int         rb_gsc_second_attacker_index(const GameState *g);
+int         rb_gsc_active_player_index(const GameState *g);
+RbPlayer   *rb_gsc_active_player(GameState *g);
+const RbPlayer *rb_gsc_const_active_player(const GameState *g);
+const RbPlayer *rb_gsc_seat_player(const GameState *g, int seat);
+RbPlayer   *rb_gsc_seat_player_mut(GameState *g, int seat);
+const RbPlayer *rb_gsc_seated_pair(const GameState *g, int me, const RbPlayer **out_opp);
+const RbPlayer *rb_gsc_try_player_by_id(const GameState *g, const char *id);
+RbPlayer   *rb_gsc_try_player_by_id_mut(GameState *g, const char *id);
+int         rb_gsc_seat_index_by_id(const char *player_id);
+
+/* ---- turn / phase (game_state_core.c:185-238) ---- */
+int         rb_gsc_is_first_turn(const GameState *g);
+RbGscTurnPhase rb_gsc_current_turn_phase(const GameState *g);
+int         rb_gsc_phase_invariant(const GameState *g);
+int         rb_gsc_can_player_act(const GameState *g, int player_id);
+int         rb_gsc_opponent_has_performed(const GameState *g, int my_player_idx);
+int         rb_gsc_game_has_ended(const GameState *g);
+int         rb_gsc_reject_if_ended(const GameState *g);
+
+/* ---- concede ---- */
+int  rb_gsc_concede(GameState *g, int player_id);
+int  rb_gsc_concede_both(GameState *g);
+
+/* ---- scoring / cheer by id (game_state_core.c:413-438) ---- */
+int  rb_gsc_cheer_count_by_id(const GameState *g, const char *player_id);
+void rb_gsc_set_cheer_count_by_id(GameState *g, const char *player_id, int count);
+int  rb_gsc_seat_cheer_count(const GameState *g, int seat);
+int  rb_gsc_score_bonus_by_id(const GameState *g, const char *player_id);
+int  rb_gsc_seat_score_bonus(const GameState *g, int seat);
+
+/* ---- per-turn effect tracking (game_state_core.c:440-503) ---- */
+void rb_gsc_clear_effect_tracking(GameState *g);
+int  rb_gsc_last_area_move_card_id(const GameState *g);
+int  rb_gsc_last_area_move_by_player(const GameState *g);
+int  rb_gsc_last_cost_wait_member(const GameState *g);
+int  rb_gsc_last_energy_placed_by_effect(const GameState *g);
+int  rb_gsc_last_energy_placed_by_player(const GameState *g);
+int  rb_gsc_current_ability_source_card_id(const GameState *g);
+void rb_gsc_push_revealed_card(GameState *g, int card_id);
+const char *rb_gsc_player_prefix_id(const GameState *g);
+
+/* ---- snapshots / zones / choices (game_state_core.c:529-711) ---- */
+int  rb_gsc_zone_is_private(const char *zone);
+int  rb_gsc_resolve_index_any_player(const GameState *g, const char *zone, int idx,
+                                     char *out, size_t out_sz);
+int  rb_gsc_choice_offered_labels(const GameState *g, const RbChoice *ch,
+                                  char *out, size_t out_sz);
+int  rb_gsc_choice_option_count(const RbChoice *ch);
+
+/* ── Ability queue (ability_queue.c) ──────────────────────────────────────────
+ * These two had file-scope `extern` declarations in their callers, so the file
+ * compiled by accident rather than by contract — the same defect that hid 45
+ * rb_gsc_* prototypes. rb_queue_is_entry_available was already here at :1890. */
+void       rb_queue_clear_completed(GameState *g);
+const char *rb_queue_entry_player_id(const GameState *g, int index);
+
+/* ---- logging: these four ALSO need the rule_log member added above ----
+ * CORRECTED 2026-10-03. This took NO GameState*, and that was not a faithful
+ * extraction — it was the bug. Rust's is a `&mut self` method
+ * (core/game_state/mod.rs:1535), so the C form STRUCTURALLY CANNOT reach
+ * g->rule_log and had to drop the line. My header note claiming it was "the
+ * shared sink" was wrong: a sink with no state has nowhere to sink to.
+ * Taking GameState* unblocks ~25 existing rb_log_push_verdict(line,"rule_log",1)
+ * call sites into one-token swaps. */
+void rb_gsc_push_rule_log_fmt(GameState *g, const char *fmt, ...);
+void rb_gsc_log_entry(GameState *g, const char *text, const char *player_label,
+                      int source_card_id, const char *source_card_name,
+                      const char *category);
+void rb_gsc_push_choice_offered(const GameState *g, const RbChoice *ch);
+void rb_gsc_push_choice_resolved(const GameState *g, const RbChoice *ch,
+                                 const char *chosen, int skipped);
+
+/* ---- snapshots / traces (game_state_core.c:778-848) ---- */
+void rb_gsc_push_performance_snapshot(GameState *g, const RbLiveSnapshot *snap);
+void rb_gsc_record_ability_application(GameState *g, int source_card_id,
+                                        const char *ability_text,
+                                        const char *effect_type,
+                                        int target_card_id, int heart_color,
+                                        int amount);
+/* The audit doc rendered this parameter as `RbTraceNode`; the real type is
+ * RbAbilityTraceNode (game_state_core.c:816). The audit's spelling does not
+ * compile. See the note above about the rest of the audit's signatures. */
+void rb_gsc_print_trace_node(const RbAbilityTraceNode *node, int indent);
+
+/* ── Cluster E entry points, landed 2026-10-03 in src/core/modifiers.c. ────────
+ * Declared HERE rather than beside the other rb_mods_* because they all take a
+ * `const GameState *`, and GameState is not defined until ~line 1800 — putting
+ * them next to rb_mods_get_cost broke 48 translation units at once.
+ *
+ * Each has 0 PRODUCTION callers today: its call site lives in a file another
+ * cluster owns. They are declared because they are correct and reachable, NOT
+ * because they are wired — see PARITY_CHECKLIST.md before assuming E9/E10/E11/
+ * E12/E16 are closed. Signatures are verbatim from the definitions. */
+void rb_record_stage_position_swap(GameState *g, int source_id, int source_index,
+                                   int target_id, int target_index);
+unsigned rb_mods_count_as_multiple_weight(const GameState *g, int counted,
+                                          int counting_card);
+unsigned rb_mods_weighted_zone_count(const GameState *g, const int *cards,
+                                      int n_cards, const char *card_type,
+                                      const char *group_names, int counting_card);
+int rb_mods_replacement_appear_wait_applies(const GameState *g, int incoming,
+                                           int area_idx);
 
 /* MemberContribution is declared ABOVE RbLiveSnapshot (it is a member of it).
  * Its definition and rationale live with the other live.rs-derived types. */

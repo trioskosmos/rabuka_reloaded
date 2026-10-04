@@ -249,7 +249,7 @@ static void on_fatal_signal(int sig)
         if (tal) tal->assertions++;                                       \
         if (!tal || tal->prompts < (n)) {                                 \
             if (tal) tal->failures++;                                     \
-            fprintf(stderr, "FAIL (VACUOUS): ");                          \
+            fprintf(stderr, "FAIL: [VACUOUS]  ");                          \
             fprintf(stderr, __VA_ARGS__);                                 \
             fprintf(stderr, " - only %d prompt(s) offered, need %d\n",   \
                     tal ? tal->prompts : -1, (int)(n));                   \
@@ -952,6 +952,15 @@ static void a1_jidou_energy_is_exactly_what_live_start_pays(void)
     CHECK(r.targets_live_start > 0,
           "A1+: VACUITY CONTROL -- ab#1's 2E payment really was OFFERED as a "
           "SelectTarget (%d)", r.targets_live_start);
+    /* J12: the [info] line above used to print a HARDCODED `queued=1` instead of
+     * this counter, which MASKED a real engine bug -- an `ability_id[512]`
+     * truncation meant ab#1 never fired at all, and the run read `queued=1`
+     * anyway. The field is measured (a1_run:912, `= fire_trigger(...)`), so it
+     * is asserted here: a zero now fails loudly instead of hiding in a log. */
+    CHECK_EQ(r.live_start_queued, 1,
+             "A1+: ab#1 really ENQUEUED exactly one printed ability "
+             "(measured fire_trigger count, was previously a hardcoded 1 in the "
+             "diagnostic)");
     CHECK_EQ(r.active_after_live_start, 0,
              "A1+: ab#1 spent exactly the 2 energy ab#0 activated -- the zone empties. "
              "This is the link: the sibling's payment is funded by the jidou.");
@@ -1305,6 +1314,13 @@ static void a6_one_appearance_grants_blade_to_host_below_threshold(void)
                     "deck %d->%d hand %d->%d CENSUS %d->%d\n",
             r.live_queued, r.targets_live, r.cards_live, r.deck_before,
             r.deck_after, r.hand_before, r.hand_after, r.census1, r.census2);
+    /* J12: `live_queued` is measured (a6_fire_live_start:1258, which returns the
+     * fire_trigger count) but was only ever PRINTED. Assert it, so a trigger
+     * that stops enqueueing fails here instead of hiding behind a diagnostic --
+     * the exact class of bug that the old hardcoded `queued=1` masked. */
+    CHECK_EQ(r.live_queued, 1,
+             "A6+: 花帆's ライブ開始時 really ENQUEUED one printed ability "
+             "(measured fire_trigger count)");
     CHECK_EQ(r.deck_after, r.deck_before,
              "A6+: 6 < 8: ab#1 must not draw -- カードを2枚引き is gated on the "
              "printed ブレード数");
@@ -2308,6 +2324,12 @@ static void b7_waited_again_after_being_activated_still_counts(void)
             queued, m, census0, census1);
 
     CHECK_EQ(census1, census0, "B7: CENSUS unchanged by the live-start resolution");
+    /* J12: `queued` is measured (line above) but was only PRINTED. Asserted here
+     * so a live-start that stops enqueueing is a FAIL, not a log line -- the
+     * masked-bug class the hardcoded `queued=1` used to hide. */
+    CHECK_EQ(queued, 1,
+             "B7: ひかり's ライブ開始時 really ENQUEUED one printed ability "
+             "(measured fire_trigger count)");
     CHECK_EQ(m, -3,
              "B7: ウェイト状態からアクティブにしていた -- the step counts "
              "MEMBERS OF THE ACTIVATION HISTORY, not members currently active.  "

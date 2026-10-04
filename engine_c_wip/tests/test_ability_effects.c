@@ -17,7 +17,7 @@ static int failures;
 
 static void test_gained_ability_target_and_duration(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int source = test_id(&game, "PL!-sd1-010-SD");
     int target = test_new_id(&game, "PL!-sd1-010-SD");
@@ -64,7 +64,7 @@ static void test_gained_ability_target_and_duration(void)
 
 static void test_activate_ability_stores_trigger_context(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int card = test_id(&game, "PL!-bp3-005-R");
     AbilityEffect effect;
@@ -88,7 +88,7 @@ static void test_activate_ability_stores_trigger_context(void)
 
 static void test_gain_trigger_is_scanned_and_suppressible(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int source = test_id(&game, "PL!-sd1-010-SD");
     int target = test_new_id(&game, "PL!-sd1-010-SD");

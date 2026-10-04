@@ -144,10 +144,17 @@ static void on_fatal_signal(int sig)
 {
     fprintf(stderr,
             "\n*** FATAL SIGNAL %d inside test: %s\n"
-            "*** The engine, not this test, is at fault.\n"
             "*** assertions=%d failures=%d prompts=%d\n",
             sig, current_test, assertions, failures, prompts);
     fflush(stderr);
+    /* Re-raise under the DEFAULT disposition. The old body ended in
+     * _Exit(128 + sig), which made the child exit NORMALLY with code 139, so
+     * the parent's WIFSIGNALED(status) was false and run_case() took its
+     * no-report path: the crashed case produced NO verdict at all and the
+     * final tally read `13 ok, 9 failed, 0 crashed` for 23 cases. Dying from
+     * the signal is what makes the CRASH verdict reachable. */
+    signal(sig, SIG_DFL);
+    raise(sig);
     _Exit(128 + sig);
 }
 
@@ -387,7 +394,7 @@ static int expect_prompts(TestGame *tg, int n, const char *what)
     note_prompt(tg);
     if (prompts < n) {
         failures++;
-        fprintf(stderr, "FAIL (VACUOUS): %s - only %d prompt(s) were offered, need %d\n",
+        fprintf(stderr, "FAIL: [VACUOUS]  %s - only %d prompt(s) were offered, need %d\n",
                 what, prompts, n);
         return 0;
     }
@@ -1053,7 +1060,16 @@ static void test_f_p2_success_zone_allows_partial_member_retrieval(void)
 static void test_f_zero_or_one_success_card_does_not_retrieve(void)
 {
     for (int success_count = 0; success_count <= 1; success_count++) {
-        TestGame *tg = &t_tg[11 + success_count];
+        /* t_tg is a ONE-slot array (line 141) because sizeof(TestGame) is
+         * 885912 B: two of them live at once is a 1.7 MB stack frame. The old
+         * `&t_tg[11 + success_count]` subscripted indices 11 and 12 of that
+         * 1-element array, i.e. 9745032..10630944 B past an 885912 B object -
+         * unmapped, so the first store in f_setup() raised SIGSEGV and gcc
+         * warned "array subscript 11 is above array bounds of 'TestGame[1]'".
+         * The two boards are independent and sequential, so one slot plus a
+         * full test_game_new() per iteration is equivalent. */
+        TestGame *tg = &t_tg[0];
+        test_game_new(tg);
         current_test = (success_count == 0)
             ? "test_f_zero_success_card_does_not_retrieve"
             : "test_f_one_success_card_does_not_retrieve";
@@ -1576,7 +1592,16 @@ static int run_case(int idx)
             fprintf(stderr, "CRASH: %s died on signal %d\n", cases[idx].name, WTERMSIG(status));
             return 2;
         }
-        return -1;
+        /* The child closed the pipe without writing a report and without dying
+         * from a signal (exit code %d). That is a lost case, so it is
+         * reported, not swallowed - the old bare `return -1` here is how a
+         * case disappeared with no verdict line and no tally. */
+        n_crashed++;
+        fprintf(stderr, "CRASH: %s produced no report (exit %d)\n",
+                cases[idx].name, WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+        printf("CRASH: %s (no report)\n", cases[idx].name);
+        fflush(stdout);
+        return 2;
     }
     buf[k] = '\0';
     int rc, a, f, s;

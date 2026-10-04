@@ -35,6 +35,7 @@ pub mod reveal_live_name_fragment_recovers_matching_live_q236_q237_test;
 pub mod self_to_waitroom_liella_recovery_test;
 pub mod self_to_waitroom_live_recovery_energy_activation_test;
 pub mod self_to_waitroom_recover_live_q79_q123_test;
+pub mod self_to_waitroom_recover_member_own_card_is_candidate_test;
 pub mod self_to_waitroom_recover_member_q79_test;
 pub mod self_wait_discard_niji_live_recovery_test;
 pub mod success_score_live_pl_bp6_013_n_test;

@@ -206,7 +206,7 @@ static void on_fatal_signal(int sig)
         assertions++;                                                       \
         if (prompts < (n)) {                                                \
             failures++;                                                     \
-            fprintf(stderr, "FAIL (VACUOUS): ");                            \
+            fprintf(stderr, "FAIL: [VACUOUS]  ");                            \
             fprintf(stderr, __VA_ARGS__);                                   \
             fprintf(stderr, " - only %d prompt(s) were offered, need %d\n",  \
                     prompts, (n));                                          \

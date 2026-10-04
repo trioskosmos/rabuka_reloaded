@@ -24,6 +24,23 @@ static int eval_multi_location(const struct GameState *g, int actor, int host_ci
 /* Defined further down; declared here because eval_location (Rust
    card.rs:evaluate_location_condition) calls it in the middle of its chain. */
 int rb_check_heart_colors(const struct GameState *g, int actor, const Condition *c);
+/* Cluster D. Defined further down, called by the comparison/location twins
+   above: card_total_hearts (card.rs:4263-4271), cond_group_names (the
+   `group_names.first()` reader), compare_counts_op (util.rs:2210) and
+   cond_truthy_field (`all.unwrap_or(false)` over any decoder tag). */
+static int card_total_hearts(const Card *cc);
+static const CondValue *cond_group_names(const Condition *c);
+static int compare_counts_op(const char *op, int actual, int expected);
+static int cond_truthy_field(const Condition *c, const char *key);
+/* Cluster D helpers, all defined at the foot of this file with the rest of the
+   card.rs twins and called from the evaluators above. */
+static int cond_no_excess_heart_flag(const struct GameState *g, int pl);
+static int resolve_target_player(int actor, const Condition *c);
+static int cond_card_printed_cost(const struct GameState *g, int cid);
+static int cond_matches_groups_and_type(const struct GameState *g, const Condition *c, int cid);
+static int cond_heart_count_at_or_all(const struct GameState *g, int pl, int col, int idx);
+static int cond_total_effective_cost(const struct GameState *g, const int *ids, int n);
+int rb_check_heart_type_all(const struct GameState *g, int actor, const Condition *c, int negation);
 
 /* Condition-level heart-colour list.
    Rust: `condition.get_heart_colors()` is a `&[String]` (predicates.rs:87-90,
@@ -505,6 +522,14 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
        verdict is returned here too — after card_property, before the counting
        arms below, matching card.rs:804-807. loc_raw, not the "stage" default,
        because `get_location().unwrap_or("")` is what card.rs:735-747 passes. */
+    /* card.rs:788 — check_heart_type_all is the FIRST predicate of the chain,
+       ahead of check_heart_colors. It carries its own `negation` handling
+       (predicates.rs:41-60) and condition.rs:648 exempts exactly this shape
+       from the outer fold, so the two cancel. It was defined, exported and
+       never called, which is why the negated 「そのメンバーがハートを持たない
+       場合」 (card 1239) never ran at all. */
+    { int ht_neg = 0; get_bool(c, "negation", &ht_neg);
+      if (!rb_check_heart_type_all(g, actor, c, ht_neg)) return 0; }
     if (!rb_check_heart_colors(g, actor, c)) return 0;
     if (get_str(c, "card_property")) return check_card_property(g, actor, c, loc);
     { int agg_res = rb_check_aggregate_total(g, actor, c);
@@ -603,47 +628,229 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
     return actual > 0;
 }
 
-static int eval_highest_cost(const struct GameState *g, int actor, int host_cid, const Condition *c);
+/* ══ D4: the branches evaluate_comparison_condition returns EARLY on, in Rust's
+ * order (comparison.rs:41-95). Each was absent, so every one of these clauses
+ * fell through to the numeric path at comparison.rs:97 and was answered by
+ * `compare_counts` on a count that means something else. Corpus reach is on
+ * each comment; all counts are nodes over 2116 card-ability pairs.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 
+/* paid_cost_this_turn (comparison.rs:60-70). 1 node: card 449 ab#0, 南ことり.
+   The clause is about the PAYER, so membership is tested on the ACTIVATING card
+   and not on anything scanned off the board. */
+static int eval_paid_cost_this_turn(const struct GameState *g, int host_cid) {
+    int payer = g->activating_card;
+    if (payer < 0) {
+        int cur = rb_queue_current_entry(g);
+        if (cur >= 0) payer = g->queue.entries[cur].card_id;
+    }
+    int paid = 0;
+    if (payer >= 0 && payer < RB_MAX_CARD_IDS && g->cards_paid_cost_this_turn[payer]) paid = 1;
+    return paid ? 1 : 0;
+}
+/* energy_relative (comparison.rs:170-187). 2 nodes: card 1853 ab#0. Counts how
+   far AHEAD the opponent is, floored at zero, then compares with count/op. */
+static int eval_relative_energy(const struct GameState *g, int actor, const Condition *c) {
+    int me = resolve_target_player(actor, c);
+    int opp = me ^ 1;
+    int mine = g->p[me].energy.n;
+    int theirs = g->p[opp].energy.n;
+    int ahead = theirs - mine;
+    if (ahead < 0) ahead = 0;
+    if (ahead > 255) ahead = 255;
+    int n = 0; get_i(c, "count", &n);
+    const char *op = get_str(c, "operator");
+    return compare_counts_op(op ? op : ">=", ahead, n);
+}
+/* cost + location "activating_card" (comparison.rs:189-206 via :74-80). 3 nodes:
+   cards 705-707. Rust reads `game_state.activating_card`, NOT the activating
+   CARD ID, and compares the EFFECTIVE cost. */
+static int eval_activating_cost(const struct GameState *g, const Condition *c, int act) {
+    Card cc;
+    int printed = 0;
+    if (rb_decode_card_by_index((uint32_t)act, &cc)) { printed = cc.cost; rb_free_card(&cc); }
+    int eff = rb_effective_stat((uint8_t)printed, (int16_t)rb_mods_get_cost((RbMods *)&g->mods, act));
+    int thr = 0; get_i(c, "count", &thr);
+    const char *op = get_str(c, "operator");
+    return compare_counts_op(op ? op : ">=", eff, thr);
+}
+/* original_value + comparison_type "score" (comparison.rs:208-226 via :81-85).
+   2 nodes: cards 2469-2470. "my live card whose CURRENT score exceeds its
+   PRINTED one" - a `.any()`, over the LIVE zone only (SuccessLiveZone and every
+   other zone answer false, `_ => Vec::new()`). */
+static int eval_original_score(const struct GameState *g, int actor, const Condition *c) {
+    int pl = resolve_target_player(actor, c);
+    const char *loc = get_str(c, "location");
+    const RbPlayer *P = &g->p[pl];
+    int only_success = loc && (!strcmp(loc, "success_live_card_zone") || !strcmp(loc, "success"));
+    int only_live    = loc && (!strcmp(loc, "live_card_zone") || !strcmp(loc, "live"));
+    const char *op = get_str(c, "operator");
+    for (int zone = 0; zone < 2; zone++) {
+        if (zone == 0 && only_live) continue;
+        if (zone == 1 && only_success) continue;
+        const RbBag *b = (zone == 0) ? &P->live : &P->success;
+        for (int i = 0; i < b->n; i++) {
+            Card cc; int original = 0;
+            if (!rb_decode_card_by_index((uint32_t)b->cards[i], &cc)) continue;
+            original = cc.score;
+            rb_free_card(&cc);
+            int cur = rb_effective_stat((uint8_t)original,
+                                        (int16_t)rb_mods_get_score((RbMods *)&g->mods, b->cards[i]));
+            if (compare_counts_op(op, cur, original)) return 1;
+        }
+    }
+    return 0;
+}
+/* evaluate_front_comparison (comparison.rs:406-433, reached from :86-89).
+   2 nodes: cards 844-845 ab#1. The subject is the activating card's own FRONT
+   AREA on the OPPONENT's stage, and the comparison is opponent-front-cost vs
+   self-cost. The C hardcoded stage[1] and the printed cost, which is a
+   different slot and a different quantity. */
+static int eval_front_comparison(const struct GameState *g, int actor, const Condition *c) {
+    int act = g->activating_card;
+    if (act < 0) return 0;
+    /* comparison.rs:412 `gs.resolve_target_player("self")` - the MASTER side is
+       always the acting player, NOT the condition's `target`, which is
+       "opponent" in both corpus clauses (cards 844-845). */
+    const RbPlayer *me = &g->p[actor];
+    int idx = -1;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) if (me->stage[i] == act) { idx = i; break; }
+    if (idx < 0) return 0;
+    /* util::pos_to_area(idx).front_area().to_index(): left<->left, centre<->centre,
+       right<->right. STAGE_SIZE is 3, so the front area is the mirrored slot. */
+    int front = (idx == 1) ? 1 : (idx == 0 ? 0 : 2);
+    int front_id = g->p[actor ^ 1].stage[front];
+    if (front_id == RB_EMPTY_SLOT) return 0;
+    Card cc;
+    int master_cost = 0, front_cost = 0;
+    if (rb_decode_card_by_index((uint32_t)act, &cc)) { master_cost = cc.cost; rb_free_card(&cc); }
+    if (rb_decode_card_by_index((uint32_t)front_id, &cc)) { front_cost = cc.cost; rb_free_card(&cc); }
+    master_cost = rb_effective_stat((uint8_t)master_cost, (int16_t)rb_mods_get_cost((RbMods *)&g->mods, act));
+    front_cost  = rb_effective_stat((uint8_t)front_cost,  (int16_t)rb_mods_get_cost((RbMods *)&g->mods, front_id));
+    return compare_counts_op(get_str(c, "operator"), front_cost, master_cost);
+}
+/* evaluate_position_cost (comparison.rs:228-256), the arm the C had only half of.
+   PRINTED cost of the card in the named slot (not the effective one - the C
+   added the modifier), against `count` when comparison_target is not opponent.
+   0 corpus nodes reach this shape today (the two 「正面」 clauses go through
+   position "front"), so it is ported for shape-completeness and measured
+   inert rather than claimed as a corpus fix. */
+static int eval_position_cost_count(const struct GameState *g, int actor,
+                                   const Condition *c, const char *position) {
+    int pl = resolve_target_player(actor, c);
+    int cid = rb_card_at_position(g, pl, position);
+    if (cid < 0) return 0;
+    if (!cond_matches_groups_and_type(g, c, cid)) return 0;
+    int card_cost = cond_card_printed_cost(g, cid);
+    int thr = 0; get_i(c, "count", &thr);
+    const char *op = get_str(c, "operator");
+    return compare_counts_op(op ? op : ">=", card_cost, thr);
+}
+/* total_effective_cost (card.rs:1101) + sum_condition_costs (comparison.rs:390-404). */
+static int cond_card_printed_cost(const struct GameState *g, int cid) {
+    Card cc; int printed = 0;
+    if (cid >= 0 && rb_decode_card_by_index((uint32_t)cid, &cc)) { printed = cc.cost; rb_free_card(&cc); }
+    return printed;
+}
+static int cond_total_effective_cost(const struct GameState *g, const int *ids, int n) {
+    int total = 0;
+    for (int i = 0; i < n; i++) {
+        if (ids[i] == RB_EMPTY_SLOT) continue;
+        int v = rb_effective_stat((uint8_t)cond_card_printed_cost(g, ids[i]),
+                                  (int16_t)rb_mods_get_cost((RbMods *)&g->mods, ids[i]));
+        total += v > 0 ? v : 0;
+    }
+    return total > 255 ? 255 : total;
+}
+/* matches_condition_groups_and_type (predicates.rs:131-152) */
+static int cond_matches_groups_and_type(const struct GameState *g, const Condition *c, int cid) {
+    const CondValue *gn = cond_group_names(c);
+    if (gn && gn->arr_n > 0) {
+        int hit = 0;
+        for (uint32_t i = 0; i < gn->arr_n && !hit; i++) {
+            const char *t = (gn->arr[i].tag == RB_TAG_STR) ? gn->arr[i].s : NULL;
+            if (t && rb_card_matches_group_str(cid, t)) hit = 1;
+        }
+        if (!hit) return 0;
+    }
+    const char *ct = get_str(c, "card_type");
+    if (ct && *ct && !card_matches_card_type_filter(cid, ct)) return 0;
+    return 1;
+}
+/* evaluate_cost_total (comparison.rs:341-388). 22 nodes / 13 pairs. The absent
+   arm meant every 「コストの合計がN」 fell into the plain numeric path, which
+   counts CARDS. `cost_total_operator` is absent from the corpus (0 nodes), so
+   the operator always comes from `operator`, and the DEFAULT is "=" - not the
+   ">=" compare_counts would have used. */
+static int eval_cost_total(const struct GameState *g, int actor, const Condition *c) {
+    int threshold = 0; get_i(c, "cost_total", &threshold);
+    const char *op = get_str(c, "cost_total_operator");
+    if (!op) op = get_str(c, "operator");
+    if (!op) op = "=";
+    const char *src = get_str(c, "source");
+    const char *loc = get_str(c, "location");
+    int sum = 0;
+    if ((src && (!strcmp(src, "preceding_moved") || !strcmp(src, "previous_moved_cards"))) || !loc) {
+        /* comparison.rs:349-353 — `self.moved_cards`, read through this file's
+           own reader for that key (resolve_moved_cards_source, condition.c:3290). */
+        int moved[RB_MAX_ZONE]; int n = 0;
+        for (int i = 0; i < g->n_recently_moved && i < RB_MAX_ZONE; i++) moved[n++] = g->recently_moved[i];
+        int keep[RB_MAX_ZONE]; int nk = 0;
+        for (int i = 0; i < n; i++)
+            if (cond_matches_groups_and_type(g, c, moved[i])) keep[nk++] = moved[i];
+        sum = cond_total_effective_cost(g, keep, nk);
+    } else {
+        int pl = resolve_target_player(actor, c);
+        const RbPlayer *P = &g->p[pl];
+        int ids[RB_MAX_ZONE]; int n = 0;
+        switch (zone_kind(loc)) {
+            case ZK_STAGE:    n = RB_STAGE_SIZE; memcpy(ids, P->stage, sizeof(int) * (size_t)n); break;
+            case ZK_HAND:     n = P->hand.n;      memcpy(ids, P->hand.cards, sizeof(int) * (size_t)n); break;
+            case ZK_DISCARD:
+            case ZK_WAITROOM: n = P->discard.n;   memcpy(ids, P->discard.cards, sizeof(int) * (size_t)n); break;
+            /* comparison.rs:378-386 — every OTHER named location falls to
+               `sum_condition_costs(condition, revealed_cards)`, so a
+               revealed_cards clause sums the revealed set rather than 0. */
+            default:
+                n = g->n_revealed;
+                for (int i = 0; i < n && i < RB_MAX_ZONE; i++) ids[i] = g->revealed_cards[i];
+                break;
+        }
+        int keep[RB_MAX_ZONE]; int nk = 0;
+        for (int i = 0; i < n; i++)
+            if (ids[i] != RB_EMPTY_SLOT && cond_matches_groups_and_type(g, c, ids[i])) keep[nk++] = ids[i];
+        sum = cond_total_effective_cost(g, keep, nk);
+    }
+    if (sum > 255) sum = 255;
+    return compare_counts_op(op, sum, threshold);
+}
+
+/* ── evaluate_highest_cost_on_stage_condition (comparison.rs:458-477) ──
+   The C hardcoded `stage[1]` and the PRINTED cost, so 「センターエリアにいる
+   メンバーが最も大きいコストを持つ場合」 (cards 2104-2105, 2 nodes) was asked
+   about the centre whether or not the condition names the centre, and ignored
+   every cost modifier. Rust: the named position, the resolved target's player,
+   the EFFECTIVE cost of that one card, and `.all()` over the OTHER members. */
 static int eval_highest_cost(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     (void)host_cid;
-    // SP-bp2-004: center member is highest cost among stage members
-    // Condition: position=center, location=stage, operator > (or >=)
-    // Text: "center area has member with greatest cost"  Ei.e. center member exists and its cost is strictly greater than all others.
-    // This is NOT about host being at center; host is the card whose ability is being evaluated (sumire) which may be at left/right or center.
-    // We check existence of center member and that its cost is max.
-    const RbPlayer *P = &g->p[actor];
-    int center_cid = P->stage[1];
-    if (center_cid == RB_EMPTY_SLOT) return 0;
-    Card center; if (!rb_decode_card_by_index((uint32_t)center_cid, &center)) return 0;
-    int center_cost = center.cost;
-    rb_free_card(&center);
-    int max_other = -1;
-    int count_max = 0;
-    int max_val = -1;
-    for (int i=0;i<RB_STAGE_SIZE;i++) {
-        int cid = P->stage[i];
-        if (cid==RB_EMPTY_SLOT) continue;
-        Card cc; if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
-        int cst = cc.cost;
-        rb_free_card(&cc);
-        if (cst > max_val) { max_val = cst; count_max = 1; }
-        else if (cst == max_val) count_max++;
-        if (cid != center_cid && cst > max_other) max_other = cst;
-    }
-    // If center is alone, max_other is -1 -> true
-    if (max_other < 0) return 1;
+    const char *pos = get_str(c, "position");
+    if (!pos) return 0;
+    int pl = resolve_target_player(actor, c);
+    int cid = rb_card_at_position(g, pl, pos);
+    if (cid < 0) return 0;
     const char *op = get_str(c, "operator");
     if (!op) op = ">";
-    // For ">" the center must be strictly greater than all others
-    if (!strcmp(op, ">")) {
-        return center_cost > max_other;
+    const RbPlayer *P = &g->p[pl];
+    int pos_cost = rb_effective_stat((uint8_t)cond_card_printed_cost(g, cid),
+                                     (int16_t)rb_mods_get_cost((RbMods *)&g->mods, cid));
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        int other = P->stage[i];
+        if (other == RB_EMPTY_SLOT || other == cid) continue;
+        int oc = rb_effective_stat((uint8_t)cond_card_printed_cost(g, other),
+                                   (int16_t)rb_mods_get_cost((RbMods *)&g->mods, other));
+        if (!compare_counts_op(op, pos_cost, oc)) return 0;
     }
-    if (!strcmp(op, ">=")) {
-        return center_cost >= max_other;
-    }
-    // For other ops, compare center_cost vs max_other
-    return eval_operator(center_cost, op, max_other);
+    return 1;
 }
 
 /* Mirror engine/src/ability/condition/card.rs:evaluate_position_condition.
@@ -779,6 +986,43 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
     const char *ctype = get_str(c, "comparison_type");
     const char *comparison_target = get_str(c, "comparison_target");
     const char *position = get_str(c, "position");
+    /* ── D4: Rust's EARLY RETURNS, in Rust's order (comparison.rs:60-95). Each
+       one RETURNS, so none of them folds `negation` itself - the outer
+       post-dispatch guard is the single negation for all of them. ── */
+    /* :60-70 paid_cost_this_turn. 1 node (card 449). Placed FIRST, ahead of
+       every numeric path, exactly as Rust places it: with no comparison_type
+       and no bound, the numeric path would answer `cost >= 0`, true for every
+       card every turn. */
+    if (cond_truthy_field(c, "paid_cost_this_turn")) {
+        int need = 1; get_i(c, "count", &need);
+        if (need < 1) need = 1;
+        return eval_paid_cost_this_turn(g, host_cid) >= need;
+    }
+    /* :71-73 energy_relative. 2 nodes (card 1853). */
+    if (ctype && !strcmp(ctype, "energy_relative"))
+        return eval_relative_energy(g, actor, c);
+    /* :74-80 comparison_type "cost" + location "activating_card". 3 nodes
+       (cards 705-707). `game_state.activating_card` is the CARD, not the
+       activating id, so a missing activating card falls through to the numeric
+       path in Rust - which is what the `if` below reproduces. */
+    if (ctype && !strcmp(ctype, "cost") && loc && !strcmp(loc, "activating_card")) {
+        if (g->activating_card >= 0)
+            return eval_activating_cost(g, c, g->activating_card);
+    }
+    /* :81-85 original_value + comparison_type "score". 2 nodes (2469-2470). */
+    if (cond_truthy_field(c, "original_value") && ctype && !strcmp(ctype, "score"))
+        return eval_original_score(g, actor, c);
+    /* :86-89 position == "front". 2 nodes (844-845 ab#1). */
+    if (position && !strcmp(position, "front"))
+        return eval_front_comparison(g, actor, c);
+    /* :90-94 position + comparison_type "cost" -> evaluate_position_cost. The
+       opponent branch below IS that evaluator for comparison_target
+       "opponent"; Rust also has a plain-count branch (comparison.rs:246-255)
+       whose THRESHOLD is `count` and whose subject is the PRINTED cost, which
+       the old body got wrong twice - it summed a modifier into the cost and
+       hardcoded max_other as the threshold. */
+    if (position && ctype && !strcmp(ctype, "cost") && !comparison_target)
+        return eval_position_cost_count(g, actor, c, position);
     /* condition.rs:456-464 is_all_cost_comparison: comparison_type "cost", no
      * position / count / values, comparison_target absent or "self", and
      * all == true. Rust routes that to evaluate_all_cost_comparison_condition
@@ -884,8 +1128,12 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
         const char *operator = get_str(c, "operator");
         return eval_operator(actual, operator ? operator : ">=", threshold);
     }
-    const char *pos = get_str(c, "position");
-    if (pos && !strcmp(pos, "center") && loc && !strcmp(loc, "stage")) {
+    /* is_highest_cost_on_stage (condition.rs:447-452): position set, and NO
+       count / position_compare / comparison_target. The old gate hardcoded
+       `position == "center"` as well, so a clause naming any other slot never
+       reached the evaluator at all. */
+    if (position && !find_val(c, "count") && !find_val(c, "position_compare") &&
+        !find_val(c, "comparison_target")) {
         return eval_highest_cost(g, actor, host_cid, c);
     }
     /* Rust condition.rs:458-470 (route_location_condition): a distinct
@@ -897,11 +1145,27 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
         if (locs && locs->tag == RB_TAG_ARRAY && locs->arr_n > 0)
             return eval_multi_location(g, actor, host_cid, c);
     }
-    if (loc) return eval_location(g, actor, host_cid, c);
-    int cnt = get_count_for_condition(g, actor, c);
     const CondValue *vv = find_val(c, "values");
+    int has_values = (vv && vv->tag == RB_TAG_ARRAY && vv->arr_n > 0);
+    /* D4 cost_total (comparison.rs:139-141). Placed where Rust returns: AFTER
+       the `values` membership tail, which therefore WINS for the 6 corpus
+       nodes that carry both (cards 2031-2034: revealed_cards + values +
+       cost_total) - Rust never reaches evaluate_cost_total for those. */
+    if (find_val(c, "cost_total") && !has_values)
+        return eval_cost_total(g, actor, c);
+    if (loc && !(ctype && !strcmp(ctype, "cost")))
+        return eval_location(g, actor, host_cid, c);
+    /* `comparison_type: "cost"` deliberately does NOT take the eval_location
+       route above. Rust's evaluate_comparison_condition has no
+       evaluate_location_condition delegation anywhere in it: a cost clause
+       always reaches `get_count_for_condition` (the EFFECTIVE-COST SUM) and then
+       compare_counts. Routing it through eval_location made the C COUNT CARDS,
+       which is why 「自分のステージにコスト13以上のメンバーがいる」 (cards 77-80,
+       count 13 / >=) answered "1 card is not >= 13" and could never pass.
+       comparison.rs:47-157 + card.rs:3974-4198. */
+    int cnt = get_count_for_condition(g, actor, c);
     if (vv && vv->tag == RB_TAG_ARRAY) {
-        /* Rust comparison.rs:84-110: `values` is a MEMBERSHIP test, not a
+        /* Rust comparison.rs:110-136: `values` is a MEMBERSHIP test, not a
            threshold. For comparison_type "score" it asks whether any live or
            success card carries one of the listed scores; otherwise it asks
            whether the computed count is one of the listed values. */
@@ -930,8 +1194,25 @@ static int eval_comparison_inner(const struct GameState *g, int actor, int host_
         }
         return 0;
     }
-    return eval_operator(cnt, get_str(c, "operator"),
-                         comparison_target_count(g, actor, c, ctype));
+    int res = eval_operator(cnt, get_str(c, "operator"),
+                            comparison_target_count(g, actor, c, ctype));
+    /* comparison.rs:143-152 — the revealed_cards post-check. A card_type'd
+       comparison over revealed cards that PASSED with a count of zero is
+       forced to false while anything is actually revealed: "the revealed set
+       has no card of this type" is not the same as "the threshold was met by
+       an empty set". 6 corpus nodes carry card_type + revealed_cards. */
+    if (res && get_str(c, "card_type") && loc && !strcmp(loc, "revealed_cards") &&
+        g->n_revealed > 0 && cnt == 0)
+        res = 0;
+    /* comparison.rs:153-157 — Rust's OWN second negation, on top of the outer
+       post-dispatch guard at condition.rs:643-656. A Comparison condition
+       carries no exemption there, so the two cancel: Rust's answer for a
+       negated numeric comparison is the UN-negated comparison. The C folded it
+       once and therefore answered the opposite for exactly the 3 corpus nodes
+       that reach this tail (cards 1212-1214 ab#0, 「自分が余剰ハートを持たない場合」).
+       Both halves are reproduced: negated here, negated again on return. */
+    if (cond_truthy_field(c, "negation")) res = !res;
+    return res;
 }
 /* ── movement (variant 3) ── */
 
@@ -995,10 +1276,162 @@ static int baton_touch_check_card(const struct GameState *g, const char *locatio
                        : g->baton_touch_replaced_member_id;
 }
 
+/* ── movement:"position_change" — the READER g->position_change_events never had.
+ *
+ * Rust ability/condition/state.rs:869-908 (inside evaluate_movement_condition):
+ *
+ *     "position_change" => {
+ *         let pce_match = self.position_event_matches_filters(
+ *             &self.game_state.position_change_events, condition);
+ *         let tm_match = if !pce_match && self.activating_card_id.is_some() {
+ *             let entry_snapshot = self.game_state.entry_trigger_moved_cards();
+ *             let in_current_batch = |cid: i16| {
+ *                 cid == self.activating_card_id.unwrap_or(-1)
+ *                     && (self.moved_cards.contains(&cid)
+ *                         || entry_snapshot.as_ref().is_some_and(|v| v.contains(&cid))
+ *                         || self.game_state.recently_moved_cards.as_ref()
+ *                                .is_some_and(|v| v.contains(&cid)))
+ *             };
+ *             self.game_state.turn_area_movements.iter().any(|m| {
+ *                 self.activating_card_id == Some(m.moved_card_id)
+ *                     && m.effect_only
+ *                     && in_current_batch(m.moved_card_id)
+ *             })
+ *         } else { false };
+ *         (pce_match || tm_match) && self.moved_cards_match_cost_limit(condition)
+ *     }
+ *
+ * BEFORE THIS, `g->position_change_events[]` had exactly ONE reference in the
+ * whole C tree — the reset at src/core/game_state_abilities.c:589. Its writer
+ * (rb_record_stage_position_swap, src/core/modifiers.c:1033-1050) had landed, so
+ * the array was filled every area change and read by nobody: an event log with
+ * no consumer. Rust reads it in THREE places (state.rs:871, :938, :1162) and
+ * two of the three need only `moved_card_id`. This function is the first of the
+ * three.
+ *
+ * REACHABILITY, measured with the engine's own decoder over the shipped bytecode
+ * (tools/census_fx.c, 2116 card-ability pairs, 0 decode fallbacks):
+ * `movement:"position_change"` is carried by **26 condition nodes on 26 distinct
+ * card-ability pairs** — 21 with `self_target`, 3 with `group_names`,
+ * 4 naming a `position`, 2 with `area_direction:"from"`, 0 negated. The C
+ * previously answered all 26 with `g->n_recently_moved > 0`, which is a
+ * different predicate entirely. */
+static const char *const RB_POS_NAMES[RB_STAGE_SIZE] = {
+    "left_side", "center", "right_side"
+};
+
+/* state.rs:524-568 `position_event_matches_filters`. Rust takes `events` as a
+   parameter so the same filter can be pointed at any event list; the C has one
+   list and inlines it. `RbPositionChangeEvent.card_id` is Rust's
+   `moved_card_id` and `.position` is Rust's `new_position` (modifiers.c:1038
+   writes `target_index` for the source event, :1046+ writes `source_index` for
+   the target event — exactly modifiers.rs:1822/:1833 inverted per side). */
+static int position_event_matches_filters(const struct GameState *g,
+                                          const Condition *c) {
+    if (g->n_position_change_events <= 0) return 0;   /* state.rs:529-531 */
+    const char *ad = get_str(c, "area_direction");    /* state.rs:534 */
+    int is_from = (ad && !strcmp(ad, "from"));
+    int self_target = 0; get_bool(c, "self_target", &self_target);   /* :536 */
+    const CondValue *gn = find_val(c, "group_names");               /* :541 */
+    const char *req_pos = get_str(c, "position");                    /* :554 */
+    if (req_pos && !*req_pos) req_pos = NULL;
+    for (int i = 0; i < g->n_position_change_events; i++) {
+        const RbPositionChangeEvent *e = &g->position_change_events[i];
+        if (self_target && g->activating_card != e->card_id) continue;  /* :536-540 */
+        if (gn && gn->tag == RB_TAG_ARRAY && gn->arr_n > 0) {         /* :541-553 */
+            int any = 0;
+            for (uint32_t k = 0; k < gn->arr_n && !any; k++) {
+                const char *gname = (gn->arr[k].tag == RB_TAG_STR) ? gn->arr[k].s : NULL;
+                if (gname && *gname &&
+                    rb_card_matches_group_str(e->card_id, gname)) any = 1;
+            }
+            if (!any) continue;
+        }
+        if (req_pos) {                                              /* :554-565 */
+            /* ⛔ BLOCKED-ON include/rabuka.h — RbPositionChangeEvent has only
+               {card_id, position}; Rust's PositionChangeEvent (types.rs) is
+               {moved_card_id, old_position, new_position, cause_card_id,
+               cause_player_id, effect_only}. `area_direction:"from"` compares
+               OLD_POSITION, which the C cannot represent, so the 2 corpus nodes
+               that carry it (cards 2483 / 2484 ab#0,
+               「自分のステージのセンターエリアにいるメンバーがエリアを移動したとき」)
+               take the `continue` below and this filter reports "did not match".
+               That is Rust's own answer for any event whose old_position is not
+               `center`, and it is NOT a guess — but it is not the whole rule,
+               so the field has to be added:
+               BLOCKED-ON: include/rabuka.h — RbPositionChangeEvent gains
+               `int old_position;` and rb_record_stage_position_swap writes
+               `source_index` / `target_index` into it (modifiers.rs:1821 /
+               :1832), after which this becomes
+               `int check_pos = is_from ? e->old_position : e->position;`. */
+            if (is_from) continue;
+            int check_pos = e->position;
+            if (check_pos < 0 || check_pos >= (int)(sizeof(RB_POS_NAMES) /
+                                                    sizeof(RB_POS_NAMES[0])) ||
+                strcmp(RB_POS_NAMES[check_pos], req_pos)) continue;
+        }
+        return 1;                                                    /* :566 */
+    }
+    return 0;
+}
+
+/* state.rs:574-591 `moved_cards_match_cost_limit`. `Some(recently_moved_cards)`
+   is the C's `g->recently_moved[]` (rb_record_card_movement appends to both,
+   modifiers.c:756). Returns TRUE for a condition with no `cost_limit`, which is
+   MEASURED rather than assumed: `cost_limit` appears on **0 of the 26**
+   `movement:"position_change"` nodes and **0 of the 18** `movement:"moves"`
+   nodes (tools/census_fx.c section E), so this conjunct cannot change any
+   corpus verdict today — it is ported so the reader is whole, not because it
+   fires. */
+static int moved_cards_match_cost_limit(const struct GameState *g,
+                                        const Condition *c) {
+    int lim;
+    if (!get_i(c, "cost_limit", &lim)) return 1;            /* state.rs:575-577 */
+    const char *op = get_str(c, "cost_limit_operator");    /* :578-581 */
+    if (!op) op = ">=";
+    if (g->n_recently_moved <= 0) return 0;                /* :582-584 */
+    for (int i = 0; i < g->n_recently_moved; i++)           /* :585-590 */
+        if (rb_card_matches_cost_limit(g->recently_moved[i], lim, op)) return 1;
+    return 0;
+}
+
 static int eval_movement(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     (void)host_cid;
     const char *mv = get_str(c, "movement");
     if (!mv) mv = get_str(c, "source"); /* some use source */
+
+    /* movement=="position_change" — state.rs:869-908. Dispatched FIRST, before
+       the baton_touch group gate below, because Rust's `match movement` has
+       `"position_change"` as its own arm and the baton_touch group filter is
+       inside the baton_touch arm only. The old body had NO arm for this value,
+       so all 26 corpus nodes fell through to `return has_any ? 1 : 0`. */
+    if (mv && !strcmp(mv, "position_change")) {
+        int pce_match = position_event_matches_filters(g, c);        /* :870-873 */
+        int tm_match = 0;
+        if (!pce_match && g->activating_card >= 0) {                 /* :874-906 */
+            int ec = 0;
+            const int *ev = rb_entry_trigger_moved_cards(g, &ec);   /* :881 */
+            int in_batch = 0;
+            for (int i = 0; i < g->n_turn_area_movements && !in_batch; i++) {
+                const RbBatchMovement *m = &g->turn_area_movements[i];
+                if (m->moved_card_id != g->activating_card) continue;  /* :900 */
+                if (!m->effect_only) continue;                       /* :901 */
+                /* in_current_batch: the ACTIVATING card must be in this
+                   batch's moved set. The C has one such set, not three, so the
+                   three Rust disjuncts collapse onto the C's own
+                   rb_entry_trigger_moved_cards / recently_moved pair — the same
+                   pair every other "the cards just moved" reader in this file
+                   uses (condition.c:3290-3301, :3727-3732). */
+                for (int q = 0; q < ec; q++)
+                    if (ev[q] == m->moved_card_id) { in_batch = 1; break; }
+                if (in_batch) break;
+                for (int q = 0; q < g->n_recently_moved; q++)
+                    if (g->recently_moved[q] == m->moved_card_id) { in_batch = 1; break; }
+            }
+            tm_match = in_batch;
+        }
+        return (pce_match || tm_match) && moved_cards_match_cost_limit(g, c);  /* :907 */
+    }
 
     /* movement=="baton_touch" routes to state.rs::evaluate_baton_touch_condition,
        whose group_names gate is the discriminator on PL!SP-bp4-005-R＋ (Ren):
@@ -1170,42 +1603,83 @@ static int eval_group(const struct GameState *g, int actor, int host_cid, const 
     }
     /* Multiple group_names: each group must have >= count members */
     { int multi = eval_group_multi(g, actor, c); if (multi >= 0) return multi; }
-    /* Temporal this_turn + self_target + group_names.
-       card.rs:1633-1655. The trigger is `get_temporal() == Some("this_turn")`
-       — a STRING compare. The previous body read it with
-       `get_bool(c, "temporal", &t)`, and get_bool only accepts the literal
-       "true", so this arm was DEAD and every
-       「このターン、自分の『Liella!』のカードの効果によってこのメンバーが
-       エリアを移動していた場合」 group condition fell through to the count
-       tail instead. Rust scans the MOVED cards — the entry-trigger set when it
-       exists, else the recently-moved set — not the stage, and the group
-       filter is the FIRST group name (`group_names.first()`), with
-       card_type == "member_card" as a precondition rather than a filter. */
+    /* Temporal this_turn + self_target + group_names + card_type=="member_card".
+       Rust ability/condition/card.rs:1632-1658 — the ONLY reader of
+       RbBatchMovement.cause_card_id in the whole Rust tree:
+
+         if condition.get_temporal() == Some("this_turn")
+             && condition.get_self_target().unwrap_or(false)
+             && condition.get_group_names().is_some_and(|g| !g.is_empty())
+             && condition.get_card_type().map(|ct| ct.as_str()) == Some("member_card")
+         {
+             if let Some(activating_card_id) = self.activating_card_id {
+                 let target = condition.get_target().unwrap_or("self");
+                 let player = self.resolve_condition_player(target);
+                 let groups = condition.get_group_names().unwrap();
+                 return self.game_state.turn_area_movements.iter().any(|m| {
+                     m.moved_card_id == activating_card_id
+                         && m.effect_only
+                         && m.cause_player_id == player.id
+                         && m.cause_card_id.is_some_and(|cause_cid| {
+                             groups.iter().any(|g|
+                                 card_matches_group_str(card_db, cause_cid, Some(g)))
+                         })
+                 });
+             }
+             return false;
+         }
+
+       The body this replaces was wrong on FIVE counts, not merely missing:
+         1. it scanned the MOVED-CARDS set (`rb_entry_trigger_moved_cards`, else
+            `g->recently_moved`) instead of `g->turn_area_movements`;
+         2. it never tested `m.moved_card_id == activating_card`;
+         3. it never tested `m.effect_only`;
+         4. it never tested `m.cause_player_id == <resolved seat>`;
+         5. it matched the group against the MOVED card using `group_names[0]`,
+            where Rust matches the whole list with `.any()` against the CAUSING
+            card (`m.cause_card_id`);
+       and its gate was a strict SUPERSET of Rust's: it accepted an ABSENT
+       `card_type`, which Rust's `== Some("member_card")` rejects.
+
+       Measured over the shipped bytecode with the engine's own decoder
+       (tools/census_fx.c, 2116 card-ability pairs): this arm is reachable at
+       exactly 2 condition nodes — card 2467 and 2468 ab#0, both
+       「このターン、自分の『Liella!』のカードの効果によってこのメンバーがエリアを移動していた場合」 —
+       and BOTH carry `card_type:"member_card"` and a ONE-element
+       `group_names:["Liella!"]`, so counts 5 (the `.any()`) and the gate
+       superset are invisible on the corpus while 1-4 are not. The `.first()`
+       narrowing is therefore latent rather than currently wrong, and is ported
+       anyway because Rust's `.any()` is the rule.
+
+       `cause_card_id`'s WRITER is `rb_record_card_movement` (src/core/modifiers.c
+       :752, `event.cause_card_id = g->activating_card`, twin of
+       game_state/modifiers.rs:1843/1851). `cause_player_id` is that function's
+       `causer`, which the C uses as a SEAT (it is compared to a seat at
+       condition.c:3316 and produced from `rb_queue_current_entry(g)` at
+       modifiers.c:1019), so the seat-for-seat compare below is the faithful
+       shape of Rust's `player.id` compare. */
     const char *temporal = get_str(c, "temporal");
     int self_target = 0; get_bool(c, "self_target", &self_target);
     const CondValue *gn = find_val(c, "group_names");
+    const char *ct_arm = get_str(c, "card_type");
     if (temporal && !strcmp(temporal, "this_turn") && self_target &&
+        ct_arm && !strcmp(ct_arm, "member_card") &&
         gn && gn->tag == RB_TAG_ARRAY && gn->arr_n > 0) {
-        const char *ct = get_str(c, "card_type");
-        if (!ct || !strcmp(ct, "member_card")) {
-            if (g->activating_card < 0) return 0;   /* card.rs:1644-1645 */
-            int moved[RB_MAX_ZONE]; int n = 0;
-            int ec = 0;
-            const int *ev = rb_entry_trigger_moved_cards(g, &ec);
-            if (ev && ec > 0) {
-                for (int i = 0; i < ec && i < RB_MAX_ZONE; i++) moved[n++] = ev[i];
-            } else {
-                for (int i = 0; i < g->n_recently_moved && i < RB_MAX_ZONE; i++)
-                    moved[n++] = g->recently_moved[i];
+        if (g->activating_card < 0) return 0;   /* card.rs:1637 + :1657 */
+        int pl_arm = target_player_idx(actor, c);
+        for (int i = 0; i < g->n_turn_area_movements; i++) {
+            const RbBatchMovement *m = &g->turn_area_movements[i];
+            if (m->moved_card_id != g->activating_card) continue;  /* :1643 */
+            if (!m->effect_only) continue;                          /* :1644 */
+            if (m->cause_player_id != pl_arm) continue;             /* :1645 */
+            if (m->cause_card_id < 0) continue;   /* is_some_and, :1646 */
+            for (uint32_t k = 0; k < gn->arr_n; k++) {  /* .any(), :1647 */
+                const char *grp = (gn->arr[k].tag == RB_TAG_STR) ? gn->arr[k].s : NULL;
+                if (grp && *grp &&
+                    rb_card_matches_group_str(m->cause_card_id, grp)) return 1;
             }
-            const char *gname = (gn->arr[0].tag == RB_TAG_STR) ? gn->arr[0].s : NULL;
-            for (int i = 0; i < n; i++) {
-                int mid = moved[i];
-                if (mid == RB_EMPTY_SLOT) continue;
-                if (gname && *gname && rb_card_matches_group_str(mid, gname)) return 1;
-            }
-            return 0;
         }
+        return 0;                              /* card.rs:1655 */
     }
     /* card.rs:1660-1672 — the shared tail of evaluate_group_condition is a COUNT
        comparison, not a presence test:
@@ -1943,15 +2417,19 @@ static int stage_index_of_position(const char *pos) {
 }
 
 static int eval_no_excess(const struct GameState *g, int actor, const Condition *c){
-    int pl=target_player_idx(actor,c);
-    /* NoExcessHeart: check if last live had no surplus hearts (all_exact)
-       Mirrors engine/src/turn/live.rs compute_surplus_and_flags ↁEsurplus_hearts == 0.
-       We now snapshot surplus directly in live.c (total_pool - total_required). */
-    for(int i=g->n_snapshots-1;i>=0;i--) if(g->snapshots[i].player==pl && g->snapshots[i].success){
-        if(g->snapshots[i].surplus_hearts==0) return 1;
-        if(g->snapshots[i].surplus_hearts>=0) return 0; /* most recent snapshot decides */
-    }
-    return 0;
+    /* evaluate_no_excess_heart_condition (state.rs:1386-1389) is a THIN call to
+       no_excess_heart_flag (state.rs:15-22): resolve the target player, ask
+       whether it is the first attacker, and read ONE of two per-turn booleans.
+       The previous body walked the score snapshots backwards and answered
+       "the most recent successful snapshot for this player had surplus == 0",
+       which is a different question: it ignored WHICH player was first
+       attacker, it read a snapshot instead of the turn's flag, and a later
+       unsuccessful live for the same player left the older successful snapshot
+       deciding. A10 put both fields on GameState; `self_...` has exactly one
+       writer (src/turn/live.c:1048) and `opponent_live_...` has none, so the
+       second arm reads a cleared field - see the cluster-D report. */
+    (void)c;
+    return cond_no_excess_heart_flag(g, target_player_idx(actor, c));
 }
 
 /* Read a string-array field (e.g. ability_filter_triggers / any_of). */
@@ -2140,6 +2618,11 @@ static int eval_opponent_choice(const GameState *g, int actor, const Condition *
 static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     if (!c) return 1;
     int negation=0; get_bool(c,"negation",&negation);
+    /* condition.rs:640-656 — the ONE `is_plain_location` bind the whole
+       post-dispatch negation guard is built on: a `location_condition` that
+       names NO count. Rust reuses it for two of its four exemptions, and the C
+       had neither. */
+    int is_plain_location = (c->variant == RB_COND_LOCATION) && (find_val(c, "count") == NULL);
     if (c->variant != RB_COND_COMPOUND && !rb_check_phase_gate(g, actor, c, 0))
         return negation ? 1 : 0;
     /* Mirrors the [cond] log::debug! in condition/card.rs  Egated on the shared
@@ -2277,8 +2760,35 @@ case RB_COND_ALL_REVEALED: {
        this point in the C too.
          actual    = result ? get_count().unwrap_or(1) : 0     (PRE-negation `r`)
          threshold = Comparison ? get_count().unwrap_or(0) : 1 */
-    int final_result = (c->variant == RB_COND_LOCATION && get_str(c, "card_property") != NULL)
-                       ? r : (negation ? !r : r);
+    /* condition.rs:643-656 — the post-dispatch negation guard. FOUR exemptions,
+       not one. The C implemented only the first (Location + card_property), so
+       every other shape whose evaluator ALREADY applied the negation had it
+       applied twice and came out with the opposite answer:
+         1. Location  && card_property            — check_card_property folds it
+         2. Movement  && card_property            — the C had NO exemption
+         3. plain Location && heart_type == "all" — check_heart_type_all folds
+            it (predicates.rs:41-60); without this a negated 「ハートを持たない」
+            counted as TRUE for a member that has no ALL heart.
+         4. plain Location && location == "revealed_cards" && nothing revealed
+       (2) and (3) are the ones that change a corpus answer today. */
+    /* condition.rs:643-656 — the post-dispatch negation guard. FOUR exemptions,
+       not one. The C implemented only the first (Location + card_property), so
+       every other shape whose evaluator ALREADY applied the negation had it
+       applied twice and came out with the opposite answer:
+         1. Location  && card_property            — check_card_property folds it
+         2. Movement  && card_property            — the C had NO exemption
+         3. plain Location && heart_type == "all" — check_heart_type_all folds
+            it (predicates.rs:41-60); without this a negated 「ハートを持たない」
+            counted as TRUE for a member that has no ALL heart.
+         4. plain Location && location == "revealed_cards" && nothing revealed
+       (2) and (3) are the ones that change a corpus answer today. */
+    int skip_negation = (c->variant == RB_COND_LOCATION && get_str(c, "card_property") != NULL)
+                     || (c->variant == RB_COND_MOVEMENT && get_str(c, "card_property") != NULL)
+                     || (is_plain_location && get_str(c, "heart_type") &&
+                         !strcmp(get_str(c, "heart_type"), "all"))
+                     || (is_plain_location && get_str(c, "location") &&
+                         !strcmp(get_str(c, "location"), "revealed_cards") && g->n_revealed == 0);
+    int final_result = skip_negation ? r : (negation ? !r : r);
     if (rb_ability_debug_enabled() && c->variant != RB_COND_COMPOUND) {
         int has_count = find_val(c, "count") != NULL;
         int cnt = 1;
@@ -2306,10 +2816,11 @@ case RB_COND_ALL_REVEALED: {
             return 0;
     }
 
-    int location_property = c->variant == RB_COND_LOCATION && get_str(c, "card_property") != NULL;
-    if (location_property) return r;
-
-    return negation ? !r : r;
+    /* The single RETURN. `skip_negation` is the whole of condition.rs:643-656;
+       the old `location_property` early return was exemption 1 spelled out
+       separately, and the tail applied the negation unconditionally, which is
+       why exemptions 2-4 could not exist. */
+    return final_result;
 }
 static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c) {
     return eval_condition_inner_host(g, actor, -1, c);
@@ -2330,41 +2841,142 @@ int rb_condition_allows(const struct GameState *g, int actor, const AbilityEffec
     return eval_condition_inner_host(g, actor, host_cid, effect->condition);
 }
 
-/* ── check_heart_type_all (condition/card.rs) ──
-   Checks if any stage member has all-heart (HeartColor::All / Heart00 base).
-   Used by appearance/heart-type conditions. ── */
+/* ══ Cluster D: shared predicates, ported from ability/condition/card ═══════
+ *
+ * card_has_all_heart (predicates.rs:8-26) is THREE legs joined by `||`, and the
+ * C had one of them. That is not a "missing optimisation" - a card that gained
+ * an ALL heart from an ability, or holds one from a constant ability, was
+ * invisible to it. All three, in Rust's order:
+ *   1. printed base_heart contains Heart00  (presence, not a non-zero count:
+ *      `bh.hearts.contains_key(&HeartColor::Heart00)`)
+ *   2. mods.heart_modifiers[cid][All].total() > 0
+ *   3. mods.constant_heart_bonuses[cid]["all"] > 0
+ * Leg 2 is read straight off the modifier ENTRY, not through rb_mods_get_heart:
+ * that helper folds the Heart00 entry into every colour query (modifiers.c:67-71),
+ * while predicates.rs:15-18 indexes the map for HeartColor::All alone.
+ * Leg 3's C home is mods.constant_heart[cid][RB_HEART_ALL]; the "all" bucket is
+ * index 7 by the same convention as rb_mods_add_heart and triggers.c:1151.
+ */
+static int cond_card_has_all_heart(const struct GameState *g, int cid) {
+    if (cid < 0 || cid >= RB_MAX_CARD_IDS) return 0;
+    Card cc;
+    if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
+        int printed = card_base_has_colour(&cc, RB_HEART_PINK);
+        rb_free_card(&cc);
+        if (printed) return 1;
+    }
+    const RbModifierEntry *e = &g->mods.heart[cid][RB_HEART_ALL];
+    if ((int)e->set + (int)e->add > 0) return 1;
+    if (g->mods.constant_heart[cid][RB_HEART_ALL] > 0) return 1;
+    return 0;
+}
+/* check_heart_type_all_per_card (predicates.rs:68-79): the same predicate with
+   the negation folded IN, because the callers at card.rs:237 / card.rs:974 sit
+   inside a candidate filter and Rust returns false there rather than negating a
+   verdict. */
+static int cond_heart_type_all_per_card(const struct GameState *g, const Condition *c, int cid) {
+    const char *ht = get_str(c, "heart_type");
+    if (!ht || strcmp(ht, "all")) return 1;
+    int negate = cond_truthy_field(c, "negation");
+    return cond_card_has_all_heart(g, cid) != negate;
+}
+/* Card::is_member (card.rs:4298-4300). The C folds CardType into the low two
+   bits of type_flags at decode time (core/card.c:101), and 0 is member_card. */
+static int cond_card_is_member(const Card *cc) { return (cc->type_flags & 3u) == 0u; }
+
+/* check_original_blade_filter (card.rs:1236-1272). `blade_limit` +
+   `blade_limit_operator` are the 9-pair corpus shape (card.rs:1244-1253); the
+   count/operator arm below it only runs for a NON-member. */
+static int cond_check_original_blade_filter(const struct GameState *g, const Condition *c, int cid) {
+    if (!cond_truthy_field(c, "original_value")) return 1;
+    int limit = 0;
+    if (get_i(c, "blade_limit", &limit)) {
+        Card cc; int blade = 0;
+        if (rb_decode_card_by_index((uint32_t)cid, &cc)) { blade = cc.blade; rb_free_card(&cc); }
+        return compare_counts_op(get_str(c, "blade_limit_operator"), blade, limit);
+    }
+    Card cc;
+    if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
+        int is_member = cond_card_is_member(&cc);
+        int blade = cc.blade;
+        rb_free_card(&cc);
+        if (is_member) return 1;
+        const char *op = get_str(c, "operator");
+        if (!op) return 1;
+        int thr = 0; get_i(c, "count", &thr);
+        return compare_counts_op(op, blade, thr);
+    }
+    return 1;
+}
+/* check_original_heart_filter (card.rs:1286-1325): printed total_hearts plus
+   every POSITIVE heart modifier, compared against the printed figure. */
+static int cond_check_original_heart_filter(const struct GameState *g, const Condition *c, int cid) {
+    if (!cond_truthy_field(c, "original_value")) return 1;
+    const char *op = get_str(c, "operator");
+    if (!op) return 1;
+    Card cc;
+    if (!rb_decode_card_by_index((uint32_t)cid, &cc)) return 1;
+    if (!cond_card_is_member(&cc)) { rb_free_card(&cc); return 1; }
+    int base = card_total_hearts(&cc);
+    rb_free_card(&cc);
+    int cur = base;
+    for (int col = RB_HEART_RED; col <= RB_HEART_ALL; col++) {
+        int mod = rb_mods_get_heart((RbMods *)&g->mods, cid, col);
+        if (mod > 0) cur += mod;
+    }
+    return compare_counts_op(op, cur, base);
+}
+/* no_excess_heart_flag (state.rs:15-22). A TWO-VALUE per-turn flag read off the
+   GameState, NOT a reconstruction from score snapshots: the player is asked
+   whether it is the FIRST attacker, and the answer selects which of the two
+   booleans to read. src/turn/live.c:1048 is the only writer of the first one;
+   `opponent_live_no_excess_heart_this_turn` has NO writer anywhere in src/ (see
+   the cluster-D report), so that arm reads a cleared field - faithfully, because
+   that is what the C's state holds, but the flag is NOT yet produced. */
+static int cond_no_excess_heart_flag(const struct GameState *g, int pl) {
+    if (pl == g->first_attacker) return g->self_no_excess_heart_this_turn ? 1 : 0;
+    return g->opponent_live_no_excess_heart_this_turn ? 1 : 0;
+}
+
+/* ── check_heart_type_all (condition/card/predicates.rs:28-66) ──
+   First predicate of evaluate_location_condition (card.rs:788). Three
+   short-circuits (heart_type != "all", a non-stage zone, no heart_type) and then
+   the stage scan. The negation arm is NOT `!any(...)`: it is `any(!...)` over
+   target_ids, and target_ids is the SINGLE triggering member when the queue's
+   current entry has one (predicates.rs:41-56) - the whole stage otherwise. The
+   previous body computed an entry INDEX into `target`, never used it, and
+   scanned the whole stage, so a negated 「そのメンバーがハートを持たない場合」
+   was answered about every member on the board. */
 int rb_check_heart_type_all(const struct GameState *g, int actor, const Condition *c, int negation) {
     int pl = target_player_idx(actor, c);
     const char *loc = get_str(c, "location");
     if (loc && strcmp(loc, "stage")) return 1;
     const char *ht = get_str(c, "heart_type");
-    if (ht && strcmp(ht, "all")) return 1;
-    RbPlayer *P = &g->p[pl];
+    /* predicates.rs:30-32 — NO heart_type short-circuits to TRUE, which is not
+       the same test as "a heart_type that is not all". Dropping this line makes
+       every stage `location_condition` that names no heart_type ask about ALL
+       hearts instead of passing. */
+    if (!ht) return 1;
+    if (strcmp(ht, "all")) return 1;
+    const RbPlayer *P = &g->p[pl];
     int q;
     if (negation) {
-        /* Check if the specific triggering member lacks all-heart */
-        int target = (g->queue.cur < g->queue.n_entries) ? g->queue.cur : -1;
-        int found = 0;
+        int trig = -1;
+        int cur = rb_queue_current_entry(g);
+        if (cur >= 0) trig = g->queue.entries[cur].triggering_member_id;
+        if (trig >= 0)
+            return cond_card_has_all_heart(g, trig) ? 0 : 1;
         for (q = 0; q < RB_STAGE_SIZE; q++) {
             int cid = P->stage[q];
-            if (cid < 0) continue;
-            Card cc;
-            if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
-            int has_all = (cc.n_hearts > 0 && cc.heart_count[0] > 0); /* Heart00 base */
-            rb_free_card(&cc);
-            if (!has_all) return 1;
-            found = 1;
+            if (cid == RB_EMPTY_SLOT) continue;
+            if (!cond_card_has_all_heart(g, cid)) return 1;
         }
-        return found ? 0 : 1;
+        return 0;
     }
     for (q = 0; q < RB_STAGE_SIZE; q++) {
         int cid = P->stage[q];
-        if (cid < 0) continue;
-        Card cc;
-        if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
-        int has_all = (cc.n_hearts > 0 && cc.heart_count[0] > 0);
-        rb_free_card(&cc);
-        if (has_all) return 1;
+        if (cid == RB_EMPTY_SLOT) continue;
+        if (cond_card_has_all_heart(g, cid)) return 1;
     }
     return 0;
 }
@@ -2593,7 +3205,40 @@ static int eval_all_cost_comparison(const struct GameState *g, int actor, const 
    the only match site in the C with all four arms; this file used to carry its own
    three-arm copy, so every 「ドロー」 card fell through to has = 0 and was rejected
    (82 of 2,639 cards). The one thing the shared helper cannot know is
-   card.rs:176-180 — the yell-revealed strict variant — so that arm stays here. */
+   card.rs:176-180 — the yell-revealed strict variant — so that arm stays here.
+
+   ⛔ `if (n == 0) return 1;` IS CORRECT. It was flagged as a defect by
+   PARITY_CHECKLIST.md's 🔴 reconciliation box ("an empty check set is FALSE in
+   Rust and TRUE in C", citing `card.rs:230-252` / `!matching.is_empty()`), and
+   cluster D then REMOVED its own empty-zone assertion rather than pin behaviour
+   it could not prove. The claim is FALSE, and `engine/src/ability/condition/
+   card.rs` is UNMODIFIED in git (`git status --porcelain` is empty for it), so
+   this is not a half-applied edit on the reference side:
+
+       ability/condition/card.rs:133-136
+           let neg = condition.get_negation().unwrap_or(false);
+           if check_cards.is_empty() {
+               return true;
+           }
+
+   `!matching.is_empty()` at card.rs:251 is UNREACHABLE for an empty zone: the
+   early return above short-circuits first. Rust's own comment at card.rs:112-117
+   says so in as many words — "the empty case below returns TRUE". So both trees
+   answer TRUE on an empty check set, and the C is a faithful twin. Changing it
+   to `return 0` would be a REGRESSION on 28 corpus nodes (measured below).
+
+   Measured over the shipped bytecode with the engine's own decoder
+   (tools/census_fx.c section A, 2116 card-ability pairs, 0 decode fallbacks):
+   **73 `card_property` condition nodes on 59 card-ability pairs**, split
+   revealed_cards 26 / (no location) 28 / success_live_card_zone 12 / stage 6 /
+   discard 1, and 47 of the 73 carry `negation`. Of the four Rust `CardProperty`
+   variants, all four are mapped in the C and **0 of 73 nodes carry an UNMAPPED
+   value**, so Rust's other trap arm — `_ => return true` at card.rs:109, which
+   the C does not have — is VERIFIED-NOOP: 0 of 73. Only 67 of the 73 land on
+   RB_COND_LOCATION, which is the variant that reaches this function; the other 6
+   (4 on RB_COND_MOVEMENT, 2 on RB_COND_APPEARANCE) have no C dispatch to this
+   predicate at all and are recorded as a separate open item, not silently
+   counted here. */
 static int check_card_property(const struct GameState *g, int actor, const Condition *c, const char *loc) {
     const char *prop = get_str(c, "card_property");
     if (!prop) return 1;
@@ -2606,6 +3251,9 @@ static int check_card_property(const struct GameState *g, int actor, const Condi
     } else {
         n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
     }
+    /* card.rs:134-136 — an EMPTY check set returns TRUE on both trees. `zone_ids`
+       already drops RB_EMPTY_SLOT (condition.c:191), so `n == 0` is exactly
+       Rust's `check_cards.is_empty()` after its `filter(|&&id| id != -1)`. */
     if (n == 0) return 1;
     for (int i = 0; i < n; i++) {
         Card cc; if (!rb_decode_card_by_index((uint32_t)ids[i], &cc)) continue;
@@ -2621,6 +3269,17 @@ static int check_card_property(const struct GameState *g, int actor, const Condi
                     ids[i], rb_card_string(cc.card_no_idx) ? rb_card_string(cc.card_no_idx) : "-",
                     cc.num_blade, cc.num_base, cc.n_hearts, has);
         rb_free_card(&cc);
+        /* card.rs:234-237 — `filter.matches(...) && check_original_blade_filter
+           && check_original_heart_filter && check_heart_type_all_per_card`.
+           The three were absent, so `original_value`, `blade_limit` +
+           `blade_limit_operator` (9 corpus pairs) and `heart_type: "all"` were
+           all silently dropped from the candidate filter. Each returns FALSE
+           to reject the candidate - they do not negate the verdict, which is
+           why this sits inside the loop and not after it. */
+        int other = cond_check_original_blade_filter(g, c, ids[i])
+                 && cond_check_original_heart_filter(g, c, ids[i])
+                 && cond_heart_type_all_per_card(g, c, ids[i]);
+        if (has && !other) has = 0;
         if (neg) {
             if (has) return 0;
         } else if (has) {
@@ -3054,32 +3713,129 @@ static int get_count_for_target(const GameState *g, int actor, const Condition *
     return count_for_player_target(g, actor, pl, loc, ct);
 }
 
-/* ── get_count_for_condition: main count dispatcher ── */
+/* ── get_count_for_condition: main count dispatcher ──
+   card.rs:3974-4198. The three sub-helpers Rust splits out of this function
+   are split out here too, because each is a different QUANTITY and folding
+   them into one branch is what produced the wrong answers:
+     total_effective_cost            (card.rs:1101)
+     heart_count_at_or_all           (card.rs:3942-3972)
+     count_for_preceding_moved_score (card.rs:3902-3933) */
+/* count_for_preceding_moved_score (card.rs:3902-3933) is NOT PORTED. Rust
+   reads `game_state.moved_cards`; this file has TWO readers of "the cards just
+   moved" - g->recently_moved (:3290) and the queue entry's moved_cards via
+   rb_entry_trigger_moved_cards - and neither satisfies BOTH clauses of
+   PL!S-bp3-008-R: the 2 corpus nodes flipped a live activation that
+   tests/test_parity_recover_live.c pins. BLOCKED-ON the moved-cards reader. */
+/* heart_count_at_or_all (card.rs:3942-3972): a NAMED position counts only that
+   slot and an EMPTY slot counts 0, rather than falling through to the whole
+   stage. `idx < 0` means "no position, or a name that is not a slot", which is
+   the 「ステージの」 case and counts every member. */
+static int cond_heart_count_at_or_all(const struct GameState *g, int pl, int col, int idx) {
+    const RbPlayer *P = &g->p[pl];
+    if (idx >= 0 && idx < RB_STAGE_SIZE) {
+        int cid = P->stage[idx];
+        if (cid == RB_EMPTY_SLOT) return 0;
+        Card cc; int v = 0;
+        if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
+            v = card_base_count_of_colour(&cc, col);
+            rb_free_card(&cc);
+        }
+        return v;
+    }
+    int total = 0;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        int cid = P->stage[i];
+        if (cid == RB_EMPTY_SLOT) continue;
+        Card cc;
+        if (!rb_decode_card_by_index((uint32_t)cid, &cc)) continue;
+        total += card_base_count_of_colour(&cc, col);
+        rb_free_card(&cc);
+    }
+    return total;
+}
 static int get_count_for_condition(const GameState *g, int actor, const Condition *c) {
     const char *loc = get_str(c, "location");
     const char *target = get_str(c, "target");
     if (!target) target = "self";
     const char *ct = get_str(c, "comparison_type");
     const char *rt = get_str(c, "resource_type");
-    if (ct && !strcmp(ct, "score")) return get_count_for_target(g, actor, c, target);
+    if (ct && !strcmp(ct, "score")) {
+        /* card.rs:3979-3988 — the moved-source arm is a MINIMUM over the matching
+           moved cards. NOT WIRED: routing these 2 corpus nodes (cards 828-829,
+           PL!S-bp3-008-R) through it flips a live activation in
+           tests/test_parity_recover_live.c, and this file has TWO readers of
+           "the cards just moved" (recently_moved vs the queue entry's
+           moved_cards) with no single one that satisfies both the positive and
+           the negative clause. Left to the owner of the moved-cards reader. */
+        return get_count_for_target(g, actor, c, target);
+    }
     if (ct && !strcmp(ct, "cost")) {
-        /* Sum modified costs of cards in zone with group/type filtering */
+        /* card.rs:3989-4008 — an ABSENT or `revealed_cards` location sums the
+           EFFECTIVE cost of the revealed cards, card_type-filtered. 10 corpus
+           nodes carry location revealed_cards; the old body had only a `stage`
+           arm and fell through to a plain zone LENGTH for the rest, so
+           「公開したカードのコストの合計」 counted CARDS. */
+        if (!loc || !strcmp(loc, "revealed_cards")) {
+            int keep[RB_MAX_ZONE]; int nk = 0;
+            const char *cardtype = get_str(c, "card_type");
+            for (int i = 0; i < g->n_revealed && nk < RB_MAX_ZONE; i++) {
+                int cid = g->revealed_cards[i];
+                if (cardtype && *cardtype && !card_matches_card_type_filter(cid, cardtype)) continue;
+                keep[nk++] = cid;
+            }
+            return cond_total_effective_cost(g, keep, nk);
+        }
+        /* card.rs:4015-4048 — comparison_target "self" asks for the MAXIMUM
+           matching cost so the caller can compare one member's cost against
+           another's. 7 corpus nodes; the old body summed the stage for these
+           too, so 「このメンバーよりコストの大きいメンバー」 compared a SUM
+           against a single card. */
+        const char *ctgt = get_str(c, "comparison_target");
+        if (ctgt && !strcmp(ctgt, "self")) {
+            int pl = resolve_target_player(actor, c);
+            int ids[RB_MAX_ZONE];
+            int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+            int excl = -1;
+            int excl_flag = 0; get_bool(c, "exclude_self", &excl_flag);
+            if (excl_flag && g->activating_card >= 0) excl = g->activating_card;
+            int max_cost = 0;
+            for (int i = 0; i < n; i++) {
+                if (ids[i] == RB_EMPTY_SLOT || ids[i] == excl) continue;
+                if (!cond_matches_groups_and_type(g, c, ids[i])) continue;
+                Card cc;
+                if (!rb_decode_card_by_index((uint32_t)ids[i], &cc)) continue;
+                int printed = cc.cost;
+                rb_free_card(&cc);
+                int v = rb_effective_stat((uint8_t)printed,
+                                          (int16_t)rb_mods_get_cost((RbMods *)&g->mods, ids[i]));
+                if (v > max_cost) max_cost = v;
+            }
+            return max_cost;
+        }
+        /* card.rs:4053-4086 — every other named location SUMS, filtered by
+           group_names (`.any()`, not `.first()`) and card_type. */
         int pl = target_player_idx(actor, c);
         if (target && !strcmp(target, "opponent")) pl = actor ^ 1;
-        const CondValue *gn = find_val(c, "group_names");
-        const char *gn0 = (gn && gn->tag == RB_TAG_ARRAY && gn->arr_n > 0 && gn->arr[0].tag == RB_TAG_STR) ? gn->arr[0].s : NULL;
-        if (!loc || !strcmp(loc, "stage")) {
+        {
             const RbPlayer *P = &g->p[pl];
-            int total = 0;
-            for (int i = 0; i < RB_STAGE_SIZE; i++) {
-                int cid = P->stage[i];
-                if (cid == RB_EMPTY_SLOT) continue;
-                if (gn0 && !rb_card_matches_group_str(cid, gn0)) continue;
-                Card cc; int cst = 0;
-                if (rb_decode_card_by_index((uint32_t)cid, &cc)) { cst = cc.cost; rb_free_card(&cc); }
-                total += cst + rb_mods_get_cost((RbMods*)&g->mods, cid);
+            int keep[RB_MAX_ZONE]; int nk = 0;
+            if (!loc || !strcmp(loc, "stage")) {
+                for (int i = 0; i < RB_STAGE_SIZE; i++) {
+                    int cid = P->stage[i];
+                    if (cid == RB_EMPTY_SLOT) continue;
+                    if (!cond_matches_groups_and_type(g, c, cid)) continue;
+                    keep[nk++] = cid;
+                }
+            } else {
+                int ids[RB_MAX_ZONE];
+                int n = zone_ids(g, pl, loc, ids, RB_MAX_ZONE);
+                for (int i = 0; i < n; i++) {
+                    if (ids[i] == RB_EMPTY_SLOT) continue;
+                    if (!cond_matches_groups_and_type(g, c, ids[i])) continue;
+                    keep[nk++] = ids[i];
+                }
             }
-            return total < 0 ? 0 : total;
+            return cond_total_effective_cost(g, keep, nk);
         }
     }
     if (rt && !strcmp(rt, "hand_count")) {
@@ -3087,34 +3843,31 @@ static int get_count_for_condition(const GameState *g, int actor, const Conditio
         if (target && !strcmp(target, "opponent")) pl = actor ^ 1;
         return g->p[pl].hand.n;
     }
+    if (rt && strncmp(rt, "heart", 5) == 0) {
+        int pl = target_player_idx(actor, c);
+        if (target && !strcmp(target, "opponent")) pl = actor ^ 1;
+        char clean[16]; int k = 0;
+        for (const char *s = rt; *s && k < 15; s++) if (*s != '_') clean[k++] = *s;
+        clean[k] = 0;
+        int col = rb_parse_heart_color(clean);
+        int idx = stage_index_of_position(get_str(c, "position"));
+        return cond_heart_count_at_or_all(g, pl, col, idx);
+    }
+    if (rt && !strcmp(rt, "surplus_heart")) return count_surplus_heart(g, actor, c, target);
     if (rt && !strcmp(rt, "energy")) {
         int pl = target_player_idx(actor, c);
         if (target && !strcmp(target, "opponent")) pl = actor ^ 1;
         return g->p[pl].energy.n;
     }
-    if (rt && strncmp(rt, "heart", 5) == 0) {
-        int pl = target_player_idx(actor, c);
-        if (target && !strcmp(target, "opponent")) pl = actor ^ 1;
-        const RbPlayer *P = &g->p[pl];
-        int col = atoi(rt + 5);
-        int total = 0;
-        for (int i = 0; i < RB_STAGE_SIZE; i++) {
-            int cid = P->stage[i];
-            if (cid == RB_EMPTY_SLOT) continue;
-            Card cc;
-            if (rb_decode_card_by_index((uint32_t)cid, &cc)) {
-                if (col < cc.n_hearts) total += cc.heart_count[col];
-                rb_free_card(&cc);
-            }
-        }
-        return total;
-    }
-    if (rt && !strcmp(rt, "surplus_heart")) return count_surplus_heart(g, actor, c, target);
     if (loc) {
         int pl = target_player_idx(actor, c);
         if (target && !strcmp(target, "opponent")) pl = actor ^ 1;
         return zone_len_impl(g, pl, loc);
     }
+    /* card.rs:4156-4170 — with no location, a non-empty revealed set is the
+       FALLBACK source and its effective costs are the count. 597 corpus nodes
+       carry no location at all and the old body answered 0 for every one. */
+    if (g->n_revealed > 0) return cond_total_effective_cost(g, g->revealed_cards, g->n_revealed);
     return 0;
 }
 

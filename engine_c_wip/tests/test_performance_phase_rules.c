@@ -9,6 +9,7 @@ static int failures;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -20,6 +21,7 @@ static int failures;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -101,7 +103,7 @@ static RbLiveSnapshot *p1_snapshot(TestGame *tg) {
 }
 
 static void test_zero_cards_on_stage_fails_live(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int live = test_id(&tg, "PL!-sd1-019-SD");
     int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -127,7 +129,7 @@ static void test_zero_cards_on_stage_fails_live(void) {
 }
 
 static void test_sufficient_hearts_passes_live(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int live = test_id(&tg, "PL!-sd1-019-SD");
     int member = test_id(&tg, "PL!-sd1-001-SD");
@@ -156,7 +158,7 @@ static void test_sufficient_hearts_passes_live(void) {
 }
 
 static void test_per_color_modifier_does_not_erase_base_requirements(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int live = test_id(&tg, "PL!-sd1-019-SD");
     int member = test_id(&tg, "PL!-sd1-001-SD");
@@ -222,7 +224,7 @@ static void set_yell_top(TestGame *tg, const char *const *yell_no, int n_yell) {
 }
 
 static void run_yell_case(const char *const *yell_no, int n_yell, int yell_bonus, int expected) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     setup_yell_game(&tg);
     int sumire = test_id(&tg, "PL!SP-bp2-015-N");

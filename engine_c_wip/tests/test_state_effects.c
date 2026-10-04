@@ -3,8 +3,16 @@
 #include <string.h>
 
 static int failures;
+static int checks;
 
+/* A `checks` counter and a NUMERIC terminal tally, because this is a FLAT
+ * single-`main` suite: a crash anywhere truncates the output silently, and
+ * until 2026-10-04 this file's only terminal line was the literal string
+ * "ALL STATE EFFECT CHECKS PASSED", so a SIGSEGV 14 assertions in produced a
+ * 0-byte stdout that every count in the corpus read as "no failures". The
+ * tally makes truncation detectable: absent tally == the run did not finish. */
 #define CHECK(condition, message) do { \
+    checks++; \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
@@ -28,9 +36,22 @@ static int has_text(const GameState *g, const char *text) {
     return 0;
 }
 
+/* `rb_mods_get_orientation` returns NULL for "no orientation modifier"
+ * (modifiers.c:121-126) — the ledger is a set of OVERRIDES, so a card nobody
+ * stamped reads back as NULL, which is exactly what Rust's
+ * `mods.get_orientation_modifier` gives for a card outside `wait_cards`
+ * (energy.rs:249-254). Handing that NULL to strcmp is what killed this suite
+ * (SIGSEGV, rc 2816), so every orientation comparison in this file goes
+ * through this predicate instead. `want == NULL` asserts "not stamped". */
+static int orientation_is(const GameState *g, int card_id, const char *want) {
+    const char *got = rb_mods_get_orientation((RbMods *)&g->mods, card_id);
+    if (!want) return got == NULL;
+    return got && !strcmp(got, want);
+}
+
 int main(void) {
     if (rb_load("src") != 0) return 1;
-    GameState g;
+static    GameState g;
     uint32_t d0[] = {0, 1, 2, 3};
     uint32_t d1[] = {4, 5, 6, 7};
     rb_seed(7);
@@ -60,7 +81,7 @@ int main(void) {
     e.n_extra = 1;
     rb_effect_energy_state_change(&g, 0, &e);
     CHECK(p->energy_active == 0, "energy wait changes only one active card");
-    CHECK(strcmp(rb_mods_get_orientation(&g.mods, energy[0]), "wait") == 0,
+    CHECK(orientation_is(&g, energy[0], "wait"),
           "energy wait records card orientation");
     CHECK(g.state_change_from[energy[0]] == 0 && g.state_change_to[energy[0]] == 1,
           "energy wait records an active-to-wait transition");
@@ -68,7 +89,7 @@ int main(void) {
     e.extra_v[0] = (char *)"active";
     rb_effect_energy_state_change(&g, 0, &e);
     CHECK(p->energy_active == 1, "energy activation changes only one waited card");
-    CHECK(strcmp(rb_mods_get_orientation(&g.mods, energy[1]), "active") == 0,
+    CHECK(orientation_is(&g, energy[1], "active"),
           "energy activation records card orientation");
     CHECK(g.state_change_from[energy[1]] == 1 && g.state_change_to[energy[1]] == 0,
           "energy activation records a wait-to-active transition");
@@ -93,7 +114,7 @@ int main(void) {
           "energy state prompt exposes only state-matching cards");
     g.n_selected_cards = 0;
     rb_resume_with_choice(&g, 0);
-    CHECK(p->energy_active == 1 && !strcmp(rb_mods_get_orientation(&g.mods, energy[0]), "wait"),
+    CHECK(p->energy_active == 1 && orientation_is(&g, energy[0], "wait"),
           "energy state prompt applies the selected card only");
 
     p->energy.n = 0;
@@ -117,11 +138,46 @@ int main(void) {
     g.state_change_triggering = 1;
     rb_effect_energy_state_change(&g, 0, &e);
     g.state_change_triggering = 0;
-    CHECK(p->energy_active == 1 &&
-          !strcmp(rb_mods_get_orientation(&g.mods, energy[0]), "wait") &&
-          !strcmp(rb_mods_get_orientation(&g.mods, energy[1]), "wait") &&
-          !strcmp(rb_mods_get_orientation(&g.mods, energy[2]), "active"),
-          "multi-card energy state change applies only chosen cards");
+    /* Rust stamps the orientation of the CHANGED cards ONLY.
+     *
+     * engine/src/ability/effects/energy.rs:249-254, `execute_energy_state_change`:
+     *
+     *     for card_id in &wait_cards {
+     *         if skip.contains(card_id) { continue; }
+     *         gs.mods.add_orientation_modifier(*card_id, "wait");
+     *     }
+     *
+     * `wait_cards` is the state_indices.take(effective_count) selection
+     * (energy.rs:191-209) — the cards this call moves. The card that stays
+     * active is never in it, so it carries NO orientation modifier at all.
+     * `rb_mods_get_orientation` (modifiers.c:121-126) returns NULL for "no
+     * modifier", and the engine's own callers all NULL-check it
+     * (modifiers.c:1286 `if (orient && !strcmp(orient, "wait"))`).
+     *
+     * The old assertion did `strcmp(rb_mods_get_orientation(&g.mods,
+     * energy[2]), "active")` on that NULL: energy[2] is the card this call
+     * does NOT change, so its orientation is 0 (the memset at line 102
+     * cleared the ledger), the accessor returns NULL, and strcmp faulted ->
+     * SIGSEGV (rc 2816) 14 assertions into the run, long before the final
+     * `printf("ALL STATE EFFECT CHECKS PASSED")`. Measured 2026-10-04: the
+     * three accessors return 0x... , 0x... , 0x0.
+     *
+     * So the C was RIGHT and the test was wrong, and the corrected assertion
+     * is STRICTER than the one it replaces: it pins the two changed cards to
+     * "wait" AND pins the untouched card to "no orientation modifier", which
+     * is what Rust actually does, instead of asserting an "active" stamp the
+     * twin never writes. */
+    const char *o0 = rb_mods_get_orientation(&g.mods, energy[0]);
+    const char *o1 = rb_mods_get_orientation(&g.mods, energy[1]);
+    const char *o2 = rb_mods_get_orientation(&g.mods, energy[2]);
+    CHECK(p->energy_active == 1, "multi-card energy state change leaves exactly one active card");
+    CHECK(o0 && !strcmp(o0, "wait"),
+          "multi-card energy state change stamps the first chosen card wait");
+    CHECK(o1 && !strcmp(o1, "wait"),
+          "multi-card energy state change stamps the second chosen card wait");
+    CHECK(o2 == NULL,
+          "the energy card this call did not change carries NO orientation modifier "
+          "(energy.rs:249-254 stamps only wait_cards)");
 
     memset(&e, 0, sizeof(e));
     e.action = (char *)"set_blade_type";
@@ -259,9 +315,9 @@ int main(void) {
     e.n_extra = 2;
     g.n_selected_cards = 0;
     rb_effect_change_state(&g, 0, &e, members[0]);
-    CHECK(!strcmp(rb_mods_get_orientation(&g.mods, members[0]), "wait") &&
-          !strcmp(rb_mods_get_orientation(&g.mods, members[1]), "active") &&
-          !strcmp(rb_mods_get_orientation(&g.mods, members[2]), "active"),
+    CHECK(orientation_is(&g, members[0], "wait") &&
+          orientation_is(&g, members[1], "active") &&
+          orientation_is(&g, members[2], "active"),
           "member state change honors card-name target filtering");
 
     for (int i = 0; i < 3; i++) rb_mods_set_orientation(&g.mods, members[i], "active");
@@ -278,12 +334,13 @@ int main(void) {
     e.n_extra = 2;
     g.n_selected_cards = 0;
     rb_effect_change_state(&g, 0, &e, members[0]);
-    CHECK(!strcmp(rb_mods_get_orientation(&g.mods, members[0]), "active") &&
-          !strcmp(rb_mods_get_orientation(&g.mods, members[1]), "active") &&
-          !strcmp(rb_mods_get_orientation(&g.mods, members[2]), "active"),
+    CHECK(orientation_is(&g, members[0], "active") &&
+          orientation_is(&g, members[1], "active") &&
+          orientation_is(&g, members[2], "active"),
           "cost-value filter excludes nonmatching members");
 
     rb_unload();
+    printf("%d checks, %d failures\n", checks, failures);
     if (failures) return 1;
     printf("ALL STATE EFFECT CHECKS PASSED\n");
     return 0;

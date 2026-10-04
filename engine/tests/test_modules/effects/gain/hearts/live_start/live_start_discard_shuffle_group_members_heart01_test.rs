@@ -324,3 +324,48 @@ fn cooking_accept_gives_heart01_to_all_niji_members() {
         "a non-虹ヶ咲 member must NOT gain heart01"
     );
 }
+
+/// 「**自分の**ステージにいるすべての『虹ヶ咲』のメンバー」 — the opponent's do not.
+///
+/// The group filter is already pinned in both directions on my own stage: a non-虹ヶ咲
+/// member there gains nothing, and two 虹ヶ咲 members there both gain. What nothing
+/// pinned was the SIDE.
+///
+/// An opponent 虹ヶ咲 member is the case that separates a `target: self` grant from a
+/// stage-wide sweep: same group, same card type, same qualifying discard — only the
+/// board differs. A sweep implementation passes every other test in this file.
+///
+/// This is the third card in this session to turn on the same word. 園田海未's
+/// 「自分のステージにいるメンバーの中のグループ名1種類につき」 discount is scoped to my
+/// stage, and きなこ's 「このバトンタッチで」 is scoped to one action; here it is
+/// 「自分のステージ」. Each was the one qualifier its tests never varied.
+#[test]
+fn cooking_does_not_give_heart01_to_the_opponents_niji_members() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    discard(&mut game, NIJI_LIVE);
+    discard(&mut game, NIJI_MEMBER_NO_BLADE);
+
+    // One 虹ヶ咲 member on each side. Same group, same card — only the board differs.
+    let mine = game.id(NIJI_MEMBER_NO_BLADE);
+    let theirs = game.new_id(NIJI_MEMBER_NO_BLADE);
+    game.state.player1.stage.stage = [mine, -1, -1];
+    game.state.player2.stage.stage = [theirs, -1, -1];
+
+    trigger_cooking(&mut game);
+    assert!(game.has_pending_choice(), "option should be offered");
+    game.select_option(1); // Pay (accept)
+
+    assert_eq!(
+        game.state.mods.get_heart_modifier(mine, HeartColor::Heart01),
+        1,
+        "my 虹ヶ咲 member gains heart01"
+    );
+    assert_eq!(
+        game.state.mods.get_heart_modifier(theirs, HeartColor::Heart01),
+        0,
+        "「自分のステージにいる」 — the opponent's 虹ヶ咲 member is not on my stage, \
+         so a stage-wide sweep would grant it here and is wrong"
+    );
+}

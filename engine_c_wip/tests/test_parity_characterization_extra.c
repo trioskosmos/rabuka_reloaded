@@ -432,7 +432,7 @@ static void test_bp7_mari_bottom_kanan_added_to_hand(void)
 /* 2. bottom card IS 黒澤ダイヤ → discarded, then added to hand. */
 static void test_bp7_mari_bottom_dia_added_to_hand(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int dia = mid(&tg, DIA);
     ident(dia, DIA);
@@ -451,7 +451,7 @@ static void test_bp7_mari_bottom_dia_added_to_hand(void)
  * arm that fails if the character-name condition has degraded to AlwaysTrue. */
 static void test_bp7_mari_bottom_suimire_stays_in_waitroom(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int suimire = mid(&tg, SUIMIRE);
     int bottom = setup_mari(&tg, suimire, -1);
@@ -489,7 +489,7 @@ static void test_bp7_mari_skip_optional_discard_moves_nothing(void)
  * `source:"discard"` behaviour. */
 static void test_bp7_mari_does_not_grab_other_discard_match(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int suimire = mid(&tg, SUIMIRE);
     int other_kanan = mid(&tg, KANAN3);
@@ -521,7 +521,7 @@ static void test_bp7_mari_does_not_grab_other_discard_match(void)
 
 static void test_candidate_pool_filter_by_card_type(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int m1 = mid(&tg, "PL!-sd1-008-SD");  /* member */
     int l1 = mid(&tg, "PL!N-sd1-025-SD");  /* live   */
@@ -590,7 +590,7 @@ static void test_candidate_pool_filter_by_group_name(void)
  * one name" claim, expressed through the Q278/Q279 joint-aware counter. */
 static void test_candidate_pool_distinct_filter(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int m1 = mid(&tg, "PL!-sd1-008-SD");
     int m2 = mid(&tg, "PL!-sd1-008-SD");
@@ -648,7 +648,7 @@ static int setup_miraclerition(TestGame *tg, int left, int center, int right)
 
 static void test_charcond_miraclerition_correct_positions_gains_score(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int osawa  = mid(&tg, OSAWA);
     int himeno = mid(&tg, HIMENO);
@@ -661,7 +661,7 @@ static void test_charcond_miraclerition_correct_positions_gains_score(void)
 
 static void test_charcond_miraclerition_empty_stage_no_score(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int live = setup_miraclerition(&tg, RB_EMPTY_SLOT, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
     CHECK_EQ(test_get_score_modifier(&tg, live), 0,
@@ -670,7 +670,7 @@ static void test_charcond_miraclerition_empty_stage_no_score(void)
 
 static void test_charcond_miraclerition_wrong_positions_no_score(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int osawa  = mid(&tg, OSAWA);
     int himeno = mid(&tg, HIMENO);
@@ -685,7 +685,7 @@ static void test_charcond_miraclerition_wrong_positions_no_score(void)
 
 static void test_charcond_miraclerition_two_of_three_no_score(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int osawa  = mid(&tg, OSAWA);
     int himeno = mid(&tg, HIMENO);
@@ -697,7 +697,7 @@ static void test_charcond_miraclerition_two_of_three_no_score(void)
 
 static void test_charcond_miraclerition_wrong_character_at_position_no_score(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int osawa  = mid(&tg, OSAWA);
     int himeno = mid(&tg, HIMENO);
@@ -766,7 +766,7 @@ static void assert_state_invariants(TestGame *tg, const char *pname)
 
 static void test_corpus_smoke_every_card_executes(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     long smoked = 0;
     uint32_t n = rb_num_cards();
@@ -858,7 +858,7 @@ static void test_decode_audit_mifune_same_name_in_success_zone_gains_heart04(voi
 
 static void test_decode_audit_mifune_different_name_no_heart04(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int mifune = mid(&tg, "PL!N-bp4-010-R＋");
     int niji = mid(&tg, "PL!N-sd1-025-SD");
@@ -884,7 +884,7 @@ static void test_decode_audit_mifune_different_name_no_heart04(void)
 
 static void test_decode_audit_mifune_empty_success_zone_no_heart04(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int mifune = mid(&tg, "PL!N-bp4-010-R＋");
     int niji = mid(&tg, "PL!N-sd1-025-SD");
@@ -935,7 +935,7 @@ static int dream_believers_setup(TestGame *tg, int n_hs_members, int waitroom_ca
 
 static void test_decode_audit_dream_believers_both_clauses_score_plus_one(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int live = dream_believers_setup(&tg, 3, mid(&tg, DREAM_BASE));
     CHECK_EQ(test_get_score_modifier(&tg, live), 1,
@@ -945,7 +945,7 @@ static void test_decode_audit_dream_believers_both_clauses_score_plus_one(void)
 
 static void test_decode_audit_dream_believers_wrong_name_no_bonus(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int live = dream_believers_setup(&tg, 3, mid(&tg, "PL!-sd1-020-SD"));
     CHECK_EQ(test_get_score_modifier(&tg, live), 0,
@@ -955,7 +955,7 @@ static void test_decode_audit_dream_believers_wrong_name_no_bonus(void)
 
 static void test_decode_audit_dream_believers_two_members_no_bonus(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int live = dream_believers_setup(&tg, 2, mid(&tg, DREAM_BASE));
     CHECK_EQ(test_get_score_modifier(&tg, live), 0,
@@ -965,7 +965,7 @@ static void test_decode_audit_dream_believers_two_members_no_bonus(void)
 
 static void test_decode_audit_dream_believers_empty_waitroom_no_bonus(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int live = dream_believers_setup(&tg, 3, -1);
     CHECK_EQ(test_get_score_modifier(&tg, live), 0,
@@ -975,7 +975,7 @@ static void test_decode_audit_dream_believers_empty_waitroom_no_bonus(void)
 
 static void test_decode_audit_dream_believers_variant_name_still_matches(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     /* 「Dream Believers（104期Ver.）」 also CONTAINS the substring, so the gate
      * is a substring test, not an exact match. */
@@ -989,7 +989,7 @@ static void test_decode_audit_dream_believers_variant_name_still_matches(void)
  * 「これにより無効にした場合」 never fires -> no waitroom recovery. */
 static void test_decode_audit_kanon_alone_on_stage_no_recovery(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int kanon = mid(&tg, "PL!SP-bp2-001-R＋");
     ident(kanon, "PL!SP-bp2-001-R＋");
@@ -1019,7 +1019,7 @@ static void test_decode_audit_kanon_alone_on_stage_no_recovery(void)
 
 static void test_kashino_identity(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int k = mid(&tg, "PL!N-bp3-010-R");
     ident(k, "PL!N-bp3-010-R");
@@ -1039,7 +1039,7 @@ static void test_kashino_identity(void)
 
 static void test_kinako_hs_multiname_card_has_three_parts(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int multi = mid(&tg, "LL-bp1-001-R＋");
     ident(multi, "LL-bp1-001-R＋");
@@ -1067,7 +1067,7 @@ static void test_kinako_hs_multiname_card_has_three_parts(void)
 
 static void test_h_heart_pipeline_three_entries_agree(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int m1 = mid(&tg, "PL!-sd1-008-SD");
     int m2 = mid(&tg, "PL!SP-bp1-001-R");
@@ -1120,7 +1120,7 @@ static void test_h_heart_pipeline_three_entries_agree(void)
 
 static void test_h_heart_pipeline_ordering_agrees(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int m = mid(&tg, "PL!-sd1-008-SD");
     test_add_to_stage(&tg, AREA_LEFT, m);
@@ -1146,7 +1146,7 @@ static void test_h_heart_pipeline_ordering_agrees(void)
 
 static void test_h_blade_pipeline_set_plus_additive(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int m = mid(&tg, "PL!SP-bp1-001-R");
     ident(m, "PL!SP-bp1-001-R");
@@ -1183,7 +1183,7 @@ static void test_h_blade_pipeline_set_plus_additive(void)
  * entries — ordering is the caller's choice, so the claim is separability. */
 static void test_h_replacement_two_events_are_separate(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int mover  = mid(&tg, FILLER);
     int mover2 = mid(&tg, FILLER);
@@ -1206,7 +1206,7 @@ static void test_h_replacement_two_events_are_separate(void)
  * drift is caught, and note the discrepancy rather than hiding it. */
 static void test_h_timestamp_singleton_set_card_pinned(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int c1 = mid(&tg, "PL!S-bp3-019-L");
     ident(c1, "PL!S-bp3-019-L");
@@ -1275,7 +1275,7 @@ static void test_h_cross_seat_mirror(void)
  * holding one id is not a board that can occur. */
 static void test_h_s9_check_timing_cascade_smoke(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int live = mid(&tg, "PL!N-sd1-025-SD");
     int m1 = mid(&tg, "PL!-sd1-008-SD");
@@ -1362,7 +1362,7 @@ static void test_i_removing_teammate_reprohibits_without_stale_state(void)
  * SuccessLiveZone are interchangeable for cannot_place. */
 static void test_i_bp2024_cannot_place_blocks_both_live_zones(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int live = mid(&tg, KAGAYAI);
     ident(live, KAGAYAI);
@@ -1376,7 +1376,7 @@ static void test_i_bp2024_cannot_place_blocks_both_live_zones(void)
 
 static void test_i_bp2024_positive_control_normal_live_is_placeable(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int normal = mid(&tg, NORMAL_LIVE);
     ident(normal, NORMAL_LIVE);
@@ -1402,7 +1402,7 @@ static void test_i_bp2024_positive_control_normal_live_is_placeable(void)
 
 static void test_j_queue_entry_does_not_inline_the_resolver(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
 
     /* The queue is a fixed inline array, not a growable heap list. */
@@ -1475,7 +1475,7 @@ static int setup_pb1007_with_success(TestGame *tg, int n)
 
 static void test_k_pb1007_cost_2_with_1_success(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int me = setup_pb1007_with_success(&tg, 1);
     test_activate_ability(&tg, me);
@@ -1488,7 +1488,7 @@ static void test_k_pb1007_cost_2_with_1_success(void)
 
 static void test_k_pb1007_cost_1_with_2_success(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int me = setup_pb1007_with_success(&tg, 2);
     test_activate_ability(&tg, me);
@@ -1498,7 +1498,7 @@ static void test_k_pb1007_cost_1_with_2_success(void)
 
 static void test_k_pb1007_cost_3_with_0_success(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int me = setup_pb1007_with_success(&tg, 0);
     test_activate_ability(&tg, me);
@@ -1555,7 +1555,7 @@ static void test_k_pr045_cost4_should_not_draw(void)
 /* Keke: 1 Liella under -> cost +1. The engine used to give 0. */
 static void test_k_keke_1_liella_cost_plus1(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int keke = mid(&tg, KEKE);
     int liella = mid(&tg, LIELLA_K);
@@ -1569,7 +1569,7 @@ static void test_k_keke_1_liella_cost_plus1(void)
 
 static void test_k_keke_2_liella_cost_plus2(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int keke = mid(&tg, KEKE);
     int l1 = mid(&tg, LIELLA_K);
@@ -1588,7 +1588,7 @@ static void test_k_keke_2_liella_cost_plus2(void)
  * flip which member counts as highest. */
 static void test_k_highest_cost_respects_modifier(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int sumire = mid(&tg, SUMIRE);
     int center = mid(&tg, PR_CENTER);
@@ -1633,7 +1633,7 @@ static void test_k_highest_cost_respects_modifier(void)
  * Liella! card from the waitroom. */
 static void test_l_kanon_invalidate_liella_live_start(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int kanon = mid(&tg, KANON_DEBUT);
     int target = mid(&tg, KANON_TARGET);
@@ -1723,7 +1723,7 @@ static void test_l_vivid_world_missing_heart_color(void)
 
 static void test_l_vivid_world_half_nijigasaki_half_other(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     /* ALL yelled cards cover heart01..heart06, but the heart06 comes from a
      * NON-虹ヶ咲 card, which the group check must filter out. */
@@ -1738,7 +1738,7 @@ static void test_l_vivid_world_half_nijigasaki_half_other(void)
  * energy paid. */
 static void test_l_natsumi_sunshine_pay_any_energy_for_score(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int live = mid(&tg, NATSUMI);
     int nico = mid(&tg, NICO);
@@ -1802,7 +1802,7 @@ static void test_l_natsumi_sunshine_pay_any_energy_for_score(void)
  * performance snapshot's final score. */
 static void test_l_vitamin_summer_live_success_hand_condition(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int live = mid(&tg, VITAMIN);
     ident(live, VITAMIN);
@@ -1862,7 +1862,7 @@ static void test_l_vitamin_summer_live_success_hand_condition(void)
  * move 1 from hand to the deck top or bottom. */
 static void test_l_step_zero_to_one_live_start(void)
 {
-    TestGame tg;
+static    TestGame tg;
     fresh(&tg);
     int live = mid(&tg, STEP);
     int chika = mid(&tg, AQOURS_CHIKA);

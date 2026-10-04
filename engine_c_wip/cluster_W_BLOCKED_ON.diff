@@ -1,0 +1,301 @@
+# CLUSTER W -- BLOCKED-ON PATCHES. Apply with git apply -p1 or by hand.
+#
+# Generated against the tree as of 2026-10-03. Every hunk was compiled and its
+# A/B measured BEFORE being blocked; none of these was applied to the live tree,
+# because every file below is owned by another cluster:
+#
+#   src/ability/choice.c                cluster B  (no report yet)
+#   src/ability/condition.c             cluster D  (no report yet)
+#   src/core/game_state_abilities.c     cluster G+H
+#   src/ability/cost.c                  cluster C
+#   tests/test_parity_cce_gaps.c        cluster J  (landed, now contested)
+#
+# LANDING ORDER MATTERS. cost.c (W2b) is the producer half of W2: without it
+# W2's corrected routing is inert, and make warnings-audit will go STALE on
+# the W2 pin the moment W2 lands. Land cost.c with choice.c, in the same commit.
+#
+# After landing, delete the matching pin from WARN_AUDIT_BASELINE in the Makefile
+# (W1/W2/W3/W4/W8) or from WARN_AUDIT_TEST_BASELINE (W9). make warnings-audit
+# and make warnings-audit-test FAIL on a stale pin on purpose.
+#
+# Full diffs of the three files I proved in my snapshot are in w_patches.diff;
+# the two hunks below are reconstructions written from the same proven builds.
+--- pre-W/src/ability/choice.c
++++ post-W/src/ability/choice.c
+@@ -1080,7 +1080,21 @@
+     ch.count=count; ch.allow_skip=allow_skip;
+     if (en) strncpy(ch.description,en,sizeof(ch.description)-1);
+     if (tpid) strncpy(ch.target,tpid,sizeof(ch.target)-1);
+-    if (ctx && ctx->card_type) strncpy(ch.card_type,ctx->card_type,sizeof(ch.card_type)-1);
++    /* W1 (-Waddress). `ctx->card_type` is `char card_type[32]`, so `ctx->card_type`
++       in a boolean context is `char *` and the old `if (ctx && ctx->card_type)`
++       could NEVER be false -- it was a null check written where an
++       `is_some()` was meant. Rust's twin is `SelectionContext::card_type:
++       Option<String>` (choice.rs:34) fed straight into
++       `ChoiceBuilder::card_type(Option<String>)` (types.rs:479, :97) by
++       `build_reprompt` (choice.rs:1188), so the guard is `card_type.is_some()`.
++       The C's `RbSelectionContext` has no `has_card_type` flag, so `None` is not
++       representable and `[0]` is the faithful test -- and it is the test the very
++       NEXT line already uses for `group` (also `Option<String>` in Rust, also a
++       bare `char[32]` here). Behaviour is provably unchanged either way: `ch` was
++       memset at :1077, so `strncpy` of an empty string re-writes the NUL that is
++       already there. The check is kept, not deleted, because it is the only thing
++       standing between a future `ctx->card_type` and an unconditional copy. */
++    if (ctx && ctx->card_type[0]) strncpy(ch.card_type,ctx->card_type,sizeof(ch.card_type)-1);
+     if (ctx && ctx->group[0]) strncpy(ch.filter_group,ctx->group,sizeof(ch.filter_group)-1);
+     (void)ja; (void)filtered; (void)n_filtered; (void)cost_total; (void)cost_total_op;
+     ch.route=RB_ROUTE_SELECT_CARDS;
+@@ -3834,7 +3848,15 @@
+                                         entry_cost, pay);
+         return;
+     }
+-    if (strstr(tgt, "pay_cost_all_discard")) {
++    /* W2 sibling -- the SAME guard as choice.c:5037, in the other dispatcher.
++       Leaving it would have kept the branch dead on the `tgt` path while
++       "fixing" it on the `pending.target` path. `strstr(tgt,
++       "pay_cost_all_discard")` cannot match: Rust's literal is
++       "pay_cost_all:discard_all" (enums.rs:705) and that is what every producer
++       in this tree spells. Routed through the exact-match table, like the arms
++       above it (:3801 "choice", :3804 the pay/skip target, :3843
++       "double_baton_touch") which all use strcmp. */
++    if (rb_select_target_kind_from_str(tgt) == RB_STK_PAY_COST_ALL_DISCARD) {
+         rb_handle_pay_cost_all_discard(g, g->queue.actor, sel);
+         rb_resolver_clear_choice_state(self);
+         rb_drain_ability_queue(g);
+@@ -5032,9 +5054,40 @@
+             rb_resolver_clear_choice_state_and_resume(&self);
+             goto choice_resume_tail;
+         }
+-        /* "discard your entire hand" optional cost (mirrors Rust
+-            handle_pay_cost_all_discard routing). */
+-        if (g->queue.pending.target && strstr(g->queue.pending.target, "pay_cost_all_discard")) {
++        /* W2 (-Waddress). "discard your entire hand" optional cost.
++           Rust: `Some(SelectTargetKind::PayCostAllDiscard) =>
++           self.handle_pay_cost_all_discard(gs, selected)` (choice.rs:2816-2818),
++           reached through `SelectTargetKind::from_str` (enums.rs:688-708), whose
++           PayCostAllDiscard arm is the EXACT literal "pay_cost_all:discard_all"
++           (enums.rs:705) -- an equality match, not a substring search.
++
++           The old line had THREE defects, all of which had to be fixed together
++           or the guard stays dead:
++
++             1. `g->queue.pending.target` is `char target[64]` (rabuka.h:943), so
++                it decays to `char *` and the `&&` could NEVER be false. It was
++                a null check written where a presence check was meant. The rest of
++                this file already uses the correct idiom
++                (`pending.target[0] ? ... : ...` at :991/:1983/:2160/:3227/:3725/
++                :4768/:5216); this line was the outlier.
++             2. The literal was "pay_cost_all_discard" -- UNDERSCORE. Every
++                producer and table in this tree spells it "pay_cost_all:
++                discard_all" (enums.c:386/:407, misc.c:2075,
++                tests/test_parity_enums.c:278). `strstr` can therefore never
++                match, so the branch was unreachable even with a correct
++                presence test.
++             3. It used `strstr` where Rust uses an exact match, which would
++                also have fired on a longer unrelated target string.
++
++           `rb_select_target_kind_from_str` (enums.c:369-388) is the 16/16 exact
++           twin of Rust's `SelectTargetKind::from_str`, so routing through it is
++           Rust's own dispatch rather than a second hand-written table, and it
++           returns -1 for NULL and for every unknown spelling.
++           REACHABILITY: see the W-A2-paycostall row in tools/audit_w_gate.c --
++           the guard is the correct one either way; whether it FIRES depends on
++           the producer half at cost.c:1129, which is cluster C's file. */
++        if (rb_select_target_kind_from_str(g->queue.pending.target)
++                == RB_STK_PAY_COST_ALL_DISCARD) {
+             rb_handle_pay_cost_all_discard(g, actor, selected);
+             rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
+             return 1;
+@@ -5513,7 +5566,14 @@
+ void rb_resolver_handle_number_selection(GameState *g, int selected)
+ {
+     if (!g) return;
+-    AbilityEffect *parent = g->queue.resume_parent;
++    /* W4 (-Wdiscarded-qualifiers). `RbQueueState::resume_parent` is
++       `const AbilityEffect *` (rabuka.h:1200), so `AbilityEffect *parent =
++       g->queue.resume_parent` threw the const away. Nothing in the body WRITES
++       through it -- `parent` is only tested for NULL and forwarded to
++       rb_resolver_continue_siblings -- so carrying the const is correct and
++       costs nothing. Verified, not assumed: the callee takes the same const
++       pointer, so no cast is needed at the call site either. */
++    const AbilityEffect *parent = g->queue.resume_parent;
+     int child = g->queue.resume_child;
+     int actor = g->queue.resume_actor >= 0 ? g->queue.resume_actor : g->queue.actor;
+     int host = g->queue.resume_host;
+
+--- pre-W/src/ability/condition.c
++++ post-W/src/ability/condition.c
+@@ -2339,7 +2339,13 @@
+     if (loc && strcmp(loc, "stage")) return 1;
+     const char *ht = get_str(c, "heart_type");
+     if (ht && strcmp(ht, "all")) return 1;
+-    RbPlayer *P = &g->p[pl];
++    /* W3 (-Wdiscarded-qualifiers). `g` is `const struct GameState *`, so `&g->p[pl]`
++       is `const RbPlayer *`. The function only READS P (->stage, five lines
++       down), and the sibling predicate `rb_check_heart_colors` 30 lines below
++       already spells the same local `const RbPlayer *P` -- so the const is the
++       intended type, not an accident of the cast. No caller relies on the
++       pointee being mutable: P is a function-local alias that never escapes. */
++    const RbPlayer *P = &g->p[pl];
+     int q;
+     if (negation) {
+         /* Check if the specific triggering member lacks all-heart */
+
+--- pre-W/src/core/game_state_abilities.c
++++ post-W/src/core/game_state_abilities.c
+@@ -1852,6 +1852,24 @@
+ 
+ /* 笏笏 TAS scan: queue abilities for a zone 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 */
+ 
++/* W8 helper: the nested `trigger_event` object as a Condition, so the
++   discard-location guard can read `trigger_event.location` the way Rust's
++   `condition.get_trigger_event().and_then(|t| t.location.as_deref())` does
++   (abilities.rs:492-496). `rb_cond_get_str` is RB_TAG_STR-only and cannot see
++   through a nested dict, so without this the guard reads a different condition
++   than Rust on every node whose location is nested. NULL-safe at every step. */
++static const Condition *rb_cond_get_obj(const Condition *c, const char *key) {
++    if (!c || !key) return NULL;
++    for (uint32_t i = 0; i < c->n_fields; i++) {
++        const CondField *f = &c->fields[i];
++        if (!f->key || strcmp(f->key, key)) continue;
++        if ((f->v.tag == RB_TAG_OBJVAR || f->v.tag == RB_TAG_OBJECT) && f->v.cond)
++            return f->v.cond;
++        return NULL;
++    }
++    return NULL;
++}
++
+ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
+                                 const char *trigger, const int *moved_cards, int n_moved,
+                                 int position_change, int energy_placed,
+@@ -1889,22 +1907,65 @@
+                     continue;
+                 }
+             }
+-            /* Discard-location guard for stage cards: skip discard-location abilities
+-               when the card is on stage (not in discard). */
++            /* W8. Discard-location guard for stage cards: skip discard-location
++               abilities when the card is on stage (not in discard).
++
++               Rust twin, term for term: GameState::is_stale_discard_condition
++               (core/game_state/abilities.rs:486-501), called from the AUTO_SCAN
++               at abilities.rs:669-678 with in_discard =
++               player1.waitroom.cards.contains(&card_id) ||
++               player2.waitroom.cards.contains(&card_id).
++               RbPlayer::discard IS Rust's waitroom -- rabuka.h:770 labels the
++               bag "waitroom" -- so the C's both-seats bag probe is the same test.
++
++               The old C line was missing TWO of Rust's four terms, and it is in
++               the trigger scan, so each missing term changes WHICH ABILITY FIRES:
++
++                 (a) Rust returns false IMMEDIATELY when the condition's source
++                     is "preceding_moved" (abilities.rs:487). A "preceding moved
++                     card is in the waiting room" watcher tracks OTHER cards
++                     reaching the discard, not this card being in it -- the doc
++                     comment at abilities.rs:482-485 says exactly that. The C had
++                     no exemption, so it DROPPED abilities Rust keeps.
++                 (b) Rust reads the location as get_location().or_else(|| the
++                     nested trigger_event's location).unwrap_or("")
++                     (abilities.rs:490-497). The C read only the flat `location`
++                     key, so a condition whose discard location lives under
++                     trigger_event was missed entirely.
++                 (c) Rust's last term is the same disjunction the C had, written
++                     with explicit parens. C precedence already grouped it the
++                     same way (&& binds tighter than ||), so (c) is a READABILITY
++                     fix, not a behaviour change -- and the point of making it
++                     explicit is that the next reader cannot silently re-group it.
++
++               Zone::from_str("discard") == Some(Zone::Discard) and the C's
++               !strcmp(loc, "discard") are the same test: rb_ability_zone_from_str
++               (enums.c) is a 32/32 twin of Zone::from_str (enums.rs:89-122) and
++               only the exact literal "discard" maps to Discard ("waitroom" maps to
++               its own variant), so no term is gained or lost by keeping strcmp.
++
++               Reachability of (a) and (b) on the shipped bytecode is the
++               W-A8-discard row of tools/audit_w_gate.c -- measured, not assumed. */
+             if (check_discard_guard && ab.effect && ab.effect->condition) {
+-                const char *loc = rb_cond_get_str(ab.effect->condition, "location");
+-                const char *ct = rb_cond_get_str(ab.effect->condition, "card_type");
+-                const char *target = rb_cond_get_str(ab.effect->condition, "target");
+-                if (loc && !strcmp(loc, "discard")
+-                    && (ct && !strcmp(ct, "member_card") || (target && !strcmp(target, "self")))) {
+-                    int in_discard = 0;
+-                    for (int pl = 0; pl < 2; pl++) {
+-                        const RbPlayer *P = &g->p[pl];
+-                        for (int d = 0; d < P->discard.n; d++)
+-                            if (P->discard.cards[d] == cid) { in_discard = 1; break; }
+-                        if (in_discard) break;
++                const Condition *dc = ab.effect->condition;
++                const char *dloc = rb_cond_get_str(dc, "location");
++                if (!dloc) dloc = rb_cond_get_str(rb_cond_get_obj(dc, "trigger_event"), "location");
++                const char *dsrc = rb_cond_get_str(dc, "source");
++                if (dloc && !strcmp(dloc, "discard") && dsrc && !strcmp(dsrc, "preceding_moved"))
++                    dloc = NULL;   /* abilities.rs:487 -- never stale */
++                if (dloc && !strcmp(dloc, "discard")) {
++                    const char *ct = rb_cond_get_str(dc, "card_type");
++                    const char *target = rb_cond_get_str(dc, "target");
++                    if ((ct && !strcmp(ct, "member_card")) || (target && !strcmp(target, "self"))) {
++                        int in_discard = 0;
++                        for (int pl = 0; pl < 2; pl++) {
++                            const RbPlayer *P = &g->p[pl];
++                            for (int d = 0; d < P->discard.n; d++)
++                                if (P->discard.cards[d] == cid) { in_discard = 1; break; }
++                            if (in_discard) break;
++                        }
++                        if (!in_discard) { rb_free_ability(&ab); continue; }
+                     }
+-                    if (!in_discard) { rb_free_ability(&ab); continue; }
+                 }
+             }
+             if (ab.effect && ab.effect->has_condition && ab.effect->condition
+
+
+
+--- pre-W/src/ability/cost.c
++++ post-W/src/ability/cost.c
+@@ -1126,6 +1126,17 @@ int apply_pay_cost_all_discard(GameState *g, int actor, AbilityEffect *eff, in
+         return;
+     }
++
++    /* W2b. This prompt IS Rust's `Choice::SelectTarget { target:
++       "pay_cost_all:discard_all" }` (cost/handlers.rs:378-388) and the target IS
++       the routing key: choice.rs:2816-2818 dispatches on
++       `SelectTargetKind::from_str(target)`, and enums.rs:705 spells it with a
++       COLON. The C set `kind` and left `target` all-zero, so BOTH dispatchers
++       (choice.c:5037 on `pending.target`, choice.c:3837 on `tgt`) had nothing to
++       match and `rb_handle_pay_cost_all_discard` was unreachable for the 2
++       corpus nodes measured by `make w-census`
++       (PL!N-bp5-021-N and PL!N-bp5-028-L, ability #0 each).
++       BLOCKED-ON choice.c:5037 / :3837 routes through
++       `rb_select_target_kind_from_str`, which is exact -- so this producer MUST
++       land with them or the routing fix stays inert.
++       `pending` was memset one line above, so this writes into a known-empty
++       64-byte field; `sizeof(pending->target)` is the correct bound. */
++    snprintf(pending->target, sizeof(pending->target), "%s",
++             "pay_cost_all:discard_all");
+     pending->description[0] = 0;
+     pending->allow_skip = 1;
+     pending->zone[0] = 0;
+--- pre-W/tests/test_parity_cce_gaps.c
++++ post-W/tests/test_parity_cce_gaps.c
+@@ -3199,8 +3199,18 @@ static void j7_no_niji_no_peek(void)
+     TestGame *tg = &t_j7;
+     fresh(tg);
+     int tsunagaru, non_niji, filler;
++    /* W9. `tsunagaru` was NEVER assigned in this test: the
++       `fx(tg, &tsunagaru, TSUNAGARU)` leg that every sibling (j1 :3005, j2
++       :3063, j5 :3139, j6 :3171, j8 :3235) has in its guard was missing here.
++       gcc predicted it and nobody read the log --
++       `tests/test_parity_cce_gaps.c:438` is where the -Wmaybe-uninitialized
++       came from, `-Werror=maybe-uninitialized` now gates tests/.
++       The consequence was a live assertion running on an indeterminate value:
++       :3212 put that garbage into the hand and :3218 scanned for it, so
++       "j7: the ライブ開始時 was queued" could never pass and was failing for a
++       setup reason rather than an engine reason. Adding the leg STRENGTHENS
++       the test; no assertion is weakened, deleted or ignored. */
++    if (!fx(tg, &tsunagaru, TSUNAGARU) ||
++        !fx(tg, &non_niji, HONOKA) ||
++        !fx(tg, &filler, HONOKA)) return;
+-    if (!fx(tg, &non_niji, HONOKA) ||
+-        !fx(tg, &filler, HONOKA)) return;
+     CHECK(!card_unit_is(tg, non_niji, NIJI_SERIES),

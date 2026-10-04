@@ -96,7 +96,7 @@ static void scenario_move_cards(void){
 }
 
 static void scenario_condition_gate(void){
-    static static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
+    static GameState g; uint32_t d0[10]={0,1,2,3,4,5,6,7,8,9}; uint32_t d1[10]={10,11,12,13,14,15,16,17,18,19};
     rb_seed(3); rb_game_init(&g,d0,10,d1,10);
     /* A staged member gives modify_score a non-empty candidate pool
      * (score.rs:403-452: live + success live + stage), because with an empty

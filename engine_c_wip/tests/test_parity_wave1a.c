@@ -371,7 +371,7 @@ static void on_fatal_signal(int sig)
         int p_ = tal ? tal->prompts : 0;                                  \
         if (p_ <= (int)(before) || (p_ - (int)(before)) < (int)(n)) {     \
             if (tal) tal->failures++;                                     \
-            fprintf(stderr, "FAIL (VACUOUS): ");                          \
+            fprintf(stderr, "FAIL: [VACUOUS]  ");                          \
             fprintf(stderr, __VA_ARGS__);                                 \
             fprintf(stderr, " - %d prompt(s) were produced after the        \
                     control point, need at least %d\n",                   \

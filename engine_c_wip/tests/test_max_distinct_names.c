@@ -174,6 +174,7 @@ static int failures;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -185,6 +186,7 @@ static int failures;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -315,7 +317,7 @@ static void card_lookup_returns_minus_one(void) {
 /* Every one of these is a print the database stores with a fullwidth "＋"; the
    ASCII "+" spelling must reach the same card the Rust engine reaches. */
 static void card_lookup_ascii_plus_resolves(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     static const char *const queries[] = {
         "LL-bp1-001-R+", "LL-bp2-001-R+", "PL!-bp3-008-R+", "PL!-bp5-003-R+",
@@ -332,7 +334,7 @@ static void card_lookup_ascii_plus_resolves(void) {
    SAME print. Before the fix the fullwidth form lost the "＋" to the
    normalizer's uninitialized hole and returned a neighbouring print. */
 static void card_lookup_plus_spellings_agree(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int wide = rb_find_card_by_no("PL!SP-pb1-002-P\uff0b");
     int narrow = rb_find_card_by_no("PL!SP-pb1-002-P+");
@@ -353,7 +355,7 @@ static void card_lookup_plus_spellings_agree(void) {
 /* Steps 3 and 4 of get_card_id: rarity fallbacks and base-prefix lookup.
    Each expected id is the print the Rust engine resolves these to. */
 static void card_lookup_fallbacks(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     card_lookup_resolves("PL!HS-pb1-003", 705);
     card_lookup_resolves("PL!S-bp6-024-R+", 1691);
@@ -366,7 +368,7 @@ static void card_lookup_fallbacks(void) {
    conflated: bp2-011-R (debut only) and pb2-011-R (auto + live start) are
    different cards (engine_c_wip AGENTS.md card-identity rule). */
 static void card_lookup_keeps_prints_distinct(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int bp2 = rb_find_card_by_no("PL!SP-bp2-011-R");
     int pb2 = rb_find_card_by_no("PL!SP-pb2-011-R");

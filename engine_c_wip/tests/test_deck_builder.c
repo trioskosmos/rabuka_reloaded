@@ -110,7 +110,15 @@ static void test_builds_from_deck_list_and_initializes_game(void)
     CHECK_EQ(deck0.main_count, 2, "deck list quantity creates two main cards");
     CHECK_EQ(deck0.energy_count, RB_MAX_ENERGY_CARDS, "deck list energy is filled");
     CHECK_EQ(rb_build_deck_from_list(&list, &deck1), 0, "second deck list builds independently");
-    GameState game;
+    /* static: sizeof(GameState) is 1195656 B (1167.6 KiB), which overflows the
+     * 1 MiB DEFAULT stack on its own. This local only ever passed because the
+     * Makefile links with -Wl,--stack,33554432 -- recorded as T5-7 / H4 in
+     * PARITY_CHECKLIST.md, blocked on the tests tree being contested. It is not
+     * contested for this file. Provably neutral: automatic storage is never
+     * zero-initialised by the C runtime and rb_init_game_from_built_decks
+     * initialises the whole struct before any read, so `static` changes no
+     * value -- it only moves 1.1 MB off the stack. */
+    static GameState game;
     CHECK_EQ(rb_init_game_from_built_decks(&game, &deck0, &deck1), 0,
              "built decks initialize a game");
     CHECK_EQ(game.p[0].energy_deck.n, RB_MAX_ENERGY_CARDS - 3,
@@ -130,6 +138,91 @@ static void test_builds_from_card_numbers(void)
     CHECK_EQ(deck.energy_count, RB_MAX_ENERGY_CARDS, "resolved energy count is filled");
 }
 
+/* ── DeckBuilder::add_default_energy_cards_from_database (deck_builder.rs:177-202)
+ *
+ * Rust pads an under-full energy deck with copies of ONE template, chosen by
+ * `card_db.cards.iter().find(|(_, c)| c.is_energy())`. `CardDatabase.cards` is a
+ * `HashMap<i16, Card>` (core/card.rs:406) and on host that is
+ * `std::collections::HashMap` with the DEFAULT RandomState (compat.rs:54) — so
+ * Rust's template is NOT deterministic across processes, and there is no value
+ * the C could "match". compat.rs:36-52 says so outright: the engine's
+ * behaviour is known to depend on HashMap iteration order and the hasher was
+ * deliberately left alone.
+ *
+ * The C therefore PINS a template instead, and this test is the pin. If the pin
+ * is ever changed it changes card IDENTITY in every deck, so it has to be a
+ * deliberate edit here rather than a silent drift: IKZL-PR-001-PR (id 0, the
+ * first energy by index, i.e. the C's fallback) and LL-E-001-SD (id 1, the
+ * preferred pin) are different cards.
+ */
+static void test_default_energy_template_is_pinned(void)
+{
+    int first_by_index = -1;
+    for (uint32_t i = 0; i < rb_num_cards(); i++) {
+        if (rb_card_is_energy((int)i)) { first_by_index = (int)i; break; }
+    }
+    CHECK(first_by_index >= 0, "the card database has at least one energy card");
+    CHECK(rb_find_card_by_no("LL-E-001-SD") != first_by_index,
+          "LL-E-001-SD is NOT the first energy by index, so the pin is a real choice");
+    {
+        Card pinned;
+        memset(&pinned, 0, sizeof(pinned));
+        int pinned_id = rb_find_card_by_no("LL-E-001-SD");
+        CHECK(rb_decode_card_by_index((uint32_t)pinned_id, &pinned),
+              "the pinned energy template decodes");
+        CHECK_EQ(pinned.cost, 0, "pinned energy template has cost 0");
+        CHECK(rb_card_is_energy(pinned_id), "pinned template is classified as energy");
+        rb_free_card(&pinned);
+    }
+    /* An all-energy input with nothing but ONE supplied card still ends up with
+     * RB_MAX_ENERGY_CARDS entries, all sharing the first supplied template —
+     * deck_builder.c:59-60 pads with energy_templates[0], which is the caller's
+     * card, not the pinned default. Rust would pad with its own arbitrary pick. */
+    {
+        int energy = rb_find_card_by_no("LL-E-002-PR");
+        RbBuiltDeck deck;
+        int ids[1] = { energy };
+        CHECK_EQ(rb_build_deck_from_card_ids(ids, 1, NULL, 0, &deck), 0,
+                 "single energy card is accepted");
+        CHECK_EQ(deck.energy_count, RB_MAX_ENERGY_CARDS, "energy deck is padded to capacity");
+        for (int i = 1; i < deck.energy_count; i++)
+            CHECK(same_template(deck.energy_cards[i], deck.energy_cards[0]),
+                  "padding repeats the first supplied energy template, not the pin");
+        rb_built_deck_clear(&deck);
+    }
+}
+
+/* DeckBuilder::build_deck_from_database (deck_builder.rs:101-127) is LENIENT:
+ * an unknown card number is pushed onto `missing_cards`, logged at debug level,
+ * and the deck is still returned Ok. The C is STRICT and returns
+ * RB_DECK_BUILD_EUNKNOWN. That is a deliberate divergence — the C entry point
+ * is the web server's, and web_server.rs surfaces the unknown name to the
+ * client instead of silently building a 59-card deck — so it is pinned here as
+ * the C contract rather than left to look like parity. */
+static void test_unknown_card_number_is_strict(void)
+{
+    const char *main_nos[2] = {"PL!-sd1-010-SD", "PL!HS-bp1-019-L"};
+    const char *bad_nos[1] = {"ZZ-NOT-A-CARD-999-X"};
+    RbBuiltDeck deck;
+    CHECK_EQ(rb_build_deck_from_card_numbers(main_nos, 2, NULL, 0, &deck), 0,
+             "known card numbers build");
+    rb_built_deck_clear(&deck);
+    CHECK(rb_card_get_card_id(bad_nos[0]) < 0,
+          "the negative fixture really is unknown to the database");
+    CHECK_EQ(rb_build_deck_from_card_numbers(bad_nos, 1, NULL, 0, &deck),
+             RB_DECK_BUILD_EUNKNOWN,
+             "an unknown card number is rejected, not skipped (Rust would skip)");
+    CHECK_EQ(deck.main_count, 0, "a rejected build leaves the output empty");
+    /* A trailing ASCII '+' is the documented web input (web_server.rs normalises
+     * every JSON card number), so it must resolve through the builder too. */
+    {
+        const char *plus_nos[1] = {"PL!-sd1-010-SD+"};
+        CHECK_EQ(rb_build_deck_from_card_numbers(plus_nos, 1, NULL, 0, &deck), 0,
+                 "a trailing '+' still resolves to its base card");
+        rb_built_deck_clear(&deck);
+    }
+}
+
 int main(void)
 {
     if (rb_load("src") != 0) {
@@ -141,6 +234,8 @@ int main(void)
     test_rejects_invalid_and_non_energy_inputs();
     test_builds_from_deck_list_and_initializes_game();
     test_builds_from_card_numbers();
+    test_default_energy_template_is_pinned();
+    test_unknown_card_number_is_strict();
     rb_unload();
     if (failures) return 1;
     printf("ALL DECK BUILDER CHECKS PASSED\n");

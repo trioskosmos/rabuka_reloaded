@@ -6,11 +6,30 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* ── per-test verdict layer (see test_parity_integration.c for the rationale):
+ * a FLAT suite's FAIL lines name an assertion, never a test, so this suite
+ * reported no per-test verdict and its FAIL lines were unattributable. This
+ * adds exactly one `FAILED: <test body>` per failing test body, in the shape
+ * every FORK suite prints. No assertion is added, removed or relaxed. */
+static const char *g_flat_failed[512];
+static int g_flat_failed_n;
+static void flat_verdict_failed(const char *fn)
+{
+    for (int i = 0; i < g_flat_failed_n; i++)
+        if (g_flat_failed[i] == fn) return;
+    if (g_flat_failed_n >= 512) return;
+    g_flat_failed[g_flat_failed_n++] = fn;
+    printf("FAILED: %s\n", fn);
+    fflush(stdout);
+}
+#define FLAT_VERDICT() flat_verdict_failed(__func__)
+
 static int failures;
 
 #define CHECK(condition, message) do { \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -22,6 +41,7 @@ static int failures;
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -37,7 +57,7 @@ static void drain_choices(TestGame *game)
 
 static void generated_opponent_live_success(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int p1_member = test_id(&game, "PL!-sd1-007-SD");
@@ -110,7 +130,7 @@ static void generated_opponent_live_success(void)
 
 static void generated_cross_player_position(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int rurino = test_id(&game, "PL!HS-PR-029-PR");
@@ -144,7 +164,7 @@ static void generated_cross_player_position(void)
 
 static void generated_draw_until_count(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int card = test_id(&game, "PL!N-PR-028-PR");
@@ -171,7 +191,7 @@ static void generated_draw_until_count(void)
 
 static void generated_target_selection(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int member_a = test_id(&game, "PL!N-PR-003-PR");

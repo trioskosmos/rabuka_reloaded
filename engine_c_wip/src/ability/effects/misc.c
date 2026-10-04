@@ -214,28 +214,74 @@ static void push_temporary_effect(GameState *g, int card_id, int dur,
     g->temp_effects[g->n_temp_effects++]=te;
 }
 
-/* Grant `amount` blades to one card. */
-static void grant_blade(GameState *g, int card_id, int amount){
+/* Grant `amount` blades to one card.
+ *
+ * Rust resource.rs:223-232:
+ *     /// Grant `amount` blades to one card through the traced modifier API.
+ *     fn grant_blade(gs: &mut GameState, effect: &AbilityEffect, card_id: i16, amount: i16) {
+ *         gs.mods.add_blade_modifier_with_trace(
+ *             card_id, amount, &mut gs.ability_applications,
+ *             gs.activating_card.unwrap_or(-1), &effect.text,
+ *         );
+ *     }
+ *
+ * So the SOURCE of the trace is `gs.activating_card` -- NOT the target -- and the
+ * LABEL is the effect's own `text`. Before this widening the C called the
+ * UNTRACED rb_mods_add_blade, so `mods.trace` received score / cost / need-heart
+ * applications and no blade application at all: any consumer filtering on
+ * RB_EFFECT_BLADE_BONUS saw nothing. That is E13, and the blocker was exactly
+ * this signature (see the CROSS-FILE REQUEST recorded at
+ * src/core/modifiers.c:404-408). `gs.activating_card.unwrap_or(-1)` is already
+ * `g->activating_card` in C, whose absent value is -1. */
+static void grant_blade(GameState *g, int card_id, int amount,
+                        const char *ability_text){
     if(card_id < 0) return;
-    rb_mods_add_blade(&g->mods, card_id, amount);
+    rb_mods_add_blade_with_trace(&g->mods, card_id, amount, g->activating_card,
+                                 ability_text);
 }
 
-/* Grant heart-color distribution to one card; is_negative flips every entry's sign. */
-static void grant_heart_distribution(GameState *g, int card_id,
+/* Grant heart-color distribution to one card; is_negative flips every entry's sign.
+ *
+ * Rust resource.rs:194-221:
+ *     /// Grant a heart-color distribution to one card through the traced
+ *     /// modifier API. Shared by every heart-granting path so sign handling
+ *     /// and trace attribution cannot drift apart between copies.
+ *     fn grant_heart_distribution(gs, effect_text: &str, card_id,
+ *                                 distribution: &[(HeartColor, u8)],
+ *                                 is_negative: bool) {
+ *         for &(color, dist_count) in distribution {
+ *             let dist_amount = if is_negative { -i16::from(dist_count) }
+ *                               else            {  i16::from(dist_count) };
+ *             gs.mods.add_heart_modifier_with_trace(
+ *                 card_id, color, dist_amount, &mut gs.ability_applications,
+ *                 gs.activating_card.unwrap_or(-1), effect_text);
+ *         }
+ *     }
+ *
+ * `effect_text` is Rust's own first parameter here, so the C widens the same way
+ * rather than reaching for `e->text` at each site. */
+static void grant_heart_distribution(GameState *g, const char *ability_text,
+                                     int card_id,
                                      const int *colors, const int *counts,
                                      int n, int is_negative){
     if(card_id < 0) return;
     for(int i=0;i<n;i++){
         int amt = is_negative ? -counts[i] : counts[i];
-        rb_mods_add_heart(&g->mods, card_id, colors[i], amt);
+        rb_mods_add_heart_with_trace(&g->mods, card_id, colors[i], amt,
+                                     g->activating_card, ability_text);
     }
 }
 
-/* Grant distribution and, for temporary durations, register revert data. */
+/* Grant distribution and, for temporary durations, register revert data.
+   Rust's apply_heart_to_card (resource.rs:234-245) likewise carries
+   `effect_text: &str` as its last parameter and hands it straight to
+   grant_heart_distribution, so the C threads it the same way. */
 static void apply_heart_to_card(GameState *g, int card_id,
                                 const int *colors, const int *counts,
-                                int n, int is_negative, int dur){
-    grant_heart_distribution(g, card_id, colors, counts, n, is_negative);
+                                int n, int is_negative, int dur,
+                                const char *ability_text){
+    grant_heart_distribution(g, ability_text, card_id, colors, counts, n,
+                             is_negative);
     if(dur == RB_TEMP_PERM || card_id < 0) return;
     int heart[8]; memset(heart,0,sizeof heart);
     for(int i=0;i<n;i++){
@@ -548,18 +594,18 @@ static void apply_blade_resource(GameState *g, const AbilityEffect *e, int kind,
             for(int q=0;q<RB_STAGE_SIZE;q++){
                 int cid=P->stage[q];
                 if(cid==RB_EMPTY_SLOT) continue;
-                grant_blade(g,cid,blades_to_add);
+                grant_blade(g,cid,blades_to_add,e->text);
                 push_temporary_effect(g,cid,dur,blades_to_add,NULL);
             }
         } else if(pos){
             int idx=rb_stage_position_index(pos);
             int cid=(idx>=0)?g->p[who].stage[idx]:RB_EMPTY_SLOT;
             if(cid!=RB_EMPTY_SLOT){
-                grant_blade(g,cid,blades_to_add);
+                grant_blade(g,cid,blades_to_add,e->text);
                 push_temporary_effect(g,cid,dur,blades_to_add,NULL);
             }
         } else if(extra_int(e,"target_count",-1)<0 && !extra_true(e,"exclude_self")){
-            grant_blade(g,activating,blades_to_add);
+            grant_blade(g,activating,blades_to_add,e->text);
             push_temporary_effect(g,activating,dur,blades_to_add,NULL);
         }
         return;
@@ -568,7 +614,7 @@ static void apply_blade_resource(GameState *g, const AbilityEffect *e, int kind,
     if(!(g->n_selected_cards>0 && !e->source) && !is_all && final_count<n_targets)
         lim = final_count;
     for(int i=0;i<lim;i++){
-        grant_blade(g,targets[i],blades_to_add);
+        grant_blade(g,targets[i],blades_to_add,e->text);
         push_temporary_effect(g,targets[i],dur,blades_to_add,NULL);
     }
 }
@@ -587,24 +633,80 @@ static void apply_heart_resource(GameState *g, const AbilityEffect *e, int kind,
             int idx=rb_stage_position_index(pos);
             int cid=(idx>=0)?g->p[who].stage[idx]:RB_EMPTY_SLOT;
             if(cid!=RB_EMPTY_SLOT)
-                apply_heart_to_card(g,cid,colors,counts,n_dist,is_negative,dur);
+                apply_heart_to_card(g,cid,colors,counts,n_dist,is_negative,dur,e->text);
         } else if(tc<0 && (!eff_extra(e,"exclude_self") ||
                            (e->target && !strcmp(e->target,"self")))){
-            apply_heart_to_card(g,activating,colors,counts,n_dist,is_negative,dur);
+            apply_heart_to_card(g,activating,colors,counts,n_dist,is_negative,dur,e->text);
         }
         return;
     }
     if(is_self_target){
-        apply_heart_to_card(g,activating,colors,counts,n_dist,is_negative,dur);
+        apply_heart_to_card(g,activating,colors,counts,n_dist,is_negative,dur,e->text);
         return;
     }
     int lim = (is_all || extra_true(e,"multiple_targets")) ? n_targets
             : (final_count < n_targets ? final_count : n_targets);
     for(int i=0;i<lim;i++)
-        apply_heart_to_card(g,targets[i],colors,counts,n_dist,is_negative,dur);
+        apply_heart_to_card(g,targets[i],colors,counts,n_dist,is_negative,dur,e->text);
 }
 
-/* ─────────────────────── h_gain_heart_colors_from_selected_card ───────────────── */
+/* Rust `card_matches_characters(&card_db, tid, effect.characters_any())`
+   (resource.rs:668-671), applied with the SAME rule this file already uses for
+   every other `characters` filter (misc.c:374-377): the decoded `characters` is
+   one comma-joined extra, so it is handed to rb_card_matches_characters whole.
+   That is deliberately NOT a split-and-accept-any compare -- see the note at
+   misc.c:355-372: switching this class of filter to any-of-list made 5 cases in
+   parity_gain_delta / parity_blades2 RED in the file-isolated A/B, because those
+   suites pin a REJECTION that depends on the whole-CSV compare. util.c's matcher
+   is a loose port for that reason and is not this change's to fix.
+   `characters_any()` is None when the field is absent and util.rs's matcher
+   treats None as "no restriction", which the caller expresses by not calling. */
+static int misc_card_matches_character_csv(int cid, const char *csv)
+{
+    if(!csv || !*csv) return 1;
+    const char *names[1];
+    names[0] = csv;
+    return rb_card_matches_characters(cid, names, 1);
+}
+
+/* ─────────────────────── h_gain_heart_colors_from_selected_card ─────────────────
+   Rust resource.rs:648-736 `gain_heart_colors_from_selected_card`. Three
+   differences from the version that stood here, each transcribed:
+
+   1. THE TARGET SET IS FILTERED. resource.rs:658-675:
+          let target_ids: Vec<i16> = {
+              let target_str = effect.target_name().to_string();
+              let player = gs.resolve_target_player_mut(&target_str);
+              player.stage.stage.iter().cloned()
+                  .filter(|&tid| tid != -1
+                      && crate::ability::util::card_matches_characters(
+                             &card_db, tid, effect.characters_any().map(|v| &**v)))
+                  .collect()
+          };
+      The C looped over EVERY stage slot, so a 「〜のカードに」 narrowing on the
+      effect was ignored and hearts went to members the cost did not name.
+
+   2. THE COLOURS ARE DEDUPED. resource.rs:694 iterates
+      `base_heart.hearts.keys()` -- a MAP, so each distinct base-heart colour is
+      visited once. The C iterated the base-slice positions, so a print carrying
+      the same colour twice in its base slice was credited twice.
+
+   3. THE TRACE SOURCE IS THE TARGET CARD, NOT THE ACTIVATING CARD.
+      resource.rs:701-708:
+          gs.mods.add_heart_modifier_with_trace(
+              target_id, color, 1, &mut gs.ability_applications,
+              target_id,          // <- source, unlike every other grant site
+              &effect.text,
+          );
+      grant_heart_distribution passes `gs.activating_card.unwrap_or(-1)` here, so
+      this site cannot go through apply_heart_to_card; it calls the traced twin
+      directly. That is also what closes the heart half of E13, whose two
+      gain_heart sites were recorded as "no C counterpart function at all" in
+      src/core/modifiers.c:391-393 -- the functions are right here; what was
+      missing was the traced write.
+
+   REACHABILITY: `gain_resource heart_colors_from_selected_card` is carried by
+   1 of the 3465 decoded effect nodes. */
 static int h_gain_heart_colors_from_selected_card(GameState *g, int actor,
                                                    const AbilityEffect *e){
     int who = misc_target_player(actor,e);
@@ -614,15 +716,40 @@ static int h_gain_heart_colors_from_selected_card(GameState *g, int actor,
     int selected = g->selected_cards[0];
     Card sc;
     if(!rb_decode_card_by_index((uint32_t)selected,&sc)) return 1;
+    /* resource.rs:658-675 -- the target stage, narrowed by `characters`. */
+    const char *chars = eff_extra(e,"characters");
+    int target_ids[RB_STAGE_SIZE];
+    int n_targets = 0;
+    for(int q=0;q<RB_STAGE_SIZE;q++){
+        int tid=P->stage[q];
+        if(tid==RB_EMPTY_SLOT) continue;
+        if(chars && *chars && !misc_card_matches_character_csv(tid, chars)) continue;
+        target_ids[n_targets++] = tid;
+    }
+    /* resource.rs:692-731 -- `base_heart.hearts.keys()`: each DISTINCT base
+     * colour once, applied to every target. */
+    int seen[8]; int n_seen = 0;
     for(int h=0; h<sc.n_hearts && h<sc.num_base; h++){
         int color = sc.heart_color[h];
         if(color<0 || color>7) continue;
-        for(int q=0;q<RB_STAGE_SIZE;q++){
-            int tid=P->stage[q];
-            if(tid==RB_EMPTY_SLOT) continue;
-            int c1[1]={color}, n1[1]={1};
-            apply_heart_to_card(g,tid,c1,n1,1,0,dur);
+        int dup=0;
+        for(int k=0;k<n_seen;k++) if(seen[k]==color){dup=1;break;}
+        if(dup) continue;
+        if(n_seen<8) seen[n_seen++]=color;
+        for(int q=0;q<n_targets;q++){
+            int tid = target_ids[q];
+            /* source = the TARGET card (resource.rs:705), unlike every other
+             * grant site, which attributes to gs.activating_card. */
+            rb_mods_add_heart_with_trace(&g->mods, tid, color, 1, tid, e->text);
         }
+    }
+    if(dur != RB_TEMP_PERM && n_targets > 0){
+        /* The revert ledger: one entry per credited card. resource.rs:715-729
+         * pushes a `live_end` temporary EFFECT per (target, colour); the C's
+         * carrier is the temp-effect array apply_heart_to_card fills, and this
+         * effect's duration decides whether a revert is registered at all. */
+        for(int q=0;q<n_targets;q++)
+            push_temporary_effect(g, target_ids[q], dur, 0, NULL);
     }
     rb_free_card(&sc);
     return 1;
@@ -644,9 +771,18 @@ static int h_gain_heart_all_type(GameState *g, int actor, const AbilityEffect *e
     if(card_id<0) card_id=s_activating_card;
     if(card_id<0) return 1;
     int amount = e->count>0 ? e->count : 1;
-    int c1[1]={RB_HEART_ALL}, n1[1]={amount};
-    apply_heart_to_card(g,card_id,c1,n1,1,0,
-                        duration_is_temporary(e)?effect_duration(e):RB_TEMP_PERM);
+    /* push_temporary_effect copies EIGHT int heart slots, so the revert ledger
+     * entry needs an 8-wide array even though only the All slot is set. */
+    int heart[8]; memset(heart,0,sizeof heart);
+    heart[RB_HEART_ALL] = amount;
+    /* resource.rs:721 (gain_heart(All)) attributes the application to the
+     * RESOLVED CARD, not to gs.activating_card, so this one goes straight to the
+     * traced twin rather than through apply_heart_to_card. */
+    rb_mods_add_heart_with_trace(&g->mods, card_id, RB_HEART_ALL, amount,
+                                 card_id, e->text);
+    push_temporary_effect(g, card_id,
+                          duration_is_temporary(e)?effect_duration(e):RB_TEMP_PERM,
+                          0, heart);
     return 1;
 }
 
@@ -678,7 +814,13 @@ static int h_bp6_pattern(GameState *g, int actor, const AbilityEffect *e){
     int dur = duration_is_temporary(e)?effect_duration(e):RB_TEMP_PERM;
     for(int i=0;i<nd;i++){
         int amt=1;
-        apply_heart_to_card(g,activating,&distinct[i],&amt,1,0,dur);
+        /* resource.rs:332-340 (the BP6 distinct-colour branch) attributes the
+         * application to gs.activating_card and pushes BOTH a traced heart
+         * modifier and a `heart_bonus` ability application, so this site is the
+         * traced writer rather than the untraced apply_heart_to_card. */
+        rb_mods_add_heart_with_trace(&g->mods, activating, distinct[i], amt,
+                                     g->activating_card, e->text);
+        push_temporary_effect(g, activating, dur, 0, NULL);
     }
     return 1;
 }
@@ -789,10 +931,10 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
         for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==activating){on_stage=1;break;}
         if(!on_stage) return 0;
         if(kind==RB_RES_BLADE){
-            grant_blade(g,activating,blades_to_add);
+            grant_blade(g,activating,blades_to_add,e->text);
             push_temporary_effect(g,activating,dur,blades_to_add,NULL);
         } else {
-            apply_heart_to_card(g,activating,colors,counts,n_dist,is_negative,dur);
+            apply_heart_to_card(g,activating,colors,counts,n_dist,is_negative,dur,e->text);
         }
         g->queue.selected_heart_color=-1;
         rule_log_activated(g,activating,"[[log_gain_resource]]");
@@ -884,6 +1026,45 @@ static int h_discard_until_count(GameState *g, int actor, const AbilityEffect *e
 }
 
 /* ─────────────────────── h_restriction ──────────────────────────────────────── */
+/* Q280's victim list. rules.c owns the `changed_state_members` latch and has
+ * this exact arm in its copy of the restriction body
+ * (src/ability/effects/rules.c, rb_rules_execute_restriction):
+ *     -- Q280: the restriction's victims are the cards THIS ability just
+ *        moved, not the card that owns the ability. changed_state_members
+ *        takes precedence: it was populated most recently by this
+ *        ability's own steps and no move-based flow touches it. --
+ *     if (st->n_changed_state_members > 0) { ...use it, then clear it... }
+ *
+ * That copy has ZERO callers -- executor.c's `restriction` arm routes to THIS
+ * one -- so the arm the checklist found was the incomplete twin's twin. It was
+ * added here to match, and `rb_rules_take_changed_state_members` exists because
+ * RbRulesState is rules.c's file-static typedef and this file cannot name the
+ * field. Keeping it a two-call read-then-clear (rather than exposing the struct)
+ * is what preserves the Rust consume-once semantics. */
+int rb_rules_take_changed_state_members(GameState *g, int *out, int max);
+/* rules.c's own RB_RULES_MOVED_CAP (rules.c:49), repeated rather than copied:
+ * the latch there is bounded by 16 and this buffer must not be smaller. */
+#define MISC_CHANGED_STATE_MEMBERS_CAP 16
+
+/* ─────────────────────── h_restriction ────────────────────────────────────────
+   Rust restriction.rs:26 execute_restriction.
+
+   THE HANDLER FAMILY IS TRIPLICATED and this file's copy is the one that runs:
+     1. misc.c h_restriction           -- LIVE (executor.c:370, triggers.c:1207)
+     2. rules.c rb_rules_execute_restriction -- 0 callers
+     3. (the C's restriction engine tests) -- fixtures, not a handler
+   The three are NOT interchangeable, so delegating 1 to 2 would change
+   behaviour: 2 records `st->wait_immune` per member with the blade-limit filter
+   (:1881-1924) and `st->cannot_activate_members` (:1870), while 1 records
+   `g->cannot_active_cards` (:1055-1060) and none of rules.c's wait_immune list.
+   What was safe to lift was the ONE missing arm, and it is now in both.
+
+   Two further differences between this copy and rules.c's, left alone on purpose
+   because changing them is a behaviour change no Rust line demands:
+     - 1 treats "cannot_activate" as a third spelling of the cannot-active arm;
+       2 has only "cannot_activate_by_effect" and "cannot_active".
+     - 1 logs through rule_log_activated with s_activating_card; 2 logs through
+       r_log_effect with the restriction_type. */
 static int h_restriction(GameState *g, int actor, const AbilityEffect *e){
     const char *rtype = eff_extra(e,"restriction_type");
     const char *rdest = eff_extra(e,"restricted_destination");
@@ -903,6 +1084,23 @@ static int h_restriction(GameState *g, int actor, const AbilityEffect *e){
         int tgt = actor;
         if(e->target && !strcmp(e->target,"opponent")) tgt = actor^1;
         if(delayed){
+            /* Q280: prefer the cards THIS ability just changed state over, which
+             * takes precedence over the generic recently-moved fallback because
+             * the latch was populated by this ability's own steps most recently
+             * and no move-based flow touches it. */
+            int changed[MISC_CHANGED_STATE_MEMBERS_CAP];
+            int n_changed = rb_rules_take_changed_state_members(g, changed,
+                                        (int)(sizeof changed / sizeof changed[0]));
+            if(n_changed>0){
+                for(int i=0;i<n_changed;i++){
+                    if(changed[i]>=0)
+                        rb_mods_add_delayed_cannot_active(&g->mods,changed[i],1);
+                }
+                for(int i=0;i<n_changed && g->n_cannot_active_cards<RB_MAX_ZONE;i++)
+                    if(changed[i]>=0)
+                        g->cannot_active_cards[g->n_cannot_active_cards++]=changed[i];
+                return 1;
+            }
             int keyed=0;
             for(int i=0;i<g->n_recently_moved;i++){
                 int cid=g->recently_moved[i];
@@ -1036,11 +1234,55 @@ static int h_choose_required_hearts(GameState *g, int actor, const AbilityEffect
     return 1;
 }
 
-/* ─────────────────────── h_choose_target_player ─────────────────────────────── */
+/* ─────────────────────── h_choose_target_player ───────────────────────────────
+   Rust engine/src/ability/effects/selection.rs:211-234:
+       pub(crate) fn execute_choose_target_player(&mut self, gs, effect) {
+           self.owner.executing = Some(effect.clone());
+           let options = effect.choice_options_any().cloned()
+               .unwrap_or_else(|| vec!["自分".to_string(), "相手".to_string()]);
+           self.awaiting.choice = Some(Choice::SelectTarget {
+               target: "self_or_opponent".to_string(),
+               description: "Choose self or opponent".to_string(),
+               description_en: Some("Choose self or opponent".to_string()),
+               description_ja: Some("自分または相手を選択".to_string()),
+               allow_skip: false,
+               options: Some(options.to_vec()),
+           });
+           if crate::core::runtime_flags::logging_enabled() {
+               let pp = self.player_prefix(gs);
+               gs.push_rule_log_fmt(format_args!("{}: ターゲットプレイヤー選択", pp));
+           }
+           Ok(())
+       }
+
+   `allow_skip: false` is a LITERAL, not `effect.optional`. The C passed
+   `e->is_optional ? 1 : 0`, so the 2 corpus choose_target_player effects that
+   carry `optional` offered a SKIP the prompt never has: answering it with a skip
+   leaves the continuation's chosen seat unset. Fixed here.
+
+   The two checklist claims that this function does NOT move, with the Rust that
+   settles both:
+     - "hardcodes count=1". Rust's `Choice::SelectTarget` carries no count at
+       all; `rb_emit_choice`'s `count` argument is meaningless for
+       RB_CHOICE_SELECT_TARGET, so 1 is as faithful as any value.
+     - "never walks e->child". Rust does not walk children here either. The
+       effect is STRUCTURAL (executor.c:37-52): `effects/mod.rs` routes it
+       through `normalized_sequential_steps` only for Sequential /
+       LookAndSelect, so for ChooseTargetPlayer the ROOT is dispatched first and
+       its steps run ONCE afterwards via the continuation the choice parks.
+       Walking e->child here would run the six corpus instances' steps twice.
+
+   NOT LANDED, because it needs a field this test does not own: Rust publishes
+   `options: effect.choice_options_any()`, carried by 10 of the corpus's
+   choose_target_player nodes. RbChoice (include/rabuka.h:952-979) has no options
+   array. See the checklist report for the exact BLOCKED-ON declaration. */
 static int h_choose_target_player(GameState *g, int actor, const AbilityEffect *e){
     if(g->queue.resume_active) return 1;
     rb_emit_choice(g,actor,RB_CHOICE_SELECT_TARGET,NULL,NULL,1,
-                   e->is_optional?1:0,"self_or_opponent");
+                   0,"self_or_opponent");   /* selection.rs:226 `allow_skip: false` */
+    rb_choice_set_bilingual_descriptions(&g->queue.pending,
+        "Choose self or opponent",
+        "\xE8\x87\xAA\xE5\x88\x86\xE3\x81\x88\xE3\x81\x9F\xE3\x81\xAF\xE6\x89\x8B\xE3\x82\x92\xE9\x81\xB8\xE6\x8A\x9E");
     rb_queue_pause_for_choice(g, &g->queue.pending);
     g->queue.resume_mode = 0;
     g->queue.resume_host = s_activating_card;
@@ -1048,67 +1290,41 @@ static int h_choose_target_player(GameState *g, int actor, const AbilityEffect *
     return 1;
 }
 
-/* ─────────────────────── h_custom (execute_custom) ──────────────────────────── */
-static int h_custom(GameState *g, int actor, const AbilityEffect *e){
-    /* 1) Deck reordering: placement_order=any_order → route as move_cards
-       (Rust custom.rs:23-34 tests `placement_order_any() ==
-       Some(PlacementOrder::AnyOrder)`, i.e. an exact string match. The
-       `extra_true(e,"placement_order")` disjunct that used to sit here fired
-       on ANY "true"/"1" value and is not a Rust branch.) */
-    (void)actor;
-    if(eff_extra(e,"placement_order") &&
-       !strcmp(eff_extra(e,"placement_order"),"any_order")){
-        /* Rust custom.rs:24-33 clones the WHOLE effect
-           (`let mut routed = effect.clone()`) and only then rewrites
-           action/source/destination. Building a near-empty struct here lost
-           `count` (and the selection filters), so the routed move_cards ran
-           with count=0 and moved nothing. Carry the fields the routed
-           move_cards actually reads; the extras array is shared exactly as
-           the previous hand-copy shared it. */
-        AbilityEffect routed;
-        memset(&routed,0,sizeof routed);
-        routed.action = "move_cards";
-        routed.source      = e->source      ? e->source      : (char *)"looked_at";
-        routed.destination = e->destination ? e->destination : (char *)"deck_top";
-        routed.count         = e->count;
-        routed.target        = e->target;
-        routed.is_optional   = e->is_optional;
-        routed.distinct_flag = e->distinct_flag;
-        routed.per_unit      = e->per_unit;
-        memcpy(routed.card_type_field, e->card_type_field, sizeof routed.card_type_field);
-        memcpy(routed.self_target_field, e->self_target_field, sizeof routed.self_target_field);
-        for(int i=0;i<e->n_extra && i<RB_MAX_EXTRA;i++){
-            routed.extra_k[i]=e->extra_k[i];
-            routed.extra_v[i]=e->extra_v[i];
-        }
-        routed.n_extra = e->n_extra;
-        rb_effect_move_cards(g, actor, &routed);
-        return 1;
-    }
+/* ── DELETED: h_custom ────────────────────────────────────────────────────────
+   A THIRD copy of Rust's `AbilityResolver::execute_custom`
+   (engine/src/ability/effects/dispatch.rs:238-287), and the copy that used to
+   run. It is deleted because it is now UNREACHABLE, which was established by
+   walking all three of this table's callers:
 
-    /* 2) Complex conditional scoring / gain_ability: has duration */
-    if(eff_extra(e,"duration")){
-        rb_gain_ability(g, actor, (AbilityEffect *)e);
-        return 1;
-    }
+     1. src/ability/effects/executor.c:379-409 -- the `custom` dispatch arm calls
+        rb_execute_custom_effect DIRECTLY (custom.c) and no longer falls through
+        to execute_misc.
+     2. src/ability/effects/misc.c both_dispatch_arm (:1848-1869) routes to this
+        table only when `!rb_executor_has_executor(arm->action)`, and `custom` IS
+        in that table (executor.c:33 `{"custom", 0}`), so a `target: "both"`
+        custom effect goes to the executor, not here.
+     3. src/turn/triggers.c:1207-1208 calls rb_execute_misc_effect under
+        `!strcmp(e->action, "restriction")` only.
 
-    /* Unhandled custom action: log */
-    {
-        const char *pp = player_prefix(g, s_activating_card);
-        char act_name[96]; act_name[0]=0;
-        if(s_activating_card>=0){
-            Card c;
-            if(rb_decode_card_by_index((uint32_t)s_activating_card,&c)){
-                if(c.name){strncpy(act_name,c.name,sizeof act_name-1);act_name[sizeof act_name-1]=0;}
-                rb_free_card(&c);
-            }
-        }
-        char line[256];
-        snprintf(line,sizeof line,"%s %s: [[log_custom_effect]]",pp,act_name);
-        rb_log_push_verdict(line,"rule_log",1);
-    }
-    return 1;
-}
+   The copy that survives is custom.c's rb_execute_custom_effect, and it is
+   strictly more faithful than what stood here:
+
+     - it DEEP-CLONES the effect before rewriting action/source/destination,
+       which is `let mut routed = effect.clone()` (dispatch.rs:240). This copy
+       hand-built a near-empty struct, so `count` was 0 and the routed
+       move_cards moved nothing.
+     - it holds the clone in a PINNED keep-alive pool for the duration of the
+       call. This copy handed rb_effect_move_cards the address of a STACK struct,
+       and the mover parks that pointer in `queue.resume_eff` (move.c:687), so
+       every deck-reordering custom effect left a dangling pointer that choice.c
+       read back after this frame was gone. That is the use-after-free F1 was
+       opened for, and it is why the promotion had to fix the lifetime BEFORE
+       flipping the dispatcher.
+
+   Rust's own reachability, for the record: `ActionType::Custom` decodes to the
+   literal "custom" (enums.rs:469) and 0 of the 2116 card-ability pairs decode
+   to that action, so neither copy runs on the corpus today. The deletion is
+   about removing the reachable-but-wrong twin, not about corpus behaviour. */
 
 /* ─────────────────────── h_play_baton_touch ─────────────────────────────────── */
 static int h_play_baton_touch(GameState *g, int actor, const AbilityEffect *e){
@@ -1514,8 +1730,41 @@ static int h_choice(GameState *g, int actor, const AbilityEffect *e){
 
 /* ─────────────────────── rb_effect_pay_cost_all_discard ─────────────────────── */
 int rb_effect_pay_cost_all_discard(GameState *g, int actor, const AbilityEffect *e){
+    if(!g) return 0;
     int who = actor;
-    if(e->target && (!strcmp(e->target,"opponent")||!strcmp(e->target,"p2")))
+    /* A MISSING cost is "self", never a crash.
+     *
+     * Rust, cost/handlers.rs:1683-1695 (`handle_pay_cost_all_discard`, the tree
+     * I read on 2026-10-04):
+     *
+     *     let cost = gs.ability_queue.current_entry().and_then(|e| e.ability.cost.clone());
+     *     let target_str = cost.as_ref().and_then(|c| c.target.as_deref()).unwrap_or("self");
+     *     let source     = cost.as_ref().and_then(|c| c.source_str()).unwrap_or("hand");
+     *     let player = gs.resolve_target_player_mut(target_str);
+     *
+     * `unwrap_or("self")` is the whole rule: a cost that is absent (no queue
+     * entry, or an entry with no cost) still discards the ACTOR's hand. The C
+     * had `if(e->target && ...)` with no `e` guard at all, and its only caller
+     * that can pass NULL is rb_handle_pay_cost_all_discard (cost.c:2371-2374),
+     * which forwards `rb_entry_cost(g)`. That is NULL on the 登場 path, which
+     * resolves the ability INLINE and never mints a queue entry
+     * (engine.c:861-931 parks ab.effect in queue.deferred and n_entries stays
+     * 0 — the engine's own trace prints `cur=0 n=0`), so `rb_entry_current_target`
+     * fails and `rb_entry_cost` returns NULL. The very first statement of this
+     * function therefore dereferenced NULL and took the process down with
+     * SIGSEGV: tests/test_parity_look_per_card.c `n_tomari_accept_6` and
+     * `n_tomari_empty_hand`, both on the newly-routed
+     * `pay_cost_all:discard_all` prompt (PL!SP-bp7-011-R / -P, ability #0).
+     *
+     * Two prompts deep: the 登場 prompt is answered, the engine opens the
+     * next one, and the answer to THAT one is what runs this arm.
+     *
+     * `rb_effect_gain_surplus_heart` two functions below (misc.c:1746) already
+     * spells the guard `if(!g||!e) return;`; this was the outlier in the same
+     * table (and the same table entry, misc.c:2301, that routes the named
+     * effect here). `e &&` costs one compare and reproduces Rust's
+     * `unwrap_or("self")` exactly: with no cost the actor's own hand goes. */
+    if(e && e->target && (!strcmp(e->target,"opponent")||!strcmp(e->target,"p2")))
         who = actor^1;
     RbPlayer *P=&g->p[who];
     while(P->hand.n>0){
@@ -1824,7 +2073,8 @@ static void both_set_spawn_target(GameState *g, const char *target){
    never both hold. Only the `primary_effect` half can fire, and that is the
    shape that keeps a compound wrapper from being split in two when its primary
    effect already runs opponent-first through execute_move_cards_both
-   (engine/src/ability/move_cards.rs:3411-3445). The dead half is kept anyway:
+   (engine/src/ability/effects/move/mod.rs:3521-3554
+   `execute_move_cards_both`). The dead half is kept anyway:
    matching Rust's predicate exactly is what makes the live half the only one
    that can decide, which is the whole point of the check. */
 static int is_multi_target_move_cards_to_deck(const AbilityEffect *e){
@@ -2070,7 +2320,17 @@ int rb_execute_misc_effect(GameState *g, int actor, const RbPlayer *self,
         else if (!strcmp(name,"activation_restriction"))     r=h_activation_restriction(g,actor,e);
         else if (!strcmp(name,"choose_required_hearts"))     r=h_choose_required_hearts(g,actor,e);
         else if (!strcmp(name,"choose_target_player"))       r=h_choose_target_player(g,actor,e);
-        else if (!strcmp(name,"custom"))                     r=h_custom(g,actor,e);
+        /* NO `custom` ARM, on purpose. It was the third copy of Rust's
+           execute_custom and the only one that ran; executor.c:379-409 now calls
+           custom.c's rb_execute_custom_effect directly, `custom` is in
+           rb_executor_has_executor's table (executor.c:33) so both_dispatch_arm
+           never routes here, and triggers.c only calls this table under
+           `action == "restriction"`. Deleting the arm rather than leaving it to
+           fall into `else r = 0` is deliberate: a `custom` effect that somehow
+           reached this table used to get WRONG behaviour (a stack pointer parked
+           in resume_eff) and now gets the honest "unhandled" answer, which is
+           what every other unclaimed action already gets. See the tombstone above
+           h_play_baton_touch for the full unreachability argument. */
         else if (!strcmp(name,"gain_surplus_heart"))         { rb_effect_gain_surplus_heart(g,actor,e); r=1; }
         else if (!strcmp(name,"pay_cost_all:discard_all"))   r=rb_effect_pay_cost_all_discard(g,actor,e);
         else r=0;

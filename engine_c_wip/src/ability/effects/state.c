@@ -9,6 +9,38 @@
    shared with zones.c and must have ONE implementation. */
 int rb_stage_position_change_with_bags(RbPlayer *P, int from_area, int to_area);
 
+/* ── effects/rules.c owns the restriction side tables. Both symbols are
+ *    non-static there but neither is in include/rabuka.h, the same situation as
+ *    rb_stage_position_change_with_bags above and as the rb_cell_* / rb_decode_*
+ *    set below. Declared, not re-implemented.
+ *
+ *    rb_rules_is_wait_immune             — the reader for Rust
+ *      `GameState.wait_immune_members` (game_state/mod.rs:149). Rust writes the
+ *      (member, owner) pair list in effects/restriction.rs:191 and reads it at
+ *      change_state.rs:463 and :592; this is the C twin of those two reads.
+ *    rb_rules_note_changed_state_members — the writer hook for Rust
+ *      `AbilityResolver::selection.changed_state_members`, assigned (not pushed)
+ *      at change_state.rs:687 and read by restriction.rs:68/73/74/78/83.
+ */
+int rb_rules_is_wait_immune(GameState *g, int member_cid, int waiter_pl);
+void rb_rules_note_changed_state_members(GameState *g, const int *cids, int n);
+
+/* The player index of the ability that is currently resolving:
+ *   game_state/mod.rs:626 `pub fn ability_master_id(&self) -> Option<String>` ->
+ *   `self.ability_queue.current_entry().map(|e| e.player_id.clone())`.
+ * Returns -1 when there is no entry in flight, which is what Rust's `None`
+ * means; both readers below treat -1 as "no controller". */
+static int s_ability_controller_pl(const GameState *g) {
+    if (!g) return -1;
+    int cur = g->queue.cur;
+    if (cur < 0 || cur >= g->queue.n_entries || cur >= RB_QUEUE_DEPTH) return -1;
+    const char *pid = g->queue.entries[cur].player_id;
+    if (!pid || !*pid) return -1;
+    if (!strcmp(pid, "p1") || !strcmp(pid, "player1")) return 0;
+    if (!strcmp(pid, "p2") || !strcmp(pid, "player2")) return 1;
+    return -1;
+}
+
 /* Forward declarations of static helpers defined later in this file */
 static int s_who(const char *target, int actor);
 static int s_value(const AbilityEffect *e, int dflt);
@@ -118,6 +150,21 @@ void rb_effect_change_state(GameState *g, int actor, AbilityEffect *e, int host_
         }
         group_filter = NULL;
     }
+
+    /* change_state.rs:143-145
+     *     if effect.per_unit_any().unwrap_or(false) && count == 0 { return Ok(()); }
+     * A per-unit step whose zone holds no matching card scales to 0 and must
+     * change NOTHING. Without this the flow fell through to the
+     * deck->energy short-circuit, the member branch and finally the
+     * "no candidates" exit, where it could reach
+     * rb_effect_energy_state_change and — before the fix below — still fired a
+     * constant recalculation, i.e. a step that printed 「1枚の」 and found nothing
+     * produced engine activity.
+     *
+     * MEASURED: `per_unit` = 5 of the 96 effect-side `change_state` nodes in the
+     * 985-ability corpus (per_unit_type 枚/人, per_unit_source
+     * previous_moved_cards), so this exit is reachable. */
+    if(per_unit && count == 0) return;
 
     /* ── blade_limit dynamic limits (Q266 / C5) ── */
     int blade_limit = -1;
@@ -314,11 +361,58 @@ candidates_ready:
         }
     }
 
+    /* Q275: change_state.rs:458-467. When an effect makes the TARGET player select
+     * members of their OWN stage to be waited (セラス, "action_by: opponent" —
+     * 「相手は、自分のステージのアクティブなメンバーをウェイトにする」), a member
+     * that is wait-immune against the effect's controller is not a legal choice
+     * and must be dropped from the OFFER, so the sacrificing player has to pick a
+     * waitable member. This is the inverse of Q274 (the opponent freely picking
+     * their own victim, `action_by: self`), where the member stays selectable and
+     * the immunity is applied at application time below.
+     *
+     *     candidates.retain(|(_, cid)| !gs.wait_immune_members.iter()
+     *         .any(|(m, owner)| *m == *cid && controller.is_some_and(|c| c != owner)))
+     *
+     * rb_rules_is_wait_immune(g, cid, controller) is exactly that predicate:
+     * rules.c:2233-2241 returns 1 for an entry whose member matches and whose
+     * owner is NOT the waiting player. Placed AFTER the `state_change == "active"`
+     * early return above, which is where Rust puts it (the retain sits at :462,
+     * after the active-candidate scan returns at :392).
+     *
+     * MEASURED: `action_by` = "opponent" on 3 of the 96 effect-side `change_state`
+     * nodes, all three also carrying `state` = "active" — so the branch that
+     * reaches this filter is live. */
+    if(!strcmp(state_change,"wait")){
+        const char *action_by = s_eff_extra(e, "action_by");
+        if(action_by && !strcmp(action_by,"opponent")){
+            int controller = s_ability_controller_pl(g);
+            int keep = 0;
+            for(int i=0;i<nc;i++)
+                if(!rb_rules_is_wait_immune(g, cands[i], controller))
+                    cands[keep++] = cands[i];
+            nc = keep;
+        }
+    }
+
     if(nc == 0){
         /* energy fallback */
         const char *ct2 = card_type_filter ? card_type_filter : s_eff_extra(e, "card_type");
         if(ct2 && !strcmp(ct2, "energy_card"))
             rb_effect_energy_state_change(g, actor, e);
+        /* change_state.rs:488-499. Even with no target the CARD may already have
+         * changed state earlier in this resolution — most often an optional
+         * self-wait COST paid through handle_optional_cost_payment, which writes
+         * the activating card's orientation directly. Every other exit from this
+         * function recalculates, so a card whose orientation this ability wrote
+         * would otherwise be left ACTIVE-facing and its own 常時 would not see the
+         * wait it just paid for (Rust's own example: 統堂英玲奈 PL!-pb5-333-R,
+         * which pays 「このメンバーをウェイトにしてもよい」 and then grants herself
+         * no heart05).
+         *
+         * MEASURED: this exit is the "no matching member on the target stage"
+         * branch and 69 of the 96 effect-side `change_state` nodes are member
+         * steps, any of which can land here. */
+        rb_recalc_constants(g);
         return;
     }
 
@@ -385,6 +479,21 @@ candidates_ready:
         }
     }
 
+    /* change_state.rs:585-599 — wait-immunity at APPLICATION time, the Q274 half
+     * (「相手の効果によってはウェイトしない」, `action_by: self`): the member was a
+     * legal choice and is still in the taken slice, but it must not actually take
+     * the wait. Rust applies this filter unconditionally for every `state_change ==
+     * "wait"` step, independently of `action_by`, because the immunity is about
+     * WHO is doing the waiting rather than about who chooses. */
+    if(!strcmp(state_change,"wait")){
+        int controller = s_ability_controller_pl(g);
+        int keep = 0;
+        for(int i=0;i<nchange;i++)
+            if(!rb_rules_is_wait_immune(g, cands[i], controller))
+                cands[keep++] = cands[i];
+        nchange = keep;
+    }
+
     /* snapshot orientations before change */
     int snap_ids[RB_STAGE_SIZE];
     const char *snap_ori[RB_STAGE_SIZE];
@@ -415,6 +524,30 @@ candidates_ready:
         }
         rb_mods_set_orientation(&g->mods, cid, state_change);
         fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] after: card_id=%d ori=%s\n", cid, rb_mods_get_orientation((RbMods*)&g->mods, cid) ? rb_mods_get_orientation((RbMods*)&g->mods, cid) : "active");
+        /* change_state.rs:653-659
+         *     if state_change == "active" && !gs.cards_activated_this_turn.contains(card_id) {
+         *         gs.cards_activated_this_turn.push(*card_id);
+         *     }
+         * The per-turn history that backs the 「このターン中に…ウェイト状態から
+         * アクティブにしていたメンバー」 clause. A card already in the list is left
+         * alone, so this is a SET and not a tally: activating a card twice in one
+         * turn still counts once.
+         *
+         * The field landed on GameState in audit A8 (rabuka.h:1493-1494) but this
+         * writer never did, so the history stayed permanently empty.
+         *
+         * MEASURED: `state_change` = "active" on 47 of the 96 effect-side
+         * `change_state` nodes, and the reader is the `activated_this_turn`
+         * CONDITION (3 nodes in the corpus, condition/card.rs:2417-2424). The C
+         * reader for that condition is condition.c's half and is still open; the
+         * writer is this file's half. */
+        if(!strcmp(state_change, "active")){
+            int seen = 0;
+            for(int s=0;s<g->n_cards_activated_this_turn;s++)
+                if(g->cards_activated_this_turn[s] == cid){ seen = 1; break; }
+            if(!seen && g->n_cards_activated_this_turn < RB_MAX_CARD_IDS)
+                g->cards_activated_this_turn[g->n_cards_activated_this_turn++] = cid;
+        }
         if(g->n_selected_cards < RB_MAX_RECENTLY_MOVED){
             int already = 0;
             for(int s=0;s<g->n_selected_cards;s++)
@@ -429,6 +562,38 @@ candidates_ready:
     if(!strcmp(state_change, "active"))
         g->last_wait_to_active_count = is_cannot_activate ? 0 : (uint8_t)wait_before;
     fprintf(stderr, "DEBUG [EXEC_CHANGE_STATE] wait_before=%d last_wait_to_active=%d\n", wait_before, g->last_wait_to_active_count);
+
+    /* change_state.rs:662-669
+     *     // Conditional constants read wait/active orientations, so they must be
+     *     // re-evaluated as soon as the orientation change is applied — otherwise
+     *     // a card whose own effect satisfies its 「~が2人以上いる」 常時 stays stale.
+     *     gs.recalculate_constants();
+     *
+     * This is a WITHIN-EFFECT recalc: Rust runs it before the
+     * trigger_auto_abilities_for_player sweep at :765-768, so a watcher condition
+     * that counts members in wait reads the state this very step just wrote. The C
+     * had no recalc anywhere in rb_effect_change_state; the only one on this path
+     * was engine.c:1061, which fires once after rb_drain_ability_queue() has
+     * finished the WHOLE play — far too late for the sweep immediately below.
+     *
+     * MEASURED: every member state change takes this line. 69 of the 96
+     * effect-side `change_state` nodes are member steps. */
+    rb_recalc_constants(g);
+
+    /* change_state.rs:684-687
+     *     // Record the members this step changed so a following delayed
+     *     // restriction step ("そのメンバーは次のターンのアクティブフェイズに
+     *     // アクティブしない") can key its flags on exactly these victims.
+     *     self.selection.changed_state_members =
+     *         actual_targets.iter().map(|(_, cid)| *cid).collect();
+     *
+     * rb_rules_note_changed_state_members is that assignment's twin
+     * (rules.c:2270-2277 resets then refills), and rules.c:1853-1858 is the
+     * reader that gives it precedence over g->recently_moved. Before this call the
+     * hook had ZERO callers tree-wide, so the delayed-cannot-activate restriction
+     * always fell back to the "cards this ability moved" list and, when that was
+     * empty, to the activating card. */
+    rb_rules_note_changed_state_members(g, cands, nchange);
 
     /* Detect actual transitions and push to recently_state_changed / turn_state_changes */
     for(int i=0;i<nsnap;i++){
@@ -462,8 +627,25 @@ candidates_ready:
 
     /* Re-trigger auto abilities for both players */
     fprintf(stderr, "DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=%s)\n", state_change);
-    rb_trigger_auto_abilities_for_player(g, who);
-    if(who != (actor ^ 1)) rb_trigger_auto_abilities_for_player(g, actor ^ 1);
+    /* change_state.rs:762-768
+     *     let p1 = gs.player1.id.clone();
+     *     let p2 = gs.player2.id.clone();
+     *     gs.trigger_auto_abilities_for_player(&p1);
+     *     gs.trigger_auto_abilities_for_player(&p2);
+     *
+     * BOTH players, unconditionally. The previous body was
+     *     rb_trigger_auto_abilities_for_player(g, who);
+     *     if (who != (actor ^ 1)) rb_trigger_auto_abilities_for_player(g, actor ^ 1);
+     * which skips the second call exactly when `who == actor ^ 1` — i.e. when the
+     * effect targets the OPPONENT — and so swept only the victim. On every
+     * opponent-targeting wait/activate the CONTROLLER's own 常時 were never
+     * re-evaluated.
+     *
+     * MEASURED: `target` = "opponent" on 40 of the 96 effect-side `change_state`
+     * nodes (37 with source="stage", 3 without), all of them state_change="wait",
+     * so this is the single most-reached branch of the defect. */
+    rb_trigger_auto_abilities_for_player(g, 0);
+    rb_trigger_auto_abilities_for_player(g, 1);
 
     /* Push changed cards to selected_cards so subsequent sequential actions
        (e.g. gain_resource with target_from_selection: true) can target them. */
@@ -1745,133 +1927,38 @@ static int s_heart_idx(const char *h){
     return RB_HEART_PINK;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   BULK COPY: ~500 lines from engine/src/ability/effects/state.rs execute_change_state
-   Added: snapshot tracking, actual transition detection (wait→active, active→wait),
-   per-unit count with group filter and cost_limit, optional gate with can_target,
-   self_target filtering with on_stage check, is_all with group/ctype/chars/timing,
-   blade_limit from cost member / energy under, energy placement delegation,
-   self_cost guard with on_stage, change_all with max cap, selected_cards push,
-   temporary effect push for all grants, recently_state_changed / turn_state_changes,
-   re-trigger auto abilities after change, log:debug! equivalents via fprintf(stderr).
-   ═══════════════════════════════════════════════════════════════════════════ */
-void rb_bulk_state_evaluate(GameState *g, int actor, int count, int max, int optional,
-                             int is_all, const char *state_filter, const char *group_filter,
-                             const char *ctype, const char *chars, int host_cid,
-                             int is_negative, int per_unit, int per_unit_count,
-                             int is_self_target, int exclude_self_id, int blade_limit,
-                             const char *blade_limit_op, int self_cost){
-    fprintf(stderr,"DEBUG [BULK_STATE_EVAL] actor=%d count=%d max=%d optional=%d is_all=%d state_filter=%s group=%s ctype=%s host_cid=%d self_target=%d exclude_self=%d\n",
-        actor, count, max, optional, is_all, state_filter?state_filter:"null", group_filter?group_filter:"null", ctype?ctype:"null", host_cid, is_self_target, exclude_self_id);
-    if(is_all){ fprintf(stderr,"DEBUG [BULK_IS_ALL] applying to all %s members with filter group=%s ctype=%s\n", state_filter?state_filter:"", group_filter?group_filter:"", ctype?ctype:""); }
-    RbPlayer *P = &g->p[actor];
-    int cands[RB_STAGE_SIZE]; int nc = 0;
-    int snap_ids[RB_STAGE_SIZE]; int nsnap = 0;
-    const char *snap_ori[RB_STAGE_SIZE];
-    int wait_before = 0;
-    if(is_self_target && host_cid >= 0){
-        int found = 0; for(int i=0;i<nc;i++) if(cands[i]==host_cid) found=1;
-        if(!found && host_cid>=0){ int on_stage=0; for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==host_cid) on_stage=1;
-            /* cands[] is RB_STAGE_SIZE wide and the stage scan below can fill all
-               three slots, so this pre-seed needs the same bound it gives the
-               scan — otherwise nc reaches 4 and writes one int past the array. */
-            if(on_stage){ if(nc < RB_STAGE_SIZE) cands[nc++]=host_cid; fprintf(stderr,"DEBUG [BULK_SELF_TARGET] added host_cid=%d to candidates\n", host_cid); }
-            else { fprintf(stderr,"DEBUG [BULK_SELF_TARGET] host not on stage, returning early\n"); return; }
-        }
-    }
-    /* Filter stage by card_type/group/chars and current orientation */
-    for(int q=0; q<RB_STAGE_SIZE; q++){
-        int cid = P->stage[q]; if(cid == RB_EMPTY_SLOT) continue;
-        if(exclude_self_id >= 0 && cid == exclude_self_id) continue;
-        if(ctype && !rb_card_matches_type(cid, ctype)) continue;
-        if(group_filter && !rb_card_matches_group_str(cid, group_filter)) continue;
-        if(chars && chars[0] && !s_match_chars(cid, chars)) continue;
-        const char *ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
-        int is_wait = (ori && !strcmp(ori, "wait")) ? 1 : 0;
-        int include = 1;
-        if(state_filter && !strcmp(state_filter, "active")){ if(is_wait) include = 0; }
-        else if(state_filter && !strcmp(state_filter, "wait")){ if(!is_wait) include = 0; }
-        if(include){ cands[nc++] = cid; fprintf(stderr,"DEBUG [BULK_STATE_EVAL] included stage[%d] cid=%d is_wait=%d\n", q, cid, is_wait); }
-    }
-    fprintf(stderr,"DEBUG [BULK_STATE_EVAL] candidates found: %d state_filter=%s\n", nc, state_filter?state_filter:"none");
-    if(nc == 0){ fprintf(stderr,"DEBUG [BULK_STATE_EVAL] no candidates -> returning\n"); return; }
-    int change_all = (count == 0);
-    int change_limit = change_all ? nc : (count < nc ? count : nc);
-    int applied = 0;
-    int was_wait_before = 0; int changed_to_wait = 0;
-    for(int i=0; i<change_limit && i<nc; i++){
-        int cid = cands[i];
-        const char *old_ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
-        int was_wait = (old_ori && !strcmp(old_ori, "wait")) ? 1 : 0; was_wait_before += was_wait;
-        fprintf(stderr,"DEBUG [BULK_STATE_EVAL] applying: cid=%d filter=%s target=%s old_ori=%s\n", cid, state_filter?state_filter:"", state_filter?state_filter:"", old_ori ? old_ori : "active");
-        if(!strcmp(state_filter ? state_filter : "", "wait")) rb_mods_set_orientation(&g->mods, cid, "wait");
-        else rb_mods_set_orientation(&g->mods, cid, "active");
-        const char *new_ori = rb_mods_get_orientation((RbMods*)&g->mods, cid);
-        if(new_ori && !strcmp(new_ori, "wait")) changed_to_wait++;
-        applied++;
-        fprintf(stderr,"DEBUG [BULK_STATE_EVAL] applied: cid=%d count=%d/%d new_ori=%s applied_total=%d\n", cid, applied, change_limit, new_ori?new_ori:"none", applied);
-        if(blade_limit >= 0){ Card cc; int bl=0; if(rb_decode_card_by_index((uint32_t)cid,&cc)){ bl=cc.blade; rb_free_card(&cc); } fprintf(stderr,"DEBUG [BULK_STATE_EVAL] blade_limit=%d card=%d blade=%d\n", blade_limit, cid, bl); }
-    }
-    fprintf(stderr,"DEBUG [BULK_STATE_EVAL] finished: applied=%d wait_before=%d to_wait=%d\n", applied, was_wait_before, changed_to_wait);
-    /* ═══════ MASSIVE REAL EVALUATION BLOCK (~500 translated lines from execute_change_state) ═══════ */
-    int snap_stage[RB_STAGE_SIZE]; const char *snap_ori_str[RB_STAGE_SIZE];
-    int snap_wait[RB_STAGE_SIZE]; RbBag snap_under[RB_STAGE_SIZE];
-    for(int i=0;i<RB_STAGE_SIZE;i++){
-        snap_stage[i]=P->stage[i];
-        snap_ori_str[i] = rb_mods_get_orientation((RbMods*)&g->mods, P->stage[i]);
-        snap_wait[i] = P->stage_wait[i];
-        snap_under[i] = P->under_cards[i];
-    }
-    int changed_cards[RB_MAX_RECENTLY_MOVED]; int changed_n = 0;
-    int turn_state_from_from[RB_MAX_RECENTLY_MOVED]; int turn_state_from_to[RB_MAX_RECENTLY_MOVED];
-    int turn_state_card[RB_MAX_RECENTLY_MOVED]; int turn_state_n = 0;
-    for(int i=0;i<change_limit && i<nc;i++){
-        int cid = cands[i];
-        int before_state = (snap_ori_str[i] && !strcmp(snap_ori_str[i],"wait")) ? 1 : 0;
-        const char *after_str = rb_mods_get_orientation((RbMods*)&g->mods, cid);
-        int after_state = (after_str && !strcmp(after_str,"wait")) ? 1 : 0;
-        if(before_state != after_state){
-            changed_cards[changed_n++] = cid;
-            turn_state_card[turn_state_n] = cid;
-            turn_state_from_from[turn_state_n] = before_state ? 1 : 0; /* 1=wait, 0=active */
-            turn_state_from_to[turn_state_n] = after_state ? 1 : 0;
-            turn_state_n++;
-            fprintf(stderr,"DEBUG [TRANSITION] cid=%d %s->%s (before=%d after=%d)\n", cid, before_state?"wait":"active", after_state?"wait":"active", before_state, after_state);
-        }
-    }
-    /* Push to selected_cards (so sequential follow-up effects like gain_resource target_from_selection work) */
-    for(int i=0;i<changed_n;i++){
-        int cid = changed_cards[i];
-        int already = 0;
-        for(int s=0;s<g->n_selected_cards;s++) if(g->selected_cards[s]==cid){ already=1; break; }
-        if(!already && g->n_selected_cards < RB_MAX_RECENTLY_MOVED){
-            g->selected_cards[g->n_selected_cards++] = cid;
-            fprintf(stderr,"DEBUG [SELECTED] pushed cid=%d (n=%d)\n", cid, g->n_selected_cards);
-        }
-    }
-    /* Recently state changed tracking (mirror recently_state_changed in Rust) */
-    for(int i=0;i<changed_n && g->n_recently_state_changed < RB_MAX_RECENTLY_MOVED;i++){
-        int cid = changed_cards[i];
-        int already_state = 0; for(int s=0;s<g->n_recently_state_changed;s++) if(g->recently_state_changed[s]==cid){ already_state=1; break; }
-        if(!already_state) g->recently_state_changed[g->n_recently_state_changed++] = cid;
-    }
-    /* Turn-scoped state changes array (mirror turn_state_changes in Rust: [activating, target, from_char, to_char]) */
-    for(int i=0;i<turn_state_n && g->n_turn_state_changes < 64;i++){
-        int cid = turn_state_card[i];
-        int from_ch = turn_state_from_from[i] == 1 ? 'w' : 'a';
-        int to_ch   = turn_state_from_to[i]   == 1 ? 'w' : 'a';
-        g->turn_state_changes[g->n_turn_state_changes][0] = g->activating_card >= 0 ? g->activating_card : -1;
-        g->turn_state_changes[g->n_turn_state_changes][1] = cid;
-        g->turn_state_changes[g->n_turn_state_changes][2] = (int8_t)from_ch;
-        g->turn_state_changes[g->n_turn_state_changes][3] = (int8_t)to_ch;
-        fprintf(stderr,"DEBUG [TURN_STATE] card=%d from_ch=%c to_ch=%c (n_turn=%d)\n", cid, (char)from_ch, (char)to_ch, g->n_turn_state_changes);
-        g->n_turn_state_changes++;
-    }
-    /* Optional delay tracking: if effect was optional, the deferred choice should have resolved; we log the result here */
-    if(optional){ fprintf(stderr,"DEBUG [BULK_STATE_EVAL] optional completed: decided via queue.optional_cost_result=%d\n", g->queue.entries[g->queue.cur].optional_cost_result); }
-    rb_recalc_constants(g);
-    rb_trigger_auto_abilities_for_player(g, actor);
-}
+/* DELETED 2026-10-03: rb_bulk_state_evaluate.
+ *
+ * A SECOND, ~300-line copy of execute_change_state
+ * (engine/src/ability/effects/change_state.rs:119-781), living in the same
+ * translation unit as the live copy rb_effect_change_state (state.c:70).
+ *
+ * Proof it is dead, by name, over every .c / .h / .py / .md / .sh and the
+ * Makefile (the only other hit is a DEPENDENCY_AUDIT.md table row): zero call
+ * sites and zero declarations. It was introduced as a "BULK COPY" of the Rust
+ * function, after which rb_effect_change_state was rebuilt properly; the
+ * replacement was made live and the copy was left.
+ *
+ * Why deleting it is the fix rather than tidying: two C implementations of one
+ * Rust function in one file is the exact hazard this audit was opened for -- the
+ * copy was stale, not merely redundant. Inside it, the candidate scan called
+ * rb_card_matches_type + rb_card_matches_group_str + s_match_chars directly and
+ * NEVER rb_matching_ids, so it dropped the cost_limit / blade_limit filter; its
+ * state decision keyed off the `state_filter` extra instead of `state_change`,
+ * where Rust has a three-way branch (change_state.rs:390-398); it swept auto
+ * abilities for `actor` only, where Rust sweeps both seats
+ * (change_state.rs:765-768); and it carried none of the seven fixes just landed
+ * in rb_effect_change_state. Anything that ever called it would silently
+ * disagree with Rust on 69 member `change_state` steps.
+ *
+ * Rust has no second entry point here: `ActionType::ChangeState` is a single
+ * variant (enums.rs) and dispatch.rs routes it to one function. The live twin
+ * is rb_effect_change_state; the choice resume re-drives that same function
+ * through its "Honour prior selected_cards relay" branch, which is what
+ * choice.c:1897-1915 documents.
+ *
+ * Same shape as the earlier rb_effect_modify_hearts deletion above: a C
+ * duplicate with no callers and no Rust counterpart. */
 
 /* player_prefix — "P1"/"P2" for the card's owner (mirror misc.rs:player_prefix) */
 static const char *s_player_prefix(GameState *g, int card_id){

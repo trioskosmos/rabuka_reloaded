@@ -66,6 +66,94 @@ fn trigger_live_start(game: &mut TestGame, filler_live: i16) {
 // ============================================================
 // BRANCH 1: Decline first optional mill → ability stops
 // ============================================================
+/// 「これにより控え室に置いたカードがライブカードの場合」 — the card THIS mill put
+/// in the waitroom, not the zone's contents.
+///
+/// Every other test in this file mills into an empty waitroom, so "was the card I
+/// just milled a live card?" and "is there a live card in the waitroom?" are the
+/// same question asked twice, and both readings of the clause answer it the same
+/// way. Seeding the waitroom first is what separates them.
+///
+/// A live card that was ALREADY in the waitroom must not wait Natsumi when the card
+/// she mills is not a live card. The clause names the card this procedure placed.
+/// Same mechanic as きなこ's `recently_moved` recovery
+/// (`baton_touch_self_to_waitroom_recovers_liella_member_pl_sp_pb2_006_test.rs`),
+/// reached here through a condition rather than a source — two cards, one rule.
+#[test]
+fn live_start_repeat_mill_blade_a_live_card_already_in_the_waitroom_does_not_wait_natsumi() {
+    let (mut game, natsumi, live_card, filler_live) = base_setup();
+    let non_live = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage[1] = natsumi;
+    // A live card in the waitroom BEFORE the ability runs. It is the only live card
+    // that will be there, and Natsumi will mill a non-live card on top of it.
+    game.state.player1.waitroom.cards.push(live_card);
+    setup_deck(&mut game, vec![non_live; 5]);
+    game.give_energy(4);
+    trigger_live_start(&mut game, filler_live);
+
+    // iter 0: mill → Yes (a non-live card), repeat → Stop
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    game.select_option(0);
+    game.drain_auto_ability_choices();
+
+    assert!(
+        game.state.mods.get_blade_modifier(natsumi) == 1,
+        "the mill still pays its blade: 「そうした場合、ブレードを得る」"
+    );
+    let orientation = game.state.mods.get_orientation_modifier(natsumi);
+    assert!(
+        orientation.is_none_or(|o| o != "wait"),
+        "the card THIS procedure milled is not a live card, so the 「これにより」 \
+         clause does not fire — the live card already in the waitroom is not \
+         「これにより控え室に置いたカード」 and must not wait her. orientation={orientation:?}"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live_card),
+        "the pre-existing live card stays in the waitroom; waitroom is {:?}",
+        game.state.player1.waitroom.cards
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&non_live),
+        "and the milled non-live card is in there too"
+    );
+}
+
+/// The converse, so the pair is a 2×2 rather than one direction: a bystander in
+/// the waitroom must not SUPPRESS the wait either.
+///
+/// Without this, a "do not wait when the waitroom already held a live card"
+/// implementation would satisfy the test above while breaking the normal case —
+/// the clause is about which card is examined, not about a veto.
+#[test]
+fn live_start_repeat_mill_blade_a_bystander_does_not_suppress_the_wait() {
+    let (mut game, natsumi, live_card, filler_live) = base_setup();
+    let non_live = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage[1] = natsumi;
+    // The bystander is NOT a live card this time, and the milled card IS.
+    game.state.player1.waitroom.cards.push(non_live);
+    setup_deck(&mut game, vec![live_card; 5]);
+    game.give_energy(4);
+    trigger_live_start(&mut game, filler_live);
+
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    game.select_option(0);
+    game.drain_auto_ability_choices();
+
+    assert_eq!(
+        game.state.mods.get_blade_modifier(natsumi),
+        1,
+        "1 blade from the mill"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(natsumi),
+        Some("wait"),
+        "the card THIS procedure milled is a live card, so she waits — a card \
+         already in the waitroom neither triggers nor blocks the clause"
+    );
+}
+
 #[test]
 fn live_start_repeat_mill_blade_decline_first_mill() {
     let (mut game, natsumi, live_card, filler_live) = base_setup();

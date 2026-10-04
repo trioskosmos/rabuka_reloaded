@@ -85,6 +85,13 @@ struct Row {
     our_supply: i32,
     our_yell: i32,
     our_required: i32,
+    // WHICH life was committed, and the colour split of both the pool it ran
+    // against and the requirement it had to meet. The whole Main phase is a
+    // colour-supply problem (see docs/BOT_GAP_ANALYSIS.md 0.4), and none of it is
+    // visible without the identity of the card and the per-colour split.
+    life_cards: String,
+    pool_colours: String,
+    req_colours: String,
     opp_supply: i32,
     opp_yell: i32,
     opp_required: i32,
@@ -428,6 +435,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             our_supply: 0,
                             our_yell: 0,
                             our_required: 0,
+                            life_cards: String::new(),
+                            pool_colours: String::new(),
+                            req_colours: String::new(),
                             opp_supply: 0,
                             opp_yell: 0,
                             opp_required: 0,
@@ -471,7 +481,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     report(&rows, games, &p1, &p2, p1_wins, p2_wins);
     if let Some(path) = csv {
         let mut out = String::from(
-            "turn,seat,lives,junk,lives_in_hand,my_success,opp_success,opp_set_size,p_pass,p_place,opp_place,opp_pass,value,margin,board_hearts,need_hearts,passed,placed,score,opp_passed,opp_placed,opp_score,our_supply,our_yell,our_required,opp_supply,opp_yell,opp_required,our_board,our_blades,opp_board,opp_blades,first_attacker,opp_set_actual\n",
+            "turn,seat,lives,junk,lives_in_hand,my_success,opp_success,opp_set_size,p_pass,p_place,opp_place,opp_pass,value,margin,board_hearts,need_hearts,passed,placed,score,opp_passed,opp_placed,opp_score,our_supply,our_yell,our_required,life_cards,pool_colours,req_colours,opp_supply,opp_yell,opp_required,our_board,our_blades,opp_board,opp_blades,first_attacker,opp_set_actual\n",
         );
         for r in &rows {
             // Built as a list rather than one 32-placeholder format string: a
@@ -500,10 +510,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (r.opp_passed as u8).to_string(),
                 (r.opp_placed as u8).to_string(),
                 r.opp_score.to_string(),
-                r.our_supply.to_string(),
-                r.our_yell.to_string(),
-                r.our_required.to_string(),
-                r.opp_supply.to_string(),
+        r.our_supply.to_string(),
+        r.our_yell.to_string(),
+        r.our_required.to_string(),
+        r.life_cards.clone(),
+        r.pool_colours.clone(),
+        r.req_colours.clone(),
+        r.opp_supply.to_string(),
                 r.opp_yell.to_string(),
                 r.opp_required.to_string(),
                 r.our_board.to_string(),
@@ -543,6 +556,31 @@ fn resolve(pending: &mut Vec<Pending>, gs: &GameState, rows: &mut Vec<Row>) {
                 .iter()
                 .map(|l| l.required.iter().map(|v| i32::from(*v)).sum::<i32>())
                 .sum();
+            // Indices 1..=6 are the six specific colours; 0 is Heart00 and 7 the
+            // ALL wildcard, so they are excluded from "coloured demand" — a
+            // life that needs Heart00 only is colour-free and is the contrast
+            // case the whole analysis turns on.
+            item.row.life_cards = snap
+                .lives
+                .iter()
+                .map(|l| l.card_no.to_string())
+                .collect::<Vec<_>>()
+                .join(";");
+            item.row.pool_colours = (1..=6)
+                .map(|c| i32::from(snap.total_hearts[c]).to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            item.row.req_colours = snap
+                .lives
+                .iter()
+                .map(|l| {
+                    (1..=6)
+                        .map(|c| i32::from(l.required[c]).to_string())
+                        .collect::<Vec<_>>()
+                        .join(".")
+                })
+                .collect::<Vec<_>>()
+                .join(";");
         }
         if let Some(snap) = snapshot_for(gs, &theirs.id) {
             item.row.opp_passed = snap.lives.iter().all(|l| l.passed) && !snap.lives.is_empty();

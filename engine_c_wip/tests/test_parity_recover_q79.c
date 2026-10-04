@@ -282,7 +282,7 @@ static int expect_prompts(TestGame *tg, int n, const char *what)
     if (pending(tg)) sh->prompts++;
     if (sh->prompts < n) {
         sh->failures++;
-        fprintf(stderr, "FAIL (VACUOUS): %s - only %d prompt(s) offered, need %d\n",
+        fprintf(stderr, "FAIL: [VACUOUS]  %s - only %d prompt(s) offered, need %d\n",
                 what, sh->prompts, n);
         return 0;
     }

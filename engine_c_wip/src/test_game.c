@@ -57,6 +57,37 @@ int test_new_id(TestGame *tg, const char *card_no){
    the underlying card records are not. */
 void test_card_copy_pool_reset(void){ rb_card_copy_pool_reset(); }
 
+/* Mirror Rust TestGame::id_ref (engine/tests/helpers/mod.rs:245-253):
+ *
+ *     pub fn id_ref(&self, card_no: &str) -> i16 {
+ *         let template_id = card_id(&self.db, card_no);
+ *         let pos = self.pool_positions.borrow().get(&template_id).copied().unwrap_or(0);
+ *         pool.get(&template_id).and_then(|v| v.get(pos).copied()).unwrap_or(template_id)
+ *     }
+ *
+ * A PEEK, not a consume: it answers "what id would the NEXT id()/new_id() call
+ * for this card_no hand out?" WITHOUT advancing the per-card counter. That is
+ * the whole point of the helper — a test can look at the instance a fixture is
+ * about to create and assert on it without spending it, which is what lets
+ * `let a = game.id(X); assert_eq!(game.id_ref(X), a + 1);` work.
+ *
+ * MISSING FROM THE C until the Q4 audit. Nothing in tests/ referenced it (0 call
+ * sites), which is why the gap survived: an unused helper is invisible to a
+ * ratchet that counts call sites.
+ *
+ * The C cannot reproduce the Rust counter, because the C's `test_id` has NO
+ * counter at all (it is `rb_find_card_by_no`, the shared template, every call —
+ * see test_harness_self.c §C). So `test_id_ref` returns the TEMPLATE id, which is
+ * exactly what the C's `test_id` will hand out. It is therefore an honest
+ * implementation of "peek at what test_id would return" and a documented
+ * divergence from the Rust's "peek at what the NEXT id() would return". Stated
+ * here rather than left to be discovered: in the C the two are the same number
+ * for the same card_no, forever. */
+int test_id_ref(TestGame *tg, const char *card_no){
+    (void)tg;
+    return rb_find_card_by_no(card_no);
+}
+
 /* Strict card_no lookup: EXACT match only, or -1.
    rb_find_card_by_no (data.c:529) is deliberately forgiving -- after the
    exact hit it falls through to a base+rarity rebuild, then to
@@ -204,22 +235,135 @@ void test_give_energy_for(TestGame *tg, int pl, int count){
         P->energy_active++;
     }
 }
+/* Mirror Rust TestGame::play_to_stage(card_id, area) — which PANICS when the
+   target area already holds a DIFFERENT card (helpers/mod.rs:390-400), because
+   the three-slot stage makes that a baton touch: the occupant is replaced and
+   sent to the waitroom. The Rust header calls this out as "a passing but wrong
+   test", and records that 137 tests were found doing it by accident (the §8.3
+   `PL!-pb2-029-N` vacuous negative is the named example).
+
+   C cannot panic, so the guard is a LOUD line on stderr instead of a silent
+   substitution — the same tag the pool-exhaustion guard above uses. It sits on
+   `test_play_to_stage` ONLY, because Rust's guard sits only there:
+   `try_play_to_stage` (:446) / `play_to_stage_baton` (:404) do NOT check, and
+   the C's `test_try_play_to_stage` / `test_play_to_stage_for` are those twins.
+   A stderr line that does not begin with `FAIL` cannot move the `^FAIL` verdict
+   count, so a suite that legitimately bats on stays green and still gets told.
+   Pinned by §G (G15/G16) of tests/test_harness_self.c. */
 int test_play_to_stage(TestGame *tg, int card_id, int area){
+    if(tg && area>=0 && area<RB_STAGE_SIZE){
+        int occ = tg->state.p[0].stage[area];
+        if(occ != RB_EMPTY_SLOT && occ != card_id)
+            fprintf(stderr,
+                    "[TEST_BATON_TOUCH] test_play_to_stage(%d, area %d): area %d "
+                    "already holds card %d, so this play BATON-TOUCHES it (the "
+                    "occupant is replaced and goes to the waitroom). Rust's "
+                    "TestGame::play_to_stage panics here (helpers/mod.rs:391); "
+                    "use test_play_to_stage_for / test_try_play_to_stage if the "
+                    "swap is intended.\n",
+                    card_id, area, area, occ);
+    }
     return test_play_to_stage_for(tg, 0, card_id, area);
 }
 /* Mirror TestGame::try_play_to_stage_for(Side, card, area): make `pl` the
    attacking seat, then run the real main-phase play action. Returns 1 on
-   success, 0 when the card is not in that seat's hand. */
+   success, 0 when the card is not in that seat's hand.
+
+   THE ATTACKING SEAT IS SET FIRST, and that is the fix. Rust
+   (engine/tests/helpers/mod.rs:290) calls `set_active_side(side)` before the
+   action, and `set_active_side` (:255-262) writes BOTH `player1
+   .is_first_attacker` and `player2.is_first_attacker`. The C models that pair
+   as the seat indices `first_attacker` / `second_attacker` (`first_attacker ==
+   0` means p1 leads — game_setup.c:534), so the faithful two-line write is
+   `first_attacker = pl; second_attacker = pl ^ 1;`.
+
+   This shim used to pass `pl` to the engine and touch neither, so every
+   `test_play_to_stage_for(tg, 1, ..)` ran with seat 0 still marked as the
+   attacker. Measured 8 such call sites in the corpus
+   (test_parity_compound_per_card.c:2097, test_parity_condition_and_effect.c:791,
+   test_parity_integration_extra.c:1740, test_parity_jidou_state.c:827,
+   test_parity_jidou_watch_clusters.c:2135, test_parity_support.c:682,
+   test_parity_trigger_paths.c:893 and :1116), and every 「自分のアタッカーの
+   ターン」 / attacker's-turn condition, and every owner-scoped drain keyed off
+   the attacker, read the wrong seat in all eight. Pinned by §H of
+   tests/test_harness_self.c. */
+static void test_set_active_seat(TestGame *tg, int pl){
+    if(!tg || pl<0 || pl>1) return;
+    tg->state.first_attacker  = pl;
+    tg->state.second_attacker = pl ^ 1;
+}
 int test_play_to_stage_for(TestGame *tg, int pl, int card_id, int area){
     if(!tg || pl<0 || pl>1) return 0;
+    test_set_active_seat(tg, pl);
     RbPlayer *P=&tg->state.p[pl];
     int idx=-1;
     for(int i=0;i<P->hand.n;i++) if(P->hand.cards[i]==card_id){ idx=i; break; }
     if(idx<0) return 0;
     return rb_play_member(&tg->state, pl, idx, area);
 }
+/* Rust's `try_play_to_stage` (helpers/mod.rs:446) carries NO baton guard, so it
+   is routed to `test_play_to_stage_for` directly rather than through
+   `test_play_to_stage`. Return value is identical either way — `test_play_to_
+   to_stage` only adds the stderr diagnostic — this keeps the diagnostic on the
+   one helper that is Rust's panicking twin. */
 int test_try_play_to_stage(TestGame *tg, int card_id, int area){
-    return test_play_to_stage(tg, card_id, area);
+    return test_play_to_stage_for(tg, 0, card_id, area);
+}
+
+/* The two explicit-baton engine entry points are NOT declared in
+   include/rabuka.h — engine.c forward-declares them for itself (engine.c:645-646)
+   and nothing else has ever named them. That omission is WHY the baton-touch
+   test helpers were missing: the seam existed and was unreachable. Local externs
+   here, following the convention already used below (test_max_distinct_names,
+   hb_arena_token_crc). REPORTED as a rabuka.h gap, not fixed here. */
+extern int rb_play_member_ex(GameState *g, int pl, int hand_idx, int stage_pos, int use_baton_touch);
+extern int rb_play_double_baton_ex(GameState *g, int pl, int hand_idx, int a1, int a2, int place);
+
+/* Mirror Rust TestGame::play_to_stage_baton(card_id, area) (mod.rs:404-407) —
+   "play a member into an area that MAY already be occupied, for tests that
+   deliberately exercise a baton touch".
+
+   This was MISSING ENTIRELY until 2026-10-03. Rust splits the two cases into
+   two functions precisely because the automatic swap is a trap: `play_to_stage`
+   panics on an occupied area and `play_to_stage_baton` is the opt-in. The C had
+   only the panicking twin's guard and no way to say "the swap is intended", so
+   a Rust test written against `play_to_stage_baton` had no C spelling at all.
+
+   The engine already carries the flag — rb_play_member_ex's 5th parameter, the
+   direct mirror of actions/mod.rs:312-318 forwarding the action's
+   `use_baton_touch: Option<bool>` (engine.c:645) — so this is the caller half
+   of an existing seam, not a new engine entry point. */
+int test_play_to_stage_baton(TestGame *tg, int card_id, int area){
+    if(!tg) return 0;
+    RbPlayer *P=&tg->state.p[0];
+    int idx=-1;
+    for(int i=0;i<P->hand.n;i++) if(P->hand.cards[i]==card_id){ idx=i; break; }
+    if(idx<0) return 0;
+    return rb_play_member_ex(&tg->state, 0, idx, area, 1);
+}
+
+/* Mirror Rust TestGame::play_to_stage_double_baton(card, area_a, area_b, land_in)
+   (mod.rs:418-435): replace the members in TWO areas and land the played card
+   in a third.
+
+   Also missing until 2026-10-03, and it is not a cosmetic gap. Rust's doc on it
+   is the reason: "The engine takes the double-baton route only when the action
+   carries two area INDICES (card_indices); with one index, or none, it takes the
+   single-play path and a 'baton touch' against an empty area just places the
+   card." A single-slot helper therefore CANNOT build the two-member debut that
+   PL!-pb2-000-DUO is gated on — the gate needs trigger_event.min_count = 2
+   recorded touches, and only this path records two (engine.c:672-693).
+
+   use_baton_touch is `Some(false)` in the Rust (mod.rs:432), matching the C's
+   5th argument of 0: the double-baton branch is taken from the card_indices,
+   not from a baton request. */
+int test_play_to_stage_double_baton(TestGame *tg, int card_id, int area_a, int area_b, int land_in){
+    if(!tg) return 0;
+    RbPlayer *P=&tg->state.p[0];
+    int idx=-1;
+    for(int i=0;i<P->hand.n;i++) if(P->hand.cards[i]==card_id){ idx=i; break; }
+    if(idx<0) return 0;
+    return rb_play_double_baton_ex(&tg->state, 0, idx, area_a, area_b, land_in);
 }
 void test_recalc(TestGame *tg){ rb_recalc_constants(&tg->state); }
 void test_clear_mods_for_card(TestGame *tg, int card_id){ rb_mods_clear_card(&tg->state.mods, card_id); }
@@ -239,9 +383,15 @@ int test_activate_ability(TestGame *tg, int card_id){
     return test_activate_ability_for(tg, 0, card_id);
 }
 /* Mirror TestGame::activate_ability_for(Side, card): make `pl` the attacking
-   seat, then run the real 起動 path. */
+   seat, then run the real 起動 path.
+
+   THE ATTACKING SEAT IS SET FIRST for the same reason and with the same
+   citation as test_play_to_stage_for above: Rust's
+   `activate_ability_for` (helpers/mod.rs:302) calls `set_active_side(side)`
+   before the action, and the C had no equivalent write. */
 int test_activate_ability_for(TestGame *tg, int pl, int card_id){
     if(!tg || pl<0 || pl>1) return 0;
+    test_set_active_seat(tg, pl);
     RbPlayer *P = &tg->state.p[pl];
     for (int i = 0; i < P->hand.n; i++)
         if (P->hand.cards[i] == card_id) return rb_activate_ability(&tg->state, pl, i);
@@ -284,7 +434,43 @@ void test_select_indices(TestGame *tg, const int *indices, int n){
     else                     rb_resume_with_choice(&tg->state, -1);
 }
 int test_has_pending_choice(TestGame *tg){ return rb_has_pending_choice(&tg->state); }
-int test_pending_choice_count(TestGame *tg){ return rb_has_pending_choice(&tg->state) ? 1 : 0; }
+/* Mirror Rust TestGame::pending_choice_count (engine/tests/helpers/choices.rs:421-428):
+ *
+ *     match self.pending_choice_view() {
+ *         Live(Choice::SelectCard { count, .. }) => *count,
+ *         Live(_)                               => 0,
+ *         Json(pc) => pc["count"].as_u64().map_or(0, |c| c as usize),
+ *         None                                  => 0,
+ *     }
+ *
+ * So the answer is HOW MANY CARDS THE PROMPT ASKS FOR, not "is one standing".
+ *
+ * DIVERGENCE, found by the Q4 audit and FIXED here. This used to be
+ *     return rb_has_pending_choice(&tg->state) ? 1 : 0;
+ * i.e. a CONSTANT 1 for every prompt that exists. For a `SelectCard { count: 1 }`
+ * — the common case — that is right by luck. For every other SelectCard it is
+ * wrong: a "look at five, take three" prompt reads 1, and so does a mandatory
+ * 5-pick. Three call sites already assert the real number and were therefore
+ * measuring the harness rather than the engine:
+ *     tests/test_parity_characterization_extra.c:1484  expects 2
+ *     tests/test_parity_characterization_extra.c:1495  expects 1
+ *     tests/test_parity_characterization_extra.c:1505  expects 3
+ * A `Json` pending choice has no analogue in the C's flat RbChoice, and the C
+ * models every pending prompt as an RbChoice, so the Json arm is unreachable
+ * here rather than unimplemented.
+ *
+ * The non-SelectCard arm returning 0 (not 1) is Rust's behaviour and is
+ * load-bearing: `SelectHeartColor`, `SelectAutoAbility` and `SelectLiveSuccess`
+ * ask for no cards, so a suite using this to decide "how many picks do I owe"
+ * must read 0 for them.
+ */
+int test_pending_choice_count(TestGame *tg){
+    if(!tg || !rb_has_pending_choice(&tg->state)) return 0;
+    const RbChoice *c = rb_get_pending_choice(&tg->state);
+    if(!c) return 0;
+    if(c->kind == RB_CHOICE_SELECT_CARD) return c->count < 0 ? 0 : c->count;
+    return 0;
+}
 void test_set_live_card(TestGame *tg, int slot, int card_id){
     /* Live-card placement — mirror Rust TestGame::set_live_card(card_id).
        The live zone is an ORDERED bag: the card leaves the hand and is
@@ -452,6 +638,84 @@ void test_answer_play_cost_choice(TestGame *tg, int accept){
 /* Default filler card id (mirrors per-module `fn filler_hand(game)` helpers that
    return a common SD filler). Used only where the helper call appears inline. */
 int test_filler_hand(TestGame *tg){ return rb_find_card_by_no("PL!-sd1-010-SD"); }
+
+/* ── Rust `fill_decks` (engine/tests/helpers/mod.rs:564-571) ──────────────────
+ *
+ *     pub fn fill_decks(game: &mut TestGame, filler: i16) {
+ *         game.state.player1.main_deck.cards.clear();
+ *         game.state.player2.main_deck.cards.clear();
+ *         for _ in 0..30 {
+ *             game.state.player1.main_deck.cards.push(filler);
+ *             game.state.player2.main_deck.cards.push(filler);
+ *         }
+ *     }
+ *
+ * MISSING FROM THE C until the Q4 audit, and the gap was a NAME TRAP rather
+ * than an omission: the C has `test_filler_hand`, which RETURNS a filler card id
+ * and mutates nothing. Nothing else in the C was named like `fill_decks`, so a
+ * transpiled `fill_decks(game, filler)` had nowhere to land and a porter reading
+ * `test_filler_hand` could reasonably have read it as "fill the hand" — it does
+ * not, it returns one id. 30 per seat, both seats, and both decks CLEARED first:
+ * the clear is the part that matters, because a deck the fixture meant to be
+ * empty otherwise keeps whatever the setup put there.
+ */
+void test_fill_decks(TestGame *tg, int filler){
+    if(!tg) return;
+    for(int p=0;p<2;p++){
+        RbPlayer *P=&tg->state.p[p];
+        P->deck.n=0;
+        for(int i=0;i<30;i++) P->deck.cards[i]=filler;
+        P->deck.n=30;
+    }
+}
+/* ── Rust `fill_energy_deck` (mod.rs:577-583) ────────────────────────────────
+ *
+ *     pub fn fill_energy_deck(game: &mut TestGame, player: u8, count: usize) {
+ *         let energy = card_id(&db, "LL-E-001-SD");
+ *         for _ in 0..count { deck.cards.push(energy); }
+ *     }
+ *
+ * Same MISSING-twin story as fill_decks. `test_add_to_energy_deck` exists and is
+ * the per-card push, so a porter could have written the loop — but the card id
+ * is resolved HERE, once, from the printed number "LL-E-001-SD", and `count` is
+ * the argument. Note this does NOT raise `energy_active`: it fills the ENERGY
+ * DECK (the draw pile), not the energy zone, so a suite that wants active energy
+ * must still call test_give_energy_for. */
+void test_fill_energy_deck(TestGame *tg, int pl, int count){
+    if(!tg || pl<0 || pl>1 || count<0) return;
+    int eid = rb_find_card_by_no("LL-E-001-SD");
+    if(eid<0) return;
+    RbPlayer *P=&tg->state.p[pl];
+    for(int i=0;i<count;i++){
+        if(P->energy_deck.n >= RB_MAX_ZONE) return;
+        P->energy_deck.cards[P->energy_deck.n++]=eid;
+    }
+}
+/* ── Rust `stage_occupant` (mod.rs:440-444) ──────────────────────────────────
+ *
+ *     pub fn stage_occupant(&self, card_id: i16, area: MemberArea) -> Option<i16> {
+ *         let slot = *self.state.player1.stage.stage.get(idx)?;
+ *         (slot != -1 && slot != card_id).then_some(slot)
+ *     }
+ *
+ * The card in `area` of OUR stage, EXCLUDING the card being played. P1 only,
+ * exactly as Rust.
+ *
+ * This is not a convenience. Rust's own doc says it "lets a test assert its own
+ * setup, which is what would have caught §8.3's vacuous negative" — a test that
+ * staged an AZALEA member and then played into the same area baton-touched the
+ * very card its negative was written about, and passed. The C inlines the same
+ * comparison inside test_play_to_stage's diagnostic, so the CHECK exists, but a
+ * test could not CALL it: 137 tests had the hazard and none of them could ask.
+ * Returns -1 for "no occupant that is not the card being played", matching
+ * Rust's `None`.
+ */
+int test_stage_occupant(TestGame *tg, int card_id, int area){
+    if(!tg || area<0 || area>=RB_STAGE_SIZE) return -1;
+    int slot = tg->state.p[0].stage[area];
+    if(slot == RB_EMPTY_SLOT || slot == card_id) return -1;
+    return slot;
+}
 
 /* Collection-predicate helpers mirroring the Rust tests' ubiquitous
    `zone.cards.iter().any(|c| c.card_no == "X")` / `.contains(&id)` patterns,
@@ -1269,4 +1533,53 @@ int test_fire_trigger_at_index(TestGame *tg, int cid, int ability_idx)
        gate the nth path applies, by asking for the FIRST match first. */
     if (test_ability_index_for_trigger(cid, trig, 0) < 0) return 0;
     return test_fire_trigger_core_seat(tg, cid, trig, /*use_nth*/ 0, ability_idx, /*pl*/ 0);
+}
+
+/* ── FLAT-suite per-test verdict layer ─────────────────────────────────────
+ *
+ * A FLAT suite runs every test body in ONE process out of ONE main(), so its
+ * `FAIL:` lines name an ASSERTION and nothing else. Without this layer a
+ * failing test in a FLAT suite cannot be attributed to any test at all, which
+ * is why "how many tests failed" was ill-defined across this corpus: hundreds
+ * of FAIL lines sat in suites that named no failing test.
+ *
+ * `__func__` (C11 6.4.2.2) names the enclosing function, and it is the SAME
+ * array object at every expansion inside one function, so pointer identity is
+ * the dedupe key -- no string compare, and no duplicate verdict lines for a
+ * function that fails twenty assertions.
+ *
+ * WHY IT LIVES HERE AND NOT PER-SUITE. An earlier harness pass pasted a private
+ * copy of this function into 12 suites. That is 12 chances to spell the dedupe
+ * or the flush differently, and the copies had already drifted. One definition,
+ * linked into every suite, cannot drift.
+ *
+ * THE TRAP THIS EXISTS TO AVOID: patching `CHECK` but not `CHECK_EQ` silently
+ * loses the majority of the tests, because most FLAT suites fail through
+ * CHECK_EQ. Both macros in every suite that adopts this MUST call FLAT_VERDICT()
+ * in their failure branch. tests/test_harness_self.c cannot police that -- it
+ * has no view of a suite's macros -- so the check is the measurement: per
+ * suite, the number of distinct FAILED verdicts must be non-zero whenever the
+ * suite emits FAIL lines. That is a number, not a promise.
+ */
+static const char *g_flat_failed[2048];
+static int g_flat_failed_n;
+
+void test_flat_verdict_failed(const char *fn)
+{
+    if (!fn) return;
+    for (int i = 0; i < g_flat_failed_n; i++)
+        if (g_flat_failed[i] == fn) return;   /* __func__ is one array per function */
+    if (g_flat_failed_n >= (int)(sizeof g_flat_failed / sizeof *g_flat_failed))
+        return;
+    g_flat_failed[g_flat_failed_n++] = fn;
+    printf("FAILED: %s\n", fn);
+    fflush(stdout);
+}
+
+/* How many distinct test functions have been reported failed so far. Exposed
+ * so a suite's own summary can be checked against its verdict lines instead of
+ * being taken on trust. */
+int test_flat_failed_count(void)
+{
+    return g_flat_failed_n;
 }

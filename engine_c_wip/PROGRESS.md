@@ -135,6 +135,70 @@ tests**, not the existence of production modules.
 - `engine/src/lib.rs` top-level bot re-exports and their tests.
 Agents must not translate these. They are not part of the C engine's behavior.
 
+> ### ⛔ SETTLED BY CLUSTER T8, 2026-10-03 — do not re-litigate these two.
+> The two exclusions above were asserted without evidence. They are now measured,
+> and both stand. Full evidence in `ORPHANS_AND_SCOPE.md` (Q2, Q3). The stale
+> line counts above are corrected in brackets; the decisions are not reopened
+> without new evidence.
+>
+> **(1) `engine/src/bot/**` — OUT. NOT a parity oracle. Not on the critical path.**
+> Correct size: **21 561 lines** across 26 files / 932 667 B (`wc -l`), not ~11.8k.
+> * The C port has no bot. `grep -rn "rb_bot|bot_|strategy_v|ismcts|neural|
+>   rollout_policy"` over `engine_c_wip/src/**.c` returns **two hits, both
+>   comments, neither code** (`src/engine.c:1569`, `src/game/deck_builder.c:154`,
+>   each saying the Rust original "has no C twin").
+> * **Zero of the ~1500 Rust test files reference the bot at all.** The parity
+>   oracle is `engine/tests/run_all.rs::scenario_oracle` — hand-written scenario
+>   fixtures replayed through `helpers::TestGame`, emitting `CHECK <n> <pass|FAIL>
+>   <actual> <expected>`, which `tests/replay.c` reproduces. It imports no policy.
+> * No in-repo expectation artefact is bot-generated. All six files in
+>   `engine_c_wip/tests/fixtures/` are hand-written scenarios or `describe_dump.rs`
+>   output. A repo-wide grep for `bot_arena|bot_replay|strategy_v7|strategy_v8|
+>   sim_bench` across every json/txt/csv/md hits **only `docs/*.md` prose**.
+> * The one genuine edge: `engine/src/replay.rs:1` imports
+>   `crate::bot::PublicObservation` and embeds it in `observe()`'s snapshot. That
+>   is a **format** dependency of a Rust-only profiling path (`observe()` is
+>   called only by itself and by `bin/sim_bench.rs`), and the C has no twin of that
+>   snapshot format. `tests/replay.c` emits `CHECK` lines, not observations.
+> * Independently blocked on engine parity: the bots need `crate::rng::Lcg`
+>   (rollout/policy seeds), `crate::turn::TurnEngine` and
+>   `crate::core::stats_pipeline`. Without the same LCG a C bot is not a
+>   comparable bot, it is a different one — and "different" is indistinguishable
+>   from "wrong" with no oracle.
+> * **Revisit only if** this project ever wants differential bot testing
+>   (C bot vs Rust bot, same seed, same games, compare traces). That is a
+>   different project.
+>
+> **(2) `engine/src/game/display.rs` (2014 lines) — OUT, deliberately.**
+> T5 had it as `BLOCKED-ON: include/rabuka.h`. **That block does not exist and
+> nothing is owed.** The reasoning that settles it:
+> * **It is a read-only projection and cannot affect the engine.** Every entry
+>   point takes `&GameState`; a grep for `&mut GameState` / `&mut game_state` /
+>   `mut gs` across all 2014 lines returns **nothing**. No parity test can be made
+>   to disagree with it, because it cannot make the engine do anything.
+> * **Its only consumers are three, none of them the engine:**
+>   `game/web_server.rs` (serialises it as the HTTP JSON payload), `bin/harness.rs:86`
+>   (a debug pretty-print) and `main.rs:27-28,87` (a re-export plus a debug print).
+>   Note `game_setup.rs`'s 57 "display" hits are all `action_display_enabled()` —
+>   a boolean from `core::runtime_flags`, **not** this module.
+> * **The C already owns the wire surface.** `src/web_server.c` (724 lines, 70
+>   distinct JSON keys) is the C's format, and it is linked only by the `web`
+>   target (`Makefile:63-66`) — not in `OBJ_LIB`, and no test target links it. So
+>   not one of the 151 C suites can observe it.
+> * **`describe.c` does not cover it and does not need to.** `describe.c` (3050
+>   lines) is the ability-TEXT projection and is already parity-proven against a
+>   committed Rust oracle (`tests/fixtures/describe_golden.txt`, 212159 B, from
+>   `engine/src/bin/describe_dump.rs`; `describe_golden` green). `display.rs` is
+>   the board-SNAPSHOT projection. They are disjoint.
+> * **ONE real gap, and it is ~100 lines, not 2014:** Rust's
+>   `filter_display_for_player` (`game/web_server.rs:1157+`) hides the opponent's
+>   hand, hides unperformed live cards, and strips bonus attribution for face-down
+>   cards. **The C has no equivalent at all** — `src/web_server.c:209` hard-codes
+>   `"ui_config":{"perspective_player":0,...}`, so every client sees both hands.
+>   If a C web UI is ever wanted, port `filter_display_for_player` FIRST
+>   (self-contained, closes a real information leak), and only then decide whether
+>   the `CardDisplay`/`GameStateDisplay` structs are wanted as a schema.
+
 ### Wave order (do these in sequence; do not just fan out forever)
 1. **Integration wave.** Many worktrees were created from a stale baseline and carry
    large unrelated diffs. Reduce every useful branch to `engine_c_wip`-only changes

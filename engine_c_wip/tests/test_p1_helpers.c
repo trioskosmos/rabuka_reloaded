@@ -10,6 +10,7 @@ static int failures;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } \
 } while (0)
 
@@ -45,7 +46,7 @@ static void t_game_new(void)
    live_cards_stuck_in_live_zone_instead_of_discard ("got 1 expected 3"). */
 static void t_set_live_card_appends(void)
 {
-    TestGame tg;
+static    TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     int a = test_id(&tg, "PL!-sd1-019-SD");
@@ -115,7 +116,7 @@ static int census_hits(TestGame *tg, int id)
    never sees it -- a fixture that LOOKS meaningful and measures nothing. */
 static void t_set_live_card_for_seats(void)
 {
-    TestGame tg;
+static    TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     int a = test_new_id(&tg, "PL!-sd1-019-SD");
@@ -181,7 +182,7 @@ static void t_set_live_card_for_seats(void)
    card is lost or double-counted. */
 static void t_live_append_census(void)
 {
-    TestGame tg;
+static    TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     int ids[3][3];
@@ -241,7 +242,7 @@ static void t_live_append_census(void)
    refused because a hole is not a state the engine can produce. The old
    expectations described a different shim and were red. */
 static void t_insert_live_card_at(void){
-    TestGame tg;
+static    TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     int a = test_new_id(&tg, "PL!-sd1-019-SD");
@@ -314,7 +315,7 @@ static void t_insert_live_card_at(void){
    is why the seat accessors answer -1 rather than collapsing to seat 0. */
 static void t_queue_entry_seat_accessor(void)
 {
-    TestGame tg;
+static    TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     CHECK(test_queue_n_entries(&tg) == 0, "a fresh game has an empty queue");
@@ -401,7 +402,7 @@ static void t_queue_entry_seat_accessor(void)
    back to the declared sibling and measure something else. */
 static void t_max_distinct_names_shim(void)
 {
-    TestGame tg;
+static    TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     int a = test_new_id(&tg, "PL!-sd1-019-SD");
@@ -423,7 +424,7 @@ static void t_max_distinct_names_shim(void)
    -- left the prompt pending and a multi-index pick could never complete. */
 static void t_select_indices_shapes(void)
 {
-    TestGame tg;
+static    TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     CHECK(test_pending_choice_count(&tg) == 0, "a fresh game has no pending choice");
@@ -464,7 +465,7 @@ static void t_select_indices_shapes(void)
    test_zone_has_card_no read out of bounds for any pl outside 0..1. */
 static void t_zone_helpers_validate_seat(void)
 {
-    TestGame tg;
+static    TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     int a = test_id(&tg, "PL!-sd1-019-SD");
@@ -487,7 +488,7 @@ static void t_zone_helpers_validate_seat(void)
 /* Stage slots are positional (Rust stage.set_area); the under-card bags append. */
 static void t_stage_and_under_placement(void)
 {
-    TestGame tg;
+static    TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     int a = test_new_id(&tg, "PL!-sd1-019-SD");
@@ -511,7 +512,7 @@ static void t_stage_and_under_placement(void)
    rb_energy_activate_all in zones.c depends on. */
 static void t_energy_active_tracks_the_bag(void)
 {
-    TestGame tg;
+static    TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     test_give_energy(&tg, 3);
@@ -550,7 +551,7 @@ static void t_energy_active_tracks_the_bag(void)
    engine records but never routes, and prove the census stays conserved. */
 static void t_cost_selection_zone_move(void)
 {
-    TestGame tg;
+static    TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     int a = test_new_id(&tg, "PL!-sd1-019-SD");

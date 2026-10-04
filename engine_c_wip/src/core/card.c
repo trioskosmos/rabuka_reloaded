@@ -958,11 +958,94 @@ static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
     if (!e || !out) return;
     const char *card_type = e->card_type_field[0] ? e->card_type_field : fx_extra(e, "card_type");
     card_filter_set_text(out->card_type, sizeof(out->card_type), card_type);
-    const char *group = fx_extra(e, "group_names");
+    /* ── group_names / exclude_group_names / groups[] ─────────────────────────
+     * util.rs:1840 + :1863-1867 + :1870-1874. Three fields, one input.
+     *
+     * An inclusion and an exclusion of the SAME group set can never both hold,
+     * and that is exactly what the extractor produces when it hoists a clause's
+     * group onto an effect that also carries the clause's exclusion. MEASURED
+     * over 2639 cards / 2116 ability pairs: 12 nodes carry
+     * `exclude_group_names`, 741 carry `group_names`, and EXACTLY 3 carry
+     * BOTH — all three with the two lists byte-equal (百生 吟子
+     * PL!HS-bp5-004, abilities.json:8144-8153). The exclusion is the intended
+     * reading — the text is 『スリーズブーケ以外』 — so where the sets are equal
+     * the redundant inclusion is dropped; no reading is lost, because there is
+     * no card that is both. Before this, those 3 nodes demanded a card be
+     * スリーズブケット AND not スリーズブケット, so the candidate set was always
+     * empty and the ability could never grant anything.
+     *
+     * `group` is `.first()` and `groups` is the WHOLE list (util.rs:1870-1874);
+     * util.c's matcher splits `group` and `.any()`s `groups`, so both are fed
+     * from the deduped list. */
+    const char *group_names = fx_extra(e, "group_names");
+    const char *exclude_gn = fx_extra(e, "exclude_group_names");
+    if (exclude_gn && *exclude_gn)
+        card_filter_set_text(out->exclude_group_names, sizeof(out->exclude_group_names), exclude_gn);
+    /* util.rs:1864-1867 ALSO drops the INCLUSION when the two sets are equal
+     * ("an inclusion and an exclusion of the SAME group set cannot both be
+     * satisfied ... the exclusion is the intended reading"). MEASURED over
+     * cards/abilities.json: EXACTLY ONE effect node of 3 053 walked
+     * effect+cost nodes carries both keys (百生 吟子,
+     * PL!HS-bp5-004-{AR,P,R}, ab#0), and its two lists are byte-equal AND equal
+     * after whitespace removal and NFKC (micro-sign) folding. 4 abilities carry
+     * exclude_group_names at all, and 0 nodes carry a bare `group` key, so the
+     * fx_extra(e, "group") fallback below is dead on this corpus.
+     *
+     * `excluded_matches` (core/card.rs:894) DOC/BODY CONTRADICTION, ADJUDICATED
+     * 2026-10-04: the BODY is authoritative and this line lands against it.
+     *   1. It is what Rust executes; a doc comment cannot change `==`.
+     *   2. Its only caller is `AbilityEffect::filter_subset` (card.rs:2413), and
+     *      both inputs are strings lifted off the SAME effect object.
+     *      Normalisation in Rust is a CARD lookup (card_matches_group_str),
+     *      unavailable to a string-vs-string test, so the doc's claim is not
+     *      implementable at that call site.
+     *   3. It is MOOT on this corpus (byte-equal, see above): both readings
+     *      give the same verdict.
+     * Rust's sibling rule in `CardFilter::from_effect` (util.rs:1864-1867) has
+     * the other shape - `Vec ==` over the whole list, order-sensitive, exact
+     * bytes. vm.c flattens a wire array into ONE comma-joined extras string, so
+     * `strcmp(group_names, exclude_gn) == 0` here is byte-equivalent to that
+     * `Vec ==`, order sensitivity included, and the one corpus node is
+     * byte-equal either way.
+     *
+     * `group_names` is nulled rather than `group` because in C both
+     * `out->group` and `out->groups[]` are fed from this one local below:
+     * nulling it here is what leaves BOTH empty while exclude_group_names -
+     * set above, straight from the wire value - survives, which is the intended
+     * reading. `has_filter` still counts exclude_group_names, so the filter is
+     * still built. */
+    if (exclude_gn && *exclude_gn && group_names && !strcmp(group_names, exclude_gn))
+        group_names = NULL;
+    const char *group = group_names;
     if (!group) group = fx_extra(e, "group");
     if (group && *group) {
         card_filter_set_text(out->group, sizeof(out->group), group);
         out->has_group = 1;
+    }
+    if (group_names && *group_names)
+        card_filter_list(group_names, (char *)out->groups,
+                         sizeof(out->groups[0]), 8, &out->n_groups);
+    /* util.rs:1878-1879 — `cost_limit_min` / `cost_limit_max` are the card-text
+     * spellings of ">=" / "<=" and are counted by has_filter (util.rs:1461-1462).
+     * MEASURED: 1 node each. They are NOT folded into `cost_limit`: Rust keeps
+     * them as separate Option<u8>s and passes the operators literally into the
+     * same matcher at util.rs:1744-1752, which util.c already does. */
+    if (card_extra_int(e, "cost_limit_min", &out->cost_limit_min))
+        out->has_cost_limit_min = 1;
+    if (card_extra_int(e, "cost_limit_max", &out->cost_limit_max))
+        out->has_cost_limit_max = 1;
+    /* util.rs:1924-1925 — 「元々拥有一个ハート」 only ever means the printed total,
+     * so unlike the blade bounds this is NOT gated on `original_value`. The
+     * operator is `.or(Some("<="))`, i.e. it is ALWAYS Some whenever the total
+     * is, so the operator string is a complete presence flag — which is exactly
+     * how util.c's local_filter_from_public reads it. MEASURED: 8 nodes carry
+     * the total and all 8 also carry an explicit operator, so the default is
+     * belt-and-braces here, but it is written unconditionally to keep the
+     * presence flag total. */
+    if (card_extra_int(e, "heart_total_limit", &out->original_heart_total)) {
+        const char *oht_op = fx_extra(e, "heart_total_operator");
+        card_filter_set_text(out->original_heart_operator, sizeof(out->original_heart_operator),
+                             (oht_op && *oht_op) ? oht_op : "<=");
     }
     if (card_extra_int(e, "cost_limit", &out->cost_limit)) {
         out->has_cost_limit = 1;
@@ -1091,24 +1174,27 @@ static void card_filter_from_effect(const AbilityEffect *e, RbCardFilter *out) {
         out->has_blade_limit = 1;
         card_filter_set_text(out->blade_op, sizeof(out->blade_op), fx_extra(e, "blade_limit_operator"));
     }
-    /* has_filter() — the C twin of CardFilter::has_filter (util.rs:1425-1446).
+    /* has_filter() — the C twin of CardFilter::has_filter (util.rs:1456-1477).
        Every term Rust lists for a field RbCardFilter actually carries is here:
-       card_type, group, cost_limit, characters, exclude_characters,
-       heart_colors, need_heart_total, need_heart_color, name_fragments,
-       original_blade_limit, ability_filter, ability_filter_triggers,
+       card_type, group, groups, exclude_group_names, cost_limit, cost_limit_min,
+       cost_limit_max, characters, exclude_characters, heart_colors,
+       need_heart_total, need_heart_color, name_fragments, original_blade_limit,
+       original_heart_total, ability_filter, ability_filter_triggers,
        card_property, or_ability_filters, distinct. The five extra terms
        (has_exclude_self,
        negation, has_cost_total, n_cost_values, has_blade_limit) are the C
        extensions effects/score.c:147-152 and effects/move.c:767 mirror when they
        recompute this flag by hand; they are left in place so the two stay in
-       step. An all-empty effect still yields has_filter == 0 — verified by
-       probe, not by inspection: card.c has no field that a zeroed AbilityEffect
-       can trip. */
-    out->has_filter = !!(out->card_type[0] || out->has_group || out->has_cost_limit ||
+       step. Note that Rust's has_filter does NOT count `exclude_cards` /
+       `exclude_names` even though matches() reads them (util.rs:1489-1513) —
+       they are filled programmatically AFTER construction, so the C matches. */
+    out->has_filter = !!(out->card_type[0] || out->has_group || out->n_groups ||
+                         out->exclude_group_names[0] ||
+                         out->has_cost_limit || out->has_cost_limit_min || out->has_cost_limit_max ||
                          out->has_characters || out->has_exclude_characters || out->has_exclude_self ||
                          out->ability_filter[0] || out->n_ability_filter_triggers || out->negation ||
                          out->n_heart_colors || out->has_need_heart_total || out->need_heart_color[0] ||
-                         out->has_original_blade ||
+                         out->has_original_blade || out->original_heart_operator[0] ||
                          out->has_cost_total || out->n_cost_values || out->n_name_fragments ||
                          out->distinct || out->has_blade_limit ||
                          out->card_property[0] || out->n_or_ability_filters

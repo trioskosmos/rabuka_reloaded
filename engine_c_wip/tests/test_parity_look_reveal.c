@@ -8,6 +8,24 @@
 #include <stdio.h>
 #include <string.h>
 
+/* ���� per-test verdict layer (see test_parity_integration.c for the rationale):
+ * a FLAT suite's FAIL lines name an assertion, never a test, so this suite
+ * reported no per-test verdict and its FAIL lines were unattributable. This
+ * adds exactly one `FAILED: <test body>` per failing test body, in the shape
+ * every FORK suite prints. No assertion is added, removed or relaxed. */
+static const char *g_flat_failed[512];
+static int g_flat_failed_n;
+static void flat_verdict_failed(const char *fn)
+{
+    for (int i = 0; i < g_flat_failed_n; i++)
+        if (g_flat_failed[i] == fn) return;
+    if (g_flat_failed_n >= 512) return;
+    g_flat_failed[g_flat_failed_n++] = fn;
+    printf("FAILED: %s\n", fn);
+    fflush(stdout);
+}
+#define FLAT_VERDICT() flat_verdict_failed(__func__)
+
 static int failures;
 static int checks;
 
@@ -15,6 +33,7 @@ static int checks;
     checks++; \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -27,6 +46,7 @@ static int checks;
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -82,7 +102,7 @@ static int pool_get(int pl, int *out, int max)
    ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_look_at_counts_and_zones(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -90,30 +110,45 @@ static void test_look_at_counts_and_zones(void)
     int c = test_new_id(&tg, MEMBER_NIJI);
     CHECK(a >= 0 && b >= 0 && c >= 0, "look_at fixtures resolve");
     if (a < 0 || b < 0 || c < 0) return;
-    test_add_to_deck(&tg, a);
-    test_add_to_deck(&tg, b);
-    test_add_to_deck(&tg, c);
+    int pool[8];
 
     /* deck source drains exactly `count` from the top */
     AbilityEffect e = {0};
     e.action = "look_at";
     e.source = "deck";
     e.count = 2;
+    test_add_to_deck(&tg, a);
+    test_add_to_deck(&tg, b);
+    test_add_to_deck(&tg, c);
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
-    int pool[8];
     CHECK_EQ(pool_get(0, pool, 8), 2, "look_at from deck fills the pool with count cards");
     CHECK(pool[0] == a && pool[1] == b, "look_at from deck preserves top-down order");
     CHECK_EQ(tg.state.p[0].deck.n, 1, "look_at from deck drains the looked cards");
-    rb_resume_with_choice(&tg.state, -1);
+    /* look.rs:1055-1096 ? execute_look_at assigns gs.looked_at_cards, records
+       carried.looked_at_origin and returns Ok(()). It opens NO Choice: the only
+       prompt it can raise is maybe_offer_look_cost_gate (look.rs:995-1013), an
+       OptionalCost skip gate, and only when the effect carries `optional`
+       (MEASURED 0 of the 200 look_at nodes in this corpus). ���� informs
+       (rule 5.7), so the prompt belongs to whatever CONSUMES the pool. */
+    CHECK(!rb_has_pending_choice(&tg.state),
+          "look_at opens no choice of its own (look.rs:1055-1096)");
+    /* A pool is only ever returned to carried.looked_at_origin when the
+       CONSUMING effect declines, and choice.c's mode-2 arm routes that through
+       rb_look_resume_indices with an empty pick. Call the engine's own decline
+       path rather than hand-restoring the deck, so the sub-cases below each
+       start from the same full zone. */
+    rb_look_resume_indices(&tg.state, 0, NULL, 0, NULL, NULL, -1, 0);
+    CHECK_EQ(tg.state.p[0].deck.n, 3,
+             "a declined consumer returns the looked-at pool to its origin (rule 5.7)");
 
     /* `all` takes the whole zone regardless of count (look.rs:1023-1029) */
     e.count = 1;
     fx_set(&e, 0, "all", "true");
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
     CHECK_EQ(pool_get(0, pool, 8), 3, "look_at with all=true takes the whole zone");
-    rb_resume_with_choice(&tg.state, -1);
+    rb_look_resume_indices(&tg.state, 0, NULL, 0, NULL, NULL, -1, 0);
 
-    /* hand source peeks  Eit must not remove the card from the hand */
+    /* hand source peeks ? it must not remove the card from the hand */
     test_add_to_hand(&tg, a);
     test_add_to_hand(&tg, b);
     e.count = 2;
@@ -122,7 +157,7 @@ static void test_look_at_counts_and_zones(void)
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
     CHECK_EQ(pool_get(0, pool, 8), 2, "look_at from hand fills the pool");
     CHECK_EQ(tg.state.p[0].hand.n, 2, "look_at from hand only peeks");
-    rb_resume_with_choice(&tg.state, -1);
+    rb_look_resume_indices(&tg.state, 0, NULL, 0, NULL, NULL, -1, 0);
     CHECK_EQ(tg.state.p[0].hand.n, 2, "hand-sourced look is fully restored on decline");
 
     /* stage source skips empty slots and respects count */
@@ -133,7 +168,7 @@ static void test_look_at_counts_and_zones(void)
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
     CHECK_EQ(pool_get(0, pool, 8), 2, "look_at from stage skips the empty slot");
     CHECK(pool[0] == a && pool[1] == c, "look_at from stage preserves slot order");
-    rb_resume_with_choice(&tg.state, -1);
+    rb_look_resume_indices(&tg.state, 0, NULL, 0, NULL, NULL, -1, 0);
 
     /* discard source */
     tg.state.p[0].discard.n = 0;
@@ -142,7 +177,7 @@ static void test_look_at_counts_and_zones(void)
     e.count = 3;
     rb_execute_effect_ex(&tg.state, 0, &e, -1);
     CHECK_EQ(pool_get(0, pool, 8), 1, "look_at from the waitroom takes the whole zone");
-    rb_resume_with_choice(&tg.state, -1);
+    rb_look_resume_indices(&tg.state, 0, NULL, 0, NULL, NULL, -1, 0);
 }
 
 /* Q85 / rule 10.2.2.2  Elook N from a short deck draws, refreshes, draws the rest. */
@@ -174,7 +209,7 @@ static void test_look_at_short_deck_refresh(void)
    ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_reveal_hand_offer_and_metadata(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -241,7 +276,7 @@ static void test_reveal_hand_automatic_when_count_covers_all(void)
    still recorded on the automatic path. */
 static void test_reveal_blind_still_records(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -263,7 +298,7 @@ static void test_reveal_blind_still_records(void)
    conditional move_cards consumes it. */
 static void test_reveal_deck_is_a_peek(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -289,7 +324,7 @@ static void test_reveal_deck_is_a_peek(void)
    heart colours before revealing. */
 static void test_reveal_looked_at_filters_candidates(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int blue_live = test_new_id(&tg, LIVE_BLUE);
@@ -319,7 +354,7 @@ static void test_reveal_looked_at_filters_candidates(void)
    ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_reveal_per_group_sources(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -379,7 +414,7 @@ static void test_reveal_per_group_sources(void)
    ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_reveal_until_live_card(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int m1 = test_new_id(&tg, MEMBER_MUS);
@@ -407,7 +442,7 @@ static void test_reveal_until_live_card(void)
 
 static void test_reveal_until_live_card_refreshes(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int m1 = test_new_id(&tg, MEMBER_MUS);
@@ -427,7 +462,7 @@ static void test_reveal_until_live_card_refreshes(void)
 
 static void test_reveal_until_chosen_card_type(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int live = test_new_id(&tg, LIVE_NIJI);
@@ -451,7 +486,7 @@ static void test_reveal_until_chosen_card_type(void)
    the FRONT of the looked-at pool and applies the member_card cost gate. */
 static void test_reveal_until_target_cost_gate(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int costly = test_new_id(&tg, MEMBER_NIJI);   /* cost 13 */
@@ -477,7 +512,7 @@ static void test_reveal_until_target_cost_gate(void)
 
 static void test_reveal_until_target_no_match_clears_pool(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -500,7 +535,7 @@ static void test_reveal_until_target_no_match_clears_pool(void)
    ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_select_offers_filtered_pool(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int m1 = test_new_id(&tg, MEMBER_MUS);
@@ -533,7 +568,7 @@ static void test_select_offers_filtered_pool(void)
 
 static void test_select_count_clamped_to_pool(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -554,7 +589,7 @@ static void test_select_count_clamped_to_pool(void)
 
 static void test_select_looked_at_and_stage(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -588,7 +623,7 @@ static void test_select_looked_at_and_stage(void)
    ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_select_cards_from_looked_at(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -620,7 +655,7 @@ static void test_select_cards_from_looked_at(void)
 
 static void test_select_cards_filters_and_clamps(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int m1 = test_new_id(&tg, MEMBER_MUS);
@@ -655,7 +690,7 @@ static void test_select_cards_filters_and_clamps(void)
    no impossible prompt is offered. */
 static void test_select_cards_unmatched_discards_pool(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -683,7 +718,7 @@ static void test_select_cards_unmatched_discards_pool(void)
    ══════════════════════════════════════════════════════════════════════╁E*/
 static void test_look_and_select_options_are_or(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int m1 = test_new_id(&tg, MEMBER_MUS);
@@ -732,7 +767,7 @@ static void test_look_and_select_options_are_or(void)
 
 static void test_look_and_select_heart_color_filter(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int blue = test_new_id(&tg, MEMBER_DIA);      /* hearts yellow,blue */
@@ -772,7 +807,7 @@ static void test_look_and_select_heart_color_filter(void)
 
 static void test_look_and_select_cost_limit_filter(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int costly = test_new_id(&tg, MEMBER_NIJI);      /* cost 13 */
@@ -811,7 +846,7 @@ static void test_look_and_select_cost_limit_filter(void)
 
 static void test_look_and_select_any_number_and_max(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -863,7 +898,7 @@ static void test_look_and_select_any_number_and_max(void)
 /* look.rs:60-81 discard_unmatched_looked_at */
 static void test_look_and_select_unmatched_path(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -995,7 +1030,7 @@ static void test_real_decoded_hanamaru_ability(void)
               look->count == 4,
           "the decoded look_action looks at four deck-top cards");
 
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int plain = test_new_id(&tg, MEMBER_MUS);
@@ -1046,7 +1081,7 @@ static void test_real_decoded_dia_no_match(void)
         return;
     }
     CHECK(1, "the Dia look_and_select ability decodes");
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     /* Four members, none of which carries a heart04 (blue). */

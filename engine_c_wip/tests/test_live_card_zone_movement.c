@@ -7,7 +7,7 @@
 static int failures;
 
 #define CHECK(condition, message) do { \
-    if (!(condition)) { fprintf(stderr, "FAIL: %s\n", message); failures++; } \
+    if (!(condition)) { fprintf(stderr, "FAIL: %s\n", message); failures++;FLAT_VERDICT();  } \
     else printf("ok: %s\n", message); \
 } while (0)
 
@@ -17,6 +17,7 @@ static int failures;
     if (actual_ != expected_) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_, expected_); \
         failures++; \
+        FLAT_VERDICT(); \
     } else printf("ok: %s\n", message); \
 } while (0)
 
@@ -54,6 +55,21 @@ static void record_timing_movements(GameState *state) {
     old_live_n[1] = state->p[1].live.n;
     memcpy(old_live[0], state->p[0].live.cards, (size_t)old_live_n[0] * sizeof(old_live[0][0]));
     memcpy(old_live[1], state->p[1].live.cards, (size_t)old_live_n[1] * sizeof(old_live[1][0]));
+    /* Open Rust's `live_card_zone.face_up` gate for BOTH seats before the check.
+     * Every Rust twin of this helper sets it explicitly --
+     *   invalid_live_card_discard_records_turn_movements        :113  (P1)
+     *   invalid_energy_card_in_live_zone_goes_to_energy_deck    :282  (P1)
+     *   check_invalid_live_cards_distinguishes_players         :347  (P1)
+     *                                                               :348  (P2)
+     * (engine/tests/test_modules/rules/conditions/live_card_zone_movement_test.rs)
+     * The C port keeps the gate at src/turn/phase.c:703 with ONE flag per SEAT,
+     * so this helper needs one line per seat -- the flag is per zone, not per
+     * slot, and `check_invalid_live_cards_distinguishes_players` is exactly the
+     * twin that proves both are read independently. Left unset, the gate returns
+     * early and the movement snapshot below records nothing, which is how 15
+     * assertions in this suite came to be red with the engine correct. */
+    state->live_face_up[0] = 1;
+    state->live_face_up[1] = 1;
     rb_check_timing(state);
     for (int player = 0; player < 2; player++) {
         for (int i = 0; i < old_live_n[player]; i++) {
@@ -151,7 +167,7 @@ static MovementEvent *movement_for(int card_id) {
 }
 
 static void test_invalid_live_card_discard_records_turn_movements(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     clear_movement_log();
     int member = test_id(&game, "PL!-sd1-010-SD");
@@ -179,7 +195,7 @@ static void test_invalid_live_card_discard_records_turn_movements(void) {
 }
 
 static void test_source_dest_condition_matches_turn_movements(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     clear_movement_log();
     int member = test_id(&game, "PL!-sd1-010-SD");
@@ -191,7 +207,7 @@ static void test_source_dest_condition_matches_turn_movements(void) {
 }
 
 static void test_source_dest_condition_wrong_source_fails(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     clear_movement_log();
     int member = test_id(&game, "PL!-sd1-010-SD");
@@ -203,7 +219,7 @@ static void test_source_dest_condition_wrong_source_fails(void) {
 }
 
 static void test_source_dest_condition_card_not_in_dest_fails(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     clear_movement_log();
     int member = test_id(&game, "PL!-sd1-010-SD");
@@ -214,7 +230,7 @@ static void test_source_dest_condition_card_not_in_dest_fails(void) {
 }
 
 static void test_source_dest_condition_needs_multiple_fails(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     clear_movement_log();
     int member = test_id(&game, "PL!-sd1-010-SD");
@@ -226,7 +242,7 @@ static void test_source_dest_condition_needs_multiple_fails(void) {
 }
 
 static void test_turn_movements_cleared_at_turn_start(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     clear_movement_log();
     int member = test_id(&game, "PL!-sd1-010-SD");
@@ -239,7 +255,7 @@ static void test_turn_movements_cleared_at_turn_start(void) {
 }
 
 static void test_invalid_energy_card_in_live_zone_goes_to_energy_deck(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     clear_movement_log();
     int energy = test_id(&game, "LL-E-001-SD");
@@ -253,7 +269,7 @@ static void test_invalid_energy_card_in_live_zone_goes_to_energy_deck(void) {
 }
 
 static void test_source_dest_condition_excludes_other_player(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     clear_movement_log();
     int member = test_id(&game, "PL!-sd1-010-SD");
@@ -265,7 +281,7 @@ static void test_source_dest_condition_excludes_other_player(void) {
 }
 
 static void test_source_dest_condition_opponent_target_includes_other_player(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     clear_movement_log();
     int member = test_id(&game, "PL!-sd1-010-SD");
@@ -277,7 +293,7 @@ static void test_source_dest_condition_opponent_target_includes_other_player(voi
 }
 
 static void test_check_invalid_live_cards_distinguishes_players(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     clear_movement_log();
     int member1 = test_id(&game, "PL!-sd1-010-SD");
@@ -359,7 +375,7 @@ static int drain_live_choices(TestGame *game, int *matched_live_success) {
 }
 
 static void test_live_cards_stuck_in_live_zone_instead_of_discard(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     clear_movement_log();
 

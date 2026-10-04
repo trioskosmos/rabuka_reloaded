@@ -1,0 +1,40 @@
+{
+  "engine/tests/test_modules/characterization/bp7_character_name_condition_test.rs": [
+    "mari_bottom_kanan_added_to_hand",
+    "mari_bottom_dia_added_to_hand"
+  ],
+  "engine/tests/test_modules/characterization/prohibition_layer_characterization_test.rs": [
+    "kanon_with_teammate_live_allowed_again"
+  ],
+  "engine/tests/test_modules/effects/ability_mod/heart02_gated_live_success_invalidation_setup_test.rs": [
+    "live_start_below_six_group_heart02_keeps_live_success"
+  ],
+  "engine/tests/test_modules/effects/compound/condition_and_effect/success_score_required_heart_and_score_pl_bp4_021_l_test.rs": [
+    "pl_bp4_021_l_success_score_thresholds_reduce_required_heart_then_add_score"
+  ],
+  "engine/tests/test_modules/effects/compound/sequential_effects/q257_wait_self_then_score_four_live_from_waitroom_to_hand_test.rs": [
+    "izumi_bp6_live_start_activates_at_score_two_for_both_rarities"
+  ],
+  "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_test.rs": [
+    "hanamaru_bp3_016_success_zone_cost_increase_constant_parsed"
+  ],
+  "engine/tests/test_modules/effects/recover/to_hand/live_success_add_one_niji_live_among_cards_moved_to_hand_plus_score_test.rs": [
+    "like_a_treasure_turn_limit_fires_once"
+  ],
+  "engine/tests/test_modules/effects/score/live_total/exact_energy_count_constant_score_test.rs": [
+    "yuna_sp_bp5_222_constant_exactly_eight_energy_grants_one_total_score"
+  ],
+  "engine/tests/test_modules/effects/score/live_total/kasumi_energy_under_test.rs": [
+    "kasumi_constant_score_bonus_applies_when_energy_under"
+  ],
+  "engine/tests/test_modules/effects/state/per_card/mei_per_distinct_catchu_member_energy_activation_test.rs": [
+    "catchu_basic_two_distinct_activate_2"
+  ],
+  "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs": [
+    "shioriko_auto_activates_waited_ally",
+    "ai_pay_activates_a_waited_member"
+  ],
+  "engine/tests/test_modules/integration/parser_e2e/parser_issues_e2e_part2_test.rs": [
+    "issue2_kanan_discard_2_gain_2_exact_aqours_lives"
+  ]
+}

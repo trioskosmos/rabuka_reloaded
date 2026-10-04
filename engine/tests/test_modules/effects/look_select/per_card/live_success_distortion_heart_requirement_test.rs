@@ -5,12 +5,21 @@
 ///
 /// Parsed (abilities.json idx 867): sequential [
 ///   modify_required_hearts(heart00, decrease, value=2, per_unit distinct CatChu),
-///   modify_required_hearts(heart02, decrease?, value=1, per_unit) — NOTE: parser
-///     emitted "decrease" for the 増やす (increase) half — suspected parser bug,
-///   modify_score(+1, per_unit) — gated on heart02>=9 in need_heart
+///   modify_required_hearts(heart02, increase, value=1, per_unit) — the parser
+///     used to emit "decrease" here, inverting 「増やす」; that is fixed and
+///     `distortion_parse_increase_half_is_increase` pins it,
+///   modify_score(+1) — gated on need_heart heart02 >= 9
 /// ]
 ///
-/// Live base: need_heart {heart02:6, heart0:9}, score 6.
+/// The header here used to read "modify_required_hearts(heart02, decrease?, ...)
+/// — suspected parser bug", directly above a test asserting the operation is
+/// `increase`. Fixed, but the stale note was left describing a bug that no longer
+/// exists, in the file a reader opens first.
+///
+/// Live base: need_heart {heart02:6, heart0:9}, score 6. With one heart02 per
+/// distinct CatChu! name and at most three stage slots, the only reachable totals
+/// are 6, 7, 8 and 9 — and all four are pinned below. That matters because 6/7/9
+/// alone cannot tell `>= 9` from `>= 8`: every one of them passes under both.
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 
@@ -173,6 +182,51 @@ fn distortion_one_catchu_no_score_gate_not_met() {
         live_score_mod(&game, live),
         0,
         "heart02=7 < 9 → no score"
+    );
+}
+
+/// 2 distinct CatChu names → heart02: 6+2=8 → gate NOT met. The closest miss.
+///
+/// This is the value the rest of the file steps over. The threshold is 9 and the
+/// reachable totals run 6, 7, 8, 9 — three of which were covered, leaving 8 as the
+/// single point where a mis-set threshold hides: `>= 8` produces identical results
+/// at 6 (no), 7 (no) and 9 (yes). So before this test the threshold was pinned only
+/// from two away, and 「9以上」 was never actually shown to exclude 8.
+///
+/// Three members is the most the stage holds, so 8 is the largest reachable miss and
+/// this is the tightest boundary available for 「9以上」.
+#[test]
+fn distortion_two_distinct_catchu_is_just_below_the_threshold() {
+    let (mut game, live) = setup_with_members(&[
+        "PL!SP-bp1-012-N", // 澁谷かのん
+        "PL!SP-bp1-015-N", // 平安名すみれ
+    ]);
+    // Distinct names, or the per-unit count would be 1 and this would duplicate the
+    // case above it.
+    game.assert_distinct_card_names(
+        game.state.player1.stage.stage[0],
+        game.state.player1.stage.stage[1],
+        "CatChu per-unit 2",
+    );
+    advance_to_live_card_set_p1(&mut game);
+    advance_to_live_start(&mut game);
+    game.drain_choices();
+
+    assert_eq!(
+        need_heart(&game, live, HeartColor::Heart02),
+        8,
+        "heart02 6 + 1*2 = 8"
+    );
+    assert_eq!(
+        need_heart(&game, live, HeartColor::Heart00),
+        5,
+        "heart00 9 - 2*2 = 5, so the decrease half is running too"
+    );
+    assert_eq!(
+        live_score_mod(&game, live),
+        0,
+        "「9以上」 — 8 is one short, so no score. A `>= 8` threshold would grant one \
+         here and pass every other test in this file."
     );
 }
 

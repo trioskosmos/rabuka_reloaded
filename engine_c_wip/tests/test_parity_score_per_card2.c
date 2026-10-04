@@ -1227,6 +1227,9 @@ static void run_case(const Case *c)
                 c->name, status, g_shared->assertions);
         failures++; assertions++;
     }
+    /* The corpus verdict, in the shape every other FORK suite prints. The
+     * `== case ...` line below stays for its per-case counts. */
+    printf(g_shared->failures > 0 ? "FAILED: %s\n" : "ok: %s\n", c->name);
     printf("== case %-56s assertions=%d failures=%d\n",
            c->name, g_shared->assertions, g_shared->failures);
     if (g_shared->failures > g_shared->assertions) {

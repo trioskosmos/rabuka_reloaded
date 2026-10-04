@@ -18,7 +18,7 @@ static int checks;
 
 #define CHECK(condition, message) do { \
     checks++; \
-    if (!(condition)) { fprintf(stderr, "FAIL: %s\n", message); failures++; } \
+    if (!(condition)) { fprintf(stderr, "FAIL: %s\n", message); failures++;FLAT_VERDICT();  } \
     else printf("ok: %s\n", message); \
 } while (0)
 #define CHECK_EQ(actual, expected, message) do { \
@@ -27,6 +27,7 @@ static int checks;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else printf("ok: %s\n", message); \
 } while (0)
 
@@ -58,7 +59,7 @@ static void set_extra(AbilityEffect *e, const char *k, const char *v) {
  * Keke (PL!SP-sd1-002-SD) debuts by deploying a cost-4 Liella! card from hand
  * into a stage slot, and the slot is asked for when several are free. */
 static void test_deploy_to_stage_keke(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int keke = test_new_id(&g, "PL!SP-sd1-002-SD");
     int liella = test_new_id(&g, "PL!SP-sd1-013-SD");
@@ -89,7 +90,7 @@ static void test_deploy_to_stage_keke(void) {
 /* ── 2. deploy into an occupied slot replaces the occupant ────────────────
  * pl_sp_sd1_002_test.rs:63-119 */
 static void test_deploy_replaces_occupant(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int keke = test_new_id(&g, "PL!SP-sd1-002-SD");
     int liella = test_new_id(&g, "PL!SP-sd1-013-SD");
@@ -119,7 +120,7 @@ static void test_deploy_replaces_occupant(void) {
 /* ── 3. stage destination with no free slot sends the take to the waitroom ─
  * engine/src/ability/move_cards.rs:1762-1784 */
 static void test_deploy_to_full_stage_goes_to_waitroom(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int a = test_new_id(&g, "PL!-sd1-010-SD");
     int b = test_new_id(&g, "PL!-sd1-002-SD");
@@ -148,7 +149,7 @@ static void test_deploy_to_full_stage_goes_to_waitroom(void) {
 /* ── 4. allow_occupied_stage overrides the full-stage bail-out ───────────
  * engine/src/ability/move_cards.rs:1764-1766 */
 static void test_deploy_allow_occupied_stage(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int a = test_new_id(&g, "PL!-sd1-010-SD");
     int b = test_new_id(&g, "PL!-sd1-002-SD");
@@ -171,7 +172,7 @@ static void test_deploy_allow_occupied_stage(void) {
 /* ── 5. empty_area with no empty slot takes nothing at all ───────────────
  * engine/src/ability/move_cards.rs:1976-1982 */
 static void test_empty_area_without_free_slot_is_a_noop(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int a = test_new_id(&g, "PL!-sd1-010-SD");
     int b = test_new_id(&g, "PL!-sd1-002-SD");
@@ -197,7 +198,7 @@ static void test_empty_area_without_free_slot_is_a_noop(void) {
  * engine/src/ability/move_cards.rs:1567-1578 (parse_effect_deck_pos) and
  * 1795-1805 (deck insert at the parsed index) */
 static void test_deck_position_insert(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int d0 = test_new_id(&g, "PL!-sd1-010-SD");
     int d1 = test_new_id(&g, "PL!-sd1-002-SD");
@@ -223,7 +224,7 @@ static void test_deck_position_insert(void) {
 
 /* ── 7. deck_top / deck_bottom placement ──────────────────────────────── */
 static void test_deck_top_and_bottom(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int d0 = test_new_id(&g, "PL!-sd1-010-SD");
     int a = test_new_id(&g, "PL!-sd1-011-SD");
@@ -246,7 +247,7 @@ static void test_deck_top_and_bottom(void) {
 /* ── 8. same_area repositioning ──────────────────────────────────────────
  * engine/src/ability/util.rs:2169-2194 */
 static void test_same_area_placement(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int blocker = test_new_id(&g, "PL!-sd1-010-SD");
     int m = test_new_id(&g, "PL!-sd1-011-SD");
@@ -292,7 +293,7 @@ static void test_same_area_without_free_slot_goes_to_hand(void) {
 /* ── 9. energy placement under a member ─────────────────────────────────
  * engine/src/ability/move_cards/placement.rs:167-218 */
 static void test_energy_under_single_member(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int host = test_new_id(&g, "PL!SP-sd1-006-SD");
     int en = test_new_id(&g, "LL-E-001-SD");
@@ -310,7 +311,7 @@ static void test_energy_under_single_member(void) {
 }
 
 static void test_energy_under_two_members_asks_which(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int host0 = test_new_id(&g, "PL!SP-sd1-006-SD");
     int host1 = test_new_id(&g, "PL!-sd1-002-SD");
@@ -368,7 +369,7 @@ static void test_move_discard_to_hand(void) {
 }
 
 static void test_move_stage_to_discard(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int a = test_new_id(&g, "PL!SP-sd1-006-SD");
     test_add_to_stage(&g, 1, a);
@@ -382,7 +383,7 @@ static void test_move_stage_to_discard(void) {
 }
 
 static void test_move_energy_deck_to_hand(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int e0 = test_new_id(&g, "LL-E-002-SD");
     test_add_to_energy_deck(&g, 0, e0);
@@ -396,7 +397,7 @@ static void test_move_energy_deck_to_hand(void) {
 }
 
 static void test_move_under_member_to_hand(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int host = test_new_id(&g, "PL!SP-sd1-006-SD");
     int en = test_new_id(&g, "LL-E-001-SD");
@@ -415,7 +416,7 @@ static void test_move_under_member_to_hand(void) {
  * The first move records the card in `recently_moved`; a following effect with
  * source "recently_moved" must be able to consume that same card. */
 static void test_move_then_resolve_recently_moved(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int a = test_new_id(&g, "PL!-sd1-010-SD");
     int s0 = test_new_id(&g, "PL!SP-sd1-006-SD");
@@ -470,7 +471,7 @@ static void test_move_selected_cards_relay(void) {
 /* ── 12. distinct card-name filter drops a short deduped take ───────────
  * engine/src/ability/move_cards.rs:2030-2037 */
 static void test_distinct_filter_drops_short_take(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int a = test_new_id(&g, "PL!-sd1-010-SD");
     int b = test_new_id(&g, "PL!-sd1-010-SD");   /* same card name as a */
@@ -492,7 +493,7 @@ static void test_distinct_filter_drops_short_take(void) {
 /* ── 13. a debut fires exactly once for a stage placement ───────────────
  * engine/src/ability/move_cards.rs:2316-2321 (inside finalize_card_movement) */
 static void test_stage_deploy_fires_debut_once(void) {
-    TestGame g;
+static    TestGame g;
     test_game_new(&g);
     int host0 = test_new_id(&g, "PL!SP-sd1-006-SD");
     int host1 = test_new_id(&g, "PL!-sd1-002-SD");

@@ -36,6 +36,7 @@ static int checks;
  if (!(condition)) { \
  fprintf(stderr, "FAIL: %s\n", message); \
  failures++; \
+ FLAT_VERDICT(); \
  } else { \
  printf("ok: %s\n", message); \
  } \
@@ -48,6 +49,7 @@ static int checks;
  if (actual_value != expected_value) { \
  fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
  failures++; \
+ FLAT_VERDICT(); \
  } else { \
  printf("ok: %s\n", message); \
  } \

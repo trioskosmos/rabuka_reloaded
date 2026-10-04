@@ -930,7 +930,56 @@ fn stage_blades_of(gs: &GameState, me: u8, db: &crate::card::CardDatabase) -> u3
         )) as u32
 }
 
-pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, String)> {
+// A per-bot override for the two live-set-lookahead weights, so a candidate can
+// be measured on ONE seat. `V7_CHECK_PRESSURE` and `V7_BLADE_ARITH` are read
+// from the environment, which is process-global — both seats of a head-to-head
+// would change together and the matchup would measure nothing. Same pattern as
+// `RngGuard`: set it at the candidate's entry point, restore on the way out.
+thread_local! {
+    static MAIN_LOOKAHEAD: std::cell::Cell<f64> = const { std::cell::Cell::new(-1.0) };
+    static MAIN_BLADE_ARITH: std::cell::Cell<f64> = const { std::cell::Cell::new(-1.0) };
+}
+
+/// Installs a per-bot Main-phase lookahead weight for the duration of a call.
+pub struct LookaheadGuard {
+    prev_pressure: f64,
+    prev_blade: f64,
+}
+
+impl LookaheadGuard {
+    pub fn new(pressure: f64, blade_arith: f64) -> Self {
+        let prev_pressure = MAIN_LOOKAHEAD.with(|c| c.replace(pressure));
+        let prev_blade = MAIN_BLADE_ARITH.with(|c| c.replace(blade_arith));
+        Self {
+            prev_pressure,
+            prev_blade,
+        }
+    }
+}
+
+impl Drop for LookaheadGuard {
+    fn drop(&mut self) {
+        MAIN_LOOKAHEAD.with(|c| c.set(self.prev_pressure));
+        MAIN_BLADE_ARITH.with(|c| c.set(self.prev_blade));
+    }
+}
+
+/// `V7_CHECK_PRESSURE` default: **0.0**, and that default is the finding.
+///
+/// The Main phase scores a candidate action by feature deltas toward a PROXY
+/// for "will I place next check". The real evaluator — the same 256-draw pass
+/// model the live-set chooser uses — is already available and already wired in
+/// right here, one line below, and it is switched off.
+///
+/// That is the same shape of error `vbr` proved is wrong in the live set:
+/// one-phase greedy toward place-probability is not the objective, because 8.4.13
+/// makes a placement change next turn's attacker slot and the win condition is a
+/// race to three (1.2.1.1). The best action for THIS check is frequently not the
+/// best action for the game.
+///
+/// Everything on record for these two weights was read in mirrors, which cannot
+/// see a one-seat change. So they have never had a valid test.
+pub(crate) fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, String)> {
     let _rng = RngGuard(crate::rng::checkpoint());
     let root = simulation_state(gs, me);
     let base = features(&root, me);
@@ -940,11 +989,17 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     // weight is in v7's own score units, so 75 means "a deploy that takes the
     // best life in hand from a coin flip to near-certainty is worth about one
     // good member".
-    let pressure_weight: f64 = std::env::var("V7_CHECK_PRESSURE")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .filter(|value: &f64| value.is_finite() && *value >= 0.0)
-        .unwrap_or(0.0);
+    let pressure_weight: f64 = MAIN_LOOKAHEAD.with(|c| {
+        let override_w = c.get();
+        if override_w >= 0.0 {
+            return override_w;
+        }
+        std::env::var("V7_CHECK_PRESSURE")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .filter(|value: &f64| value.is_finite() && *value >= 0.0)
+            .unwrap_or(0.0)
+    });
     let base_pressure = if pressure_weight > 0.0 {
         crate::bot::strategy_v7::check_pressure(&root, me, &gs.card_database)
     } else {
@@ -1032,11 +1087,17 @@ pub fn score_actions(gs: &GameState, actions: &[Action], me: u8) -> Vec<(f64, St
     // Blade arithmetic: re-price active blades by what they can actually
     // fill against the life in hand and the colours left in our own deck.
     // `V7_BLADE_ARITH=<weight>`; 0 keeps v7's flat 6/blade.
-    let blade_arith: f64 = std::env::var("V7_BLADE_ARITH")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .filter(|value: &f64| value.is_finite() && *value >= 0.0)
-        .unwrap_or(0.0);
+    let blade_arith: f64 = MAIN_BLADE_ARITH.with(|c| {
+        let override_w = c.get();
+        if override_w >= 0.0 {
+            return override_w;
+        }
+        std::env::var("V7_BLADE_ARITH")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .filter(|value: &f64| value.is_finite() && *value >= 0.0)
+            .unwrap_or(0.0)
+    });
     // MEASURED 2026-09-23: Pass=-0.05 + energy tax exploded draws
     // (1569/3000, avg turns 3.7)  Eevery UseAbility at score≁E then beat
     // Pass and main never ended cleanly. Keep flat 0.0 (v6 doctrine).

@@ -40,6 +40,7 @@ static int gaps;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -52,6 +53,7 @@ static int gaps;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -775,7 +777,7 @@ static int stage_member_count(TestGame *tg, int pl)
 
 static void test_q207_multiname_contains_three_names_and_occupies_one_slot(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int multi = test_id(&game, MULTI_AYUMU);
@@ -797,7 +799,7 @@ static void test_q207_multiname_contains_three_names_and_occupies_one_slot(void)
 
 static void test_q208_multiname_and_single_occupy_two_slots(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int multi = test_id(&game, MULTI_AYUMU);

@@ -224,7 +224,7 @@ static void kasumi_turn1_ability_offered_only_once_per_turn(void)
 /* #[test] kasumi_turn1_ability_available_again_next_turn */
 static void kasumi_turn1_ability_available_again_next_turn(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int kasumi = setup_kasumi(&game, NIJI_LIVE_1);

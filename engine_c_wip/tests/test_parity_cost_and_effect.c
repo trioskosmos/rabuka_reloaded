@@ -42,6 +42,7 @@ static int checks;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -54,6 +55,7 @@ static int checks;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -176,11 +178,32 @@ static int activate_ability_index(TestGame *tg, int card, int idx)
             tg->state.queue.resume_host = card;
             tg->state.queue.resume_eff = ab.effect;
             /* The cost prompt's resume may dereference the tree, so hand the
-             * whole ability to the keepalive and detach it from `ab`. */
+             * whole ability to the keepalive and detach it from `ab`.
+             *
+             * The handoff must be TOTAL. `Ability` is an OWNING struct, so
+             * `g.activation_keepalive = ab` is a shallow copy: nulling only
+             * ab.cost / ab.effect (what this used to do) leaves full_text /
+             * triggerless_text / triggers owned by BOTH copies. The
+             * `rb_free_ability(&ab)` at the end of this function then released
+             * those three blocks, and the keepalive's own release —
+             * choice.c:5549-5552 `rb_free_ability(&g->activation_keepalive)`
+             * when the prompt finally closes — freed the SAME three blocks a
+             * second time: heap double free -> allocator abort -> SIGABRT
+             * (rc 1536) with the suite's final tally never printed.
+             *
+             * Measured 2026-10-04: the abort is inside `free(a->full_text)`,
+             * the first of the three string frees in rb_free_ability
+             * (vm.c:1338-1343) — no effect_free probe fires at all.
+             *
+             * This is verbatim the defect engine-side rb_drain_keep_alive
+             * documents (ability_queue.c:1302-1318: "Zeroing the local before
+             * the release makes rb_free_ability a no-op and leaves a single
+             * owner") and that tests/test_parity_cce_gaps.c:1486-1501 was
+             * already fixed for; this helper was re-introducing it by hand.
+             * memset() makes the local release a no-op and leaves one owner. */
             tg->state.activation_keepalive = ab;
             tg->state.activation_keepalive_valid = 1;
-            ab.cost = NULL;
-            ab.effect = NULL;
+            memset(&ab, 0, sizeof(ab));
         }
     }
     if (ab.effect && paid && !test_has_pending_choice(tg))
@@ -381,7 +404,7 @@ static const char *pending_zone(TestGame *tg)
  * ══════════════════════════════════════════════════════════════════════════ */
 static void test_q196_mandatory_cost_then_draw(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     bare_board(&tg);
 
@@ -425,7 +448,7 @@ static void test_q196_mandatory_cost_then_draw(void)
  *     prompt. */
 static void test_q196_hand_only_gate_from_stage(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     bare_board(&tg);
 
@@ -545,7 +568,7 @@ static void test_q214_optional_score_energy_pay_and_decline(void)
 
     /* ── case 3: score-2 live but only 1 energy → the gate auto-skips ──── */
     {
-        TestGame tg; test_game_new(&tg);
+static        TestGame tg; test_game_new(&tg);
         int shizuku, filler;
         if (!need(&tg, &shizuku, "PL!N-bp5-003-R", 1) ||
             !need(&tg, &filler, "PL!-sd1-010-SD", 1)) { CHECK(0, "B3 fixtures"); return; }
@@ -643,7 +666,7 @@ static void test_success_score_gate_offers_no_cost(void)
 
 static void test_success_score_sequential_discard_two(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     bare_board(&tg);
 
@@ -685,7 +708,7 @@ static void test_pb1_007_cost_scales_with_success_count(void)
     for (unsigned r = 0; r < sizeof(rows) / sizeof(rows[0]); r++) {
         /* ── the COST shape, read through the resolver's real cost path ───── */
         {
-            TestGame tg;
+static            TestGame tg;
             test_game_new(&tg);
             bare_board(&tg);
             int me, lily, filler, mus_live;
@@ -746,7 +769,7 @@ static void test_pb1_007_insufficient_hand_and_group_filter(void)
 {
     /* Insufficient hand: a cost of 3 with 2 cards cannot be paid. */
     {
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         bare_board(&tg);
         int me, lily, filler;
@@ -814,7 +837,7 @@ static void discard_two_setup(TestGame *tg, int watanabe, int hanamaru, int fill
 
 static void test_discard_two_cost_moves_two_cards(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
 
     int watanabe, hanamaru, filler, target;
@@ -871,7 +894,7 @@ static void test_discard_two_multi_index_answer_in_one_call(void)
     /* The Rust twin pays the two-card cost with ONE select_indices(&[0, 1]).
      * choice.c:2438 collapses a SelectCard answer to selected_indices[0], so
      * this is the direct pin for that defect: keep it strict. */
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
 
     int watanabe, hanamaru, filler, target;
@@ -915,7 +938,7 @@ static void chika_setup(TestGame *tg, int chika, int filler)
 
 static void test_reveal_cost_cost20_places_under_and_draws(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
 
     int chika, cost20, cost20b, low;
@@ -946,7 +969,7 @@ static void test_reveal_cost_cost20_places_under_and_draws(void)
 
 static void test_reveal_cost_low_cost_not_selectable(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
 
     int chika, low;
@@ -970,7 +993,7 @@ static void test_reveal_cost_low_cost_not_selectable(void)
 
 static void test_reveal_cost_cost10_placed_under(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
 
     int chika, cost10, low;
@@ -1011,7 +1034,7 @@ static void bp3_021_setup(TestGame *tg, int live, int mate, int filler, int wait
 
 static void test_optional_recovery_accepted_reaches_deck_top(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
 
     int live, mate, filler, wait_member;
@@ -1040,7 +1063,7 @@ static void test_optional_recovery_accepted_reaches_deck_top(void)
 
 static void test_optional_recovery_declined_preserves_waitroom(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
 
     int live, mate, filler, wait_member;
@@ -1291,7 +1314,7 @@ static void test_optional_debut_cost_mill_paid_and_declined(void)
 {
     /* paid */
     {
-        TestGame tg; test_game_new(&tg);
+static        TestGame tg; test_game_new(&tg);
         int meko, filler, filler2, sblive;
         if (!need(&tg, &meko, "PL!HS-pb1-004-R", 1) ||
             !need(&tg, &filler, FILLER_M, 1) ||
@@ -1362,7 +1385,7 @@ static void test_wait_other_group_cost(void)
 
     /* Q163: the opponent's 虹ヶ咲 member is not a cost target */
     {
-        TestGame tg; test_game_new(&tg);
+static        TestGame tg; test_game_new(&tg);
         int emma, opp_niji, filler;
         if (!need(&tg, &emma, "PL!N-bp3-008-R＋", 1) ||
             !need(&tg, &opp_niji, "PL!N-sd1-001-SD", 1) ||
@@ -1564,7 +1587,7 @@ static void test_optional_two_card_cost_pay_and_skip(void)
 
     /* declined */
     {
-        TestGame tg; test_game_new(&tg);
+static        TestGame tg; test_game_new(&tg);
         int izumi, kozue, tsuzuri, filler;
         if (!need(&tg, &izumi, "PL!HS-sd1-008-SD", 1) ||
             !need(&tg, &kozue, "PL!HS-bp1-012-PR", 1) ||
@@ -1641,7 +1664,7 @@ static void test_center_compound_cost_paid_before_effect(void)
 
     /* not in the centre: the position gate blocks the activation entirely */
     {
-        TestGame tg; test_game_new(&tg);
+static        TestGame tg; test_game_new(&tg);
         int yoshiko, chika;
         if (!need(&tg, &yoshiko, "PL!S-bp3-006-R＋", 1) ||
             !need(&tg, &chika, "PL!-sd1-001-SD", 1)) { CHECK(0, "N2 fixtures"); return; }
@@ -1709,7 +1732,7 @@ static void test_maki_cost_discard_and_all_match_blade(void)
      * read 3+3 and then 3+3+3, which looks exactly like an engine bug. */
     int maki, filler, ruby, mus_maki;
     {
-        TestGame ids;
+static        TestGame ids;
         test_game_new(&ids);
         if (!need(&ids, &maki, "PL!-bp6-006-R＋", 1) ||
             !need(&ids, &filler, FILLER_M, 1) ||
@@ -1737,7 +1760,7 @@ static void test_maki_cost_discard_and_all_match_blade(void)
 
     /* all five revealed cards carry heart02 → blade +3 and a μ's pick */
     {
-        TestGame tg; test_game_new(&tg);
+static        TestGame tg; test_game_new(&tg);
         int top[5] = { ruby, ruby, ruby, ruby, mus_maki };
         maki_setup(&tg, maki, filler, top, 5);
         activate_ability_index(&tg, maki, 0);
@@ -1777,7 +1800,7 @@ static void test_maki_cost_discard_and_all_match_blade(void)
  * ══════════════════════════════════════════════════════════════════════════ */
 static void test_gap_sequential_cost_root_dropped_by_bridge(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     bare_board(&tg);
 

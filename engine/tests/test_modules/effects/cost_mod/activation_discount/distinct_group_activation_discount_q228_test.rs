@@ -164,6 +164,108 @@ fn distinct_group_activation_discount_q228_reduction_charges_effective_cost() {
     );
 }
 
+/// The discount counts MY stage only: 「自分のステージにいるメンバーの中の
+/// グループ名1種類につき」.
+///
+/// Every other test in this file varies player 1's stage and leaves player 2's
+/// alone, so nothing here can tell 「自分のステージ」 from 「両者のステージ」 — the
+/// opponent's members never appear in a discount assertion at all. Since the
+/// opponent's board is exactly where this ability does its waiting (「相手の
+/// ステージにいるコスト10以下のメンバー」), it is the natural place for a stage read
+/// to reach by mistake.
+///
+/// The shape is chosen so the two readings disagree in the strongest possible way.
+/// Player 1 holds ONE member, so the correct cost is 4E − 1 = 3 against 2 energy:
+/// not affordable. If the opponent's groups were counted too, three distinct
+/// groups on player 2 would take the cost to 0 and the activation would be offered
+/// — which is what this asserts it is not.
+#[test]
+fn distinct_group_activation_discount_q228_ignores_the_opponents_stage() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let umi = game.id("PL!-bp5-004-R＋"); // μ's — the only card on MY stage
+    let liella = game.id("PL!SP-bp1-007-R＋");
+    let niji = game.id("PL!N-bp1-012-R＋");
+    let joint = game.id("LL-bp1-001-R＋"); // 虹ヶ咲 + Liella! + 蓮ノ空
+
+    game.state.player1.stage.stage = [umi, -1, -1];
+    game.state.player2.stage.stage = [liella, niji, joint];
+
+    assert_eq!(
+        game.state.distinct_stage_groups("p1"),
+        1,
+        "precondition: my stage holds a single group"
+    );
+    assert!(
+        game.state.distinct_stage_groups("p2") >= 3,
+        "precondition: the opponent's stage is the one with group variety in it — \
+         got {}",
+        game.state.distinct_stage_groups("p2")
+    );
+
+    game.give_energy(2); // one short of the correct cost of 3
+
+    let offered = game_setup::generate_possible_actions(&game.state)
+        .into_iter()
+        .any(|a| {
+            a.action_type == game_setup::ActionType::UseAbility
+                && a.parameters.as_ref().and_then(|p| p.card_id) == Some(umi)
+        });
+    assert!(
+        !offered,
+        "cost is 4E − 1 (my stage only) = 3, which 2 energy cannot pay. The \
+         opponent's {} groups must not discount it",
+        game.state.distinct_stage_groups("p2")
+    );
+
+    // And the press is refused without spending anything, so the check above is
+    // not merely about which offers get generated.
+    let err = game.try_activate_ability(umi).unwrap_err();
+    assert!(
+        err.contains("cost") || err.contains("energy"),
+        "expected affordability rejection, got: {err}"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        2,
+        "a rejected activation leaves the energy untouched"
+    );
+}
+
+/// The same board with the opponent's stage emptied — the discount is identical.
+///
+/// Without this, the test above could pass for the wrong reason: an implementation
+/// that ignored BOTH stages would also decline to offer the activation. Together
+/// the two say the number comes from my stage and from nothing else.
+#[test]
+fn distinct_group_activation_discount_q228_same_cost_with_an_empty_opponent_stage() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let umi = game.id("PL!-bp5-004-R＋");
+    let joint = game.id("LL-bp1-001-R＋");
+
+    game.state.player1.stage.stage = [umi, joint, -1]; // μ's + 3 groups = 4 → cost 0
+    game.state.player2.stage.stage = [-1, -1, -1];
+
+    assert_eq!(game.state.distinct_stage_groups("p1"), 4);
+    assert_eq!(game.state.distinct_stage_groups("p2"), 0);
+
+    let offer = game_setup::generate_possible_actions(&game.state)
+        .into_iter()
+        .find(|a| {
+            a.action_type == game_setup::ActionType::UseAbility
+                && a.parameters.as_ref().and_then(|p| p.card_id) == Some(umi)
+        })
+        .expect("four of my own groups reduce the cost to zero");
+    assert_eq!(
+        offer.parameters.as_ref().and_then(|p| p.final_cost),
+        Some(0),
+        "the discount comes from my stage alone"
+    );
+}
+
 #[test]
 fn distinct_group_activation_selects_one_eligible_opponent_physical_instance() {
     let db = load_real_database();

@@ -68,7 +68,7 @@ pub const FLIP_SAMPLES: usize = 192;
 /// score. Index = printed score, clamped.
 const SCORE_MEDIAN: [i32; 12] = [2, 3, 5, 7, 10, 12, 14, 16, 19, 21, 23, 25];
 const SCORE_MAX: [i32; 12] = [4, 4, 8, 9, 12, 14, 15, 18, 21, 21, 23, 25];
-const SCORE_SLOTS: usize = SCORE_MEDIAN.len();
+pub const SCORE_SLOTS: usize = SCORE_MEDIAN.len();
 
 /// One placement is 1/3 of the game: three successes win it (1.2.1.1) and a
 /// won check places exactly one card (8.4.7).
@@ -105,7 +105,7 @@ impl Drop for RngGuard {
 }
 
 #[inline]
-fn clamp_score(score: i32) -> usize {
+pub fn clamp_score(score: i32) -> usize {
     score.clamp(0, SCORE_SLOTS.i32_count() - 1).usize_count()
 }
 
@@ -580,9 +580,141 @@ pub struct OppModel {
     /// forecast rate when they attack second and we cannot see them yet.
     #[allow(dead_code)]
     pub commit_rate: f64,
+    /// How many extra score points the opponent is expected to buy with the
+    /// information our own set size gives them.
+    ///
+    /// ## This is the term the whole live-set model was missing
+    ///
+    /// 8.2.2 sets our cards face-down; 8.2.4 then lets the opponent set theirs;
+    /// 8.3 is where anything is revealed. **The only thing that crosses the
+    /// boundary is a COUNT.** They never see which card, only how many - and a
+    /// count is exactly the signal they need, because in this deck a bigger set
+    /// is a bigger score: the four lives score 1/2/4/7.
+    ///
+    /// Every other part of `OppModel` treats the opponent's score as a fixed
+    /// distribution that our choice cannot move. That is a Nash-within-one-head
+    /// error: it assumes we commit into a static environment when our own
+    /// commitment is an input to what they can build. So the bot cannot see
+    /// that showing a big set *invites* a bigger counter, and it picks its set
+    /// as if the comparison were already booked.
+    ///
+    /// Measured context for why this matters more than it sounds: the whole
+    /// score comparison turns on about a point (median deficit on a lost
+    /// comparison is 1, p75 is 2), and 29% of contested checks are exact ties.
+    /// One point of score is the entire game, and one extra card is several
+    /// points - which is precisely what the opponent gets to answer.
+    ///
+    /// 0.0 is the shipped behaviour exactly. `v13` exists to find out whether
+    /// the term is worth a non-zero weight at all before anyone decides it
+    /// should have one.
+    pub counter: f64,
+    /// P(they pass | they must REACH score t), indexed by 	.
+    /// See V8_PRESSURE in uild_with for why this is the largest term.
+    pub pressure: [f64; SCORE_SLOTS],
+    /// Whether pressure carries real information or is a flat placeholder.
+    pub pressure_known: bool,
 }
 
 impl OppModel {
+    /// ## EVALUATION TOOL — NOT A LEGAL BOT
+    ///
+    /// An exact model of the opponent, built by reading their **real** board and
+    /// their **real** committed set. It cheats deliberately and must never be
+    /// reachable from a shipped policy: it is an evaluation instrument, not a
+    /// strategy.
+    ///
+    /// ## Why a cheating evaluator is the right instrument
+    ///
+    /// A best response needs the information it responds to. That is not a flaw
+    /// in the instrument — it is what makes the result a *lower bound* rather
+    /// than another guess. Timbers et al., *Approximate Exploitability:
+    /// Learning a Best Response in Large Games*, IJCAI 2022 / arXiv:2004.09677,
+    /// show that swapping the exact opponent policy for an approximate one only
+    /// loosens the bound and still leaves it a valid lower bound.
+    ///
+    /// ## Why this is the only thing left that can find a bug
+    ///
+    /// Every intervention in this project's record is self-play. A symmetric
+    /// change cannot move a symmetric win rate off 50%, so all of them are blind
+    /// to any defect **both seats share** — and `v9` is compared almost
+    /// exclusively against itself. A flaw in `v9` is therefore invisible to the
+    /// entire existing record, and no further self-play tuning will surface it.
+    ///
+    /// This reads the opponent's true position, so it can win by exploiting a
+    /// shared mistake. **The per-decision traces are the point**: a large win
+    /// names the decisions `v9` gets wrong, and those become legitimate rules to
+    /// encode. A small win means `v9` is genuinely hard.
+    ///
+    /// The set is a point mass, not a distribution: nothing is left to be
+    /// uncertain about.
+    pub fn omniscient(gs: &GameState, me: u8, db: &CardDatabase) -> Self {
+        let opp = 1 - me;
+        let board = board_pool(gs, opp, db);
+        let sampler = FlipSampler::build(gs, opp, db);
+        let pools = sampler.sample_pools(&board, flip_samples());
+        let zone = &gs.seat_player(opp).live_card_zone;
+        let mut score: i32 = expected_yell_score(gs, opp, db, active_blades(gs, opp, db));
+        let mut need: Acc = [0i16; 11];
+        for &cid in zone.cards.iter() {
+            score += printed_score(db, cid);
+            for (k, v) in need.iter_mut().zip(life_need(gs, cid).iter()) {
+                *k += *v;
+            }
+        }
+        let mut dist = [0.0f64; SCORE_SLOTS];
+        if !zone.cards.is_empty() {
+            dist[clamp_score(score)] = 1.0;
+        }
+        Self {
+            set_size: zone.cards.len(),
+            success: gs.seat_player(opp).success_live_card_zone.cards.len(),
+            score_dist: dist,
+            // 8.4.3.2: an empty live zone is no live and no placement.
+            pass_prob: if zone.cards.is_empty() {
+                0.0
+            } else {
+                pass_probability(&pools, &need)
+            },
+            commitment: Commitment::Observed,
+            commit_rate: 1.0,
+            counter: 0.0,
+            pressure: [0.0; SCORE_SLOTS],
+            pressure_known: false,
+        }
+    }
+
+    /// `build_with`, plus the count-as-signal term. See `OppModel::counter`.
+    pub fn with_counter(mut self, k: f64) -> Self {
+        if k.is_finite() && k > 0.0 {
+            self.counter = k;
+        }
+        self
+    }
+
+    /// `with_counter`, plus our published score: the opponent must REACH it.
+    ///
+    /// This is the `V8_PRESSURE` application point. `pass_prob` as built is the
+    /// rate against the shipped bar (`2 * their_set_size`); under a published
+    /// total they have to clear a bigger requirement, and `pressure[t]` is
+    /// exactly `P(they clear enough to reach t)`. Only the forecast case is
+    /// conditioned: when we attack second their commitment is already observed
+    /// and already inside the model, so re-deriving it from a score we would
+    /// publish *after* they committed would be fiction.
+    pub fn under_our_score(&self, our_score: i32) -> Self {
+        if !self.pressure_known || our_score <= 0 {
+            return self.clone();
+        }
+        if matches!(self.commitment, Commitment::Observed) {
+            return self.clone();
+        }
+        let need = clamp_score(our_score).saturating_sub(1);
+        let mut out = self.clone();
+        if self.pass_prob > 0.0 && self.commit_rate > 0.0 {
+            out.pass_prob = (self.pressure[need] * self.commit_rate).clamp(0.0, 1.0);
+        }
+        out
+    }
+
     pub fn build(gs: &GameState, me: u8, db: &CardDatabase) -> Self {
         Self::build_with(gs, me, db, commitment_of(gs, me))
     }
@@ -834,6 +966,61 @@ impl OppModel {
         // board commits more reliably than one with an empty stage.
         let target = (2 * set_size).clamp(1, SCORE_SLOTS - 1).i32_count();
         let bar = score_median_hearts(target);
+        // `V8_PRESSURE`: their pass probability as a function of the score WE
+        // publish, indexed by our total. Computed now, resolved after `clears`.
+        //
+        // ## Why this is the biggest remaining term
+        //
+        // 43% of all placements come from the OPPONENT failing their own check
+        // (measured: they pass 55.7% of committed checks). That is the single
+        // largest source of placements in the game, and until now it was
+        // exogenous — `bar` came from THEIR set size alone:
+        //
+        //     let target = (2 * set_size).clamp(1, ...);
+        //     let bar    = score_median_hearts(target);
+        //
+        // which never mentions what we published. But 8.4.6 compares TOTALS, so
+        // to place at all they must reach `our_score + 1`, and a bigger score
+        // needs a bigger requirement. **Publishing a high score therefore
+        // suppresses their pass rate** — a channel our own play can push which
+        // the bot cannot currently express.
+        //
+        // This is a different mechanism from `OppModel::counter`, which refuted
+        // at -6 pp. That one shifted the score COMPARISON — who wins when both
+        // pass. This one shifts whether they pass AT ALL, feeding the term that
+        // produces 43% of placements rather than the small correction on `we_c`.
+        //
+        // It is also why this is not the `V8_COMMIT_GAME` equilibrium, which was
+        // behaviourally identical to the control: a constant shift across
+        // candidates cannot reorder them, but a per-candidate bar can, because
+        // `our_score` differs between candidates.
+        let sampled_pressure: Option<[f64; SCORE_SLOTS]> = match sampled_yield {
+            Some(ref totals) if !totals.is_empty() => {
+                let n = totals.len() as f64;
+                Some(core::array::from_fn(|slot| {
+                    // To beat a total of `slot` they must REACH slot + 1.
+                    let need = score_median_hearts(slot as i32 + 1);
+                    (totals.iter().filter(|&&t| board_total + t >= need).count() as f64 / n)
+                        .min(1.0)
+                }))
+            }
+            // Without the coverage sampler, fall back to `YIELD_PRIOR` — the same
+            // hand-fitted yield distribution the shipped `clears` already uses, so
+            // the pressure curve carries no NEW assumption. It is a hard
+            // threshold, but it still varies with the target, which is all this
+            // term needs.
+            _ => Some(core::array::from_fn(|slot| {
+                let need = score_median_hearts(slot as i32 + 1);
+                YIELD_PRIOR
+                    .iter()
+                    .filter(|(yield_per_blade, _)| {
+                        f64::from(board_total) + yield_per_blade * blades as f64 >= f64::from(need)
+                    })
+                    .map(|(_, w)| *w)
+                    .sum::<f64>()
+                    .min(1.0)
+            })),
+        };
         // `V8_OPP_ENSEMBLE`: ensemble determinization over the opponent's
         // UNKNOWN heart composition, replacing the single hard threshold.
         //
@@ -939,6 +1126,10 @@ impl OppModel {
         } else {
             clears * commit_rate
         };
+        // Without a sampled yield there is nothing to condition on, so the
+        // honest fallback is the shipped bar for every target. Degrading to known
+        // behaviour beats inventing a slope.
+        let pressure = sampled_pressure.unwrap_or_else(|| core::array::from_fn(|_| clears));
 
         log::debug!(
             "v8 opp t{} me{} {} zone={observed} modelled_set={set_size} board={board_total} \
@@ -959,6 +1150,9 @@ impl OppModel {
             pass_prob,
             commitment,
             commit_rate,
+            counter: 0.0,
+            pressure,
+            pressure_known: sampled_pressure.is_some(),
         }
     }
 
@@ -1044,6 +1238,9 @@ impl OppModel {
             pass_prob,
             commitment: self.commitment,
             commit_rate: self.commit_rate,
+            counter: self.counter,
+            pressure: self.pressure,
+            pressure_known: self.pressure_known,
         }
     }
 
@@ -1169,11 +1366,20 @@ impl OppModel {
         our_set_size: usize,
         our_success: usize,
     ) -> (f64, f64, f64) {
-        let _ = our_set_size;
-        let _ = self.set_size;
+        // The count they can see raises the score they are building to beat.
+        // `self.set_size` is what they actually committed when we attack second
+        // and it is already inside `score_dist`, so the shift is only for the
+        // forecast case - us attacking first, where they will choose their set
+        // size *after* seeing ours. Applying it unconditionally would double
+        // count the observed case.
+        let lift = if matches!(self.commitment, Commitment::Unobserved) {
+            (self.counter * our_set_size as f64).round() as i32
+        } else {
+            0
+        };
         let mut below = 0.0;
         let mut above = 0.0;
-        let idx = clamp_score(our_score);
+        let idx = clamp_score(our_score + lift).max(0) as usize;
         for (score, weight) in self.score_dist.iter().enumerate() {
             if *weight <= 0.0 {
                 continue;
@@ -1184,7 +1390,7 @@ impl OppModel {
                 above += weight;
             }
         }
-        let tie = self.score_dist[idx];
+        let tie = if lift > 0 { 0.0 } else { self.score_dist[idx] };
         let we_tie_place = our_success < 2;
         let they_tie_place = self.success < 2;
         let we_place = below + if we_tie_place { tie } else { 0.0 };
@@ -2074,6 +2280,9 @@ mod tests {
             pass_prob,
             commitment: Commitment::Observed,
             commit_rate: 1.0,
+            counter: 0.0,
+            pressure: [0.0; SCORE_SLOTS],
+            pressure_known: false,
         }
     }
 
@@ -2167,6 +2376,14 @@ mod tests {
         let early = check_outcome(1.0, 5, 1, 1, &opp);
         let at_match_point = check_outcome(1.0, 5, 1, 2, &opp);
         assert!(early.p_place > at_match_point.p_place);
+    }
+
+    #[test]
+    fn tie_places_regardless_of_set_size_below_match_point() {
+        let opp = opp_model(1, 0, 1.0, &[(5, 1.0)]);
+        let multi_card_tie = check_outcome(1.0, 5, 2, 1, &opp);
+        let at_match_point = check_outcome(1.0, 5, 1, 2, &opp);
+        assert!(multi_card_tie.p_place > at_match_point.p_place);
     }
 
     /// The free win (8.4.3.2) falls out of the model rather than being a

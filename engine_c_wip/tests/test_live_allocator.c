@@ -71,7 +71,7 @@ static RbLiveSnapshot *perform_batch(TestGame *tg, int pl)
 
 static void test_zero_blade_does_not_reveal(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_game_cards(&tg);
     int live = test_id(&tg, "PL!HS-bp1-019-L");
@@ -90,7 +90,7 @@ static void test_zero_blade_does_not_reveal(void)
 static void test_b_heart07_doubles_and_restricts(void)
 {
     for (int mode = 0; mode < 3; mode++) {
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         clear_game_cards(&tg);
         int live = test_id(&tg, mode == 1 ? "PL!-sd1-020-SD" : "PL!HS-bp1-019-L");
@@ -120,7 +120,7 @@ static void test_b_heart07_doubles_and_restricts(void)
 
 static void test_insufficient_b_heart07_fails(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_game_cards(&tg);
     int live = test_id(&tg, "PL!HS-bp1-019-L");
@@ -139,7 +139,7 @@ static void test_insufficient_b_heart07_fails(void)
 
 static void test_yell_order_and_waited_state(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_game_cards(&tg);
     int live = test_id(&tg, "PL!HS-bp1-019-L");
@@ -166,7 +166,7 @@ static void test_yell_order_and_waited_state(void)
 
 static void test_structured_yell_modifier(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_game_cards(&tg);
     int live = test_id(&tg, "PL!HS-bp1-019-L");
@@ -207,7 +207,7 @@ static void test_backtracking_and_wildcards(void)
 
 static void test_score_icon_yell_increments_live_score(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_game_cards(&tg);
     int live = test_id(&tg, "PL!-sd1-019-SD");
@@ -229,7 +229,7 @@ static void test_score_icon_yell_increments_live_score(void)
 
 static void test_batch_yell_cards_are_conserved(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_game_cards(&tg);
     int live = test_id(&tg, "PL!HS-bp1-019-L");

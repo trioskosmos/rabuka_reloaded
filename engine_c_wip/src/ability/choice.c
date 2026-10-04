@@ -195,7 +195,7 @@ static int  stage_choice_accepts(const GameState *g, int cid);
 static int  stage_publish_selected(GameState *g, int cid);
 
 /* Rust's SelectionContext carries `cost_limit: Option<u8>` / `cost_total:
-   Option<u8>` (selection.rs:55-58), and move_cards.rs:2700-2772 applies each ONLY
+   Option<u8>` (selection.rs:55-58), and effects/move/mod.rs:2656-2790 applies each ONLY
    when it is Some. The C's RbChoice is flat and cannot tell None from Some(0):
    rb_emit_choice zeroes it and the producer only writes the field when the
    ability carries that extra. rb_move_execute_selected_cards_from_zone then tests
@@ -225,7 +225,7 @@ static int choice_prompt_cost_total(const RbChoice *ch)
    rb_move_execute_selected_cards_from_zone expects. Rust puts the same list
    on the Choice (move/selection.rs:38 `.characters(filter.characters)`) and
    execute_selected_cards_from_zone applies it
-   (move_cards.rs:2716-2723: `!card_matches_characters(...) => continue`), so
+   (effects/move/mod.rs:178-183: `!card_matches_characters(...) => continue`), so
    leaving the C argument at NULL meant 桜坂しずく's 「手札からコスト4以下の
    「桜坂しずく」のメンバーカードを1枚」 (PL!N-pb1-015-R) deployed the `mu's`
    filler instead of the named member. */
@@ -1080,7 +1080,21 @@ int rb_resolver_build_reprompt_full(RbAbilityResolver *self, GameState *g, const
     ch.count=count; ch.allow_skip=allow_skip;
     if (en) strncpy(ch.description,en,sizeof(ch.description)-1);
     if (tpid) strncpy(ch.target,tpid,sizeof(ch.target)-1);
-    if (ctx && ctx->card_type) strncpy(ch.card_type,ctx->card_type,sizeof(ch.card_type)-1);
+    /* W1 (-Waddress). `ctx->card_type` is `char card_type[32]`, so `ctx->card_type`
+       in a boolean context is `char *` and the old `if (ctx && ctx->card_type)`
+       could NEVER be false -- it was a null check written where an
+       `is_some()` was meant. Rust's twin is `SelectionContext::card_type:
+       Option<String>` (choice.rs:34) fed straight into
+       `ChoiceBuilder::card_type(Option<String>)` (types.rs:479, :97) by
+       `build_reprompt` (choice.rs:1188), so the guard is `card_type.is_some()`.
+       The C's `RbSelectionContext` has no `has_card_type` flag, so `None` is not
+       representable and `[0]` is the faithful test -- and it is the test the very
+       NEXT line already uses for `group` (also `Option<String>` in Rust, also a
+       bare `char[32]` here). Behaviour is provably unchanged either way: `ch` was
+       memset at :1077, so `strncpy` of an empty string re-writes the NUL that is
+       already there. The check is kept, not deleted, because it is the only thing
+       standing between a future `ctx->card_type` and an unconditional copy. */
+    if (ctx && ctx->card_type[0]) strncpy(ch.card_type,ctx->card_type,sizeof(ch.card_type)-1);
     if (ctx && ctx->group[0]) strncpy(ch.filter_group,ctx->group,sizeof(ch.filter_group)-1);
     (void)ja; (void)filtered; (void)n_filtered; (void)cost_total; (void)cost_total_op;
     ch.route=RB_ROUTE_SELECT_CARDS;
@@ -1186,8 +1200,8 @@ static int choice_pay_skip_answer(const RbChoice *ch, int selected_idx)
    entry records `optional_cost_result == Some(false)`, so
    `run_ability_effect` (engine.rs:267-286) is never reached AND the
    remaining commands of that resolution are never resumed — in Rust they are
-   the entry's OWN `pending_actions` (ability_queue.rs:521 set_pending_actions
-   stores an owned Vec), which the stop simply leaves in place.
+the entry's OWN `pending_actions` (queue.rs:532-536 `set_pending_actions`
+    stores an owned Vec), which the stop simply leaves in place.
 
    The C parks the same remaining commands as raw pointers on the queue
    (queue.resume_parent / resume_child for the sibling effects, queue.deferred
@@ -1973,6 +1987,33 @@ static int choice_handle_multi_indices(RbAbilityResolver *self, GameState *g,
     return 0;
 }
 
+/* ── same-unit cost: the C's Selection.moved_cards (choice.rs:821) ──────────
+ *
+ * Rust's resolver is a long-lived field on GameState, so `self.selection`
+ * accumulates across every choice of one ability resolution. The C's
+ * RbAbilityResolver is a LOCAL at both call sites of
+ * rb_resolver_handle_select_card (choice.c:971 and :5332), so
+ * `self->n_moved_cards` is back to 0 on EVERY answer and cannot answer
+ * "how many of this cost's cards have I already paid?". This file-static is
+ * that accumulator: keyed to the queue entry, so a second ability paying its
+ * own cost starts from zero. Every terminal exit out of the hand-cost block
+ * resets it. */
+static int s_same_unit_entry = -1;
+static int s_same_unit_paid;
+
+static int same_unit_paid_count(int entry, int added)
+{
+    if (entry != s_same_unit_entry) { s_same_unit_entry = entry; s_same_unit_paid = 0; }
+    s_same_unit_paid += added;
+    return s_same_unit_paid;
+}
+
+static void same_unit_paid_reset(void)
+{
+    s_same_unit_entry = -1;
+    s_same_unit_paid = 0;
+}
+
 int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const char *selected) {
     if (!g || !g->queue.has_pending) return -1;
     int actor = g->queue.actor;
@@ -2106,7 +2147,77 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
                 }
             }
             self->pending_choice = (RbChoice){0};
+            same_unit_paid_reset();
             return rb_resolver_clear_choice_state_and_resume(self);
+        }
+        /* choice.rs:817-865 — same-unit remainder re-prompt. Rust puts this arm
+         * BETWEEN the "this answer moved nothing" exit above and the any_number
+         * re-prompt below, and it is the ONLY arm whose TOTAL comes from the
+         * cost rather than from the prompt: the gate tests the PROMPT count
+         * (ctx.count, choice.rs:1031) while `total_needed` reads cost.count
+         * (choice.rs:820). The C used one number for both, so 「同じユニット名を
+         * 持つカード2枚を控え室に置いてもよい」 — whose prompt asks for ONE card at a
+         * time — finalized after the first pick instead of re-prompting for the
+         * second: MEASURED prompts=1, one card discarded, no re-prompt, and the
+         * player paid 17 for a 2-card cost. */
+        {
+            const AbilityEffect *cost = rb_entry_cost(g);
+            int same_unit = choice_cost_flag(cost, "same_unit_name", 0);
+            int prompt_count = g->queue.pending.count;   /* choice.rs:1031 ctx.count */
+            int moved_now = self->n_moved_cards - moved_before;
+            if (same_unit && prompt_count > 0 && moved_now == prompt_count) {
+                int total_needed = rb_effect_count_or(cost, 1);   /* choice.rs:820 */
+                /* choice.rs:821 total_moved = self.selection.moved_cards.len().
+                 * NOT self->n_moved_cards: that is 0 on every answer. */
+                int total_moved = same_unit_paid_count(cur, moved_now);
+                if (total_moved < total_needed) {                  /* choice.rs:822 */
+                    int remaining = total_needed - total_moved;
+                    /* choice.rs:828-832 — the unit comes from the FIRST card paid,
+                     * not from the one just answered. */
+                    const char *unit_name = NULL;
+                    if (self->n_moved_cards > 0)
+                        unit_name = rb_card_unit_name(self->moved_cards[0]);
+                    /* choice.rs:833-839 — the whole hand filtered to that unit.
+                     * The C has no `validate` closure at this site, so the unit
+                     * test is intersected with the indices the PREVIOUS prompt
+                     * offered: that is the validation the player was just shown,
+                     * and it is what keeps a different-unit card (lily) out. */
+                    int hand_ids[RB_MAX_ZONE];
+                    int n_hand = rb_zone_cards(g, actor, "hand", hand_ids, RB_MAX_ZONE);
+                    int same_unit_idxs[RB_MAX_ZONE];
+                    int n_same = 0;
+                    int had_filter = (g->queue.pending.n_filtered_indices > 0);
+                    for (int i = 0; i < n_hand && n_same < RB_MAX_ZONE; i++) {
+                        const char *u = rb_card_unit_name(hand_ids[i]);
+                        if (!unit_name || !u || strcmp(u, unit_name) != 0) continue;
+                        if (had_filter) {
+                            int keep = 0;
+                            for (int k = 0; k < g->queue.pending.n_filtered_indices; k++)
+                                if (g->queue.pending.filtered_indices[k] == i) { keep = 1; break; }
+                            if (!keep) continue;
+                        }
+                        same_unit_idxs[n_same++] = i;
+                    }
+                    if (n_same == 0) {
+                        /* choice.rs:840-845 returns Err. This hand-cost block has
+                         * no error channel, so the payment finalizes rather than
+                         * opening a prompt over an empty pool. */
+                        g->mods.last_cost_discard_count = self->n_moved_cards;
+                        if (cur >= 0) g->queue.entries[cur].cost_paid = 1;
+                        same_unit_paid_reset();
+                        return rb_resolver_clear_choice_state_and_resume(self);
+                    }
+                    char en[80];
+                    snprintf(en, sizeof(en),
+                             "Select %d more card(s) with the same unit name", remaining);
+                    /* Rust passes the ja string here too (choice.rs:854);
+                     * choice_build_reprompt ignores it ((void)ja, :1349), so the
+                     * English text is passed twice, as the energy arm does. */
+                    choice_build_reprompt(g, actor, "hand", remaining, en, en, 0,
+                                          same_unit_idxs, n_same);
+                    return 0;
+                }
+            }
         }
         if (is_any_number) {
             /* any_number: after each pick, re-prompt with skip allowed (choice.rs:680-727) */
@@ -2119,6 +2230,7 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
                 if (cur>=0) g->queue.entries[cur].cost_paid=1;
                 memset(&g->queue.pending,0,sizeof(g->queue.pending));
                 g->queue.has_pending=0;
+                same_unit_paid_reset();
                 return rb_resolver_clear_choice_state_and_resume(self);
             }
             if (hand_n > 0) {
@@ -2137,7 +2249,7 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
         if (cost_count > 0 && self->n_moved_cards < cost_count) {
             int remaining = cost_count - self->n_moved_cards;
             int hand_n = g->p[actor].hand.n;
-            if (hand_n == 0) return -1; /* cannot pay */
+            if (hand_n == 0) { same_unit_paid_reset(); return -1; } /* cannot pay */
             char en[64]; char ja[64];
             snprintf(en,sizeof(en),"Select %d more card(s) from hand for cost", remaining);
             snprintf(ja,sizeof(ja),"コストとして手札からさらに%d枚選択", remaining);
@@ -2151,6 +2263,7 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
         if (cur>=0) g->queue.entries[cur].cost_paid=1;
         /* pay deferred sub-costs if any (choice.rs:737 pay_deferred_costs) */
         rb_pay_deferred_costs(g, actor, NULL);
+        same_unit_paid_reset();
         return rb_resolver_clear_choice_state_and_resume(self);
     }
 
@@ -2515,7 +2628,7 @@ int rb_resolver_handle_hand_selection(RbAbilityResolver *self, GameState *g, con
        accumulator, so this port now does the same. The C twin already exists and
        is what the multi-index arm of this same file uses:
        rb_resolver_execute_selected_cards_from_zone -> rb_move_execute_selected_cards_from_zone
-       (move.c:2460, the port of move_cards.rs:2693-2772). It applies the prompt's
+       (move.c:2460, the port of effects/move/mod.rs:2656 `execute_selected_cards_from_zone`). It applies the prompt's
        own card_type / cost_limit / cost_total / group / characters filters,
        resolves the destination through rb_entry_destination, records the
        movement, and can raise a sub-choice (stage placement, success
@@ -3214,7 +3327,7 @@ int rb_resolver_filter_discard_by_budget(RbAbilityResolver *self, GameState *g, 
  *      group / characters, not accepted blindly.
  */
 
-/* move.c's twin of Rust move_cards.rs:2490 finalize_card_movement. Declared
+/* move.c's twin of Rust effects/move/mod.rs:2494 `finalize_card_movement`. Declared
  * here rather than in rabuka.h because move.c owns it and this file only
  * started calling it once the choice path had to run the real finalizer. */
 void rb_move_finalize_card_movement(GameState *g, int actor,
@@ -3256,7 +3369,7 @@ static int choice_effect_target_seat(const GameState *g, int answering_seat)
  * the inline 登場 path the effect tree is a `Ability ab` LOCAL of
  * `rb_play_member` (engine.c:1159-1190) that has already returned by the time
  * the answer arrives — a use-after-return read on every discard answer. When no
- * destination is named, Rust falls back to the DISCARD (move_cards.rs:2573-2583,
+ * destination is named, Rust falls back to the DISCARD (effects/move/mod.rs:2810-2830,
  * as documented in move.c:486-492); the C fell back to `pending.target`, which
  * holds the SEAT ("self"/"opponent"), i.e. it asked for a zone literally named
  * "self", which `zone_bag` cannot resolve — the third way this path could lose a
@@ -3285,7 +3398,7 @@ static const char *choice_effect_state_change(GameState *g)
     return sc;
 }
 
-/* execute_selected_cards_from_zone's filter pass (move_cards.rs:2700-2772 in
+/* execute_selected_cards_from_zone's filter pass (effects/move/mod.rs:2656-2803 in
  * Rust; the C twin of the same pass is move.c:1852-1865). The picked card is
  * re-validated against the PROMPT's own filter rather than trusted, so an
  * answer that slips past the displayed candidate list cannot move a card the
@@ -3332,7 +3445,7 @@ static int choice_discard_pick_legal(const RbChoice *ch, int cid)
     return 1;
 }
 
-/* choice.rs:2594-2606 execute_selected_cards_from_zone, then move_cards.rs:2490
+/* choice.rs:2594-2606 execute_selected_cards_from_zone, then effects/move/mod.rs:2494
  * finalize_card_movement. Returns 1 when the card reached its destination.
  *
  * THE CARD MUST NOT BE DESTROYED. Rust's `place_card_in_zone` returns true for
@@ -3356,10 +3469,10 @@ static int choice_discard_move_card(RbAbilityResolver *self, GameState *g, int s
         return 0;
     }
     int moved[1]; moved[0] = cid;
-    /* move_cards.rs:2490-2572 — zone-exit cleanup, `state_change="wait"`,
+    /* effects/move/mod.rs:2494-2582 — zone-exit cleanup, `state_change="wait"`,
      * record_card_movement, recalculate_constants and the placed card's own
      * 登場. Rust's `Zone::Stage | Zone::EmptyArea | Zone::SameArea` are ONE
-     * dispatch arm (move_cards.rs:2807-2818) and that arm fires the debut
+     * dispatch arm (effects/move/mod.rs:2810-2813) and that arm fires the debut
      * (placement.rs:400-403), so the finalizer is told the canonical "stage"
      * for all three: without it an appeared member never debuts (N13). */
     const char *fin_dst = (!strcmp(dst, "empty_area") || !strcmp(dst, "same_area")) ? "stage" : dst;
@@ -3834,7 +3947,15 @@ void rb_resolver_handle_select_target(RbAbilityResolver *self, GameState *g,
                                         entry_cost, pay);
         return;
     }
-    if (strstr(tgt, "pay_cost_all_discard")) {
+    /* W2 sibling -- the SAME guard as choice.c:5037, in the other dispatcher.
+       Leaving it would have kept the branch dead on the `tgt` path while
+       "fixing" it on the `pending.target` path. `strstr(tgt,
+       "pay_cost_all_discard")` cannot match: Rust's literal is
+       "pay_cost_all:discard_all" (enums.rs:705) and that is what every producer
+       in this tree spells. Routed through the exact-match table, like the arms
+       above it (:3801 "choice", :3804 the pay/skip target, :3843
+       "double_baton_touch") which all use strcmp. */
+    if (rb_select_target_kind_from_str(tgt) == RB_STK_PAY_COST_ALL_DISCARD) {
         rb_handle_pay_cost_all_discard(g, g->queue.actor, sel);
         rb_resolver_clear_choice_state(self);
         rb_drain_ability_queue(g);
@@ -3947,28 +4068,125 @@ void rb_resolver_handle_draw_any_number(GameState *g, const char *selected) {
     rb_drain_ability_queue(g);
 }
 
-/* ── handle_order_selection (choice.rs:2619) — faithful: reorder looked_at / hand order ── */
+/* ── Deck-order context: the C's LookAndSelectStep::Order { ordered } (choice.rs:2990) ──
+ *
+ * File-static for the same reason g_look is: the prompt spans several queue
+ * resumptions, so the accumulator cannot live in a stack frame. choice.c owns
+ * it; the producer (rb_order_prompt_begin, below) is called from the move
+ * site in move_missing.c. */
+static int s_order_cards[RB_MAX_ZONE];
+static int s_order_n;
+static int s_order_player = -1;
+static int s_order_actor = -1;
+
+static void order_emit_prompt(GameState *g, int pl, int actor, int n_pool);
+
+/* rb_order_prompt_begin — the shared body of BOTH Rust producers:
+ *   move/mod.rs:1914-1931  (maybe_prompt_deck_order, called at :2272)
+ *   move/mod.rs:3128-3156  (the look_and_select Finalize arm, needs_order)
+ * Both do the same three things — set the looked_at pool, arm
+ * Choice::SelectTarget{target:"order"} with a "(N cards)" description, and
+ * park. Rust additionally sets in_flight = LookAndSelect{Finalize{destination:
+ * Deck}}, which handle_order_selection matches to start from an EMPTY ordered
+ * list; `s_order_n = 0` below is that empty list (choice.rs:2985-2992).
+ *
+ * `reverse_pool` is mod.rs:1906-1908 (order_pool.reverse() for a Hand source).
+ * Returns 0 when there is no order to ask about (Rust's `taken.len() > 1`). */
+int rb_order_prompt_begin(GameState *g, int actor, const int *cards, int n,
+                          int reverse_pool)
+{
+    if (!g || !cards || n <= 1) return 0;
+    if (n > RB_MAX_ZONE) n = RB_MAX_ZONE;
+    int pl = (actor >= 0 && actor <= 1) ? actor : 0;
+    int pool[RB_MAX_ZONE];
+    for (int i = 0; i < n; i++) pool[i] = cards[i];
+    if (reverse_pool)
+        for (int i = 0, j = n - 1; i < j; i++, j--) {
+            int t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+        }
+    rb_look_clear(pl);
+    for (int i = 0; i < n; i++) rb_look_add(pl, pool[i]);
+    s_order_n = 0;
+    s_order_player = pl;
+    s_order_actor = (actor >= 0 && actor <= 1) ? actor : pl;
+    order_emit_prompt(g, pl, s_order_actor, n);
+    return 1;
+}
+
+static void order_emit_prompt(GameState *g, int pl, int actor, int n_pool)
+{
+    char desc[128];
+    snprintf(desc, sizeof(desc), "Choose order for cards on deck (%d cards)", n_pool);
+    rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, n_pool, 0, "order");
+    rb_choice_set_description(&g->queue.pending, desc);
+    /* rb_emit_choice clears resume_look_owner (choice.c:5394), and the pool
+     * lives in g_look[pl], so the owner has to be restated after the emit. */
+    g->queue.resume_look_owner = pl;
+}
+
+/* handle_order_selection — choice.rs:2984-3055.
+ *
+ * The old body parsed a comma-separated "2,0,1", reordered the looked_at pool
+ * by those indices and then cleared the choice state — it never PLACED the
+ * cards, so 「好きな順番でデッキの上に置く」 left them on the table. Rust removes
+ * ONE index per answer, re-arms the same SelectTarget while more than one card
+ * remains, and on the last answer drains the remainder and inserts every card
+ * at deck position 0 in reverse, so the first-picked card ends up on top. */
+int rb_move_handle_order_selection(GameState *g, const char *selected)
+{
+    if (!g || !selected) return -1;
+    int pl = s_order_player;
+    if (pl < 0 || pl > 1)
+        pl = (g->queue.actor >= 0 && g->queue.actor <= 1) ? g->queue.actor : 0;
+    int pool[RB_MAX_ZONE];
+    int n = rb_looked_at_pool(pl, pool, RB_MAX_ZONE);
+    /* choice.rs:2994-2998 is `selected.parse::<usize>()`, and Rust's integer
+     * from_str accepts an optional '+' then digits ONLY — it rejects leading and
+     * trailing whitespace, which strtol silently skips. Validate the shape
+     * first so the C's notion of a valid index matches Rust's exactly. */
+    {
+        const char *q = selected;
+        if (*q == '+') q++;
+        if (!*q) return -1;
+        for (const char *d = q; *d; d++)
+            if (*d < '0' || *d > '9') return -1;
+    }
+    char *end = NULL;
+    long idx = strtol(selected, &end, 10);
+    if (!end || *end || end == selected || idx < 0 || idx >= n) return -1;
+    if (s_order_n < RB_MAX_ZONE) s_order_cards[s_order_n++] = pool[idx];
+    rb_look_remove(pl, pool[idx]);                 /* ordered.push(remove(idx)) */
+    n = rb_looked_at_pool(pl, pool, RB_MAX_ZONE);
+    if (n > 1) {                                   /* choice.rs:3004-3020 */
+        int actor = (s_order_actor >= 0 && s_order_actor <= 1) ? s_order_actor : pl;
+        order_emit_prompt(g, pl, actor, n);
+        return 1;                                  /* re-armed; the prompt stands */
+    }
+    for (int i = 0; i < n && s_order_n < RB_MAX_ZONE; i++)  /* choice.rs:3021 */
+        s_order_cards[s_order_n++] = pool[i];
+    rb_look_clear(pl);
+    RbPlayer *P = &g->p[pl];                       /* choice.rs:3041-3044 */
+    for (int i = s_order_n - 1; i >= 0; i--) {
+        if (P->deck.n >= RB_MAX_ZONE) break;
+        for (int k = P->deck.n; k >= 1; k--) P->deck.cards[k] = P->deck.cards[k - 1];
+        P->deck.cards[0] = s_order_cards[i];
+        P->deck.n++;
+    }
+    s_order_n = 0;
+    s_order_player = -1;
+    s_order_actor = -1;
+    return 0;
+}
+
 void rb_resolver_handle_order_selection(GameState *g, const char *selected) {
     if (!g) return;
-    /* selected is comma-separated order indices, e.g. "2,0,1" */
-    if (selected && selected[0]) {
-        int order[RB_MAX_ZONE]; int n_order=0;
-        char buf[128]; strncpy(buf, selected, sizeof(buf)-1); buf[sizeof(buf)-1]=0;
-        char *tok=strtok(buf,",");
-        while(tok && n_order < RB_MAX_ZONE) { order[n_order++]=atoi(tok); tok=strtok(NULL,","); }
-        /* reorder looked_at pool if pending was looked_at */
-        if (g->queue.pending.zone[0] && strstr(g->queue.pending.zone,"looked_at")) {
-            int pool[RB_MAX_ZONE]; int n = rb_looked_at_pool(g->queue.actor, pool, RB_MAX_ZONE);
-            int reordered[RB_MAX_ZONE]; int rn=0;
-            for(int i=0;i<n_order && rn<n;i++) if(order[i]>=0 && order[i]<n) reordered[rn++]=pool[order[i]];
-            /* write back via clear+add (simplified) */
-            rb_look_clear(g->queue.actor);
-            for(int i=0;i<rn;i++) rb_look_add(g->queue.actor, reordered[i]);
-        }
-    }
+    int r = rb_move_handle_order_selection(g, selected);
+    /* r < 0 is Rust's Err: the answer is invalid and the prompt stands
+     * (choice.rs:2994-2998). */
+    if (r < 0) return;
+    if (r == 1) return;                 /* re-armed over the shrunken pool */
     RbAbilityResolver tmp; memset(&tmp,0,sizeof(tmp)); tmp.gs=g;
-    rb_resolver_clear_choice_state(&tmp);
-    rb_drain_ability_queue(g);
+    rb_resolver_clear_choice_state_and_resume(&tmp);
 }
 
 /* ── handle_position_change_choice (choice.rs:2652) — faithful: skip, ChoiceRoute::Raw parsing, formation plan, position_change execution ── */
@@ -4086,11 +4304,31 @@ int rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState
                 P->stage[src_idx] = b; P->stage_wait[src_idx] = P->stage_wait[dst_idx];
                 P->stage[dst_idx] = a; P->stage_wait[dst_idx] = P->stage_wait[src_idx];
                 g->position_change_occurred_this_turn = 1;
-                /* Two members swapped places on the stage: a real area move, so both
-                   zones are named explicitly (the 0,0 this replaces was already
-                   stage->stage, see the position_change:opponent:front arm above). */
-                rb_record_card_movement(g, a, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 0, 0);
-                if (b >= 0) rb_record_card_movement(g, b, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 0, 0);
+                /* Two members swapped places on the stage. This is the C's fold of
+                   Rust `record_stage_position_swap` (game_state/modifiers.rs:1799-1857),
+                   so it is now CALLED rather than re-implemented: the twin writes
+                   both position_change_events (modifiers.rs:1817-1838) AND both
+                   turn_area_movements events with `effect_only: true`
+                   (modifiers.rs:1845 / :1853) and `cause_player_id` = the queue's
+                   current entry seat (modifiers.rs:1812-1816).
+
+                   The two `rb_record_card_movement(..., 0, 0)` calls this replaces
+                   were wrong on THREE counts against that Rust: `effect_only` was
+                   0 where Rust passes the literal `true`; `cause_player_id` was
+                   hard-coded to seat 0 instead of the mover seat; and
+                   `position_change_events` was left EMPTY, which is why
+                   `movement:"position_change"` (26 corpus nodes on 26 pairs,
+                   measured with tools/census_fx.c) could never be satisfied by a
+                   real swap. `effect_only` had NO reader anywhere in src/ before
+                   this wave, so nothing could observe the wrong value; the reader
+                   now exists in src/ability/condition.c (Rust
+                   ability/condition/state.rs:869-908 + :524-568, ported as
+                   position_event_matches_filters) and does.
+
+                   `moved_card_id` and order are unchanged: the twin pushes the
+                   source then the target, exactly as the two calls did, and each
+                   still lands in batch_movements / turn_area_movements once. */
+                rb_record_stage_position_swap(g, a, src_idx, b, dst_idx);
                 rb_trigger_auto_abilities_for_movement_current(g);
             }
             rb_resolver_clear_choice_state_and_resume(self);
@@ -4214,11 +4452,12 @@ int rb_resolver_handle_position_change_choice(RbAbilityResolver *self, GameState
                 P->stage[src_idx] = b; P->stage_wait[src_idx] = P->stage_wait[dst_idx];
                 P->stage[dst_idx] = a; P->stage_wait[dst_idx] = P->stage_wait[src_idx];
                 g->position_change_occurred_this_turn = 1;
-                /* Two members swapped places on the stage: a real area move, so both
-                   zones are named explicitly (the 0,0 this replaces was already
-                   stage->stage, see the position_change:opponent:front arm above). */
-                rb_record_card_movement(g, a, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 0, 0);
-                if (b >= 0) rb_record_card_movement(g, b, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 0, 0);
+                /* Same twin as the fixed-destination arm above: Rust
+                   record_stage_position_swap (modifiers.rs:1799-1857). See that
+                   comment for the three counts the two `..., 0, 0)` calls this
+                   replaces got wrong (`effect_only`, `cause_player_id`, and the
+                   unfilled position_change_events). */
+                rb_record_stage_position_swap(g, a, src_idx, b, dst_idx);
                 rb_trigger_auto_abilities_for_movement_current(g);
             }
     } else {
@@ -4528,7 +4767,7 @@ static void choice_run_skipped_continuation(GameState *g, AbilityEffect *def, in
     1. OWNED PATH — the normal case. A queue entry exists, so the entry owns
        deep clones of the tail (compound.c `save_remaining` mirrors
        compound/pause.rs:120-129 `save_remaining_actions`, which lands in
-       ability_queue.rs:521's owned `entry.pending_actions`). Rust consumes
+       (queue.rs:539-545 `save_pending_actions`, the one the T4-8 row is about). Rust consumes
        that list in exactly one place — `resume_pending_actions` (choice.rs:108-126)
        — so the C equivalent lives here too. Take the batch, run it in order,
        free each node as it is consumed, and re-park whatever a sub-prompt
@@ -4796,9 +5035,16 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
     g->queue.auto_ability = 0;
     g->queue.state = RB_QUEUE_RESOLVING;   /* resuming / draining an ability */
     /* The effect parked with the prompt belongs to the ENTRY's ability, and Rust
-       re-runs it FROM THE ENTRY (`AbilityResolver::resume_pending_actions` ->
-       `AbilityQueue::resume_pending_actions`, ability_queue.rs:522-536, which takes
-       `current_entry_mut()` and executes its own parked actions). `actor` above is
+       re-runs it FROM THE ENTRY (`AbilityResolver::resume_pending_actions`,
+       engine/src/ability/choice.rs:117-135, which calls
+       `ability_queue.take_pending_actions()` — queue.rs:549-552 — then re-runs each
+       parked action and stamps `entry.effect_started = true` when one re-opens a
+       prompt, choice.rs:122-125).
+       ⛔ CORRECTION 2026-10-04 (field census). This cited
+       "`AbilityQueue::resume_pending_actions`, ability_queue.rs:522-536", and there
+       is NO SUCH FUNCTION: `ability_queue.rs` no longer exists (the queue is
+       engine/src/ability/queue.rs) and `resume_pending_actions` lives on the
+       RESOLVER in choice.rs, not on the queue. `actor` above is
        the seat that has to ANSWER (rabuka.h, RbChoice.actor: "which player made the
        choice"), which is a different seat whenever the opponent is asked to pick —
        改札's 「ライブ成功時」 is exactly that shape: player 1's ability asks the
@@ -5032,9 +5278,54 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
             rb_resolver_clear_choice_state_and_resume(&self);
             goto choice_resume_tail;
         }
-        /* "discard your entire hand" optional cost (mirrors Rust
-            handle_pay_cost_all_discard routing). */
-        if (g->queue.pending.target && strstr(g->queue.pending.target, "pay_cost_all_discard")) {
+        /* W2 (-Waddress). "discard your entire hand" optional cost.
+           Rust: `Some(SelectTargetKind::PayCostAllDiscard) =>
+           self.handle_pay_cost_all_discard(gs, selected)` (choice.rs:2816-2818),
+           reached through `SelectTargetKind::from_str` (enums.rs:688-708), whose
+           PayCostAllDiscard arm is the EXACT literal "pay_cost_all:discard_all"
+           (enums.rs:705) -- an equality match, not a substring search.
+
+           The old line had FOUR defects, all of which had to be fixed together
+           or the guard stays dead:
+
+             1. `g->queue.pending.target` is `char target[64]` (rabuka.h:943), so
+                it decays to `char *` and the `&&` could NEVER be false. It was
+                a null check written where a presence check was meant. The rest of
+                this file already uses the correct idiom
+                (`pending.target[0] ? ... : ...` at :991/:1983/:2160/:3227/:3725/
+                :4768/:5216); this line was the outlier.
+             2. The literal was "pay_cost_all_discard" -- UNDERSCORE. Every
+                producer and table in this tree spells it "pay_cost_all:
+                discard_all" (enums.c:386/:407, misc.c:2075,
+                tests/test_parity_enums.c:278). `strstr` can therefore never
+                match, so the branch was unreachable even with a correct
+                presence test.
+             3. It used `strstr` where Rust uses an exact match, which would
+                also have fired on a longer unrelated target string.
+             4. FOUND WHEN LANDING, and the reason the corrected routing still
+                did not fire: `rb_clear_pending_choice` (choice.c:4483) memsets
+                the WHOLE `g->queue.pending`, and it runs at :4815 -- 274 lines
+                ABOVE this guard. So `g->queue.pending.target` is not merely
+                always-true-and-then-useless here, it is ALWAYS EMPTY at this
+                point, and the corrected exact-match test could never match it
+                either. Every other arm in this function that needs the prompt's
+                own text reads `saved_pending`, the copy captured at :4761 before
+                the clear (:4784 route, :4790 target, :5265/:5269 the
+                SelectTarget dispatch itself). This guard now reads the same copy,
+                which is what makes the correction observable rather than inert.
+
+           `rb_select_target_kind_from_str` (enums.c:369-388) is the 16/16 exact
+           twin of Rust's `SelectTargetKind::from_str`, so routing through it is
+           Rust's own dispatch rather than a second hand-written table, and it
+           returns -1 for NULL and for every unknown spelling.
+           REACHABILITY: see the W-A2-paycostall row in tools/audit_w_gate.c --
+           2 corpus nodes, PL!SP-bp7-011-P and PL!SP-bp7-011-R, ability #0 each
+           (both 登場, cost `move_cards source=hand destination=discard all=true
+           optional=true`). The prompt is raised and this arm is what answers it;
+           the sibling guard in rb_resolver_handle_select_target is the second
+           route and now matches on the same exact literal. */
+        if (rb_select_target_kind_from_str(saved_pending.target)
+                == RB_STK_PAY_COST_ALL_DISCARD) {
             rb_handle_pay_cost_all_discard(g, actor, selected);
             rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
             return 1;
@@ -5334,12 +5625,15 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
        `queue.state == 3` with `choice_player_id == ""`, where clearing the
        state and re-pausing the same entry immediately yields "p1"/"p2".
        Rust stamps it too: pause_for_choice's "Universal default" arm
-       (ability_queue.rs:345-351) copies player_id into choice_player_id on
-       every pause, and ability_queue.rs:771 asserts it.
+       (engine/src/ability/queue.rs:350-358) copies player_id into choice_player_id
+       on every pause, and queue.rs:771 asserts it. ⛔ CORRECTION 2026-10-04: both
+       lines used to cite `ability_queue.rs`, a file that no longer exists — the
+       queue is engine/src/ability/queue.rs. The 345-351 and 771 line numbers were
+       still correct against it and are kept.
 
        Two C-only side effects of the pause are deliberately neutralized, because
        neither exists in Rust — Rust's pause_for_choice only touches
-       `state` and `choice_player_id` (ability_queue.rs:303-404):
+       `state` and `choice_player_id` (queue.rs:303-404):
 
        (a) Minting a placeholder entry (ability_queue.c:315-327) when there is no
            live entry. rb_emit_choice never minted one — the state stamp used to
@@ -5356,7 +5650,7 @@ void rb_emit_choice(GameState *g, int actor, RbChoiceKind kind,
         rb_queue_pause_for_choice(g, &ch);
         g->queue.actor = actor;
     }
-    g->queue.state = RB_QUEUE_AWAITING_CHOICE;   /* QueueState FSM (ability_queue.rs) */
+    g->queue.state = RB_QUEUE_AWAITING_CHOICE;   /* QueueState FSM (engine/src/ability/queue.rs) */
 }
 
 /* ── Type helpers (ported from engine/src/ability/types.rs) ── */
@@ -5422,7 +5716,7 @@ const char *rb_ability_error_to_string(int err) {
 
 /* ---- ported choice.rs functions ---- */
 
-/* ── handle_energy_zone_selection (move_cards.rs:3585) ── */
+/* ── handle_energy_zone_selection (engine/src/ability/effects/move/mod.rs:3349) ── */
 void rb_resolver_handle_energy_zone_selection(GameState *g, int actor, const int *indices, int n_indices, const char *destination) {
     if (!g || !indices || n_indices <= 0) return;
     RbPlayer *P = &g->p[actor];
@@ -5460,7 +5754,7 @@ void rb_resolver_handle_energy_zone_selection(GameState *g, int actor, const int
                 for (int i = 0; i < n_removed; i++) {
                     rb_stage_place_under_card(P, target_index, removed[i]);
                     rb_mods_clear_card(&g->mods, removed[i]);
-                    /* move_cards.rs:3366 — the only push_movement_event in
+                    /* move/mod.rs:3475 — the only push_movement_event in
                        handle_energy_zone_selection, and it names both zones:
                        "energy_zone" -> "under_member". Spelled out here because
                        RB_ZONEID_STAGE == 0, so a bare 0,0 would be read as a
@@ -5513,7 +5807,14 @@ void rb_resolver_handle_energy_zone_selection(GameState *g, int actor, const int
 void rb_resolver_handle_number_selection(GameState *g, int selected)
 {
     if (!g) return;
-    AbilityEffect *parent = g->queue.resume_parent;
+    /* W4 (-Wdiscarded-qualifiers). `RbQueueState::resume_parent` is
+       `const AbilityEffect *` (rabuka.h:1200), so `AbilityEffect *parent =
+       g->queue.resume_parent` threw the const away. Nothing in the body WRITES
+       through it -- `parent` is only tested for NULL and forwarded to
+       rb_resolver_continue_siblings -- so carrying the const is correct and
+       costs nothing. Verified, not assumed: the callee takes the same const
+       pointer, so no cast is needed at the call site either. */
+    const AbilityEffect *parent = g->queue.resume_parent;
     int child = g->queue.resume_child;
     int actor = g->queue.resume_actor >= 0 ? g->queue.resume_actor : g->queue.actor;
     int host = g->queue.resume_host;

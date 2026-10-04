@@ -1181,9 +1181,25 @@ static int setup_ability_activates_from_discard(const Ability *ab) {
  *   - a MANDATORY cost the player cannot pay withholds the offer (rule
  *     9.6.2.3); an optional-payment cost keeps it offered;
  *   - mandatory non-energy costs (discard / wait / ...) must also validate.
- * Returns 1 when the ability may be offered. */
+ *
+ * `card_id` is the card under consideration and is what the Rust twin passes as
+ * `Some(card_id)` to `validate_mandatory_cost` — game_setup.rs:2188-2192 (stage
+ * scan) and :2295-2299 (discard scan), both reading
+ * `AbilityResolver::validate_mandatory_cost(game_state, &c.0, Some(card_id))`.
+ * It is NOT `g->activating_card`: at offer time that field is not set, which is
+ * the whole reason handlers.rs:189-196 takes the card explicitly ("offer/
+ * activation time run before `gs.activating_card` is set, so callers pass the
+ * card under consideration for self_cost/exclude_self filtering").
+ *
+ * `rb_validate_cost` was here before and is the PAY-time gate
+ * (handlers.rs:169-181): it validates optional / any-number / max / sequential /
+ * pay_energy components too, so it refuses offers Rust keeps. That is strictly
+ * MORE refusal than Rust performs, which is why this is a removal of refusals
+ * and why the suite movement it produces has to be read as "the C was refusing
+ * abilities Rust offers", not as a regression. */
 static int setup_ability_cost_offered(const GameState *g, int actor,
-                                      const Ability *ab, int stage_groups,
+                                      const Ability *ab, int card_id,
+                                      int stage_groups,
                                       int active_energy_count,
                                       int *out_base, int *out_effective) {
     int base = 0, effective = 0;
@@ -1196,7 +1212,7 @@ static int setup_ability_cost_offered(const GameState *g, int actor,
     if (!ab->cost) return 1;
     if (!setup_cost_has_optional_payment(ab->cost) && effective > active_energy_count)
         return 0;
-    if (!rb_validate_cost(g, actor, ab->cost)) return 0;
+    if (!rb_validate_mandatory_cost(g, actor, ab->cost, card_id)) return 0;
     return 1;
 }
 
@@ -1244,7 +1260,7 @@ int rb_setup_ability_candidates(const GameState *g, RbSetupAbilityCandidate *out
             else if (ab.use_limit >= 0 &&
                      rb_resolver_use_limit_reached(g, card_id, ability_index, ab.use_limit))
                 offer = 0;
-            else if (!setup_ability_cost_offered(g, pl, &ab, stage_groups,
+            else if (!setup_ability_cost_offered(g, pl, &ab, card_id, stage_groups,
                                                  active_energy_count, &base, &effective))
                 offer = 0;
 
@@ -1280,7 +1296,7 @@ int rb_setup_ability_candidates(const GameState *g, RbSetupAbilityCandidate *out
             else if (ab.use_limit >= 0 &&
                      rb_resolver_use_limit_reached(g, card_id, a, ab.use_limit))
                 offer = 0;
-            else if (!setup_ability_cost_offered(g, pl, &ab, stage_groups,
+            else if (!setup_ability_cost_offered(g, pl, &ab, card_id, stage_groups,
                                                  active_energy_count, &base, &effective))
                 offer = 0;
 

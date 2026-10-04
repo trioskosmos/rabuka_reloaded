@@ -22,6 +22,24 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* „Ÿ„Ÿ per-test verdict layer (see test_parity_integration.c for the rationale):
+ * a FLAT suite's FAIL lines name an assertion, never a test, so this suite
+ * reported no per-test verdict and its FAIL lines were unattributable. This
+ * adds exactly one `FAILED: <test body>` per failing test body, in the shape
+ * every FORK suite prints. No assertion is added, removed or relaxed. */
+static const char *g_flat_failed[512];
+static int g_flat_failed_n;
+static void flat_verdict_failed(const char *fn)
+{
+    for (int i = 0; i < g_flat_failed_n; i++)
+        if (g_flat_failed[i] == fn) return;
+    if (g_flat_failed_n >= 512) return;
+    g_flat_failed[g_flat_failed_n++] = fn;
+    printf("FAILED: %s\n", fn);
+    fflush(stdout);
+}
+#define FLAT_VERDICT() flat_verdict_failed(__func__)
+
 static int failures;
 static int checks;
 
@@ -29,6 +47,7 @@ static int checks;
     checks++; \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -41,6 +60,7 @@ static int checks;
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -115,7 +135,7 @@ static int par_hearts_total(const int hearts[8]) {
 /* stats_pipeline.rs:22-57 member_original_hearts ? printed base, then the
  * copy / multiplier / override layering. */
 static void a_member_original_hearts_layers(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int big = test_id(&game, "PL!SP-pb2-005-R");     /* {02:3, 03:3, 06:3} */
@@ -190,7 +210,7 @@ static void a_apply_additive_heart_mods(void) {
 
 /* stats_pipeline.rs:78-90 / 187-201 blade layering. */
 static void a_effective_blade(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int blader = test_id(&game, "PL!S-PR-014-PR");   /* printed blade 6 */
@@ -225,7 +245,7 @@ static void a_effective_blade(void) {
 /* stats_pipeline.rs:143-183 member_heart_detail ? base vs positive-only
  * bonus array. */
 static void a_member_heart_detail(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int member = test_id(&game, "PL!SP-pb2-005-R");
@@ -351,7 +371,7 @@ static void b_pb1_020_l_heart04_total_threshold(void) {
 static void b_sd1_026_sd_energy_threshold(void) {
     const char *variants[2] = {"PL!SP-sd1-026-SD", "PL!SP-sd1-026-SRL"};
     for (int v = 0; v < 2; v++) {
-        TestGame game;
+static        TestGame game;
         test_game_new(&game);
         int live = test_id(&game, variants[v]);
         test_add_to_live(&game, live);
@@ -360,7 +380,7 @@ static void b_sd1_026_sd_energy_threshold(void) {
         CHECK_EQ(test_get_score_modifier(&game, live), 1, "9 energy -> score +1");
     }
 
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int live = test_id(&game, "PL!SP-sd1-026-SD");
     test_add_to_live(&game, live);
@@ -386,7 +406,7 @@ static void b_bp5_026_l_group_heart_total(void) {
     CHECK_EQ(test_get_score_modifier(&game, live), 1,
              "two Liella! members' base hearts total 17 >= 11 -> score +1");
 
-    TestGame low;
+static    TestGame low;
     test_game_new(&low);
     par_fill_decks(&low, filler);
     int live2 = test_id(&low, "PL!SP-bp5-026-L");
@@ -443,7 +463,7 @@ static void b_bp4_028_l_distinct_waitroom_lives(void) {
 
 /* card_score/opponent_energy_gated_score_test.rs */
 static void b_bp6_022_l_opponent_energy_gate(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int live = test_id(&game, "PL!S-bp6-022-L");
     test_add_to_live(&game, live);
@@ -453,7 +473,7 @@ static void b_bp6_022_l_opponent_energy_gate(void) {
     CHECK_EQ(test_get_score_modifier(&game, live), 1,
              "opponent 3 > self 1 -> score +1");
 
-    TestGame tie;
+static    TestGame tie;
     test_game_new(&tie);
     int live2 = test_id(&tie, "PL!S-bp6-022-L");
     test_add_to_live(&tie, live2);
@@ -500,7 +520,7 @@ static void b_bp4_026_l_revealed_distinct_liella(void) {
  * Rust drives TurnEngine::trigger_live_success_abilities; the C gate lives
  * behind rb_trigger_live_success, so the same ability is fired directly. */
 static void b_bp7_022_l_revealed_group_hearts(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int live = test_id(&game, "PL!S-bp7-022-L");
     test_add_to_live(&game, live);
@@ -535,7 +555,7 @@ static void b_bp7_022_l_revealed_group_hearts(void) {
 
 /* card_score/live_start_total_blade_threshold_live_score_q116_test.rs */
 static void b_sd1_028_sd_total_blade_threshold(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int f = test_id(&game, "PL!-sd1-010-SD");
     par_fill_decks(&game, f);
@@ -574,7 +594,7 @@ static void b_bp1_027_l_unique_heart_colors(void) {
     CHECK_EQ(test_get_score_modifier(&game, solitude), 3,
              "3 unique heart colours across Nijigasaki members -> score +3");
 
-    TestGame other;
+static    TestGame other;
     test_game_new(&other);
     par_fill_decks(&other, filler);
     int solitude2 = test_id(&other, "PL!N-bp1-027-L");
@@ -589,7 +609,7 @@ static void b_bp1_027_l_unique_heart_colors(void) {
 
 /* card_score/live_start_group_member_four_heart_score_test.rs */
 static void b_pb2_045_l_four_heart_liella_member(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int filler = test_id(&game, "PL!-sd1-010-SD");
     par_fill_decks(&game, filler);

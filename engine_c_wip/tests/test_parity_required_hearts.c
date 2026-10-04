@@ -96,6 +96,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -355,6 +356,67 @@ static void rh_note_fire(int since, const char *what)
                "zero below comes from the paired positive on this ability in "
                "this file, not from this count\n", what);
     }
+}
+
+/* ── PREMISE CONTROLS ────────────────────────────────────────────────────
+ *
+ * A negative whose PAIRED POSITIVE is red can still assert something that is
+ * TRUE and INDEPENDENT of the broken mechanism: that its own fixture really
+ * presents the state the case name claims.  rh_caveat() is NOT withdrawn by
+ * this -- every zero it annotates stays UNEARNED and still counted -- but the
+ * case stops asserting nothing at all.
+ *
+ * This matters because a wrong fixture is precisely how a negative ends up
+ * asserting something true about the WRONG cards.  In the Q246 fixture of
+ * tests/test_parity_hearts_live_start.c, kosuzu2 and dia2 were never
+ * identity-pinned and two `CHECK_EQ(.., 0, ..)` lines could pass about cards
+ * nobody named.  mid() is forgiving -- rb_find_card_by_no falls back to
+ * base+rarity rebuild, then lowest-prefix, then a SUBSTRING search
+ * (src/core/data.c:446) -- so a mistyped card number does not return -1, it
+ * returns SOME OTHER REAL CARD, and ident() was never asked about it.
+ *
+ * Same idiom as the PROMPT CONTROL lines in tests/test_parity_state_per_card.c
+ * (a different class, already correct, and not touched by this change). */
+
+/* Distinct member NAMES across the stage and the waitroom -- the very counter
+ * modify_required_hearts' per-distinct arm reads. */
+static int rh_board_distinct_names(TestGame *tg, int pl)
+{
+    int board[RB_STAGE_SIZE + RB_MAX_ZONE];
+    int n = 0, i;
+    for (i = 0; i < RB_STAGE_SIZE; i++) {
+        int c = tg->state.p[pl].stage[i];
+        if (c != RB_EMPTY_SLOT && c >= 0) board[n++] = c;
+    }
+    for (i = 0; i < tg->state.p[pl].discard.n; i++) {
+        int c = tg->state.p[pl].discard.cards[i];
+        if (c >= 0) board[n++] = c;
+    }
+    return rb_count_distinct_member_name_units(board, n);
+}
+
+static int rh_card_hearts(int cid, int color)
+{
+    int h[8];
+    if (cid < 0) return -1;
+    if (!card_base_hearts(cid, h)) return -1;
+    return h[color];
+}
+
+/* Asserted, not reported. Counts as an assertion like any other, and a red
+ * premise is a FAIL -- a wrong fixture must never be papered over by a green
+ * zero downstream of it. */
+static void rh_premise(int ok, const char *fmt, ...)
+{
+    char msg[512];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof msg, fmt, ap);
+    va_end(ap);
+    assertions++;
+    if (ok) { printf("ok: premise: %s\n", msg); return; }
+    failures++;
+    fprintf(stderr, "FAIL: premise: %s\n        [%s]\n", msg, current_test);
 }
 
 /* Every constant test starts by proving the card really carries a
@@ -936,10 +998,25 @@ static void c_five_plus_duplicate_no_reduction(void)
     if (!rh_setup_distinct(&tg, 5, &fx)) return;
     int duplicate = mid(&tg, "PL!HS-sd1-001-SD");
     if (duplicate < 0) return;
+    ident(&tg, duplicate, "PL!HS-sd1-001-SD");
+    rh_premise(rb_card_no_eq(duplicate, "PL!HS-sd1-001-SD"),
+               "the card about to be added really is the SAME PRINT as staged "
+               "member 0 (PL!HS-sd1-001-SD). It is a different INSTANCE -- mid() "
+               "allocates a fresh one per call via test_new_id, which is exactly "
+               "what makes it a duplicate -- got id %d vs member 0 id %d",
+               duplicate, fx.members[0]);
+    rh_premise(duplicate != fx.members[0],
+               "... and it really is a DISTINCT instance of that print (id %d != "
+               "%d), not the same pool slot written twice", duplicate, fx.members[0]);
     if (tg.state.p[0].discard.n < RB_MAX_ZONE)
         tg.state.p[0].discard.cards[tg.state.p[0].discard.n++] = duplicate;
     CHECK_EQ(tg.state.p[0].discard.n, 4,
              "four cards in the waitroom: five distinct 蓮ノ空 plus a duplicate");
+    rh_premise(rh_board_distinct_names(&tg, 0) == 5,
+               "the board still carries exactly 5 DISTINCT member names after "
+               "the duplicate was added (%d cards on stage+waitroom) -- so the "
+               "zero below is about THIS board, not about a board that never had "
+               "five in the first place", 2 + tg.state.p[0].discard.n);
 
     int snap = rb_log_buffer_len();
     if (!rh_fire(&tg, fx.live, TRIG_LIVE_START)) return;
@@ -957,6 +1034,14 @@ static void c_five_plus_renosora_live_no_reduction(void)
     if (!rh_setup_distinct(&tg, 5, &fx)) return;
     int other_live = mid(&tg, "PL!HS-sd1-017-SD");
     if (other_live < 0) return;
+    ident(&tg, other_live, "PL!HS-sd1-017-SD");
+    rh_premise(rb_card_is_live(other_live) == 1,
+               "the card about to be added really IS a ライブ card (id %d); the "
+               "whole claim of this case is that a LIVE card in the waitroom is "
+               "not counted as a member unit", other_live);
+    rh_premise(rh_board_distinct_names(&tg, 0) == 5,
+               "the board really carries 5 DISTINCT member names before the live "
+               "card is added");
     if (tg.state.p[0].discard.n < RB_MAX_ZONE)
         tg.state.p[0].discard.cards[tg.state.p[0].discard.n++] = other_live;
 
@@ -977,8 +1062,19 @@ static void c_five_plus_wrong_group_no_reduction(void)
     if (!rh_setup_distinct(&tg, 5, &fx)) return;
     int wrong = mid(&tg, "PL!-sd1-010-SD");
     if (!ident(&tg, wrong, "PL!-sd1-010-SD")) return;
+    rh_premise(rh_board_distinct_names(&tg, 0) == 5,
+               "the board really carries 5 DISTINCT member names BEFORE the "
+               "non-蓮ノ空 card is added");
     if (tg.state.p[0].discard.n < RB_MAX_ZONE)
         tg.state.p[0].discard.cards[tg.state.p[0].discard.n++] = wrong;
+    rh_premise(rh_board_distinct_names(&tg, 0) == 6,
+               "the extra card really does raise the board to 6 DISTINCT member "
+               "NAMES -- it is a different series, and the distinct counter is "
+               "series-wide rather than group-filtered (%d cards on stage+waitroom). "
+               "So the zero below is the ability's GROUP filter rejecting it, not "
+               "the distinct count having stayed at 5 all along; without this, the "
+               "assertion could be green because the counter never saw six at all",
+               2 + tg.state.p[0].discard.n);
 
     int snap = rb_log_buffer_len();
     if (!rh_fire(&tg, fx.live, TRIG_LIVE_START)) return;
@@ -1085,7 +1181,25 @@ static void d_mirage_non_renosora_arrivals_no_reduction(void)
     int f2 = mid(&tg, "PL!S-sd1-001-SD");
     int b = mid(&tg, "PL!-sd1-007-SD");
     int c = mid(&tg, "PL!-sd1-001-SD");
-    if (f1 < 0 || f2 < 0 || b < 0 || c < 0) return;
+    /* Every one of these four was resolved with a bare `>= 0` before. mid() is
+     * forgiving (base+rarity rebuild, then lowest-prefix, then SUBSTRING --
+     * src/core/data.c:446), so a mistyped number does not return -1, it returns
+     * a different real card, and this case's zeros could then be true about
+     * cards nobody named. */
+    if (!ident(&tg, f1, "PL!-sd1-010-SD")) return;
+    if (!ident(&tg, f2, "PL!S-sd1-001-SD")) return;
+    if (!ident(&tg, b, "PL!-sd1-007-SD")) return;
+    if (!ident(&tg, c, "PL!-sd1-001-SD")) return;
+    /* PREMISE: the case is "baton arrivals WITHOUT 蓮ノ空 membership", so both
+     * arrivals must really be members and must really be on the board. */
+    rh_premise(b != c,
+               "the two arrivals really are two DIFFERENT cards (ids %d and %d), "
+               "so the case really puts two separate cards through the baton "
+               "rather than replaying one slot", b, c);
+    rh_premise(rb_card_is_live(b) == 0 && rb_card_is_live(c) == 0,
+               "both arrivals really are MEMBERS, not live cards (b=%d c=%d) -- "
+               "the claim under test is the membership gate, not the card type",
+               b, c);
 
     rh_set_stage3(&tg, 0, f1, f2, RB_EMPTY_SLOT);
     test_add_to_hand(&tg, b);
@@ -1314,6 +1428,16 @@ static void f_center_rin_zero_heart03_no_reduction(void)
     static TestGame tg;
     int rin = mid(&tg, "PL!-sd1-005-SD");
     if (!ident(&tg, rin, "PL!-sd1-005-SD")) return;
+    /* PREMISE: the case is "0 heart03 in the centre", so the centre card must
+     * really print 0 heart03.  Without this the zero below is unearned even if
+     * the paired positive is fixed: the fixture could be a member that prints
+     * heart03 and the assertion would be green for the wrong reason. */
+    rh_premise(rh_card_hearts(rin, H03) == 0,
+               "the centre member really prints 0 heart03 (PL!-sd1-005-SD has "
+               "heart03=%d; heart01=%d heart02=%d heart04=%d heart05=%d "
+               "heart06=%d)", rh_card_hearts(rin, H03), rh_card_hearts(rin, H01),
+               rh_card_hearts(rin, H02), rh_card_hearts(rin, H04),
+               rh_card_hearts(rin, H05), rh_card_hearts(rin, H06));
     int wonder = rh_wonder_board(&tg, rin);
     if (wonder < 0) return;
     CHECK_EQ(need_of(&tg, wonder, H00), 0,
@@ -1337,6 +1461,10 @@ static void f_center_non_mus_no_reduction(void)
     static TestGame tg;
     int non_mus = mid(&tg, "PL!SP-sd1-001-SD");
     if (!ident(&tg, non_mus, "PL!SP-sd1-001-SD")) return;
+    /* PREMISE: the case is "a non-mu's centre member", so the centre card must
+     * really not be in μ's. The group bytes are escaped, never transcribed. */
+    rh_premise(rb_card_matches_group_str(non_mus, "\xCE\xBC's") == 0,
+               "the centre member really is NOT in mu's (PL!SP-sd1-001-SD)");
     int wonder = rh_wonder_board(&tg, non_mus);
     if (wonder < 0) return;
     CHECK_EQ(need_of(&tg, wonder, H00), 0,
@@ -2447,6 +2575,9 @@ static void l_heart02_lt5_no_effect(void)
 
 static int n_tests_ok, n_tests_failed, n_tests_crashed, n_tests_setup;
 static int n_vacuous_reported;
+/* cases whose caveats outnumbered their own assertions -- see the gate in
+ * run(); a vacuous case must assert something real or be DELETED */
+static int n_content_free;
 
 static void on_segv(int sig)
 {
@@ -2542,6 +2673,28 @@ static void run(const char *name, void (*fn)(void))
     n_setup_bugs += c.setup_bugs;
     n_vacuous  += c.vacuous;
     n_vacuous_reported += c.vacuous;
+
+    /* A VACUOUS CASE MUST STILL ASSERT SOMETHING REAL.
+     *
+     * rh_caveat() marks one zero as UNEARNED.  It must not turn the whole case
+     * into a content-free one -- and there is now a mechanical check for that,
+     * not a review convention.  c.vacuous counts the caveats themselves (each
+     * one is an assertion), so a case whose assertion count does not EXCEED
+     * its caveat count ran nothing of its own.  That is precisely the "proves
+     * nothing" case the vacuity rule forbids: it must assert something real or
+     * be deleted, and it can no longer be quietly reclassified into a tidy
+     * setup/vacuous bucket in the summary.  Enforced in the PARENT, so a child
+     * cannot fail to report it. */
+    if (c.vacuous > 0 && c.assertions <= c.vacuous) {
+        n_content_free++;
+        assertions++;
+        failures++;
+        fprintf(stderr, "FAIL: premise: case [%s] reported %d vacuous "
+                        "negative(s) but ran %d assertion(s) of its own. A "
+                        "vacuous case must assert something real or be DELETED, "
+                        "not merely reclassified.\n",
+                name, c.vacuous, c.assertions);
+    }
 
     int status = 0;
     waitpid(pid, &status, 0);

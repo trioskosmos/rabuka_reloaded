@@ -86,14 +86,34 @@ int rb_ability_has_remaining_uses(const GameState *g, int cid, int idx) {
     return used < limit;
 }
 
-/* Mirror abilities.rs::opp_cause_key */
+/* Mirror abilities.rs:1070-1078 (`opp_cause_key`).
+   ⚠ CORRECTION 2026-10-04 (field census). This used to read only "Mirror
+   abilities.rs::opp_cause_key" and the body was NOT a mirror: Rust folds the
+   sequence with `(u64::from(seq) << 44).rotate_left(44)`, and this line had the
+   bare `s << 44`. For a u16 `seq` a rotate_left(44) of `seq << 44` is exactly
+   `seq << 24` (the high bits land at 44+44 = 88 mod 64 = 24, and `seq >> 20` is
+   always 0), so the two engines were building their dedupe identities in
+   DIFFERENT bit ranges: C in bits 44..59, Rust in bits 24..39. Both are injective
+   in `seq`, so no corpus input is expected to separate them — which is precisely
+   why it survived — but they do not share a collision set, and the key is compared
+   only against keys this same function produced, so a collision in one engine need
+   not be a collision in the other.
+   ⚠ NOT CHANGED, and the reason is measured, not timidity: making the C faithful
+   (s << 24) moves `seq` into bits 24..39, which is exactly where `m << 20` and the
+   low half of `num_key` already live, so it makes the identity MORE collision-prone
+   and shifts the bit ranges three terms share. That is a parity change to a
+   dedupe identity and it wants its own test, not a ride-along in a field-census
+   change. BLOCKED-ON: tests/test_parity_foreign_cause.c — a claim for a test that
+   pins the identity layout and the once-per-move arm. */
 uint64_t rb_opp_cause_key(uint32_t num_key, int moved_card_id, uint16_t seq) {
     uint64_t m = (uint64_t)(uint32_t)moved_card_id;
     uint64_t s = (uint64_t)seq;
     return (uint64_t)num_key ^ (m << 20) ^ (s << 44);
 }
 
-/* Mirror abilities.rs::opponent_id */
+/* Mirror abilities.rs:2800 (`GameState::opponent_id`). Rust takes a player_id
+   string and returns the other PlayerId; the C folds the two-seat case to the
+   seat index, which is the same answer for "p1"/"p2". */
 int rb_opponent_id(int pl) { return pl ? 0 : 1; }
 
 /* Defined in src/core/zones.c / src/core/card.c; declared locally because
@@ -683,9 +703,15 @@ static void rb_build_ability_queue_entry(GameState *g, int card_id, int ability_
                                          int triggering_member_id);
 static int rb_effect_is_ability_resolution_watcher(const AbilityEffect *e);
 /* Defined with the opponent-cause watcher hook below (Rust
-   abilities.rs:506-545); the stage TAS scan needs it earlier. */
-static int rb_hooked_by_foreign_cause(const GameState *g, const AbilityEffect *e,
-                                      int card_id, int player);
+   abilities.rs:506-545); the stage TAS scan needs it earlier.
+   NOT static: pinned directly by tests/test_parity_foreign_cause.c, because the
+   fix that moved this scan from g->batch_movements to g->turn_area_movements
+   moved ZERO failures across 33 suites — i.e. no corpus ability exercises the
+   arm — so without a test of its own the next agent would have no reason to
+   keep the corrected vector and would revert it. include/rabuka.h is owned
+   elsewhere, so the test carries its own extern. */
+int rb_hooked_by_foreign_cause(const GameState *g, const AbilityEffect *e,
+                               int card_id, int player);
 static void rb_set_just_completed(GameState *g, int key);
 static int rb_just_completed_batch_matches(const GameState *g,
                                            const int *moved, int n_moved);
@@ -777,6 +803,60 @@ static int rb_is_stale_discard_condition(const Condition *c, int card_is_in_disc
     const char *tgt = rb_cond_get_str(c, "target");
     return ((ct && !strcmp(ct, "member_card")) || (tgt && !strcmp(tgt, "self"))) ? 1 : 0;
 }
+
+/* ══ DEAD TWINS — NOT COVERAGE. Do not read these as landed work. ═════════════
+ *
+ * gcc reports six unused static functions and one unused local in this file
+ * (`make warnings-audit`; identical set at the pre-wave baseline, so none of it
+ * is new). They are NOT harmless leftovers and NOT duplicates of the live code.
+ * Measured against the live paths in this same file:
+ *
+ *   rb_claim_batch_slot (abilities.rs:510-524)
+ *       the dedup body is INLINED and DUPLICATED at FOUR enqueue sites instead
+ *       of being routed through the twin: :989-1000 (the push helper), :2021-
+ *       2029 and :2095-2102 (the two ability scans) and :2291-2298 (the batch
+ *       scan). Every site re-implements only the `batch_triggered_keys` half.
+ *
+ *   rb_set_just_completed (:183-186) / rb_just_completed_batch_matches
+ *   (:195-200) / rb_clear_just_completed
+ *       NEVER CALLED, so the live sites at :985, :2021 and :2095 still veto with
+ *       a bare `key == g->just_completed_ability_key`, which is exactly the bug
+ *       this twin's own comment above says was fixed ("the C kept only the key,
+ *       so `key == just_completed_ability_key` vetoed unconditionally and every
+ *       second event of a turn was swallowed"). The fresh-batch rule is
+ *       therefore still ABSENT from the running engine.
+ *
+ *   rb_requires_this_move (abilities.rs:570-575)
+ *       never called; the stage/live/moved scans at :2021/:2095/:2291 do not
+ *       apply the 「placed and this card is not among the moves」 exclusion.
+ *
+ *   rb_is_stale_discard_condition (see its own comment above for what it
+ *       protects) — never called.
+ *
+ * ⛔ WHY THEY ARE NOT WIRED HERE, and why they cannot be:
+ *   IMPOSSIBLE from this file alone. `rb_set_just_completed` is static, so the
+ *   two LIVE writers of `g->just_completed_ability_key` — src/ability/
+ *   ability_queue.c:1535 and :1571 — cannot call it. The twin was written on
+ *   the explicit assumption that the `key` field in the side-table record
+ *   detects "a key this file never recorded" and falls back to the legacy
+ *   veto. So even wiring the reader here would leave `rb_just_completed_
+ *   batch_matches` returning 1 on every call: the snapshot is untrusted by
+ *   construction. Wiring requires the setter to be callable across translation
+ *   units, which means either making it non-static (a rabuka.h prototype) or
+ *   moving `just_completed_moved` into the GameState struct — and
+ *   include/rabuka.h is not this task's file.
+ *     BLOCKED-ON: include/rabuka.h — `void rb_set_just_completed(GameState *g, int key);`
+ *       beside the queue prototypes (~rabuka.h:1890-1900), and the three call
+ *       sites in src/ability/ability_queue.c:1535 / :1571 routed through it;
+ *       or add `int just_completed_moved[RB_MAX_RECENTLY_MOVED];
+ *       int just_completed_moved_n;` to GameState so the snapshot needs no
+ *       side table and no cross-TU setter.
+ *     BLOCKED-ON: src/ability/ability_queue.c:1535 / :1571 — route the two
+ *       live `just_completed_ability_key` writers through the setter.
+ *   Until both land, the four enqueue sites above keep the older inline form and
+ *   the twin functions keep their Rust citations as a specification of what the
+ *   running engine still lacks.
+ */
 
 /* Mirror GameState::requires_this_move (abilities.rs:570-575):
 
@@ -1713,7 +1793,7 @@ static void rb_build_ability_queue_entry(GameState *g, int card_id, int ability_
 
 /* ── Trigger auto ability (string-keyed) ────────────────────────────── */
 
-/* Mirror abilities.rs:1083-1085 --
+/* Mirror abilities.rs:1260-1267 --
        let requested_text = ability_id
            .strip_prefix(card_no.as_str())
            .and_then(|suffix| suffix.strip_prefix('_'));
@@ -1852,6 +1932,24 @@ void rb_trigger_auto_ability_by_index(GameState *g, int trigger_type,
 
 /* ── TAS scan: queue abilities for a zone ───────────────────────────── */
 
+/* W8 helper: the nested `trigger_event` object as a Condition, so the
+   discard-location guard can read `trigger_event.location` the way Rust's
+   `condition.get_trigger_event().and_then(|t| t.location.as_deref())` does
+   (abilities.rs:492-496). `rb_cond_get_str` is RB_TAG_STR-only and cannot see
+   through a nested dict, so without this the guard reads a different condition
+   than Rust on every node whose location is nested. NULL-safe at every step. */
+static const Condition *rb_cond_get_obj(const Condition *c, const char *key) {
+    if (!c || !key) return NULL;
+    for (uint32_t i = 0; i < c->n_fields; i++) {
+        const CondField *f = &c->fields[i];
+        if (!f->key || strcmp(f->key, key)) continue;
+        if ((f->v.tag == RB_TAG_OBJVAR || f->v.tag == RB_TAG_OBJECT) && f->v.cond)
+            return f->v.cond;
+        return NULL;
+    }
+    return NULL;
+}
+
 static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
                                 const char *trigger, const int *moved_cards, int n_moved,
                                 int position_change, int energy_placed,
@@ -1889,22 +1987,65 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
                     continue;
                 }
             }
-            /* Discard-location guard for stage cards: skip discard-location abilities
-               when the card is on stage (not in discard). */
+            /* W8. Discard-location guard for stage cards: skip discard-location
+               abilities when the card is on stage (not in discard).
+
+               Rust twin, term for term: GameState::is_stale_discard_condition
+               (core/game_state/abilities.rs:486-501), called from the AUTO_SCAN
+               at abilities.rs:669-678 with in_discard =
+               player1.waitroom.cards.contains(&card_id) ||
+               player2.waitroom.cards.contains(&card_id).
+               RbPlayer::discard IS Rust's waitroom -- rabuka.h:770 labels the
+               bag "waitroom" -- so the C's both-seats bag probe is the same test.
+
+               The old C line was missing TWO of Rust's four terms, and it is in
+               the trigger scan, so each missing term changes WHICH ABILITY FIRES:
+
+                 (a) Rust returns false IMMEDIATELY when the condition's source
+                     is "preceding_moved" (abilities.rs:487). A "preceding moved
+                     card is in the waiting room" watcher tracks OTHER cards
+                     reaching the discard, not this card being in it -- the doc
+                     comment at abilities.rs:482-485 says exactly that. The C had
+                     no exemption, so it DROPPED abilities Rust keeps.
+                 (b) Rust reads the location as get_location().or_else(|| the
+                     nested trigger_event's location).unwrap_or("")
+                     (abilities.rs:490-497). The C read only the flat `location`
+                     key, so a condition whose discard location lives under
+                     trigger_event was missed entirely.
+                 (c) Rust's last term is the same disjunction the C had, written
+                     with explicit parens. C precedence already grouped it the
+                     same way (&& binds tighter than ||), so (c) is a READABILITY
+                     fix, not a behaviour change -- and the point of making it
+                     explicit is that the next reader cannot silently re-group it.
+
+               Zone::from_str("discard") == Some(Zone::Discard) and the C's
+               !strcmp(loc, "discard") are the same test: rb_ability_zone_from_str
+               (enums.c) is a 32/32 twin of Zone::from_str (enums.rs:89-122) and
+               only the exact literal "discard" maps to Discard ("waitroom" maps to
+               its own variant), so no term is gained or lost by keeping strcmp.
+
+               Reachability of (a) and (b) on the shipped bytecode is the
+               W-A8-discard row of tools/audit_w_gate.c -- measured, not assumed. */
             if (check_discard_guard && ab.effect && ab.effect->condition) {
-                const char *loc = rb_cond_get_str(ab.effect->condition, "location");
-                const char *ct = rb_cond_get_str(ab.effect->condition, "card_type");
-                const char *target = rb_cond_get_str(ab.effect->condition, "target");
-                if (loc && !strcmp(loc, "discard")
-                    && (ct && !strcmp(ct, "member_card") || (target && !strcmp(target, "self")))) {
-                    int in_discard = 0;
-                    for (int pl = 0; pl < 2; pl++) {
-                        const RbPlayer *P = &g->p[pl];
-                        for (int d = 0; d < P->discard.n; d++)
-                            if (P->discard.cards[d] == cid) { in_discard = 1; break; }
-                        if (in_discard) break;
+                const Condition *dc = ab.effect->condition;
+                const char *dloc = rb_cond_get_str(dc, "location");
+                if (!dloc) dloc = rb_cond_get_str(rb_cond_get_obj(dc, "trigger_event"), "location");
+                const char *dsrc = rb_cond_get_str(dc, "source");
+                if (dloc && !strcmp(dloc, "discard") && dsrc && !strcmp(dsrc, "preceding_moved"))
+                    dloc = NULL;   /* abilities.rs:487 -- never stale */
+                if (dloc && !strcmp(dloc, "discard")) {
+                    const char *ct = rb_cond_get_str(dc, "card_type");
+                    const char *target = rb_cond_get_str(dc, "target");
+                    if ((ct && !strcmp(ct, "member_card")) || (target && !strcmp(target, "self"))) {
+                        int in_discard = 0;
+                        for (int pl = 0; pl < 2; pl++) {
+                            const RbPlayer *P = &g->p[pl];
+                            for (int d = 0; d < P->discard.n; d++)
+                                if (P->discard.cards[d] == cid) { in_discard = 1; break; }
+                            if (in_discard) break;
+                        }
+                        if (!in_discard) { rb_free_ability(&ab); continue; }
                     }
-                    if (!in_discard) { rb_free_ability(&ab); continue; }
                 }
             }
             if (ab.effect && ab.effect->has_condition && ab.effect->condition
@@ -2047,11 +2188,14 @@ static int queue_moved_cards_abilities(GameState *g, const int *moved_cards, int
 }
 
 /* ── Opponent-cause watchers ──────────────────────────────────────────
-   Rust twin: engine/src/core/game_state/abilities.rs:1033-1149
-   (opp_cause_key + fire_opponent_cause_watchers_for_move), armed from
-   GameState::push_movement_event (modifiers.rs:1538-1551) for every
-   stage→stage area move whose cause player differs from the moved card's
-   owner. */
+   Rust twin: engine/src/core/game_state/abilities.rs:1080-1184
+   (fire_opponent_cause_watchers_for_move), armed from GameState::push_movement_event
+   (core/game_state/modifiers.rs:1888-1930, sequence bump at :1905) for every
+   stage→stage area move whose cause player differs from the moved card's owner.
+   ⛔ The previous text cited "abilities.rs:1033-1149" and "modifiers.rs:1538-1551";
+   both were stale — the function is at :1086 and the movement-event arm at
+   modifiers.rs:1888-1930. The body was right; the citations pointed a re-deriver
+   at the wrong function. */
 
 /* 「(対戦相手のカードの効果でも発動する。)」 marker.
    Rust: AbilityEffect::fires_on_opponent_effects (card.rs:1419-1421) reads the
@@ -2078,16 +2222,51 @@ static int rb_effect_fires_on_opponent_effects(const AbilityEffect *e, int card_
     return 0;
 }
 
-/* ── Opponent-cause dedupe identity (abilities.rs:1033-1041, 1122-1131) ──
+/* ── Opponent-cause dedupe identity (abilities.rs:1070-1078, :1151-1168) ──
    Rust keeps the fired identities in `GameState.mods.opp_cause_fired_keys`
    (a HashSet<u64>), cleared with the rest of the turn-scoped movement data by
-   clear_card_movement_tracking (modifiers.rs:1597-1599). C has no field for
-   the set, and include/rabuka.h is owned by another agent, so the set lives
-   here as a per-(GameState, turn) side table. Scoping by BOTH the state
-   pointer and g->turn reproduces Rust's turn-scoped lifetime without a hook
-   into src/core/modifiers.c: an entry only matches while the same game is
-   still on the same turn, and entries for any other game/turn are dead weight
-   reclaimed in place. */
+   clear_card_movement_tracking (modifiers.rs:2041), and TESTED at abilities.rs:1159
+   — `if self.mods.opp_cause_fired_keys.contains(&ekey) { continue; }` is the live
+   gate, pushed at :1162. So the field is NOT write-only and the C twin is worth
+   having.
+
+   ⛔ CORRECTION 2026-10-04 (field census). The previous text here said "C has no
+   field for the set, and include/rabuka.h is owned by another agent, so the set
+   lives here as a per-(GameState, turn) side table." The first half is FALSE:
+   `uint64_t opp_cause_fired_keys[16]` + `n_opp_cause_fired_keys` are declared in
+   include/rabuka.h (the RbMods block) and the CLEAR is already landed —
+   rb_clear_card_movement_tracking sets `g->mods.n_opp_cause_fired_keys = 0`
+   (src/core/modifiers.c, the fold of modifiers.rs:2041). The second half is true
+   only in the sense that the field is never WRITTEN.
+
+   ⛔ BLOCKED-ON: src/turn/phase.c:420 — and this is the whole blocker, and it is a
+   real, provable divergence rather than a formality. `g->turn++` happens at exactly
+   one place in the tree, phase.c:382 (the RB_PHASE_VICTORY rollover); engine.c's
+   rb_end_turn rollover was folded into it. That site calls
+   rb_clear_card_appearance_tracking(g), which does NOT touch
+   `n_opp_cause_fired_keys` — so migrating this side table onto the field would
+   leave the set alive across the rollover. The side table avoids that by keying
+   every entry on (GameState*, g->turn), and `s_movement_seq` below restarts its
+   per-move counter each turn, so migrating WITHOUT the clear produces a hard
+   suppression: the same watcher + same moved card on turn N+1 recomputes the same
+   ekey (seq restarts at 1) and `contains` returns true, so a
+   「(対戦相手のカードの効果でも発動する。)」 watcher that Rust fires on turn N+1 is
+   silently dropped for the rest of the game. Exact change: in phase.c's rollover,
+   beside the hand-rolled `g->debut_count_this_turn[0]=g->debut_count_this_turn[1]=0;`
+   and `g->position_change_occurred_this_turn=0;`, add
+   `g->mods.n_opp_cause_fired_keys = 0;` — or replace the whole hand-rolled fold with
+   rb_clear_card_movement_tracking(g), which is the exact Rust line (phases.rs:309)
+   but needs a prototype in include/rabuka.h that it does not have. Once that lands,
+   delete `s_opp_cause_fired[]`, `s_n_opp_cause_fired`, `RB_OPP_CAUSE_FIRED_CAP` and
+   RbOppCauseFired, and re-key the two helpers below on
+   g->mods.opp_cause_fired_keys[0 .. n_opp_cause_fired_keys]; the turn prune and the
+   FIFO reclaim both become unnecessary because the clear is now the lifetime. A
+   parity test for the dedupe itself (a re-scan of ONE move must not re-arm, a
+   SECOND distinct move of the same card in the same turn must) does not exist:
+   tests/test_parity_foreign_cause.c covers the hook and the hooked_by_foreign_cause
+   guard, not this set. BLOCKED-ON: tests/ — claim needed for that test.
+   The 16-slot field vs Rust's spilling SmallVec is a capacity difference, not a
+   semantic one, and is adequate for the corpus. */
 #define RB_OPP_CAUSE_FIRED_CAP 512
 typedef struct { const GameState *g; int turn; uint64_t key; } RbOppCauseFired;
 static RbOppCauseFired s_opp_cause_fired[RB_OPP_CAUSE_FIRED_CAP];
@@ -2125,12 +2304,20 @@ static void rb_opp_cause_fired_add(const GameState *g, uint64_t key) {
     s_n_opp_cause_fired++;
 }
 
-/* movement_event_counter mirror (modifiers.rs:1503): a monotonically
-   increasing per-movement sequence number. It is part of the dedupe identity
-   so the SAME watcher arms once PER MOVE — two distinct moves of the same
-   card within one turn each get their own key, while a re-scan of one move
-   does not re-arm. Scoped per (game, turn), which is the granularity the
-   fired-key set itself is cleared at. */
+/* movement_event_counter mirror (core/game_state/modifiers.rs:1905, field declared
+   at core/game_state/mod.rs:257): a monotonically increasing per-movement sequence
+   number, part of the dedupe identity so the SAME watcher arms once PER MOVE —
+   two distinct moves of the same card within one turn each get their own key,
+   while a re-scan of one move does not re-arm. Scoped per (game, turn), which is
+   the granularity the fired-key set itself is cleared at.
+   ⚠ SAME SHAPE AS `s_opp_cause_fired[]` ABOVE, and it is the one that CAN be
+   migrated safely: Rust's `movement_event_counter` is a plain GameState u16 that is
+   only ever incremented, never cleared (modifiers.rs:1905), so putting it on `g->`
+   needs no rollover hook at all. This file uses the side table only because it
+   predates the field. Deleting it is a separate, independent change from the
+   `opp_cause_fired_keys` migration above and must not be bundled with it, because
+   that one still needs src/turn/phase.c:420. NOT DONE HERE: it is not one of this
+   cluster's fields and a dedupe-identity change wants its own test. */
 #define RB_MOVEMENT_SEQ_SLOTS 8
 typedef struct { const GameState *g; int turn; uint32_t seq; } RbMovementSeq;
 static RbMovementSeq s_movement_seq[RB_MOVEMENT_SEQ_SLOTS];
@@ -2160,7 +2347,7 @@ static uint16_t rb_movement_event_next_seq(const GameState *g) {
 void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
                                               int causer_player) {
     if (!g || moved_card_id < 0) return;
-    /* abilities.rs:1054-1063 -- the watcher belongs to the MOVED CARD's owner.
+    /* abilities.rs:1091-1100 -- the watcher belongs to the MOVED CARD's owner.
        A cause by that same owner is already covered by the owner-side TAS
        scan, so the hook stays silent. */
     int owner = rb_owner_of_card(g, moved_card_id);
@@ -2168,7 +2355,7 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
 
     uint16_t seq = rb_movement_event_next_seq(g);
 
-    /* abilities.rs:1064-1068 -- scan the OWNER's stage. */
+    /* abilities.rs:1101-1106 -- scan the OWNER's stage. */
     const RbPlayer *op = &g->p[owner];
     for (int s = 0; s < RB_STAGE_SIZE; s++) {
         int watcher_id = op->stage[s];
@@ -2177,16 +2364,16 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
         for (int a = 0; a < nab; a++) {
             Ability ab;
             if (!rb_decode_card_ability((uint32_t)watcher_id, a, &ab)) continue;
-            /* abilities.rs:1083-1088 -- 自動 only. */
+            /* abilities.rs:1120-1125 -- 自動 only. */
             if (!rb_ability_matches_trigger(&ab, "自動")) { rb_free_ability(&ab); continue; }
             if (!ab.effect) { rb_free_ability(&ab); continue; }
-            /* abilities.rs:1094-1098 -- only effects carrying the explicit
+            /* abilities.rs:1130-1134 -- only effects carrying the explicit
                「(対戦相手のカードの効果でも発動する。)」 parenthetical. */
             if (!rb_effect_fires_on_opponent_effects(ab.effect, watcher_id)) {
                 rb_free_ability(&ab); continue;
             }
             if (!ab.effect->condition) { rb_free_ability(&ab); continue; }
-            /* abilities.rs:1103-1111 -- evaluate the condition under the
+            /* abilities.rs:1135-1150 -- evaluate the condition under the
                watcher as the activating card and with a moved-card context of
                EXACTLY [moved_card_id] (ConditionContext::with_moved_cards).
                The C condition evaluator reads its moved-card context straight
@@ -2204,7 +2391,7 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
                    sizeof(int) * (size_t)saved_n_recent);
             g->n_recently_moved = saved_n_recent;
             if (!passes) { rb_free_ability(&ab); continue; }
-            /* abilities.rs:1115-1131 -- per-MOVE dedupe identity, then claim
+            /* abilities.rs:1151-1168 -- per-MOVE dedupe identity, then claim
                the plain batch key so an empty-batch rescan pass (which
                bypasses movement gating for composites) cannot re-fire this
                watcher after the hook already did. */
@@ -2212,7 +2399,7 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
             uint64_t ekey = rb_opp_cause_key((uint32_t)num_key, moved_card_id, seq);
             if (rb_opp_cause_fired_contains(g, ekey)) { rb_free_ability(&ab); continue; }
             rb_opp_cause_fired_add(g, ekey);
-            /* abilities.rs:1129-1131 ADDS the plain batch key; it does not
+            /* abilities.rs:1163-1168 ADDS the plain batch key; it does not
                TEST it. The only gate on this arm is opp_cause_fired_keys, which
                is keyed by (ability, moved card, movement sequence) — so a SECOND
                distinct move of the same card in the same turn is a different
@@ -2230,7 +2417,7 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
                     if (g->n_batch_triggered_keys < cap)
                         g->batch_triggered_keys[g->n_batch_triggered_keys++] = num_key;
                 }
-                /* abilities.rs:1138-1146 — the enqueue carries the move as
+                /* abilities.rs:1175-1183 — the enqueue carries the move as
                    the watcher's trigger batch. */
                 rb_build_ability_queue_entry(g, watcher_id, a, "",
                                             (owner == 0) ? "p1" : "p2", "自動",
@@ -2257,18 +2444,37 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
    at the watcher's OWN last area-move record, which is stable across rescan
    passes unlike the per-batch key set.
 
-   Rust reads `turn_area_movements` (modifiers.rs:1536). C has no such vector;
-   `g->batch_movements` is the movement event log pushed by
-   rb_record_card_movement and reset with the rest of the turn-scoped movement
-   data by rb_clear_card_movement_tracking, so the same lookup is done there
-   (scanning in reverse, like Rust's `.iter().rev().find(...)`). */
-static int rb_hooked_by_foreign_cause(const GameState *g, const AbilityEffect *e,
-                                      int card_id, int player) {
+   Rust reads `turn_area_movements` (abilities.rs:549). That vector exists in
+   the C (rabuka.h:1535-1536) and has a real writer —
+   rb_record_area_movement in src/core/modifiers.c:803-808 pushes the same
+   RbBatchMovement the hook was handed — so this reader reads it directly.
+
+   The batch_movements scan this replaced was wrong twice over: `batch_movements`
+   is the PER-BATCH set, which is emptied when the batch closes, so a rescan
+   pass after the batch found nothing and the guard silently never fired; and it
+   had to reconstruct "was this an AREA move" with a
+   source_zone==STAGE && dest_zone==STAGE test that Rust never performs, because
+   turn_area_movements only ever holds area moves by construction. The stale
+   "C has no such vector" note above this function was false from A8 onward.
+
+   PARITY TEST: tests/test_parity_foreign_cause.c. It pins the vector (a
+   foreign-caused area move still answers after the BATCH is closed, which is
+   exactly what the old batch_movements scan could not do), the
+   `cause_player_id == player` negative, the `.rev().find()` LAST-match
+   direction, and the `fires_on_opponent_effects` pre-gate. It deliberately does
+   NOT assert a source-unconditional / target-guarded split: the comment in
+   modifiers.rs about an unguarded source slot and a guarded target slot belongs
+   to record_stage_position_swap, a different function, and this arm has no such
+   split -- it matches moved_card_id alone, for any card in the area log. */
+int rb_hooked_by_foreign_cause(const GameState *g, const AbilityEffect *e,
+                               int card_id, int player) {
     if (!g || !e || !rb_effect_fires_on_opponent_effects(e, card_id)) return 0;
-    for (int i = g->n_batch_movements - 1; i >= 0; i--) {
-        const RbBatchMovement *m = &g->batch_movements[i];
+    /* abilities.rs:548-555 — `turn_area_movements.iter().rev()
+     * .find(|m| m.moved_card_id == card_id)`, then `rec.cause_player_id !=
+     * player_id`. Reverse order because Rust reads the LAST such move. */
+    for (int i = g->n_turn_area_movements - 1; i >= 0; i--) {
+        const RbBatchMovement *m = &g->turn_area_movements[i];
         if (m->moved_card_id != card_id) continue;
-        if (m->source_zone != RB_ZONEID_STAGE || m->dest_zone != RB_ZONEID_STAGE) continue;
         return m->cause_player_id != player;
     }
     return 0;
@@ -2969,8 +3175,21 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
 
 /* ── Rule 9.5.3.2 ordering prompt ───────────────────────────────────── */
 
-/* Defined in src/ability/ability_queue.c; not exported by include/rabuka.h. */
-extern int  rb_queue_is_entry_available(const GameState *g, int idx);
+/* Defined in src/ability/ability_queue.c. `rb_queue_is_entry_available` used to
+   be redeclared here as well; that extern is GONE because the function is
+   ALREADY exported by include/rabuka.h:1890 and the redeclaration said nothing
+   the header does not. The other two are genuinely absent from the header, so
+   they are declared here with their exact signatures and this file is the report
+   rather than the header:
+
+     BLOCKED-ON: include/rabuka.h — add, beside the other rb_queue_* prototypes
+     (around rabuka.h:1890-1900, next to `rb_queue_is_entry_available`):
+         const char *rb_queue_entry_player_id(const GameState *g, int index);
+         void        rb_queue_clear_completed(GameState *g);
+
+   Definitions are src/ability/ability_queue.c:1123 and :689.
+   tests/test_parity_queue_resume.c:41 carries its own copy of the second
+   declaration for the same reason and can drop it once the header has both. */
 extern const char *rb_queue_entry_player_id(const GameState *g, int index);
 extern void rb_queue_clear_completed(GameState *g);
 

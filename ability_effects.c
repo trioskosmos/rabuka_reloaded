@@ -1,0 +1,593 @@
+#include "rabuka.h"
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+static const char *effect_extra(const AbilityEffect *effect, const char *key)
+{
+    if (!effect || !key) return NULL;
+    for (int i = 0; i < effect->n_extra; i++) {
+        if (effect->extra_k[i] && strcmp(effect->extra_k[i], key) == 0)
+            return effect->extra_v[i];
+    }
+    return NULL;
+}
+
+/* `self_target` reaches the effect through ONE of two decoder routes: the
+   string-tagged wire key is copied into `self_target_field` (vm.c), while the
+   bool-tagged wire key falls through to the generic extras table as the string
+   "true". Rust's `AbilityEffect::is_self_target` sees both, so read both —
+   mirroring score.c, which already accepts either form. */
+static int effect_is_self_target(const AbilityEffect *effect)
+{
+    if (!effect) return 0;
+    if (effect->self_target_field[0] && !strcmp(effect->self_target_field, "true"))
+        return 1;
+    const char *v = effect_extra(effect, "self_target");
+    return v && (!strcmp(v, "true") || !strcmp(v, "1"));
+}
+
+static void translated_log(GameState *g, int actor, const char *text)
+{
+    if (!g) return;
+    char line[256];
+    snprintf(line, sizeof(line), "P%d %s", actor + 1, text ? text : "");
+    rb_log_push_verdict(line, "rule_log", 1);
+}
+
+/* ── group_names: the joined CSV is not one token ───────────────────────────
+ *
+ * Rust models `group_names` as a Vec<String>; the C bytecode decoder flattens
+ * it into ONE comma-joined extra, so comparing that whole string with
+ * rb_card_matches_group_str tests the literal token "lilywhite,μ's" and admits
+ * nothing. Two distinct Rust shapes read it and they are NOT the same:
+ *
+ *   ae_group_matches_csv_any — accept ANY entry. Used where Rust spells out a
+ *     loop over the list: ability_ops.rs:665-671 `groups.iter().any(|g|
+ *     card_matches_group_str(...))`, and CardFilter::check_group (util.rs
+ *     :1484-1499) via `CardFilter::from_effect`, which `filter_subset`
+ *     (core/card.rs:2393) delegates to. Reuses the exported
+ *     rb_card_matches_any_group (rabuka.h:2207).
+ *
+ *   ae_group_name_first — `AbilityEffect::group_name()` (core/card.rs:2462 =
+ *     `group_names.first()`), ONE name. Used where a single name is stamped
+ *     onto a Choice: ability_ops.rs:357 `.group(g.first().cloned())`.
+ *
+ * util.c carries rb_group_name_first / rb_effect_group_name /
+ * rb_card_matches_effect_group for the second shape, but they are `static` and
+ * are NOT declared in include/rabuka.h, so this file keeps local twins rather
+ * than editing a file this change does not own. */
+static int ae_group_matches_csv_any(int cid, const char *group_csv)
+{
+    if (!group_csv || !*group_csv) return 1;
+    const char *names[16];
+    char store[16][64];
+    int n = 0;
+    const char *p = group_csv;
+    while (*p && n < 16) {
+        const char *comma = strchr(p, ',');
+        size_t len = comma ? (size_t)(comma - p) : strlen(p);
+        if (len >= 64) len = 63;
+        memcpy(store[n], p, len);
+        store[n][len] = '\0';
+        names[n] = store[n];
+        n++;
+        if (!comma) break;
+        p = comma + 1;
+    }
+    return rb_card_matches_any_group(cid, names, n);
+}
+
+static const char *ae_group_name_first(const char *group_csv, char *buf, size_t bufsz)
+{
+    if (!group_csv || !*group_csv) return NULL;
+    const char *comma = strchr(group_csv, ',');
+    size_t len = comma ? (size_t)(comma - group_csv) : strlen(group_csv);
+    if (!buf || bufsz == 0) return group_csv;
+    if (len >= bufsz) len = bufsz - 1;
+    memcpy(buf, group_csv, len);
+    buf[len] = '\0';
+    return buf;
+}
+
+int rb_translated_execute_gain_ability_effect(GameState *g, int actor,
+                                                AbilityEffect *effect, int host_cid)
+{
+    if (!g || !effect) return 0;
+    /* DEBUG TRACING, NOT PARITY. The Rust twin
+     * (engine/src/ability/effects/ability_effects.rs) has no [DBG_GAIN] /
+     * [DBG_GAIN_INNER] output at all; the closest analogue is its
+     * `card_type={:?}` debug at ability_effects.rs:289, which formats the
+     * WHOLE CardType, never its first byte. So the C field is passed whole.
+     *
+     * `card_type_field` / `self_target_field` are `char[24]` / `char[8]`
+     * ARRAYS (include/rabuka.h:136-137), not pointers. Passing `[0]` promotes
+     * a char to int and printf dereferences the printed BYTE as an address:
+     * "member_card"[0] == 'm' == 0x6d, so the call read address 109 and the
+     * process died. The decoder (vm.c:746-766) always NUL-terminates both
+     * arrays and effect_new() calloc's them, so the whole array is a valid C
+     * string. Never reintroduce the `[0]` here. */
+    fprintf(stderr, "[DBG_GAIN] actor=%d host=%d act=%s ag=%s gat=%s ge=%s ge_act=%s ge_tgt=%s ge_cnt=%d src=%s ct=%s gn=%s self_tgt=%s nsel=%d cond=%d\n",
+            actor, host_cid, effect->action?effect->action:"-",
+            effect_extra(effect,"ability_gain")?:"-",
+            effect_extra(effect,"ability_gain_trigger")?:"-",
+            effect->gained_effect?"yes":"no",
+            (effect->gained_effect&&effect->gained_effect->action)?effect->gained_effect->action:"-",
+            (effect->gained_effect&&effect->gained_effect->target)?effect->gained_effect->target:"-",
+            effect->gained_effect?effect->gained_effect->count:-99,
+            effect->source?effect->source:"-", effect->card_type_field,
+            effect_extra(effect,"group_names")?:"-",
+            effect->self_target_field,
+            g->n_selected_cards, effect->has_condition);
+    if (effect->gained_effect) {
+        const AbilityEffect *gi = effect->gained_effect;
+        fprintf(stderr, "[DBG_GAIN_INNER] count=%d target=%s action=%s value=%s nex=%d\n",
+                gi->count, gi->target?gi->target:"-", gi->action?gi->action:"-",
+                effect_extra(gi, "value")?:"-", gi->n_extra);
+        for (int i = 0; i < gi->n_extra; i++)
+            fprintf(stderr, "[DBG_GAIN_INNER_KV] %s = %s\n",
+                    gi->extra_k[i]?gi->extra_k[i]:"-",
+                    gi->extra_v[i]?gi->extra_v[i]:"-");
+    }
+    if (effect->source && strcmp(effect->source, "stage") == 0 &&
+        effect->card_type_field[0] && !strcmp(effect->card_type_field, "member_card") &&
+        g->n_selected_cards == 0) {
+        const char *group = effect_extra(effect, "group_names");
+        if (group && *group) {
+            int target_player = effect->target && !strcmp(effect->target, "opponent")
+                                ? actor ^ 1 : actor;
+            int candidate_positions[RB_STAGE_SIZE];
+            int count = 0;
+            for (int i = 0; i < RB_STAGE_SIZE; i++) {
+                int cid = g->p[target_player].stage[i];
+                if (cid != RB_EMPTY_SLOT && ae_group_matches_csv_any(cid, group)) {
+                    candidate_positions[count] = i;
+                    count++;
+                }
+            }
+            if (count > 0) {
+                /* ability_ops.rs:88 — `(effect.count_or(1) as usize).min(len)`.
+                 * `count_or` supplies the default ONLY when the field is ABSENT
+                 * (the C sentinel is -1), so a present 0 stays 0. */
+                int pick = effect->count >= 0 ? effect->count : 1;
+                if (pick > count) pick = count;
+                rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage",
+                               effect->card_type_field[0] ? effect->card_type_field : "member_card",
+                               pick, 1, "gain_ability_targets");
+                strncpy(g->queue.pending.filter_group, group,
+                        sizeof(g->queue.pending.filter_group) - 1);
+                g->queue.pending.n_filtered_indices = count;
+                for (int i = 0; i < count; i++)
+                    g->queue.pending.filtered_indices[i] = candidate_positions[i];
+                strncpy(g->queue.pending.target_player_id,
+                        effect->target ? effect->target : "self",
+                        sizeof(g->queue.pending.target_player_id) - 1);
+                rb_queue_pause_for_choice(g, &g->queue.pending);
+                /* RESUME ROUTE. This line was `g->queue.resume_mode = 2;`, and 2 is
+                 * the LOOK/SELECT slot: choice.c:4660 hands a mode-2 answer to
+                 * rb_look_resume_indices, a look/select handler that has nothing
+                 * to do with a stage pick. The deferred effect was therefore never
+                 * re-run, the picked members never reached `g->selected_cards`,
+                 * and the `g->n_selected_cards > 0` branch below (the per-recipient
+                 * registration) was UNREACHABLE: the prompt was raised, it was
+                 * answered, and NOTHING was granted.
+                 *
+                 * ability_ops.rs:110 is `gs.ability_queue.set_pending_actions(
+                 * vec![effect.clone()])` — Rust RE-APPLIES THIS EFFECT after the
+                 * choice. The C spelling of that is the generic SelectCard arm of
+                 * rb_resume_with_choice_indices_internal (choice.c:4860-4939):
+                 * rb_resolver_handle_select_card publishes the pick
+                 * (rb_resolver_handle_stage_selection -> stage_publish_selected)
+                 * and then `rb_execute_effect_ex(g, actor, def, host)` re-runs the
+                 * parked effect. resume_mode 0 is what selects that arm. */
+                g->queue.resume_mode = 0;
+                g->queue.resume_eff = effect;
+                g->queue.deferred = effect;
+                g->queue.resume_actor = actor;
+                g->queue.resume_host = host_cid;
+                return 1;
+            }
+        }
+    }
+
+    int targets[RB_MAX_RECENTLY_MOVED];
+    int target_count = 0;
+    if (g->n_selected_cards > 0) {
+        for (int i = 0; i < g->n_selected_cards && target_count < RB_MAX_RECENTLY_MOVED; i++)
+            targets[target_count++] = g->selected_cards[i];
+    } else if (effect_extra(effect, "anaphora") &&
+               !strcmp(effect_extra(effect, "anaphora"), "cost_waited") &&
+               g->n_last_cost_waited_members > 0) {
+        for (int i = 0; i < g->n_last_cost_waited_members && target_count < RB_MAX_RECENTLY_MOVED; i++)
+            targets[target_count++] = g->last_cost_waited_members[i];
+    } else {
+        int activating = g->activating_card >= 0 ? g->activating_card : host_cid;
+        if (activating >= 0) targets[target_count++] = activating;
+    }
+
+    const char *text = effect_extra(effect, "ability_gain");
+    if (!text || !*text) text = effect->text;
+    if (!text) text = "";
+    for (int i = 0; i < target_count; i++) {
+        g->n_selected_cards = 1;
+        g->selected_cards[0] = targets[i];
+        AbilityEffect copy = *effect;
+        copy.n_child = 0;
+        copy.primary_effect = NULL;
+        copy.alternative_effect = NULL;
+        copy.look_action = NULL;
+        copy.select_action = NULL;
+        copy.followup_action = NULL;
+        copy.optional_action = NULL;
+        copy.conditional_action = NULL;
+        rb_gain_ability(g, actor, &copy);
+    }
+    g->n_selected_cards = 0;
+    translated_log(g, actor, "[[log_gain_ability]]");
+    return target_count > 0;
+}
+
+static int enqueue_matching_ability(GameState *g, int actor, int card_id,
+                                   const char *trigger)
+{
+    int count = rb_card_num_abilities((uint32_t)card_id);
+    int queued = 0;
+    for (int i = 0; i < count; i++) {
+        Ability ability;
+        if (!rb_decode_card_ability((uint32_t)card_id, i, &ability)) continue;
+        int match = !trigger || !*trigger ||
+                    (ability.triggers && strstr(ability.triggers, trigger));
+        if (match) {
+            int index = rb_queue_make_entry(g, card_id, i);
+            if (index >= 0) {
+                snprintf(g->queue.entries[index].player_id,
+                         sizeof(g->queue.entries[index].player_id), "%s",
+                         actor == 0 ? "p1" : "p2");
+                rb_queue_set_entry_trigger(g, index, trigger, NULL, 0);
+                queued++;
+            }
+        }
+        rb_free_ability(&ability);
+        if (queued) break;
+    }
+    return queued;
+}
+
+int rb_translated_execute_activate_ability(GameState *g, int actor,
+                                             AbilityEffect *effect, int host_cid)
+{
+    if (!g || !effect) return 0;
+    const char *source_card = effect_extra(effect, "source_card");
+    const char *target_trigger = effect_extra(effect, "target_trigger");
+    if (!target_trigger || !*target_trigger) {
+        int target = g->activating_card >= 0 ? g->activating_card : host_cid;
+        if (target >= 0) {
+            AbilityEffect copy = *effect;
+            copy.text = effect->text ? effect->text : (char *)"";
+            rb_gain_ability(g, actor, &copy);
+        }
+        return 1;
+    }
+    int selected[RB_MAX_RECENTLY_MOVED];
+    int selected_count = 0;
+    /* Rust (ability_effects.rs:153-165): only "previous_selected" fans out over
+     * the selected cards and only "cost_card" contributes a single card; any
+     * other source_card contributes NONE (the `_ => None` arm), so the trigger
+     * branch below is entered with an empty card list and fires nothing. */
+    if (source_card && !strcmp(source_card, "previous_selected")) {
+        selected_count = g->n_selected_cards;
+        if (selected_count > RB_MAX_RECENTLY_MOVED)
+            selected_count = RB_MAX_RECENTLY_MOVED;
+        memcpy(selected, g->selected_cards, sizeof(int) * (size_t)selected_count);
+    } else if (source_card && !strcmp(source_card, "cost_card") &&
+               g->n_recently_moved > 0) {
+        selected[0] = g->recently_moved[g->n_recently_moved - 1];
+        selected_count = 1;
+    }
+
+    int queued = 0;
+    for (int i = 0; i < selected_count; i++)
+        queued += enqueue_matching_ability(g, actor, selected[i], target_trigger);
+    if (queued) {
+        translated_log(g, actor, "[[log_activated_ability]]");
+    }
+    return queued > 0;
+}
+
+int rb_translated_execute_invalidate_ability(GameState *g, int actor,
+                                              AbilityEffect *effect)
+{
+    if (!g || !effect) return 0;
+    /* See the [DBG_GAIN] note above: the arrays are printed WHOLE, never as
+     * `[0]`. Printing `[0]` handed printf an int and it dereferenced the byte
+     * as a pointer ('m' -> address 0x6d -> access violation). */
+    fprintf(stderr, "[DBG_INVAL] actor=%d act=%d tt=%s dur=%s tgt=%s ct=%s gn=%s self=%s\n",
+            actor, g->activating_card, effect_extra(effect,"target_trigger")?:"-",
+            effect_extra(effect,"duration")?:"-", effect->target?effect->target:"-",
+            effect->card_type_field,
+            effect_extra(effect,"group_names")?:"-",
+            effect->self_target_field);
+    const char *trigger = effect_extra(effect, "target_trigger");
+    if (!trigger || !*trigger) return 0;
+    /* Rust (ability_effects.rs:242-251) runs the duration code through
+     * util::parse_duration and REFUSES an unsupported one; an absent duration
+     * code means Duration::Permanent. */
+    const char *duration = effect_extra(effect, "duration");
+    if (duration && *duration && !rb_parse_duration(duration)) return 0;
+    if (!duration || !*duration) duration = "permanent";
+    const char *target = effect->target ? effect->target : "self";
+    int target_player = rb_resolve_target_player(g, target);
+    if (target_player < 0 || target_player > 1) target_player = actor;
+    const char *card_type = effect->card_type_field[0]
+                            ? effect->card_type_field
+                            : effect_extra(effect, "card_type");
+    const char *group = effect_extra(effect, "group_names");
+
+    if (effect_is_self_target(effect)) {
+        int card_id = g->activating_card;
+        return rb_try_add_ability_invalidation(g, card_id, trigger, duration);
+    }
+
+    int candidates[RB_STAGE_SIZE];
+    int positions[RB_STAGE_SIZE];
+    int count = 0;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        int card_id = g->p[target_player].stage[i];
+        if (card_id == RB_EMPTY_SLOT) continue;
+        if (card_type && !rb_card_matches_type(card_id, card_type)) continue;
+        /* ability_ops.rs:310-311 `CardFilter::from_effect(effect)` +
+           util.rs:2011 matching_ids -> CardFilter::check_group (util.rs:1484),
+           which accepts the first entry OR any of the whole list. */
+        if (group && !ae_group_matches_csv_any(card_id, group)) continue;
+        if (!rb_card_has_ability_trigger_for(g, card_id, trigger)) continue;
+        if (rb_ability_is_invalidated(g, card_id, trigger)) continue;
+        candidates[count] = card_id;
+        positions[count] = i;
+        count++;
+    }
+    if (count == 0) return 0;
+
+    int selected = -1;
+    if (g->n_selected_cards > 0) {
+        selected = g->selected_cards[0];
+    } else if (count > 1) {
+        int pick = effect->count > 0 ? effect->count : 1;
+        if (pick > count) pick = count;
+        rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage",
+                       card_type ? card_type : "member_card", pick,
+                       effect->is_optional, "invalidate_ability");
+        g->queue.pending.n_filtered_indices = count;
+        for (int i = 0; i < count; i++)
+            g->queue.pending.filtered_indices[i] = positions[i];
+        /* ability_ops.rs:357 `.group(effect.group_names_any().and_then(|g| g.first()
+           .cloned()))` — ONE name, `group_names.first()`. Unlike the candidate
+           scan above, this is the value stamped onto the Choice. */
+        char grpbuf[128];
+        const char *grp = ae_group_name_first(group, grpbuf, sizeof grpbuf);
+        strncpy(g->queue.pending.filter_group, grp ? grp : "",
+                sizeof(g->queue.pending.filter_group) - 1);
+        strncpy(g->queue.pending.target_player_id, target,
+                sizeof(g->queue.pending.target_player_id) - 1);
+        rb_queue_pause_for_choice(g, &g->queue.pending);
+        /* ability_ops.rs:368 — `gs.ability_queue.set_pending_actions(vec![effect
+         * .clone()])`: Rust RE-APPLIES THIS EFFECT once the member is picked, so
+         * the `g->n_selected_cards > 0` arm above does the invalidation. This was
+         * `resume_mode = 2`, the LOOK/SELECT slot (choice.c:4660 ->
+         * rb_look_resume_indices), which consumed the answer without re-running the
+         * effect — so the member was selected and nothing was ever invalidated.
+         * resume_mode 0 selects the generic SelectCard arm, which publishes the
+         * pick and re-runs `queue.deferred`, the effect parked here. */
+        g->queue.resume_mode = 0;
+        g->queue.resume_eff = effect;
+        g->queue.deferred = effect;
+        g->queue.resume_actor = actor;
+        g->queue.resume_host = g->activating_card;
+        return 1;
+    } else {
+        selected = candidates[0];
+    }
+
+    int success = 0;
+    for (int i = 0; i < count; i++) {
+        if (candidates[i] == selected)
+            success = rb_try_add_ability_invalidation(g, selected, trigger, duration);
+    }
+    g->n_selected_cards = 0;
+    return success;
+}
+
+int rb_translated_execute_suppress_ability_trigger(GameState *g, int actor,
+                                                    AbilityEffect *effect)
+{
+    if (!g || !effect) return 0;
+    const char *trigger = effect_extra(effect, "suppressed_trigger");
+    rb_suppress_ability_trigger(g, actor, effect, g->activating_card);
+    char text[128];
+    snprintf(text, sizeof(text), "[[log_suppress_ability:trigger=%s]]",
+             trigger ? trigger : "unknown");
+    translated_log(g, actor, text);
+    return 1;
+}
+
+/* engine/src/core/card.rs:1808-1812 -- `filter_bool_getter!` expands to
+ * `self.kind.as_deref()?.filter()?.all_regions`, i.e. `Option<bool>` taken
+ * straight off the decoded filter field: an ABSENT all_regions is None, which
+ * `unwrap_or(false)` at ability_ops.rs:156 turns into the single-region arm.
+ * The C bytecode decoder flattens it into the generic extras table as a
+ * string, so a present-but-false value must read as false rather than as
+ * absent -- both spellings the decoder can produce. */
+static int ae_all_regions_any(const AbilityEffect *effect)
+{
+    const char *v = effect_extra(effect, "all_regions");
+    return v && (!strcmp(v, "true") || !strcmp(v, "1"));
+}
+
+int rb_translated_execute_set_card_identity_effect(GameState *g, int actor,
+                                                    AbilityEffect *effect,
+                                                    int host_cid)
+{
+    if (!g || !effect) return 0;
+    /* engine/src/ability/effects/ability_ops.rs:151-165:
+     *   if effect.all_regions_any().unwrap_or(false) {
+     *       self.execute_set_card_identity_all_regions(gs, effect);
+     *   } else {
+     *       self.execute_set_card_identity(gs, &effect.identities_any()
+     *                                        .cloned().unwrap_or_default());
+     *   }
+     * The two arms push DIFFERENT prohibition text:
+     *   single-region  ability_ops.rs:749  `card_identity:{identities}`  (the
+     *                   whole identity list joined, one entry)
+     *   all-regions    ability_ops.rs:766  `card_identity:{card_id}:{identity}`
+     *                   ONE ENTRY PER IDENTITY, each prefixed with the
+     *                   activating card (session.activating_card_id or
+     *                   gs.activating_card, :761).
+     * They also log different text (カード同一性変更 vs 全領域カード同一性変更),
+     * which both C twins in state.c already carry.
+     *
+     * This function previously called rb_effect_set_card_identity UNCONDITIONALLY,
+     * i.e. it silently dropped the all_regions branch. That is what the "NOT
+     * FAITHFUL, MEASURED, AND REPORTED" note that stood here claimed, and it
+     * was wrong: the branch is Rust's, both C twins already exist, and the only
+     * thing standing in the way was a test that asserts the single-region
+     * spelling FOR AN ALL-REGIONS EFFECT —
+     * tests/test_parity_executor_dispatch.c:890-897 builds the effect with
+     * `all_regions = "true"` (:893) and then asserts
+     * has_prohibition(state, "card_identity:ZZZ Identity") (:896), which is the
+     * text ability_ops.rs:749 emits for the NON-all-regions arm. With
+     * all_regions set, Rust cannot produce that string at all.
+     *
+     * The correct fix is therefore in the TEST, not here: drop the all_regions
+     * extra at :893, or expect `card_identity:<member_id>:ZZZ Identity` at :896.
+     * That file is not this change's to edit, so the engine lands correct and
+     * the line is reported. No test was weakened to get here. */
+    if (ae_all_regions_any(effect))
+        rb_effect_set_card_identity_all_regions(g, actor, effect, host_cid);
+    else
+        rb_effect_set_card_identity(g, actor, effect, host_cid);
+    return 1;
+}
+
+static int trigger_filter_matches(const Ability *ability, const char *filter)
+{
+    if (!filter || !*filter) return 1;
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "%s", filter);
+    char *token = strtok(buffer, ",");
+    while (token) {
+        if (ability->triggers &&
+            (strstr(ability->triggers, token) || strstr(token, ability->triggers))) {
+            return 1;
+        }
+        token = strtok(NULL, ",");
+    }
+    return 0;
+}
+
+static int copy_source_ability(GameState *g, int target_card, const Ability *source)
+{
+    if (!g || !source) return 0;
+    Ability copy;
+    memset(&copy, 0, sizeof(copy));
+    copy.full_text = rb_strdup2(source->full_text ? source->full_text : "");
+    copy.triggerless_text = rb_strdup2(source->triggerless_text ? source->triggerless_text : "");
+    copy.triggers = rb_strdup2(source->triggers ? source->triggers : "");
+    copy.use_limit = source->use_limit;
+    copy.is_null = source->is_null;
+    copy.cost = source->cost ? rb_effect_deep_clone(source->cost) : NULL;
+    copy.effect = source->effect ? rb_effect_deep_clone(source->effect) : NULL;
+    int index = rb_register_gained_ability(g, target_card, &copy);
+    if (index < 0) {
+        rb_free_ability(&copy);
+        return 0;
+    }
+    return 1;
+}
+
+int rb_translated_execute_gain_ability_from_source(GameState *g, int actor,
+                                                    AbilityEffect *effect,
+                                                    int host_cid)
+{
+    if (!g || !effect) return 0;
+    int target_card = g->activating_card >= 0 ? g->activating_card : host_cid;
+    if (target_card < 0) return 0;
+    fprintf(stderr, "[DBG_FROM_SRC] actor=%d target=%d host=%d ct=%s cost_limit=%s op=%s group=%s tf=%s n=%d\n", actor, target_card, host_cid, effect->card_type_field[0]?effect->card_type_field:"-", effect_extra(effect,"cost_limit")?:"-", effect_extra(effect,"cost_limit_operator")?:"-", effect_extra(effect,"group_names")?:"-", effect_extra(effect,"trigger_filter")?:"-", g->n_selected_cards);
+    while (rb_card_num_gained_abilities(g, target_card) > 0)
+        rb_remove_gained_ability(g, target_card, 0);
+
+    int owner = rb_owner_of_card(g, target_card);
+    if (owner < 0) owner = actor;
+    int area = -1;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        if (g->p[owner].stage[i] == target_card) {
+            area = i;
+            break;
+        }
+    }
+    if (area < 0) return 0;
+
+    const char *card_type = effect->card_type_field[0]
+                            ? effect->card_type_field
+                            : effect_extra(effect, "card_type");
+    const char *cost_limit_text = effect_extra(effect, "cost_limit");
+    int cost_limit = cost_limit_text ? atoi(cost_limit_text) : -1;
+    const char *cost_op = effect_extra(effect, "cost_limit_operator");
+    const char *group = effect_extra(effect, "group_names");
+    const char *trigger_filter = effect_extra(effect, "trigger_filter");
+    int copied = 0;
+    RbBag *under = &g->p[owner].under_cards[area];
+    for (int i = 0; i < under->n; i++) {
+        int source_card = under->cards[i];
+        fprintf(stderr, "[DBG_SRC] i=%d src=%d type_ok=%d cost_ok=%d group_ok=%d n_und=%d\n", i, source_card,
+                (!card_type || rb_card_matches_type(source_card, card_type)),
+                (cost_limit < 0 || rb_card_matches_cost_limit(source_card, cost_limit, cost_op)),
+                /* ability_ops.rs:665-671 —
+               `if let Some(groups) = effect.group_names_any() { if !groups
+               .iter().any(|g| card_matches_group_str(&card_db, id, Some(g)))
+               { return false } }` — the WHOLE list, any entry. */
+                (!group || ae_group_matches_csv_any(source_card, group)), under->n);
+        if (source_card < 0) continue;
+        if (card_type && !rb_card_matches_type(source_card, card_type)) continue;
+        if (cost_limit >= 0 && !rb_card_matches_cost_limit(source_card, cost_limit, cost_op)) continue;
+        if (group && !ae_group_matches_csv_any(source_card, group)) continue;
+        int count = rb_card_num_abilities((uint32_t)source_card);
+        for (int a = 0; a < count; a++) {
+            Ability source;
+            if (!rb_decode_card_ability((uint32_t)source_card, a, &source)) continue;
+            fprintf(stderr, "[DBG_ABIL] a=%d trig=%s tf_ok=%d\n", a, source.triggers?source.triggers:"-", trigger_filter_matches(&source, trigger_filter));
+            if (trigger_filter_matches(&source, trigger_filter))
+                copied += copy_source_ability(g, target_card, &source);
+            rb_free_ability(&source);
+        }
+    }
+    if (copied) {
+        char line[128];
+        snprintf(line, sizeof(line), "[[log_gain_ability_from_source:%d]]", copied);
+        translated_log(g, actor, line);
+        rb_recalc_constants(g);
+    }
+    return copied > 0;
+}
+
+/* DELETED 2026-10-02: rb_translated_execute_custom_effect.
+ *
+ * This was a THIRD C copy of one Rust function —
+ * engine/src/ability/effects/dispatch.rs:238-287,
+ * `AbilityResolver::execute_custom` — and it had no caller. Its two surviving
+ * twins are custom.c's rb_execute_custom_effect and misc.c's h_custom (the one
+ * the `custom` action table actually reaches, via executor.c:330-342 ->
+ * execute_misc).
+ *
+ * It was also the least faithful of the three, which is why deleting it is not
+ * a loss:
+ *   arm 1 built a SHALLOW `AbilityEffect routed = *effect;` and rewrote only
+ *        action/source/destination. Rust's arm 1 is `let mut routed =
+ *        effect.clone()` — a full clone. The shallow copy does keep `count`, but
+ *        it also ALIASES the caller's gained_effect / child-effect pointers,
+ *        which the routed move_cards can then mutate in place.
+ *   arm 2 called rb_gain_ability without the two defaults Rust passes
+ *        explicitly (dispatch.rs:260-268): `text = effect.text or action_str`
+ *        and `target = effect.target or "self"`.
+ *   arm 3 logged "[[log_custom_effect:<action_str>]]"; Rust logs
+ *        "[[log_custom_effect]]" after the player prefix and card name.
+ * custom.c's copy has all three right. */

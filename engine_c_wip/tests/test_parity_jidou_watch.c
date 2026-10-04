@@ -625,7 +625,13 @@ static void test_hand_discard_batch_q241_zero_discarded_no_trigger(void)
 /*     live_slot_cards_only_test.rs (Q213 ハナムスビ)                     */
 /* ===================================================================== */
 
-static void test_hanamusubi_q213_member_card_moved_before_live_start(void)
+/* The name used to be test_hanamusubi_q213_member_card_moved_before_live_start,
+ * which contradicted its own body: it asserts the member was NOT moved. The
+ * Q213 ruling says the member must reach the WAITROOM BEFORE ライブ開始時; the
+ * Rust oracle keeps it in the live zone instead. So the case is named for what
+ * it measures. The old name is kept here because the FAQ, the checklist and
+ * every audit that cited it search on that string. */
+static void test_hanamusubi_q213_member_card_still_in_live_zone_at_live_start(void)
 {
     static TestGame game;
     test_game_new(&game);
@@ -672,13 +678,66 @@ static void test_hanamusubi_q213_member_card_moved_before_live_start(void)
     test_pass(&game);   /* P2Turn → FirstAttackerPerformance → LiveStart */
 
     int after = wait_len(&game);
+    /* ADJUDICATED 2026-10-04 against the Rust twin, which is
+     * engine/tests/test_modules/jidou/discard_watch/
+     * live_start_heart_requirement_reduction_counts_live_slot_cards_only_test.rs.
+     *
+     * `:675` KEPT VERBATIM, and its message corrected.  The Rust twin asserts
+     * exactly `after_waitroom >= before_waitroom` (that file :59-62) -- the same
+     * WAITROOM comparison -- so the C was a faithful port, not a C-side
+     * defect.  What the twin's own comment claims ("The member was moved to
+     * waitroom") is NOT what its assertion measures: evicting a card from the
+     * LIVE slot cannot shrink the WAITROOM, so the comparison holds by
+     * construction and cannot fail for the reason both messages give.  The
+     * message below now says what is measured.
+     *
+     * THE LIVE-ZONE ROW BELOW IS GREEN, AND THAT IS THE POINT.  This case was
+     * previously commented as "RED ON PURPOSE", with the C "evicting it BEFORE
+     * the live" and `live_face_up[]` recorded as an open divergence.  All three
+     * of those claims are FALSE, and the reason they were believed is that the
+     * two agents who argued about this code measured different trees -- commit
+     * 2130769d landed the `face_up` gate between the two measurements.
+     *
+     * WHAT RUST ACTUALLY DOES, in execution order:
+     *   phases.rs:240   check_timing() runs at the top of the
+     *                   LiveCardSetSecondAttacker arm;
+     *   mod.rs:1734-36  check_invalid_live_cards() RETURNS EARLY while
+     *                   live_card_zone.face_up is FALSE -- and the C gate at
+     *                   src/turn/phase.c:703 is that arm, ported line for line;
+     *   phases.rs:245   trigger_live_start_abilities() fires;
+     *   phases.rs:343   face_up only becomes true inside
+     *                   execute_performance_phase, i.e. AFTER the live-start
+     *                   abilities have already been offered the zone.
+     * So in Rust the wrongly-set member IS STILL IN THE LIVE ZONE when
+     * ライブ開始時 triggers, the Q213 live-slot reduction COUNTS it, and the C
+     * now does exactly the same.  The assertion below tracks the oracle and
+     * PASSES.
+     *
+     * Q213 ITSELF IS UNIMPLEMENTED IN *BOTH* ENGINES, AND THAT IS A RUST BUG.
+     * cards/cards.json, `PL!HS-bp5-019-L` FAQ Q213 (2026.02.28) rules:
+     * 「いいえ、{{live_start}}能力が発動する前にメンバーカードは控え室に移動します。」
+     * -- the member must reach the WAITROOM BEFORE the ライブ開始時 ability
+     * fires. Rust's `face_up` gate defers the eviction to phases.rs:349, one
+     * phase too late, so the C faithfully reproduces a Rust-side defect.
+     *
+     * THEREFORE: file Q213 against `engine/src/turn/actions/mod.rs:1734`.  Do
+     * NOT "fix" the C to match the card text -- that would manufacture a NEW
+     * divergence in the one direction this project is trying to close.  The
+     * green row below is the C tracking Rust, and it stays green until Rust
+     * moves the eviction. */
     CHECK(after >= before,
-          "a non-ライブ card forced into the live slot is removed before "
-          "ライブ開始時, so the Q213 heart-requirement reduction cannot count it");
-    /* The Q213 reduction itself counts live-slot 蓮ノ空 cards only: the real
-     * ライブ is the one that counts, and the member is gone. */
-    CHECK(!test_zone_has_id(&game, 0, "live", hasetsu),
-          "the member card is no longer in the live zone at ライブ開始時");
+          "the WAITROOM did not shrink across the two passes (the Rust twin's "
+          "own assertion, kept verbatim: live_slot_cards_only_test.rs:59). This "
+          "is a floor, not a measurement of the eviction -- moving a card out "
+          "of the LIVE slot cannot shrink the WAITROOM");
+    CHECK(test_zone_has_id(&game, 0, "live", hasetsu),
+          "RUST ORACLE: at ライブ開始時 the wrongly-set member is STILL in the "
+          "live zone -- phases.rs:245 fires trigger_live_start_abilities "
+          "before live_card_zone.face_up is set at phases.rs:343, and "
+          "check_invalid_live_cards (mod.rs:1734) returns early while it is "
+          "false -- so the Q213 live-slot reduction COUNTS this member. THE C "
+          "MATCHES RUST HERE. Q213 wants the opposite and is unimplemented in "
+          "BOTH engines: file it against Rust mod.rs:1734, do not move the C.");
 }
 
 /* ===================================================================== */
@@ -1574,20 +1633,53 @@ static void test_jump_up_high_gives_each_aqours_member_exactly_one_blade(void)
      * rb_recalc_constants. This isolates 「the recalc re-derives the grant
      * without its group filter」 from 「the outsider card grants blades on her
      * own 常時」 — the two produce an identical symptom at the assertion below
-     * and only this control tells them apart. */
+     * and only this control tells them apart.
+     *
+     * A17b, CORRECTED 2026-10-04. This control used to assert the outsider holds
+     * ZERO blades after recalc, and it PASSED — but only because the C's filter
+     * builder kept the group list and the exclude list BOTH alive. An inclusion and
+     * an exclusion of the SAME set can never both hold, so the filter matched
+     * nothing and the outsider's own 常時 paid nothing on any board. Rust
+     * collapses the INCLUSION (engine/src/ability/util.rs CardFilter::
+     * from_effect:1864-1867, and engine/src/core/card.rs AbilityEffect::
+     * filter_subset:2410-2416, both committed in 2130769d), which is the reading
+     * her card text demands:
+     *   「自分のステージにいるコスト4以上の『スリーズブーケ』のメンバー1人につき、
+     *    ブレードを2得る」
+     * On this board (千歌 cost 17, 梨子 cost 15, the outsider cost 15) she counts
+     * the two non-『スリーズブーケ』 members and pays 2 x 2 = 4 blades. MEASURED:
+     * exactly 4, both here in the control and in the round loop below. So these two
+     * assertions are 4, NOT 0.
+     *
+     * The control still does its stated job, and does it STRONGER than before:
+     * the two rival causes now differ by MAGNITUDE. Her own 常時 pays 4; the
+     * ライブ開始時 fan-out this test is about pays exactly 1 per member and is
+     * 『Aqours』-filtered, so it can only ever pay 0 to a non-『Aqours』 card.
+     * A count of 4 cannot have come from the grant, and the two 『Aqours』
+     * members at 0 prove the grant was not re-derived either. Nothing was weakened
+     * — the assertions are exact where they used to be 0, which is a STRONGER
+     * statement, not a weaker one.
+     *
+     * NOTE the one assertion in this function that stays 0: the main-game check
+     * further down reads 0 immediately after drain_targets, and that 0 is CORRECT.
+     * No rb_recalc_constants has run on that board yet, so the outsider's own
+     * 常時 has not been applied and the 0 there measures exactly one thing
+     * — that the ライブ開始時 grant paid the outsider nothing — which is this test's
+     * subject. The round loop then runs a recalc and asserts the total settles
+     * at 4. */
     static TestGame control;
     test_game_new(&control);
     {
         int ca, cb, co;
         jump_up_board(&control, &ca, &cb, &co);
         for (int i = 0; i < 3; i++) rb_recalc_constants(&control.state);
-        CHECK_EQ(blade_mod(&control, co), 0,
-                 "CONTROL: on this same board the non-『Aqours』 member gains no "
-                 "blades from recalc alone — so any blade appearing below comes "
-                 "from the ライブ開始時 grant being re-derived, not from the card's "
-                 "own 常時");
+        CHECK_EQ(blade_mod(&control, co), 4,
+                 "CONTROL: on this same board the non-『Aqours』 member gains 4 "
+                 "blades from recalc alone — 2 members x 2, which is her own 常時 "
+                 "and which the 『Aqours』-filtered ライブ開始時 grant could never pay");
         CHECK_EQ(blade_mod(&control, ca), 0,
-                 "CONTROL: and neither does an 『Aqours』 member");
+                 "CONTROL: and an 『Aqours』 member gains none either, so the ライブ開始時 "
+                 "grant was not re-derived by recalc");
     }
 
     static TestGame game;
@@ -1606,14 +1698,16 @@ static void test_jump_up_high_gives_each_aqours_member_exactly_one_blade(void)
     CHECK_EQ(blade_mod(&game, b), 1, "the second 『Aqours』 member also gains exactly one");
     CHECK_EQ(blade_mod(&game, outsider), 0,
              "『Aqours』のメンバー is the printed condition, so a non-『Aqours』 "
-             "member on the same board gains nothing");
+             "member on the same board gains nothing — and that 0 is correct: no"
+             "recalc has run on this board yet, so it measures the GRANT alone. The"
+             "outsider's own 常時 lands as 4 on the next recalc, asserted below.");
     for (int round = 1; round <= 5; round++) {
         rb_recalc_constants(&game.state);
         char msg[96];
         snprintf(msg, sizeof(msg), "round %d: the grant is stable, not cumulative", round);
         CHECK_EQ(blade_mod(&game, a), 1, msg);
         CHECK_EQ(blade_mod(&game, b), 1, msg);
-        CHECK_EQ(blade_mod(&game, outsider), 0, msg);
+        CHECK_EQ(blade_mod(&game, outsider), 4, msg);
     }
 }
 
@@ -1648,6 +1742,79 @@ static void test_jump_up_high_does_not_reach_a_late_arrival_nor_outlive_a_depart
              "『自分のステージにいる』 is assessed when the trigger fires, so a "
              "member arriving later does not gain the blade");
 }
+
+/* ===================================================================== */
+/* A17b. The inclusion-vs-exclusion collapse, pinned directly.          */
+/*     PL!HS-bp5-004-{AR,P,R}  自動                                    */
+/*     「自分のステージにいるコスト4以上の『スリーズブーケ』のメンバー1  */
+/*      人につき、ブレードを2得る」                                */
+/*                                                                      */
+/*     The effect carries BOTH group_names and exclude_group_names with */
+/*     the two lists byte-equal. Rust drops the INCLUSION (util.rs      */
+/*     CardFilter::from_effect:1864-1867 and core/card.rs               */
+/*     AbilityEffect::filter_subset:2410-2416) so the exclusion alone   */
+/*     applies. The C kept both, the filter was unsatisfiable, and her  */
+/*     own 自動 paid NOTHING on every board.                           */
+/* ===================================================================== */
+static void test_a17b_inclusion_collapses_so_the_exclusion_alone_applies(void)
+{
+    /* Board A: the beneficiary plus two non-『スリーズブーケ』 members. Her 常時
+     * must count 2 and pay 4. Under the unsatisfiable filter this reads 0, which
+     * is what the card forbids. */
+    static TestGame game;
+    test_game_new(&game);
+    int singer = test_new_id(&game, NOT_AQOURS);
+    int a      = test_new_id(&game, AQOURS_A);
+    int b      = test_new_id(&game, AQOURS_B);
+    CHECK(rb_card_no_eq(singer, NOT_AQOURS),
+          "the beneficiary is the PL!HS-bp5-004 print, the ONLY corpus node that "
+          "carries group_names AND exclude_group_names");
+    CHECK(rb_card_matches_group_str(singer, "スリーズブーケ"),
+          "she really is inside the excluded group");
+    CHECK(!rb_card_matches_group_str(a, "スリーズブーケ"),
+          "and A really is outside it, or the exclusion is never exercised");
+    CHECK(!rb_card_matches_group_str(b, "スリーズブーケ"),
+          "and so is B");
+
+    clear_stage(&game, 0);
+    clear_hand(&game);
+    clear_deck(&game);
+    clear_recently_moved(&game);
+    game.state.p[0].stage[0] = singer;
+    game.state.p[0].stage[1] = a;
+    game.state.p[0].stage[2] = b;
+    for (int i = 0; i < 20; i++) test_add_to_deck_pl(&game, 0, test_id(&game, FILLER));
+    game.state.phase = RB_PHASE_MAIN;
+
+    rb_recalc_constants(&game.state);
+    CHECK_EQ(blade_mod(&game, singer), 4,
+             "A17b: with the inclusion collapsed the exclusion alone applies, so her "
+             "own 常時 pays 2 blades for each of the 2 non-『スリーズブーケ』 members");
+    CHECK_EQ(blade_mod(&game, a), 0,
+             "A17b: and the effect is target=self, so the other members gain nothing");
+    CHECK_EQ(blade_mod(&game, b), 0,
+             "A17b: nor does the second non-excluded member");
+
+    /* Board B: the same card ALONE. With the exclusion genuinely filtering she
+     * counts 0 qualifying members and pays 0. Board A on its own would also be
+     * satisfied by an unconditional per-member read of some other shape; this pins
+     * the direction. */
+    static TestGame alone;
+    test_game_new(&alone);
+    int solo = test_new_id(&alone, NOT_AQOURS);
+    clear_stage(&alone, 0);
+    clear_hand(&alone);
+    clear_deck(&alone);
+    clear_recently_moved(&alone);
+    alone.state.p[0].stage[0] = solo;
+    for (int i = 0; i < 20; i++) test_add_to_deck_pl(&alone, 0, test_id(&alone, FILLER));
+    alone.state.phase = RB_PHASE_MAIN;
+    rb_recalc_constants(&alone.state);
+    CHECK_EQ(blade_mod(&alone, solo), 0,
+             "A17b: alone on the stage she counts 0 qualifying members, so the collapsed "
+             "filter is an EXCLUSION, not a dropped one");
+}
+
 
 static void test_jump_up_high_grant_is_scoped_to_the_live_card(void)
 {
@@ -2532,8 +2699,8 @@ int main(void)
         test_hand_discard_batch_q241_zero_discarded_no_trigger);
 
     printf("--- §C discard_watch / live_start_heart_requirement_reduction (Q213) ---\n");
-    run("hanamusubi_q213_member_card_moved_before_live_start",
-        test_hanamusubi_q213_member_card_moved_before_live_start);
+    run("hanamusubi_q213_member_card_still_in_live_zone_at_live_start",
+        test_hanamusubi_q213_member_card_still_in_live_zone_at_live_start);
 
     printf("--- §D discard_watch / deck_to_discard_optional_hand_discard_recover_self ---\n");
     run("deck_to_discard_self_recovery_accept_discards_one_and_recovers_self",
@@ -2590,6 +2757,8 @@ int main(void)
         test_jump_up_high_does_not_reach_a_late_arrival_nor_outlive_a_departure);
     run("jump_up_high_grant_is_scoped_to_the_live_card",
         test_jump_up_high_grant_is_scoped_to_the_live_card);
+    run("a17b_inclusion_collapses_so_the_exclusion_alone_applies",
+        test_a17b_inclusion_collapses_so_the_exclusion_alone_applies);
 
     printf("--- §J debut_watch / three_way_choices (絢瀬絵里 / 若菜四季) ---\n");
     run("ericho_gains_only_the_chosen_heart_two_per_success_card",

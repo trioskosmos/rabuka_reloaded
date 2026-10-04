@@ -62,15 +62,46 @@ int rb_trigger_is(const char *triggers, const char *needle) {
  * pushed that way is invisible to the owner-scoped drain and is dropped without
  * ever resolving. Enqueue through `rb_queue_enqueue` (which stamps the owner)
  * and set the trigger token separately, exactly as
- * `rb_build_ability_queue_entry` does for the 自動 scan. */
+ * `rb_build_ability_queue_entry` does for the 自動 scan.
+
+ * `moved` / `n_moved` is the ENQUEUE-TIME movement batch, and it is NOT the
+ * same value at every call site. Rust decides per scan:
+ *
+ *   trigger_debut_abilities        trigger_scan.rs:148 takes
+ *                                  `let moved_snapshot = game_state
+ *                                   .recently_moved_cards.clone()` BEFORE the
+ *                                  loop and passes `moved_snapshot.clone()` to
+ *                                  EVERY enqueued 登場 ability (:156, :166,
+ *                                  :180, :190, :205, :215, :221). So every 登場
+ *                                  entry carries the batch that was live when
+ *                                  the member appeared.
+ *   trigger_live_start_abilities   trigger_scan.rs:345-346 passes `None`.
+ *   trigger_live_success_abilities trigger_scan.rs:525-526 passes `None`.
+ *   自動 / TAS scan                abilities.rs:1437 passes `moved`; the C's
+ *                                  builder at game_state_abilities.c:1694-1700
+ *                                  already reproduces that one.
+ *
+ * The snapshot is load-bearing, not decoration:
+ * `rb_entry_trigger_moved_cards` (game_state_abilities.c:1614) is the FIRST
+ * source `moved_card_pool` / `those_cards` conditions consult (condition.c
+ * :1194-1200, :3203-3210) and it PREFERS the snapshot over the live global,
+ * while `rb_drain_ability_queue` zeroes `g->n_recently_moved` at
+ * src/ability/ability_queue.c:1420 before the cost runs. So by the time a 登場
+ * effect asks "those cards", the live global is already empty and the entry
+ * snapshot is the only surviving evidence that this card's move caused the
+ * trigger. Passing NULL from the 登場 scan (as this helper used to for all three
+ * scans) left 3 登場 abilities with `source: "those_cards"` and up to 22 with
+ * `type: "movement_condition"` resolving against an EMPTY set where Rust sees
+ * the batch — a real divergence on real cards, not a test artefact. */
 static int rb_push_owned_entry(GameState *g, int pl, int card_id, int ability_idx,
-                               const char *trigger)
+                               const char *trigger,
+                               const int *moved, int n_moved)
 {
     if (!g || pl < 0 || pl > 1) return 0;
     int idx = rb_queue_enqueue(g, card_id, ability_idx, ability_idx,
                                (pl == 0) ? "p1" : "p2", NULL);
     if (idx < 0) return 0;
-    rb_queue_set_entry_trigger(g, idx, trigger, NULL, 0);
+    rb_queue_set_entry_trigger(g, idx, trigger, moved, n_moved);
     return 1;
 }
 
@@ -127,63 +158,6 @@ static int rb_trigger_seen_add(RbTriggerSeen *seen, int *n, int card_id, int abi
     return 1;
 }
 
-static int queue_gained_trigger_seen(GameState *g, int pl, int card_id,
-                                     const char *trigger, RbTriggerKind kind,
-                                     int area,
-                                     RbTriggerSeen *seen, int *n_seen);
-
-static int queue_gained_trigger(GameState *g, int pl, int card_id, const char *trigger)
-{
-    RbTriggerKind kind = rb_trigger_from_token(trigger);
-    return queue_gained_trigger_seen(g, pl, card_id, trigger, kind, -1, NULL, NULL);
-}
-
-/* Same as queue_gained_trigger, but with an optional caller-owned dedupe set
-   and an optional activation-area gate.
-   engine/src/turn/trigger_scan.rs:218 declares `seen: HashSet<(i16, usize)>`
-   INSIDE trigger_live_start_abilities and inserts at :282-286, i.e. the set is
-   scoped to ONE seat's ONE scan. `queue_gained_trigger_seen` is the shared arm
-   of the DEBUT scan (Rust has no gained arm there either -- see
-   rb_trigger_debut) and of the ライブ成功時 scan, where Rust's gained loop is
-   trigger_scan.rs:462-514 and DOES share the same `seen` set (:479-482,
-   ability_idx = GAINED_ABILITY_INDEX_BASE + gained_index).
-
-   `area` is the stage index of the host card, or a negative value for the
-   live-card zone. It is negative in every Rust chain as well: the three scans
-   encode `position: Option<MemberArea>` and gate with
-   `position.is_some_and(|area| !check_effect_position(..))`, i.e. the
-   activation-position gate applies ONLY to a staged member.
-
-   `kind` is the TriggerKind the caller's trigger string denotes. Rust matches a
-   gained ability with `ability.has_trigger(kind)` -- the PER-TOKEN classifier
-   (card.rs:834 -> triggers.rs:62-74), not a substring `contains` -- so it is
-   reproduced exactly; `trigger` itself stays the wire string, which is what the
-   invalidation test and the queue entry's trigger field need. */
-static int queue_gained_trigger_seen(GameState *g, int pl, int card_id,
-                                     const char *trigger, RbTriggerKind kind,
-                                     int area,
-                                     RbTriggerSeen *seen, int *n_seen)
-{
-    if (!g || card_id < 0 || !trigger) return 0;
-    int queued = 0;
-    int count = rb_card_num_gained_abilities(g, card_id);
-    for (int i = 0; i < count; i++) {
-        const Ability *ability = rb_card_gained_ability(g, card_id, i);
-        if (!ability || !ability->triggers || !rb_ability_has_trigger(ability, kind)) continue;
-        if (rb_ability_is_invalidated(g, card_id, trigger)) continue;
-        if (area >= 0 &&
-            !rb_check_effect_position(effect_activation_position_any(ability->effect), area))
-            continue;
-        int limit = ability->use_limit < 0 ? 99 : ability->use_limit;
-        int ability_idx = RB_GAINED_ABILITY_INDEX_BASE + i;
-        if (seen && !rb_trigger_seen_add(seen, n_seen, card_id, ability_idx)) continue;
-        if (rb_use_limit_reached(&g->queue, card_id, ability_idx, limit, g->turn)) continue;
-        /* Rust records nothing at enqueue -- see the note on
-           rb_push_owned_entry. The use is spent when this entry resolves. */
-        if (rb_push_owned_entry(g, pl, card_id, ability_idx, trigger)) queued++;
-    }
-    return queued;
-}
 
 /* Mirror triggers.rs:TriggerKind::from_token (triggers.rs:54-75): trim the
     token, match against the wire constants; unknown → RB_TK_COUNT (no kind).
@@ -229,13 +203,38 @@ RbTriggerKind rb_trigger_from_token(const char *s) {
    field the C's own baton-touch paths set: engine.c:1092 (single baton) and
    engine.c:955 (double baton) write `g->baton_touch_used[pl] = 1`, and
    engine.c:1566 clears it, so it is exactly "this play action was a baton
-   touch". */
+   touch".
+
+   THERE IS NO GAINED ARM HERE, and that is now faithful.
+   `trigger_debut_abilities` (trigger_scan.rs:23-139) walks
+   `card.abilities.iter().enumerate()` and NOTHING ELSE -- no
+   `gained_card_abilities` loop, so `trigger_auto_ability_by_index_refs` is
+   only ever reached with a printed `ability_index`. The C used to call
+   `queue_gained_trigger(g, pl, card_id, "登場")` here, firing a runtime-GAINED
+   登場 ability that Rust never fires. That is the same divergence already
+   removed from the ライブ開始時 scan below (see the note there); this is its
+   登場 twin, and it was still live.
+
+   MEASURED REACHABILITY: 0 of 985. `cards/abilities.json` has 24
+   `gain_ability` / `gain_ability_from_source` effect nodes, and the distinct
+   values of their `ability_gain_trigger` are 常時 (20 nodes) and ライブ成功時
+   (2 nodes) -- never 登場. Four nodes mention 登場 inside their CONDITION
+   text (an `appearance_condition` "『蓮ノ空』のメンバーが登場しており"), which
+   is a condition, not the granted ability's trigger. So the removal is
+   measurement-neutral by construction, exactly as the ライブ開始時 removal was,
+   and it stops the C from diverging the day the parser does emit a gained
+   登場 ability. */
 int rb_trigger_debut(GameState *g, int pl, int card_id) {
     int area = -1;
     if (g && pl >= 0 && pl < 2)
         for (int s = 0; s < RB_STAGE_SIZE; s++)
             if (g->p[pl].stage[s] == card_id) { area = s; break; }
     int baton_touch_used = (g && pl >= 0 && pl < 2) ? g->baton_touch_used[pl] : 0;
+
+    /* trigger_scan.rs:148 `let moved_snapshot = game_state.recently_moved_cards
+       .clone()` -- taken ONCE, before the loop, and cloned into every entry. */
+    const int *moved = g ? g->recently_moved : NULL;
+    int n_moved = g ? g->n_recently_moved : 0;
 
     int n = rb_card_num_abilities((uint32_t)card_id);
     int queued = 0;
@@ -266,14 +265,12 @@ int rb_trigger_debut(GameState *g, int pl, int card_id) {
                     trigger_auto_ability(..., player_id, ...) stamps. Pushing
                     un-stamped here made the entry invisible to the owner-scoped
                     drain. */
-if (rb_push_owned_entry(g, pl, card_id, i, "登場")) {
-                      queued = 1;
-                  }
+                 if (rb_push_owned_entry(g, pl, card_id, i, "登場", moved, n_moved))
+                     queued++;
              }
         }
         rb_free_ability(&ab);
     }
-    queued += queue_gained_trigger(g, pl, card_id, "登場");
     return queued;
 }
 
@@ -339,16 +336,37 @@ int rb_trigger_live_start(GameState *g, int pl) {
                 !rb_ability_is_invalidated(g, cid, "ライブ開始時")) {
                 if (rb_trigger_seen_add(seen, &n_seen, cid, ai) &&
                     !rb_use_limit_reached(&g->queue, cid, ai, ab.use_limit<0?99:ab.use_limit, g->turn)) {
-                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=1\n",
-                            pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(0),
-                            rb_trigger_zone_label(0), cid, ai);
+                     /* MEASURE, THEN PRINT. The push is above the fprintf, not
+                        below it. It used to be below: the line printed a literal
+                        `queued=1` while the real counter `queued` (declared at
+                        the top of this function) was only incremented on success.
+                        rb_push_owned_entry returns 0 on a bad seat and on
+                        rb_queue_enqueue < 0, so every failed push was REPORTED
+                        as a successful enqueue. That is the masked-failure class:
+                        a diagnostic that asserts the ability fired when it did
+                        not -- the same shape as the `ability_id[512]` bug the
+                        J12 rows were opened for, and it was never caught because
+                        the number it printed could not disagree with itself.
+
+                        `int pushed` IS `queued`: 1 exactly when the entry reached
+                        the queue, 0 otherwise, so the printed field and the
+                        accumulated count can no longer drift apart. */
                      /* Owner-stamped: this loop scans g->p[pl].live, so the card
                         belongs to `pl`. Rust's live-start scan binds one
                         player_id_clone for the whole scan
                         (turn/triggers.rs:180, :309-317) and passes it to every
                         trigger_auto_ability, for BOTH the live-card zone and the
-                        stage members. Records nothing (see rb_push_owned_entry). */
-                     if (rb_push_owned_entry(g, pl, cid, ai, "ライブ開始時")) queued++;
+                        stage members. Records nothing (see rb_push_owned_entry).
+                        The trigger name is \xNN-escaped per the repo rule for
+                        fullwidth literals; the bytes are identical to the raw
+                        UTF-8 ライブ開始時 they replace. */
+                     int pushed = rb_push_owned_entry(g, pl, cid, ai,
+                                                      "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE9\x96\x8B\xE5\xA7\x8B\xE6\x99\x82",
+                                                      NULL, 0);
+                     if (pushed) queued++;
+                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=%d\n",
+                            pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(0),
+                            rb_trigger_zone_label(0), cid, ai, pushed);
                 } else {
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=0 use_limit\n",
                             pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(0),
@@ -386,14 +404,26 @@ int rb_trigger_live_start(GameState *g, int pl) {
                !rb_ability_is_invalidated(g, cid, "ライブ開始時")){
                 if(rb_trigger_seen_add(seen, &n_seen, cid, i) &&
                    !rb_use_limit_reached(&g->queue, cid, i, ab.use_limit<0?99:ab.use_limit,g->turn)){
-                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=1\n",
-                            pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(1),
-                            rb_trigger_zone_label(1), cid, i);
+                    /* MEASURE, THEN PRINT -- second site, same defect as the
+                       live-card loop above. The push is above the fprintf so
+                       `queued=%d` reports the RETURN VALUE of the push instead
+                       of the literal 1; a push refused for a bad seat or a
+                       negative rb_queue_enqueue now prints queued=0 and leaves
+                       the accumulated `queued` untouched, which is what
+                       rb_push_owned_entry actually did. */
                      /* Owner-stamped: same `pl` as the live-card loop above —
                         g->p[pl].stage, and Rust passes one player_id_clone for the
                         whole chained live_cards + stage_cards scan. Records
-                        nothing (see rb_push_owned_entry). */
-                     if (rb_push_owned_entry(g, pl, cid, i, "ライブ開始時")) queued++;
+                        nothing (see rb_push_owned_entry). Trigger name
+                        \xNN-escaped per the repo rule for fullwidth literals;
+                        same bytes as the raw UTF-8 it replaces. */
+                     int pushed = rb_push_owned_entry(g, pl, cid, i,
+                                                      "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE9\x96\x8B\xE5\xA7\x8B\xE6\x99\x82",
+                                                      NULL, 0);
+                     if (pushed) queued++;
+                    fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=%d\n",
+                            pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(1),
+                            rb_trigger_zone_label(1), cid, i, pushed);
                 } else {
                     fprintf(stderr, "[LIVE_START_SCAN] pl=%d trigger=%s zone=%s label=%s cid=%d ab=%d queued=0 use_limit\n",
                             pl, rb_canonical_trigger(ab.triggers), rb_trigger_zone_id(1),
@@ -548,7 +578,7 @@ int rb_trigger_live_success(GameState *g, int pl) {
                all — the printed arm's `ability_has_remaining_uses` lives in the
                TAS scan (abilities.rs:971), not here — and, like every Rust
                enqueue, records nothing. */
-            if (rb_push_owned_entry(g, pl, cid, idx, RB_TSTR_LIVE_SUCCESS)) queued++;
+if (rb_push_owned_entry(g, pl, cid, idx, RB_TSTR_LIVE_SUCCESS, NULL, 0)) queued++;
             continue;
         }
         Ability ab;
@@ -567,7 +597,7 @@ int rb_trigger_live_success(GameState *g, int pl) {
                 cid, idx, 0, limit, reached, key == g->just_completed_ability_key);
         rb_free_ability(&ab);
         if (key == g->just_completed_ability_key || reached) continue;
-        if (rb_push_owned_entry(g, pl, cid, idx, RB_TSTR_LIVE_SUCCESS)) queued++;
+        if (rb_push_owned_entry(g, pl, cid, idx, RB_TSTR_LIVE_SUCCESS, NULL, 0)) queued++;
     }
     return queued;
 }

@@ -1,4 +1,4 @@
-﻿//! V8 live-card-set decision: ONE argmax over the shared check model.
+//! V8 live-card-set decision: ONE argmax over the shared check model.
 //!
 //! v7 built this decision as a chain of mutually exclusive special cases —
 //! free win, ceiling fold, minimum-win, strict closeout, desperation life,
@@ -59,6 +59,10 @@ pub(crate) struct Candidate {
     pub junk: Vec<usize>,
     pub outcome: CheckOutcome,
     pub value: f64,
+    /// The total score this set was priced at, including expected yell score.
+    /// Needed to re-price the set against an alternative opponent response, which
+    /// is what commitment_game does; outcome alone does not carry it.
+    pub score: i32,
 }
 
 /// Value of one extra card in hand for the NEXT check, derived from our own
@@ -378,6 +382,20 @@ pub(crate) fn candidate_value_zone(
     filter_value: f64,
     holds_life: bool,
 ) -> f64 {
+    candidate_value_zone_with(outcome, p_pass, filter_value, holds_life, 0.0)
+}
+
+/// `candidate_value_zone` with rule 8.4.13's turn-order consequence priced in.
+///
+/// The four-argument form above is what every caller and test uses, and it
+/// prices nothing, which is the shipped behaviour exactly. See `turn_order_cost`.
+pub(crate) fn candidate_value_zone_with(
+    outcome: CheckOutcome,
+    p_pass: f64,
+    filter_value: f64,
+    holds_life: bool,
+    turn_order: f64,
+) -> f64 {
     let burned = if !holds_life {
         0.0
     } else if matches!(std::env::var("V8_LIFE_BURN").as_deref(), Ok("stationary")) {
@@ -387,7 +405,57 @@ pub(crate) fn candidate_value_zone(
     } else {
         (1.0 - p_pass) * life_resale_value() * PLACEMENT_CREDIT
     };
-    outcome.value - burned + filter_value
+    outcome.value - burned + filter_value - turn_order_cost(&outcome, turn_order)
+}
+
+/// `V8_TURNORDER=<w>`: the price of winning the check ALONE, in placement units.
+///
+/// ## The rule that is missing from the model
+///
+/// ```text
+///    8.4.13  8.4.7 において、一方のプレイヤーのみが成功ライブカード置き場に
+///           カードを移動していた場合、そのプレイヤーが先攻プレイヤーとなり、
+///           その相手が後攻プレイヤーとなります。そうでない場合、現在の先攻
+///           プレイヤーが引き続き先攻プレイヤーです。
+/// ```
+///
+/// A SOLE placement makes you the **先攻** — the first attacker — next turn, and
+/// the first-attacker slot is not symmetric with the second. Per-check
+/// calibration, split by attacker order:
+///
+/// ```text
+///    first attacker   n=2729   we placed 0.161   they passed 0.442
+///    second attacker  n=2689   we placed 0.441   they passed 0.673
+/// ```
+///
+/// Two and a half times. The reason is structural: 8.2.2 gives the second
+/// attacker the first attacker's set COUNT before choosing, so 93% of
+/// second-attacker decisions are made against a zone already holding a card,
+/// while a first attacker is always deciding blind.
+///
+/// So placing alone does not merely bank a placement - it **surrenders the
+/// better slot**. Nothing in `check_outcome` prices that: the whole function is
+/// one check in isolation, and this is a consequence for the *next* check.
+/// Measured consequences of ignoring it are on both sides of the ledger, which
+/// is why this is a single signed weight rather than a correction:
+///
+/// - at 2-2 a sole placement WINS the game, which the `rule_payoff` term
+///   already prices at +1 and which dominates any plausible weight here;
+/// - at 0-2 handing over the slot keeps us alive for the next check.
+///
+/// `P(we place alone)` is approximated as `p_place * (1 - opp_place)`, the
+/// independent form. `check_outcome` computes the exact `ours_only` but does not
+/// expose it, and the error is second-order against a term whose sign is what
+/// is being measured. Setting it to 0.0 is the shipped behaviour exactly.
+///
+/// The default is 0.0 on purpose. Nothing selects this; `w` is swept to find out
+/// whether the slot is worth pricing at all before anyone decides it should be.
+fn turn_order_cost(outcome: &CheckOutcome, w: f64) -> f64 {
+    if !(w.is_finite() && w > 0.0) {
+        return 0.0;
+    }
+    let sole = outcome.p_place * (1.0 - outcome.opp_place);
+    w * sole * PLACEMENT_CREDIT
 }
 
 /// What one life in hand is worth, in placement tickets, when it is NOT the one
@@ -425,6 +493,400 @@ fn life_resale_value() -> f64 {
     }
 }
 
+/// Which departures from the shipped live-set policy are active.
+///
+/// Grouped rather than read from the environment at each use so that a candidate
+/// can be built as a **named bot**, not a switch. `--env` is process-global, so a
+/// process-global switch changes BOTH seats of a head-to-head — which makes it
+/// impossible to measure a candidate against a pure opponent, and a mirror
+/// cannot measure one at all (see the `V12` entry in `registry.rs`).
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct LiveCfg {
+    /// Allow a pair of lives wherever the default allows one (`v11`).
+    pub wide: bool,
+    /// Price a sole placement's rule 8.4.13 cost of surrendering the 先攻 slot.
+    pub turn_order: f64,
+    /// Price the set at its post-ライブ開始時 score and requirement.
+    pub self_rewrite: bool,
+    /// Score the opponent buys with the count we publish (see OppModel::counter).
+    pub counter: f64,
+    /// Make the opponent clear enough to REACH our published total. See
+    /// OppModel::under_our_score; this is the 43%-of-placements term.
+    pub pressure: bool,
+    /// EVALUATION ONLY. Read the opponent's real board and set. See
+    /// OppModel::omniscient - this is a cheating best-response instrument,
+    /// never a legal policy.
+    pub omniscient: bool,
+    /// V8_SCORE_BIAS: value added per point of published score.
+    ///
+    /// Measured justification, from 2198 contested checks (both committed, both
+    /// passed), bucketed by which life was played:
+    ///
+    /// `	ext
+    ///    card   share   mean_score   opp_score   win-or-TIE   placed
+    ///      2    18.0%       2.43        2.65        66.8%      38.1%
+    ///      3    16.3%       3.06        2.97        68.9%      39.3%
+    ///      5     9.4%       4.21        3.48        79.9%      48.6%   <- best
+    ///      7     4.7%       4.68        4.47        67.1%      35.4%
+    /// ``n    ///
+    /// The score-4.2 band is the best contested play in the deck by ten points of
+    /// placement rate and it is played on 9.4% of checks, while the 2-3 band
+    /// delivers 38-39% on a third of them. V8_P_FIRST biases the OTHER way
+    /// (toward the most reliable life), which is the direction this data argues
+    /// against.
+    ///
+    /// p_pass is already well calibrated per card - measured gaps of +/-0.01
+    /// across the bulk - so this is not a sampler defect to fix. It is the
+    /// weighting between reliability and score in the ranking, and the data says
+    /// the weighting is off by about ten points of contested placement.
+    pub score_bias: f64,
+}
+
+/// `V8_COMMIT_GAME=<w>`: choose the live set as an EQUILIBRIUM of the commitment
+/// subgame rather than as the argmax against a fixed opponent distribution.
+///
+/// ## What is wrong with the shipped choice
+///
+/// `enumerate_candidates` scores every candidate `a` against ONE opponent
+/// model — a single `score_dist` smear and a single `pass_prob` — and takes the
+/// best. That treats the opponent as part of the environment. It is not. Under
+/// 8.2.2 → 8.2.4 the second attacker sets after seeing our COUNT, so what they
+/// can build is a function of what we publish, and the right question is not
+/// "which `a` is best against this opponent" but "which `a` is best against an
+/// opponent who is choosing their best reply to `a`".
+///
+/// That is a small matrix game — our candidates against their response counts —
+/// and it is small enough to solve. This is the one place in Loveca that is a
+/// genuine imperfect-information simultaneous commitment; everything around it
+/// is perfect information.
+///
+/// ## The opponent scenarios
+///
+/// The response axis is **how many cards they set**, because that is the only
+/// thing they can see about us. For each count `m` their score is the sum of the
+/// best `m` distinct live-card scores that exist in this game — read off the
+/// live cards in hand and in every public zone, which is real information and
+/// not a prior. Pooling `m` requirements is harder than one (8.3.15), so their
+/// pass probability falls with `m`.
+///
+/// ## Solving it
+///
+/// Iterated best response (fictitious play) over the small game, both seats
+/// best-responding, converging on a mutual best response. That is the honest
+/// solution for this size; it is deterministic, needs no equilibrium solver, and
+/// it is the standard method for exactly this shape of subgame.
+///
+/// `w` blends the equilibrium pick against the shipped myopic argmax, so
+/// `w = 0` is today's behaviour exactly and `w = 1` is the full equilibrium.
+/// Nothing selects this.
+fn commitment_game(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+    candidates: &[Candidate],
+    opp: &OppModel,
+    my_success: usize,
+) -> Option<usize> {
+    let w = std::env::var("V8_COMMIT_GAME")
+        .ok()
+        .and_then(|v| v.trim().parse::<f64>().ok())
+        .filter(|v| v.is_finite() && (0.0..=1.0).contains(v))?;
+    if w <= 0.0 || candidates.is_empty() {
+        return None;
+    }
+    let scenarios = response_scenarios(gs, me, db, opp);
+    if scenarios.is_empty() {
+        return None;
+    }
+    // Payoff of `cand[i]` when the opponent answers with `scen[j]`.
+    let mut pay = vec![vec![0.0f64; scenarios.len()]; candidates.len()];
+    for (i, c) in candidates.iter().enumerate() {
+        for (j, sc) in scenarios.iter().enumerate() {
+            let o = v8_model::check_outcome(
+                c.outcome.p_pass,
+                c.score,
+                c.lives.len().max(1),
+                my_success,
+                sc,
+            );
+            pay[i][j] = o.value;
+        }
+    }
+    // Fictitious play: both seats best-respond, repeatedly.
+    let rounds = 24usize;
+    let mut my_regret = vec![0.0f64; candidates.len()];
+    let mut their_regret = vec![0.0f64; scenarios.len()];
+    for _ in 0..rounds {
+        let mi = (0..candidates.len())
+            .max_by(|&a, &b| {
+                my_regret[a]
+                    .partial_cmp(&my_regret[b])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap();
+        let ti = (0..scenarios.len())
+            .max_by(|&a, &b| {
+                their_regret[a]
+                    .partial_cmp(&their_regret[b])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap();
+        // Our payoff against their best reply, and theirs against our pick.
+        let ours = pay[mi][ti];
+        let theirs = -ours;
+        for r in my_regret.iter_mut() {
+            *r += ours;
+        }
+        for r in their_regret.iter_mut() {
+            *r += theirs;
+        }
+    }
+    // Fictitious play converges to a mix, and the final regret vector IS that
+    // mix. Renormalise defensively; a degenerate game must not panic.
+    let total: f64 = their_regret.iter().map(|v| v.max(0.0)).sum();
+    let mut weights = vec![0.0f64; scenarios.len()];
+    if total > 0.0 {
+        for (k, wgt) in weights.iter_mut().enumerate() {
+            *wgt = their_regret[k].max(0.0) / total;
+        }
+    } else {
+        for wgt in weights.iter_mut() {
+            *wgt = 1.0 / scenarios.len() as f64;
+        }
+    }
+    let equilibrium: Vec<f64> = (0..candidates.len())
+        .map(|i| (0..scenarios.len()).map(|j| pay[i][j] * weights[j]).sum())
+        .collect();
+    let best_eq = equilibrium
+        .iter()
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max);
+    let Some(best_i) = (0..candidates.len()).find(|&i| equilibrium[i] == best_eq) else {
+        return None;
+    };
+    // Blend: only override the shipped pick if the equilibrium prefers another
+    // candidate by more than the interpolation justifies.
+    let shipped = candidates
+        .iter()
+        .enumerate()
+        .max_by(|a, b| {
+            a.1.value
+                .partial_cmp(&b.1.value)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|(i, _)| i)?;
+    let shipped_eq = equilibrium[shipped];
+    let gap = best_eq - shipped_eq;
+    if gap <= 1e-9 {
+        return None;
+    }
+    // At `w >= 1.0` take the equilibrium outright, so a run at full trust
+    // measures the IDEA rather than this guard. Below that, only override when
+    // the equilibrium's preference is worth more than `1/w` of a placement, so a
+    // hairline numerical difference cannot flip a set.
+    if w >= 1.0 {
+        Some(best_i)
+    } else if gap * w > 1.0 / 3.0 {
+        Some(best_i)
+    } else {
+        None
+    }
+}
+
+/// The opponent's response scenarios, indexed by how many cards they set.
+fn response_scenarios(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+    opp: &OppModel,
+) -> Vec<OppModel> {
+    let scores = live_score_pool(gs, me, db);
+    if scores.is_empty() {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    // m = 0: they fold. Their placement chance is zero, so it cannot hurt us and
+    // including it would only add a constant; the interesting axis is m >= 1.
+    for m in 1..=scores.len().min(3) {
+        let total: i32 = scores.iter().take(m).sum();
+        let mut dist = [0.0f64; v8_model::SCORE_SLOTS];
+        let idx = v8_model::clamp_score(total) as usize;
+        dist[idx] = 1.0;
+        // 8.3.15 pools the requirements, so a wider set is a harder check. The
+        // falloff is first-order and is the one fitted number here; it is a
+        // model of the rules, not of this deck.
+        let pass = (opp.pass_prob * (1.0 - 0.15 * (m - 1) as f64)).clamp(0.0, 1.0);
+        out.push(OppModel {
+            set_size: m,
+            success: opp.success,
+            score_dist: dist,
+            pass_prob: pass,
+            commitment: opp.commitment,
+            commit_rate: opp.commit_rate,
+            counter: 0.0,
+            pressure: [0.0; v8_model::SCORE_SLOTS],
+            pressure_known: false,
+        });
+    }
+    out
+}
+
+/// The distinct live-card SCORES still in play, largest first.
+///
+/// Ours in hand plus every public zone on both sides - the waiting room, both
+/// success zones and both live zones. This is genuine information rather than a
+/// prior: it is how a player would work out which finishers the opponent can
+/// still be holding. Deliberately NOT the decks, which are private and shuffled.
+fn live_score_pool(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<i32> {
+    let mut out: Vec<i32> = Vec::new();
+    let mut take = |cid: i16| {
+        if let Some(card) = db.get_card(cid) {
+            if card.card_type == CardType::Live {
+                out.push(i32::from(card.get_score()));
+            }
+        }
+    };
+    for seat in 0..2u8 {
+        let p = gs.seat_player(seat);
+        // Only OUR hand: the opponent's is not public. Public zones are, for both
+        // seats - a waiting room and a success zone are face-up (8.3.4, 8.4.7).
+        if seat == me {
+            for &cid in p.hand.cards.iter() {
+                take(cid);
+            }
+        }
+        for &cid in p.waitroom.cards.iter() {
+            take(cid);
+        }
+        for &cid in p.success_live_card_zone.cards.iter() {
+            take(cid);
+        }
+        for &cid in p.live_card_zone.cards.iter() {
+            take(cid);
+        }
+    }
+    out.sort_unstable_by(|a, b| b.cmp(a));
+    out.dedup();
+    out
+}
+
+/// `V8_SELF_REWRITE`: the score and requirement a set's cards will really have
+/// at performance time, for each card in `chosen` in the same order.
+///
+/// ## What is wrong with the printed values
+///
+/// A ライブ card may rewrite **itself** at ライブ開始時, and the bot has never
+/// priced that. `5CP3Z idou` ships one:
+///
+/// ```text
+///    始まりは君の空  PL!SP-sd2-023-sd2 x3
+///    trigger   ライブ開始時
+///    condition 自分の成功ライブカード置き場にカードが2枚以上ある場合
+///    effect    このカードのスコアを＋５し、必要ハートは
+///              heart02 x3  heart03 x3  heart06 x3  heart0 x3  になる
+/// ```
+///
+/// Printed: **score 1, 3 hearts**. At two or more successes: **score 6, 12
+/// hearts** (three each of heart02/heart03/heart06 plus three of anything).
+///
+/// That is a five-point swing in the one quantity rule 8.4.6 compares on, and
+/// it fires in exactly the state where the game is decided — and where
+/// per-check calibration says the bot is most over-confident:
+///
+/// ```text
+///    my_success == 0   n=1255   placed 61.9%
+///    my_success == 1   n=1374   placed 38.3%
+///    my_success == 2   n=1344   placed 24.0%   <- the match-point bomb's window
+/// ```
+///
+/// The bot prices this card as score 1, so it reads a score-6 bomb as a
+/// throwaway cheap card and never sets it to win a comparison. Worse, the
+/// requirement it hides is 12 hearts, not 3 — so it is also wrong in the other
+/// direction on every match-point check where the card IS played.
+///
+/// ## Why this is generic and not a four-card table
+///
+/// It clones the state, commits the candidate, fires the engine's own
+/// ライブ開始時 trigger, and reads the result back out of `gs.mods` using the
+/// engine's own formulas (`overridden_stat` / `effective_stat` for score,
+/// `stats_pipeline::effective_need_heart` for the requirement — the same calls
+/// `turn::live` makes). A card this file has never seen still prices itself,
+/// and a card that rewrites a *different* card still prices correctly, because
+/// the rewrite is whatever the engine resolved rather than a table entry.
+///
+/// `RngGuard` is mandatory for the same reason `project_live_start` needs it:
+/// the engine draws while resolving, and a policy call that perturbs game RNG
+/// is a policy call that changes the game.
+///
+/// If a live-start ability leaves a choice pending, the answer loop is skipped
+/// and the printed values are used for anything the engine has not yet applied
+/// — a degradation toward the shipped behaviour, never a wrong-inflated one,
+/// because the read-back is of resolved state.
+fn effective_lives(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+    chosen: &[&Life],
+) -> Vec<(i32, Acc)> {
+    let printed: Vec<(i32, Acc)> = chosen
+        .iter()
+        .map(|l| (l.score, l.need))
+        .collect();
+    if chosen.is_empty() {
+        return printed;
+    }
+    let _guard = RngGuard::new();
+    let mut sim = gs.clone();
+    let me_id = sim.seat_player(me).id.clone();
+    // `Life` carries a hand SLOT, not a card id.
+    let mut ids: Vec<i16> = Vec::with_capacity(chosen.len());
+    for life in chosen {
+        let Some(&cid) = sim.seat_player(me).hand.cards.get(life.index) else {
+            return printed;
+        };
+        ids.push(cid);
+        let _ = sim.seat_player_mut(me).live_card_zone.add_card(cid, db);
+    }
+    crate::turn::TurnEngine::trigger_live_start_abilities(&mut sim, &me_id);
+    sim.process_pending_auto_abilities(&me_id);
+
+    let mut out = Vec::with_capacity(ids.len());
+    for (slot, &cid) in ids.iter().enumerate() {
+        let mut score = printed[slot].0;
+        let mut need = printed[slot].1;
+        let Some(card) = db.get_card(cid) else {
+            out.push((score, need));
+            continue;
+        };
+        // Score: identical to `turn::live`'s own resolution. A non-zero `set`
+        // REPLACES the printed score rather than adding to it.
+        let set_score = sim.mods.get_score_set_modifier(cid);
+        let additive = sim.mods.get_score_modifier(cid) - set_score;
+        score = if set_score != 0 {
+            i32::from(crate::constants::overridden_stat(set_score, additive))
+        } else {
+            i32::from(crate::constants::effective_stat(card.get_score(), additive))
+        };
+        // Requirement: the engine's own pipeline, which folds set and additive
+        // per-colour modifiers over the printed need.
+        if let Some(nh) = card.need_heart.as_ref() {
+            if let Some(eff) = crate::core::stats_pipeline::effective_need_heart(
+                Some(nh),
+                cid,
+                &sim.mods.need_heart_modifiers,
+            ) {
+                let mut arr: Acc = [0i16; 11];
+                for (color, wanted) in &eff.hearts {
+                    arr[crate::bot::strategy_common::hc_index(*color)] = i16::from(*wanted);
+                }
+                need = arr;
+            }
+        }
+        out.push((score, need));
+    }
+    out
+}
+
 /// Enumerate every live-zone of up to `max_slots` hand cards: choose a subset
 /// of hand LIVES, then fill the remaining slots with the hand cards whose loss
 /// costs least. Lives and junk compete for the same slots, so "swing for score
@@ -437,7 +899,7 @@ fn enumerate_candidates(
     pools: &[[i16; 8]],
     opp: &OppModel,
     draw_credit: f64,
-    wide: bool,
+    cfg: LiveCfg,
 ) -> Vec<Candidate> {
     let p = gs.seat_player(me);
     let max_slots = usize::from(3u8.saturating_sub(p.live_card_set_limit_reduction));
@@ -471,7 +933,7 @@ fn enumerate_candidates(
     // cell `V8_MAX_LIVES=2` measured, rather than the "second life only where a
     // comparison is believed to be live" cell `V8_CONTESTED_WIDE` measured. The
     // evidence for that choice is in the `wide` entry point below.
-    let (base_lives, base_contested) = if wide { (2usize, 2usize) } else { (1usize, 1usize) };
+    let (base_lives, _base_contested) = if cfg.wide { (2usize, 2usize) } else { (1usize, 1usize) };
     let max_lives = std::env::var("V8_MAX_LIVES")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
@@ -490,7 +952,7 @@ fn enumerate_candidates(
     let contested_lives = if std::env::var_os("V8_CONTESTED_WIDE").is_some() {
         max_slots.min(max_lives + 1)
     } else {
-        base_contested.min(max_lives)
+        max_lives
     };
     let my_success = p.success_live_card_zone.cards.len();
     let yell_score = v8_model::expected_yell_score(gs, me, db, v8_model::active_blades(gs, me, db));
@@ -605,16 +1067,42 @@ fn enumerate_candidates(
             .collect();
         let mut need: Acc = [0i16; 11];
         let mut score = yell_score;
-        for life in &chosen {
-            for (need_k, life_need) in need.iter_mut().zip(life.need.iter()) {
-                *need_k += *life_need;
+        // `V8_SELF_REWRITE`: price the set at the score and requirement its
+        // cards will ACTUALLY have when the check resolves, not their printed
+        // ones. See `effective_lives` for why the printed values are wrong and
+        // what it costs.
+        let eff: Option<Vec<(i32, Acc)>> = if cfg.self_rewrite {
+            Some(effective_lives(gs, me, db, &chosen))
+        } else {
+            None
+        };
+        for (slot, life) in chosen.iter().enumerate() {
+            let (life_score, life_need) = match eff.as_ref().and_then(|v| v.get(slot)) {
+                Some(&(s, ref n)) => (s, n),
+                None => (life.score, &life.need),
+            };
+            for (need_k, need_v) in need.iter_mut().zip(life_need.iter()) {
+                *need_k += *need_v;
             }
-            score += life.score;
+            score += life_score;
         }
         // Width is only allowed when the extra score can change the outcome.
         // `contested_masses` gives the placement mass on each side of a
         // contested check; with no mass on either side the check is decided by
         // passing alone and a second life is pure added cost.
+        // `V8_PRESSURE`: the opponent must REACH our published total (8.4.6), so
+        // a higher-scoring set makes THEIR check harder. This is the 43% term —
+        // placements won because they fail — and it is the one channel by which
+        // playing a bigger score can pay even when we expect to lose the
+        // comparison. Applied per candidate, so unlike `OppModel::counter` it
+        // can reorder them.
+        let pressured;
+        let opp = if cfg.pressure {
+            pressured = opp.under_our_score(score);
+            &pressured
+        } else {
+            opp
+        };
         let (we_contested, they_contested, _) =
             opp.contested_masses(score, chosen.len().max(1), my_success);
         let is_contested = we_contested > 0.0 && they_contested > 0.0;
@@ -673,7 +1161,7 @@ fn enumerate_candidates(
             .iter()
             .map(|j| draw_credit - j.keep_value)
             .sum();
-        let value = candidate_value_zone(outcome, p_pass, filter_value, !chosen.is_empty())
+        let value = candidate_value_zone_with(outcome, p_pass, filter_value, !chosen.is_empty(), cfg.turn_order)
             // `V8_JOINT`: the shipped value pays for ONE success whatever the
             // set size, which is what rule 8.3.16 / Q35 actually pays - a set
             // is all-or-nothing, so the never-sets-two behaviour is correct and
@@ -688,7 +1176,9 @@ fn enumerate_candidates(
                 my_success,
                 opp.success,
             );
+        let value = value + cfg.score_bias * score as f64;
         out.push(Candidate {
+            score,
             lives: chosen.iter().map(|life| life.index).collect(),
             junk: filler.iter().map(|j| j.index).collect(),
             outcome,
@@ -1196,7 +1686,7 @@ pub(crate) fn score_candidates(
     gs: &GameState,
     me: u8,
     db: &CardDatabase,
-    wide: bool,
+    cfg: LiveCfg,
 ) -> (Vec<Candidate>, OppModel) {
     let board = v8_model::board_pool(gs, me, db);
     let sampler = v8_model::FlipSampler::build(gs, me, db);
@@ -1205,9 +1695,13 @@ pub(crate) fn score_candidates(
     // `pass_probability` — which used to need a re-clamp here because the
     // sampler used to produce `i32` buckets.
     let pools = sampler.sample_pools(&board, v8_model::flip_samples());
-    let opp = OppModel::build(gs, me, db);
+    let opp = if cfg.omniscient {
+        OppModel::omniscient(gs, me, db)
+    } else {
+        OppModel::build(gs, me, db).with_counter(cfg.counter)
+    };
     let draw_credit = draw_value(gs, me, db);
-    let candidates = enumerate_candidates(gs, me, db, &pools, &opp, draw_credit, wide);
+    let candidates = enumerate_candidates(gs, me, db, &pools, &opp, draw_credit, cfg);
     // Per-check telemetry, paired with v7's `V7CHK` line so the two can be
     // compared at the same blade count. v8 develops a bigger board than v7
     // (T4 12.8 vs 11.2) and passes fewer checks (0.389 vs 0.435), and
@@ -1290,7 +1784,7 @@ pub(crate) fn score_candidates(
 }
 
 pub fn choose_live_set_v8(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    choose_live_set_v8_inner(gs, actions, db, false)
+    choose_live_set_v8_inner(gs, actions, db, LiveCfg::default())
 }
 
 /// `choose_live_set_v8` with the set-width cap raised from one life to two.
@@ -1382,14 +1876,93 @@ pub fn choose_live_set_v8(gs: &GameState, actions: &[Action], db: &CardDatabase)
 ///
 /// The entry point stays so the cell is not re-run. Nothing selects it.
 pub fn choose_live_set_v8_wide(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
-    choose_live_set_v8_inner(gs, actions, db, true)
+    choose_live_set_v8_inner(gs, actions, db, LiveCfg { wide: true, ..LiveCfg::default() })
+}
+
+/// `choose_live_set_v8` with rule 8.4.13's turn-order term priced at
+/// `V8_TURNORDER`, and with the live-start self-rewrite priced when
+/// `V8_SELF_REWRITE` is set.
+///
+/// The weight is read **here**, at the entry point, and not inside
+/// `turn_order_cost`. That is the whole reason this function exists rather than
+/// an env read at the point of use: `v12 vs v9` has to be a real asymmetric
+/// matchup, so the switch has to reach the candidate and not the opponent. An
+/// env read at the point of use changes both seats of the process and the
+/// matchup measures nothing.
+///
+/// `V8_TURNORDER` is in units of `PLACEMENT_CREDIT` — the value of one
+/// placement — and is the price of winning the check ALONE. See
+/// `turn_order_cost` for what that is and why the sign is not obvious.
+pub fn choose_live_set_v8_order(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    let turn_order = std::env::var("V8_TURNORDER")
+        .ok()
+        .and_then(|v| v.trim().parse::<f64>().ok())
+        .unwrap_or(0.0);
+    choose_live_set_v8_inner(
+        gs,
+        actions,
+        db,
+        LiveCfg {
+            turn_order,
+            self_rewrite: std::env::var_os("V8_SELF_REWRITE").is_some(),
+            ..LiveCfg::default()
+        },
+    )
+}
+
+/// `choose_live_set_v8` with the opponent read from their REAL board and set.
+///
+/// **EVALUATION ONLY.** This is the best-response instrument: it sees the
+/// opponent's actual hand and committed zone, which no legal bot may do. It
+/// exists so that a defect shared by both seats — invisible to every self-play
+/// measurement in this project — can finally be observed. See
+/// `OppModel::omniscient`.
+pub fn choose_live_set_v8_br(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    choose_live_set_v8_inner(
+        gs,
+        actions,
+        db,
+        LiveCfg {
+            omniscient: true,
+            ..LiveCfg::default()
+        },
+    )
+}
+
+/// `choose_live_set_v8` with our own set size priced as the public signal it
+/// is: the opponent sees a COUNT (8.2.2 -> 8.2.4, reveals are 8.3) and answers
+/// it with a bigger set. `V8_COUNTER` is score points per card we publish.
+///
+/// This is v13's whole difference from stock `choose_live_set`. The weight is
+/// read HERE so the switch reaches the candidate and not its opponent - see
+/// `choose_live_set_v8_order` for why that matters.
+pub fn choose_live_set_v8_counter(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    let counter = std::env::var("V8_COUNTER")
+        .ok()
+        .and_then(|v| v.trim().parse::<f64>().ok())
+        .unwrap_or(0.0);
+    choose_live_set_v8_inner(
+        gs,
+        actions,
+        db,
+        LiveCfg {
+            counter,
+            pressure: std::env::var_os("V8_PRESSURE").is_some(),
+            score_bias: std::env::var("V8_SCORE_BIAS")
+                .ok()
+                .and_then(|v| v.trim().parse::<f64>().ok())
+                .filter(|v| v.is_finite())
+                .unwrap_or(0.0),
+            ..LiveCfg::default()
+        },
+    )
 }
 
 fn choose_live_set_v8_inner(
     gs: &GameState,
     actions: &[Action],
     db: &CardDatabase,
-    wide: bool,
+    cfg: LiveCfg,
 ) -> Action {
     let _rng = RngGuard::new();
     let me = gs.active_player_index();
@@ -1401,16 +1974,28 @@ fn choose_live_set_v8_inner(
         return emit_live_set(gs, actions, &[]);
     }
 
-    let (candidates, opp) = score_candidates(gs, me, db, wide);
+    let (candidates, opp) = score_candidates(gs, me, db, cfg);
+    // `V8_COMMIT_GAME`: the shipped pick is the argmax against ONE opponent
+    // model. This re-prices the same candidates against an opponent who is
+    // choosing their best reply, and takes the equilibrium when it disagrees by
+    // more than the interpolation justifies. `None` means "keep the argmax",
+    // which is also what an unset switch returns.
+    let equilibrium_pick =
+        commitment_game(gs, me, db, &candidates, &opp, p.success_live_card_zone.cards.len());
     let best = candidates
         .iter()
-        .fold(None::<&Candidate>, |acc, cand| match acc {
-            None => Some(cand),
-            Some(current) if better(cand, current) => Some(cand),
+        .enumerate()
+        .fold(None::<(usize, &Candidate)>, |acc, (i, cand)| match acc {
+            None => Some((i, cand)),
+            Some((_, current)) if better(cand, current) => Some((i, cand)),
             keep => keep,
         });
-    let Some(best) = best else {
+    let Some((best_i, _)) = best else {
         return emit_live_set(gs, actions, &[]);
+    };
+    let best: &Candidate = match equilibrium_pick {
+        Some(i) => &candidates[i],
+        None => &candidates[best_i],
     };
 
     let mut desired = best.lives.clone();
@@ -1623,7 +2208,7 @@ pub fn predict_live_set(gs: &GameState, db: &CardDatabase) -> Option<LivePredict
     if p.live_card_set_limit_reduction >= 3 || gs.cannot_live_players.contains(&p.id) {
         return None;
     }
-    let (candidates, opp) = score_candidates(gs, me, db, false);
+    let (candidates, opp) = score_candidates(gs, me, db, LiveCfg::default());
     let best = candidates
         .iter()
         .fold(None::<&Candidate>, |acc, cand| match acc {
@@ -1759,6 +2344,7 @@ mod tests {
     #[test]
     fn ranking_prefers_value_then_fewer_lives() {
         let mk = |lives: &[usize], value: f64| Candidate {
+            score: 3,
             lives: lives.to_vec(),
             junk: Vec::new(),
             outcome: outcome(1.0, 1.0, value),

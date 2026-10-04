@@ -67,7 +67,7 @@ static void unknown_zones_are_contained(void)
 
 static void group_filter_excludes_self(void)
 {
-    TestGame tg;
+static    TestGame tg;
     RbCardFilter filter;
     int cards[3];
     int matches[3];
@@ -116,7 +116,7 @@ static void add_condition_field(Condition *condition, const char *key, uint8_t t
 
 static void turn_number_and_phase_are_conjunctive(void)
 {
-    TestGame tg;
+static    TestGame tg;
     Condition condition;
     test_game_new(&tg);
     memset(&condition, 0, sizeof(condition));

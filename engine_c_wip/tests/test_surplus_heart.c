@@ -3,11 +3,30 @@
 #include <stdio.h>
 #include <string.h>
 
+/* ── per-test verdict layer (see test_parity_integration.c for the rationale):
+ * a FLAT suite's FAIL lines name an assertion, never a test, so this suite
+ * reported no per-test verdict and its FAIL lines were unattributable. This
+ * adds exactly one `FAILED: <test body>` per failing test body, in the shape
+ * every FORK suite prints. No assertion is added, removed or relaxed. */
+static const char *g_flat_failed[512];
+static int g_flat_failed_n;
+static void flat_verdict_failed(const char *fn)
+{
+    for (int i = 0; i < g_flat_failed_n; i++)
+        if (g_flat_failed[i] == fn) return;
+    if (g_flat_failed_n >= 512) return;
+    g_flat_failed[g_flat_failed_n++] = fn;
+    printf("FAILED: %s\n", fn);
+    fflush(stdout);
+}
+#define FLAT_VERDICT() flat_verdict_failed(__func__)
+
 static int failures;
 
 #define CHECK(condition, message) do { \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -19,6 +38,7 @@ static int failures;
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -93,7 +113,7 @@ static int drive_past_placement(TestGame *tg, int want) {
 }
 
 static void bella_q173_two_lives_succeed_both_trigger_waited_placement(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     setup_bellas(&tg, 1);
 
@@ -114,7 +134,7 @@ static void bella_q173_two_lives_succeed_both_trigger_waited_placement(void) {
 }
 
 static void bella_q173_single_life_places_single_waited_energy(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     setup_bellas(&tg, 0);
 

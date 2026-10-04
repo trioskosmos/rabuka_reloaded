@@ -1150,11 +1150,49 @@ void rb_queue_dump_state(const GameState *g, char *buf, size_t buf_sz) {
    Use-limit tracking
    ========================================================================== */
 
+/* The identity of one spent use, mirroring Rust's
+   `turn_limited_abilities_used: HashMap<(i16, usize, u32), u8>` key
+   (core/game_state/abilities.rs:146-151 reads it back through
+   `ability_uses_used`). Rust keys on the FULL (card_id, ability_index) pair,
+   so this must too.
+
+   The key used to be `(card_id << 4) | (ability_idx & 0xF)` — a FOUR-BIT
+   ability index. That silently aliases two different Rust keys onto one C
+   counter, and the gained arm is where it bites:
+
+     RB_GAINED_ABILITY_INDEX_BASE is 10000 (rabuka.h:3028), and
+     10000 & 0xF == 0, so a GAINED ability at index 10000+g produced the same
+     key as the PRINTED ability #g on the same card. Rust keeps them apart;
+     the C merged a gained ability's use count into a printed ability's, so
+     `rb_use_limit_reached` could refuse a printed 自動 ability because an
+     unrelated gained ability had resolved, and `rb_use_count` could report a
+     nonzero count for an ability that never resolved at all.
+
+   MEASURED REACHABILITY TODAY: 0 of 985. Over all 24 `gain_ability` /
+   `gain_ability_from_source` nodes in cards/abilities.json the distinct
+   `ability_gain_trigger` values are 常時 (20) and ライブ成功時 (2) — never
+   自動 or 起動, which are the only two families that carry a use_limit in the
+   corpus (`use_limit AND 自動` = 53, `use_limit AND 起動` = 80, and
+   `use_limit AND {登場, ライブ開始時, ライブ成功時, 常時}` = 0 each). So the
+   collision needs a gained ability the parser never emits. That is exactly the
+   definition of a latent bug in a WIRED path (the gained ライブ成功時 arm at
+   src/turn/triggers.c:522-537 calls rb_use_limit_reached with the aliased
+   index), so it is fixed here rather than documented around.
+
+   PROVABLY BEHAVIOUR-NEUTRAL on the corpus: with no key collisions in
+   existence, widening the key changes which slot a pair hashes to but not
+   which pairs compare equal, so every verdict is identical. card_id < 2^15
+   (2639 cards) and ability_idx is masked to 16 bits, so the packed key stays
+   inside a positive int and RB_USE_TRACK is untouched. */
+static int rb_use_key(int card_id, int ability_idx) {
+    return (card_id << 16) | (ability_idx & 0xFFFF);
+}
+
 int rb_use_limit_reached(RbAbilityQueue *q, int card_id, int ability_idx,
                          int limit, int cur_turn) {
     if (!q || limit <= 0) return 0;
     if (q->use_turn != cur_turn) return 0;
-    int key = (card_id << 4) | (ability_idx & 0xF);
+    int key = rb_use_key(card_id, ability_idx);
     for (int i = 0; i < q->n_uses; i++)
         if (q->use_keys[i] == key) return q->use_counts[i] >= limit;
     return 0;
@@ -1166,7 +1204,7 @@ void rb_record_use(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn
         q->n_uses = 0;
         q->use_turn = cur_turn;
     }
-    int key = (card_id << 4) | (ability_idx & 0xF);
+    int key = rb_use_key(card_id, ability_idx);
     for (int i = 0; i < q->n_uses; i++)
         if (q->use_keys[i] == key) { q->use_counts[i]++; return; }
     if (q->n_uses < RB_USE_TRACK) {
@@ -1178,7 +1216,7 @@ void rb_record_use(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn
 
 int rb_use_count(RbAbilityQueue *q, int card_id, int ability_idx, int cur_turn) {
     if (!q || q->use_turn != cur_turn) return 0;
-    int key = (card_id << 4) | (ability_idx & 0xF);
+    int key = rb_use_key(card_id, ability_idx);
     for (int i = 0; i < q->n_uses; i++)
         if (q->use_keys[i] == key) return q->use_counts[i];
     return 0;

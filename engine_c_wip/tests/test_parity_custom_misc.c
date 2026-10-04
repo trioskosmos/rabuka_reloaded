@@ -11,6 +11,24 @@
 #include <string.h>
 #include <stdlib.h>
 
+/* ── per-test verdict layer (see test_parity_integration.c for the rationale):
+ * a FLAT suite's FAIL lines name an assertion, never a test, so this suite
+ * reported no per-test verdict and its FAIL lines were unattributable. This
+ * adds exactly one `FAILED: <test body>` per failing test body, in the shape
+ * every FORK suite prints. No assertion is added, removed or relaxed. */
+static const char *g_flat_failed[512];
+static int g_flat_failed_n;
+static void flat_verdict_failed(const char *fn)
+{
+    for (int i = 0; i < g_flat_failed_n; i++)
+        if (g_flat_failed[i] == fn) return;
+    if (g_flat_failed_n >= 512) return;
+    g_flat_failed[g_flat_failed_n++] = fn;
+    printf("FAILED: %s\n", fn);
+    fflush(stdout);
+}
+#define FLAT_VERDICT() flat_verdict_failed(__func__)
+
 static int failures;
 static int checks;
 
@@ -18,6 +36,7 @@ static int checks;
     checks++; \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -30,6 +49,7 @@ static int checks;
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -119,7 +139,7 @@ static int member_triple(TestGame *tg, int *a, int *b, int *c)
 
 static void test_blade_grants_to_own_stage(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -136,7 +156,7 @@ static void test_blade_grants_to_own_stage(void)
 
 static void test_blade_negative_sign(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -153,7 +173,7 @@ static void test_blade_negative_sign(void)
 
 static void test_blade_self_target_field(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -172,7 +192,7 @@ static void test_blade_self_target_field(void)
 
 static void test_blade_opponent_target(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -213,7 +233,7 @@ static void test_blade_position_filter(void)
    is resolvable from the real card database. */
 static void test_blade_card_type_filter(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     int live = find_card(WANT_LIVE, NULL, NULL);
@@ -235,7 +255,7 @@ static void test_blade_card_type_filter(void)
 
 static void test_blade_target_count_selection_choice(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -283,7 +303,7 @@ static void test_heart_colors_only_falls_back_to_first(void)
 {
     /* Rust misc.rs:1813-1814 falls back to heart_colors[0] when the effect
        carries no singular heart_color. */
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -305,7 +325,7 @@ static void test_heart_multi_color_distribution(void)
 {
     /* Rust misc.rs:932-946 + util::heart_gain_per_entry: 6 hearts over 3
        fixed colors => 2 of each, not 6 of the first color. */
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -328,7 +348,7 @@ static void test_heart_count_below_color_count_is_single(void)
 {
     /* final_count(2) < heart_colors.len()(3) => no distribution branch, so the
        single-color fallback uses heart_colors[0] (misc.rs:932-946 guard). */
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -350,7 +370,7 @@ static void test_heart_count_below_color_count_is_single(void)
 
 static void test_heart_negative_sign(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -393,7 +413,7 @@ static void test_heart_colors_from_selected_card(void)
     /* Rust misc.rs:627-633 -> gain_heart_colors_from_selected_card: grant 1 of
        every base heart color printed on the selected card, to every stage
        member of the target player. */
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int selected = find_card(WANT_BASE_HEARTS, NULL, NULL);
     int a, b, c;
@@ -433,7 +453,7 @@ static void test_resource_absent_grants_nothing(void)
        is Other (misc.rs:33-39), and both appliers bail out for Other
        (misc.rs:1004, misc.rs:1059). Nothing is granted — in particular NOT
        energy, which is what this handler used to invent. */
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -459,7 +479,7 @@ static void test_resource_unknown_string_grants_nothing(void)
 {
     /* Same rule for an unrecognised resource string: only "blade" and "heart"
        are resource kinds (misc.rs:33-39). "energy" is NOT one of them. */
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -480,7 +500,7 @@ static void test_resource_surplus_heart_not_energy(void)
 {
     /* Rust misc.rs:686-696 short-circuits resource == "surplus_heart" into
        execute_gain_surplus_heart, so it never reaches a resource grant. */
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -540,7 +560,7 @@ static void test_discard_until_count_prompts(void)
 
 static void test_restriction_cannot_active(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     AbilityEffect e = {0};
     e.action = "restriction";
@@ -557,7 +577,7 @@ static void test_restriction_cannot_active(void)
 
 static void test_restriction_cannot_activate_opponent(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     AbilityEffect e = {0};
     e.action = "restriction";
@@ -572,7 +592,7 @@ static void test_restriction_cannot_activate_opponent(void)
 
 static void test_restriction_cannot_live(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     AbilityEffect e = {0};
     e.action = "restriction";
@@ -630,7 +650,7 @@ static void test_perform_yell_collects_blades(void)
 
 static void test_shuffle_conserves_cards(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -656,7 +676,7 @@ static void test_custom_placement_order_any_routes_move(void)
 {
     /* Rust custom.rs:23-34: placement_order == AnyOrder routes to
        execute_move_cards with source=looked_at, destination=deck_top. */
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -681,7 +701,7 @@ static void test_custom_placement_order_true_is_not_a_route(void)
     /* The handler used to treat placement_order == "true" as if it were
        "any_order" (extra_true on a non-boolean key). Rust compares against
        PlacementOrder::AnyOrder only, so "true" must fall through. */
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -707,7 +727,7 @@ static void test_custom_duration_routes_gain_ability(void)
 {
     /* Rust custom.rs:37-52: an effect carrying a duration goes to
        execute_gain_ability, not to the unhandled-custom log. */
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -732,7 +752,7 @@ static void test_custom_duration_routes_gain_ability(void)
 
 static void test_custom_unhandled_is_a_noop(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -795,7 +815,7 @@ static void test_position_change_swaps_area(void)
 
 static void test_pay_cost_all_discard(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -814,7 +834,7 @@ static void test_pay_cost_all_discard(void)
 
 static void test_place_energy_under_member_from_energy_deck(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;

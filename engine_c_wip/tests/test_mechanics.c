@@ -17,13 +17,14 @@ static void drain_all_choices(TestGame *tg) {
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
 } while (0)
 
 static void test_gained_live_total_bonus(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int target = test_id(&tg, "PL!SP-bp5-222-R");
     CHECK(target >= 0, "live-total test card exists");
@@ -62,7 +63,7 @@ static void test_gained_live_total_bonus(void) {
 }
 
 static void test_direct_live_total_bonus(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     AbilityEffect effect = {0};
     effect.action = "modify_score";
@@ -75,7 +76,7 @@ static void test_direct_live_total_bonus(void) {
 }
 
 static void test_live_score_consumes_bonus(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int live = test_id(&tg, "PL!N-sd2-025-P");
     CHECK(live >= 0, "live score test card exists");
@@ -95,7 +96,7 @@ static void test_live_score_consumes_bonus(void) {
 }
 
 static void test_invalid_live_movement(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int member = test_id(&tg, "PL!-sd1-010-SD");
     test_add_to_live(&tg, member);
@@ -104,6 +105,16 @@ static void test_invalid_live_movement(void) {
         test_add_to_deck(&tg, member);
         test_add_to_deck_pl(&tg, 1, member);
     }
+    /* Rust's twin `invalid_live_card_discard_records_turn_movements` pushes the
+     * member into player1.live_card_zone AND THEN sets
+     * `player1.live_card_zone.face_up = true`
+     * (engine/tests/test_modules/rules/conditions/live_card_zone_movement_test.rs:112-113)
+     * before calling check_timing. The C port keeps Rust's gate at
+     * src/turn/phase.c:703 (`if (!g->live_face_up[is_p1 ? 0 : 1]) return;`), one
+     * flag per SEAT. Without this line the gate correctly returns early, the
+     * eviction arm below is never reached, and every assertion in this test is
+     * measuring a CLOSED GATE rather than the rule it is named for. */
+    tg.state.live_face_up[0] = 1;
     rb_check_timing(&tg.state);
     CHECK(!test_zone_has_id(&tg, 0, "live", member),
           "invalid live member leaves the live zone");
@@ -114,7 +125,7 @@ static void test_invalid_live_movement(void) {
 }
 
 static void test_invalid_energy_movement(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int energy = test_id(&tg, "LL-E-001-SD");
     int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -124,6 +135,13 @@ static void test_invalid_energy_movement(void) {
         test_add_to_deck(&tg, filler);
         test_add_to_deck_pl(&tg, 1, filler);
     }
+    /* Same precondition, Rust's OTHER twin:
+     * `invalid_energy_card_in_live_zone_goes_to_energy_deck` sets
+     * `player1.live_card_zone.face_up = true` at
+     * live_card_zone_movement_test.rs:282, immediately after pushing the energy
+     * card at :281. See the note in test_invalid_live_movement above for why the
+     * C needs it spelled out. */
+    tg.state.live_face_up[0] = 1;
     rb_check_timing(&tg.state);
     CHECK(!test_zone_has_id(&tg, 0, "live", energy),
           "invalid energy leaves the live zone");
@@ -135,7 +153,7 @@ static void test_invalid_energy_movement(void) {
 }
 
 static void test_movement_tracking_clear(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card = test_id(&tg, "PL!-sd1-010-SD");
     tg.state.moved_this_turn[card] = 1;
@@ -145,7 +163,7 @@ static void test_movement_tracking_clear(void) {
 }
 
 static void test_performance_snapshot(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int live = test_id(&tg, "PL!-bp3-026-L");
     int center = test_id(&tg, "PL!-pb1-014-R");
@@ -175,7 +193,7 @@ static void test_performance_snapshot(void) {
           "snapshot records the performed live card");
 }
 static void test_live_failure_moves_to_waitroom(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     tg.state.live_batch_mode = 1;
     int live = test_id(&tg, "PL!N-sd1-025-SD");
@@ -196,7 +214,7 @@ static void test_live_failure_moves_to_waitroom(void) {
 }
 
 static void test_both_lives_compare_scores(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     tg.state.live_batch_mode = 1;
     int live = test_id(&tg, "PL!N-sd1-025-SD");
@@ -225,7 +243,7 @@ static void test_both_lives_compare_scores(void) {
 }
 
 static void test_single_live_auto_wins(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     tg.state.live_batch_mode = 1;
     int live = test_id(&tg, "PL!N-sd1-025-SD");

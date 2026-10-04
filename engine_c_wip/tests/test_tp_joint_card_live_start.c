@@ -24,6 +24,7 @@ static int failures;
     if (!(c)) { \
         fprintf(stderr, "FAIL: %s\n", msg); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", msg); \
     } \
@@ -35,6 +36,7 @@ static int failures;
     if (a_ != e_) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", msg, a_, e_); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", msg); \
     } \
@@ -118,7 +120,7 @@ static void finish_live_setup(TestGame *game)
    Selecting all 3 should pay cost and grant score+3. */
 static void test_bp1_live_start_pay_cost_gains_score_three(void)
 {
-    TestGame game;
+static    TestGame game;
     int joint, ayumu, kanon, live, filler, guard = 0;
     int idxs[3];
 
@@ -170,7 +172,7 @@ static void test_bp1_live_start_pay_cost_gains_score_three(void)
    and no effect fires. */
 static void test_bp1_live_start_no_matching_hand_cards_skips(void)
 {
-    TestGame game;
+static    TestGame game;
     int joint, live, filler;
 
     test_game_new(&game);
@@ -357,7 +359,7 @@ static void test_bp3_live_start_skip_gains_no_blade(void)
    which missed `"ライブ開始時, 登場"`. This test verifies the fix. */
 static void test_bp4_live_start_dual_trigger_fires(void)
 {
-    TestGame game;
+static    TestGame game;
     int joint, live, ayumu, filler, i;
 
     test_game_new(&game);
@@ -432,7 +434,7 @@ static void test_bp4_debut_trigger_fires_independently(void)
 /* bp4 debut trigger completes look_and_select: select member → hand, rest → waitroom. */
 static void test_bp4_debut_look_select_puts_card_in_hand(void)
 {
-    TestGame game;
+static    TestGame game;
     int joint, ayumu, f1, f2, f3, f4, i, zero[1];
     int hand_before, hand_after_play, hand_after;
 
@@ -536,7 +538,7 @@ static void test_bp4_debut_skip_select_discards_all(void)
  * cost ≤ revealed card's cost AND original blade ≤ 3. */
 static void test_bp4_debut_wait_opponent_members_after_selection(void)
 {
-    TestGame game;
+static    TestGame game;
     int joint, ayumu, filler, i, zero[1];
     int p2_low, p2_high_cost, p2_filler;
     const char *ori;
@@ -715,7 +717,7 @@ static void test_bp6_live_start_same_color_deduplicates(void)
 /* Skipping the bp6 cost (0 cards) gains no hearts. */
 static void test_bp6_live_start_skip_gains_no_heart(void)
 {
-    TestGame game;
+static    TestGame game;
     int joint, kotori, live, filler;
 
     test_game_new(&game);
@@ -751,7 +753,7 @@ static void test_bp6_live_start_skip_gains_no_heart(void)
    all three individual names (FAQ: the card has all three identities). */
 static void test_joint_card_has_all_three_name_identities(void)
 {
-    TestGame game;
+static    TestGame game;
     Card card;
     char norm[512];
     int joint_id;

@@ -30,6 +30,7 @@ static int assertions;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s  [%s:%d]\n", message, __FILE__, __LINE__); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -43,6 +44,7 @@ static int assertions;
         fprintf(stderr, "FAIL: %s (got %d expected %d)  [%s:%d]\n", message, \
                 actual_value, expected_value, __FILE__, __LINE__); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \

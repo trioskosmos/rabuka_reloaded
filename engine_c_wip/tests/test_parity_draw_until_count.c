@@ -114,7 +114,7 @@ static void fill_zone(RbBag *bag, int card, int n)
     engine_c_wip/tests/test_target_selection.c:135-164 (green, 35 checks). */
 static void test_card_fills_hand_to_target_count(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int card = test_id(&game, "PL!N-PR-028-PR");
     int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -189,7 +189,7 @@ static void test_card_fills_hand_to_target_count(void)
     is created or destroyed. */
 static void test_card_fills_hand_to_target_count_stepwise(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int card = test_id(&game, "PL!N-PR-028-PR");
     int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -267,7 +267,7 @@ static void test_target_sizes_via_count_fallback(void)
 {
     static const int targets[] = { 1, 3, 5, 7 };
     for (int i = 0; i < (int)(sizeof(targets) / sizeof(targets[0])); i++) {
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         reset_board(&tg);
@@ -316,7 +316,7 @@ static void test_hand_already_at_or_above_target(void)
 /* ── 5. target_count 0 (or absent) is a no-op (unwrap_or(0)) ─────────────── */
 static void test_target_zero(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     reset_board(&tg);
@@ -340,7 +340,7 @@ static void test_target_zero(void)
 /* ── 6. Deck too small: draws what exists and stops ──────────────────────── */
 static void test_deck_smaller_than_target(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     reset_board(&tg);
@@ -370,7 +370,7 @@ static void test_empty_deck_and_waitroom(void)
    draw.rs:70-77 refreshes the deck from the waitroom and keeps drawing. */
 static void test_empty_deck_refreshes_from_waitroom(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     reset_board(&tg);
@@ -401,7 +401,7 @@ static void test_non_hand_destination_is_noop(void)
 /* ── 10. target="opponent" refills the opponent, not the actor ───────────── */
 static void test_opponent_target(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     reset_board(&tg);
@@ -441,7 +441,7 @@ static void test_partial_fill_from_non_empty_hand(void)
    a plain `draw` (which would use `count` as a flat draw size). */
 static void test_draw_card_wrapper_routes_draw_until_count(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     reset_board(&tg);
@@ -463,7 +463,7 @@ static void test_draw_card_wrapper_routes_draw_until_count(void)
    falling back to player1, so the count is derived from player1's hand. */
 static void test_target_both_fills_both_players(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     reset_board(&tg);
@@ -488,7 +488,7 @@ static void test_target_both_fills_both_players(void)
    even when the caller passes actor 0. */
 static void test_self_target_follows_ability_master(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     reset_board(&tg);
@@ -513,7 +513,7 @@ static void test_self_target_follows_ability_master(void)
    hand is filled to target_count, never count x per_unit. */
 static void test_wrapper_rules_do_not_apply_to_draw_until_count(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     reset_board(&tg);
@@ -587,7 +587,7 @@ int main(void)
     }
     if (getenv("RB_ABILITY_DEBUG")) rb_ability_debug_set(1);
     if (getenv("RB_DUMP_ABILITY")) {
-        TestGame g0; test_game_new(&g0);
+static        TestGame g0; test_game_new(&g0);
         dump_ability(test_id(&g0, "PL!N-PR-028-PR"));
         return 0;
     }

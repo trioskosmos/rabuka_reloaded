@@ -129,13 +129,35 @@ static void mc_sel_moved_push(GameState *g, int cid) {
     if (g->n_those_cards < RB_MAX_RECENTLY_MOVED)
         g->those_cards[g->n_those_cards++] = cid;
 }
-/* transport.rs / mod.rs `set_recently_moved_batch` — REPLACES the batch, it
- * does not append (mod.rs:1683 `gs.set_recently_moved_batch(moved, ...)`). */
-static void mc_set_recently_moved_batch(GameState *g, const int *cards, int n) {
-    g->n_recently_moved = 0;
-    for (int i = 0; i < n && i < RB_MAX_RECENTLY_MOVED; i++)
-        g->recently_moved[g->n_recently_moved++] = cards[i];
-}
+/* ── TOMBSTONE (2026-10-04). `mc_set_recently_moved_batch` REMOVED.
+ *
+ * A census classified this DEAD-WRONG: "comments claim it REPLACES the batch;
+ * being unreferenced, no live path performs that replacement; g->those_cards is
+ * therefore only ever APPENDED to". Checked, and BOTH halves of that are wrong:
+ *
+ *  (1) The replace idiom is not missing. `g->n_recently_moved = 0` followed by
+ *      a bounded append is implemented on ~20 LIVE paths in this tree --
+ *      effects/look.c:822+827, effects/misc.c:172, effects/move_missing.c:416,
+ *      effects/state.c:1613, ability/ability_queue.c:1420+1569,
+ *      ability/choice.c:2299, core/game_state_core.c:485
+ *      (rb_gsc_set_recently_moved_cards), turn/live.c:1875-1876, engine.c
+ *      (several). This function was a dead DUPLICATE of that idiom, not its
+ *      only implementation.
+ *  (2) `those_cards` is NOT only ever appended. It is reset to 0 at
+ *      move.c:2525 and move_missing.c:417. The census compared two different
+ *      fields: `recently_moved` (what this function wrote) and `those_cards`
+ *      (the resolver-local accumulator that mc_sel_moved_push above appends to
+ *      BY DESIGN, with an intentional dedupe). mc_sel_moved_push is not Rust's
+ *      set_recently_moved_batch and is not meant to be.
+ *
+ * The body was faithful to Rust mod.rs:1683; it was simply the 21st copy of an
+ * idiom the tree already had 20 live copies of, with no callers. Deleted so the
+ * next reader does not wire it "to activate the code" and get a 21st
+ * implementation of something already correct.
+ *
+ * Deadness was proved by the compiler, not by grep: gcc -Wunused-function on
+ * this file reports "'mc_set_recently_moved_batch' defined but not used". It
+ * was `static`, so no other translation unit could have been calling it. */
 /* mod.rs:2527-2533 — the CURRENT entry's player id ("p1"/"p2") as an index. */
 static int mc_cause_player(const GameState *g) {
     if (!g) return 0;
@@ -163,7 +185,23 @@ static void mc_push_movement_event(GameState *g, const int *cards, int n,
 
 
 /* ── card_matches_filter: full effect filter (static for this TU) ── */
+/* The `!e || !k` guard is the tree's strictest extra-accessor policy and the
+ * one this function's own sibling uses (move_missing.c:432 `cmf_extra`, the
+ * same name and the same port). It was MISSING here, and every one of this
+ * file's ~80 call sites dereferences `e` through this accessor, so a NULL
+ * effect crashed on the first one it reached.
+ *
+ * It is not hypothetical. move.c:1380 read
+ *     if (is_discard) can_skip = cmf_extra_true(e, "max") || (e && e->is_optional);
+ * -- the only reference to `e` in that whole block written WITHOUT the `e &&`
+ * that its immediate neighbours 1379/1381/1382/1384 all carry. So the one
+ * reachable-with-NULL line in rb_move_take_cards_from_standard_zone (a
+ * non-static function whose entire body is otherwise written to tolerate a
+ * NULL effect: `if (e && ...)`, `e ? cmf_extra(e,...) : NULL`, and a forward
+ * declaration in a second TU) faulted. Guarding the accessor rather than that
+ * one line fixes all ~80 sites, not one. */
 static const char *cmf_extra(const AbilityEffect *e, const char *k){
+    if(!e || !k) return NULL;
     for(int i=0;i<e->n_extra;i++) if(e->extra_k[i] && !strcmp(e->extra_k[i],k)) return e->extra_v[i];
     return NULL;
 }
@@ -982,7 +1020,17 @@ void rb_move_prompt_card_selection(GameState *g, int actor, const char *zone,
     const char *group = cmf_extra(e, "group_names");
     if (group)
         strncpy(g->queue.pending.filter_group, group, sizeof(g->queue.pending.filter_group) - 1);
-    if (e->target) {
+    /* The `e &&` here is the same NULL contract as cmf_extra's, and this is the
+     * SECOND way a NULL effect faulted on this path. `rb_move_take_cards_from_
+     * standard_zone` is written to tolerate a NULL effect throughout, and when
+     * the source zone holds more cards than were asked for it ends up here
+     * (outcome "Prompt"); this bare `e->target` then dereferenced NULL for the
+     * hand / energy / live_card_zone cases, where line 1380's discard branch is
+     * not taken. cmf_extra above is now guarded, so this line was the only
+     * remaining fault. The two prompt helpers called below
+     * (rb_move_prompt_carry_resume_context, rb_move_prompt_fill_filtered)
+     * already guard, which is why the defect sits here and not there. */
+    if (e && e->target) {
         strncpy(g->queue.pending.target, e->target, sizeof(g->queue.pending.target) - 1);
         strncpy(g->queue.pending.target_player_id, e->target, sizeof(g->queue.pending.target_player_id) - 1);
     }
@@ -1377,7 +1425,7 @@ int rb_move_take_cards_from_standard_zone(GameState *g, int actor,
 
     /* mod.rs:1190-1197 */
     int any_number = e && cmf_extra_true(e, "any_number");
-    if (is_discard)       can_skip = cmf_extra_true(e, "max") || (e && e->is_optional);
+    if (is_discard)       can_skip = (e && cmf_extra_true(e, "max")) || (e && e->is_optional);
     else if (is_hand)     can_skip = (e && e->is_optional) || any_number;
     else if (is_success)  can_skip = (e && e->is_optional);
     else                  can_skip = 0;

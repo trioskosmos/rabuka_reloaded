@@ -3124,7 +3124,7 @@ static void n_absent_after_source_removed_before_play(void)
    assertion. */
 enum { ST_NONE = 0, ST_OK, ST_RED, ST_CRASH, ST_SETUP, ST_VAC };
 #define CD_MAX_CASES 128
-static struct { const char *name; int status; } cd_cases[CD_MAX_CASES];
+static struct { const char *name; int status; int assertions; } cd_cases[CD_MAX_CASES];
 static int cd_n_cases;
 
 static int case_status(const char *name)
@@ -3134,11 +3134,22 @@ static int case_status(const char *name)
     return ST_NONE;
 }
 
-static void case_record(const char *name, int status)
+/* How many assertions the case actually ran. Read only by the post-hoc vacuity
+ * audit, which uses it to enforce "a vacuous case must assert something real or
+ * be DELETED" mechanically instead of by review convention. */
+static int case_assertions(const char *name)
+{
+    for (int i = 0; i < cd_n_cases; i++)
+        if (!strcmp(cd_cases[i].name, name)) return cd_cases[i].assertions;
+    return 0;
+}
+
+static void case_record(const char *name, int status, int ran)
 {
     if (cd_n_cases >= CD_MAX_CASES) return;
     cd_cases[cd_n_cases].name = name;
     cd_cases[cd_n_cases].status = status;
+    cd_cases[cd_n_cases].assertions = ran;
     cd_n_cases++;
 }
 
@@ -3226,33 +3237,33 @@ static void run(const char *name, void (*fn)(void))
     waitpid(pid, &status, 0);
     if (WIFSIGNALED(status)) {
         n_tests_crashed++;
-        case_record(name, ST_CRASH);
+        case_record(name, ST_CRASH, c.assertions);
         printf("%-8s %s  <-- CRASHED on signal %d (engine fault)\n",
                "CRASH", name, WTERMSIG(status));
     } else if (!WIFEXITED(status)) {
         n_tests_crashed++;
-        case_record(name, ST_CRASH);
+        case_record(name, ST_CRASH, c.assertions);
         printf("%-8s %s  <-- abnormal exit\n", "CRASH", name);
     } else if (WEXITSTATUS(status) == CHILD_OK) {
         n_tests_ok++;
-        case_record(name, ST_OK);
+        case_record(name, ST_OK, c.assertions);
         printf("ok      %s\n", name);
     } else if (WEXITSTATUS(status) == CHILD_FAILURES) {
         n_tests_failed++;
-        case_record(name, ST_RED);
+        case_record(name, ST_RED, c.assertions);
         printf("FAILED  %s\n", name);
     } else if (WEXITSTATUS(status) == CHILD_VACUOUS) {
         n_tests_setup++;
-        case_record(name, ST_VAC);
+        case_record(name, ST_VAC, c.assertions);
         printf("VACUOUS %s  <-- no reported failures, but a negative assertion "
                "could not be proven non-vacuous\n", name);
     } else if (WEXITSTATUS(status) == CHILD_SETUPBUG) {
         n_tests_setup++;
-        case_record(name, ST_SETUP);
+        case_record(name, ST_SETUP, c.assertions);
         printf("SETUPBUG %s  <-- SETUP BUG (fixture could not be built)\n", name);
     } else {
         n_tests_crashed++;
-        case_record(name, ST_CRASH);
+        case_record(name, ST_CRASH, c.assertions);
         printf("CRASH   %s  <-- unexpected child exit %d\n", name, WEXITSTATUS(status));
     }
     fflush(stdout);
@@ -3444,7 +3455,7 @@ int main(void)
         { "g_four_unique_groups_cost_zero",               "g_reduction_charges_effective_cost" },
         { "g_zero_cost_all_rarities",                     "g_reduction_charges_effective_cost" },
     };
-    int n_vac_cases = 0;
+    int n_vac_cases = 0, n_content_free = 0;
     for (size_t i = 0; i < sizeof vac_deps / sizeof vac_deps[0]; i++) {
         int pos = case_status(vac_deps[i].positive);
         int neg = case_status(vac_deps[i].negative);
@@ -3454,6 +3465,22 @@ int main(void)
                    "case's zeros are unearned (assertions above stand, result "
                    "reclassified)\n", vac_deps[i].negative, vac_deps[i].positive);
             n_vac_cases++;
+            /* A VACUOUS CASE MUST STILL ASSERT SOMETHING REAL.  Reclassifying a
+             * green negative whose positive is red is the right bookkeeping, but
+             * it must not become a place where a case asserts nothing at all:
+             * a vacuous case has to assert something real or be DELETED.  This is
+             * the mechanical form of that rule, evaluated after the fact over the
+             * counters the run already collected -- no assertion is relaxed,
+             * skipped or retuned to reach it, and it names the offending case. */
+            if (case_assertions(vac_deps[i].negative) == 0) {
+                n_content_free++;
+                assertions++;
+                failures++;
+                fprintf(stderr, "FAIL: premise: vacuous case [%s] ran ZERO "
+                                "assertions of its own. A vacuous case must "
+                                "assert something real or be DELETED, not merely "
+                                "reclassified.\n", vac_deps[i].negative);
+            }
         }
     }
     n_vacuous += n_vac_cases;

@@ -29,7 +29,20 @@ const JUMP_UP: &str = "PL!S-sd1-022-SD";
 /// filter is exercised in both directions by the same board.
 const AQOURS_A: &str = "PL!S-sd1-001-SD";
 const AQOURS_B: &str = "PL!S-sd1-002-SD";
-const NOT_AQOURS: &str = "PL!HS-bp5-004-R";
+/// A member that is NOT 『Aqours』, so the group filter is exercised in both
+/// directions by the same board.
+///
+/// This was `PL!HS-bp5-004-R` (百生 吟子), which is not 『Aqours』 and so satisfied the
+/// claim — but she is NOT an inert fixture. Her own 常時 ability pays +2 blades per
+/// cost-4+ member that is not 『スリーズブケット』, so once that ability was fixed she
+/// picked up blades of her own on every `recalculate_constants()` and this test, which
+/// measures only what Jump up HIGH grants, read 4 where it expected 0.
+///
+/// 徒町 小鈴 is the same shape of answer for the right reason: DOLLCHESTRA, so
+/// decisively outside 『Aqours』, and her only ability is ライブ開始時, which
+/// `recalculate_constants()` never dispatches. The inertness is asserted below rather
+/// than left to this comment.
+const NOT_AQOURS: &str = "PL!HS-bp5-005-R";
 /// A cheap live used to walk a real live; it is only a vehicle for the rollover.
 const LIVE: &str = "PL!-sd1-019-SD";
 
@@ -70,6 +83,21 @@ fn stage_two_aqours_and_one_outsider(game: &mut TestGame) -> (i16, i16, i16) {
         ),
         "the non-beneficiary must be OUTSIDE 『Aqours』, or the group filter is \
          never exercised in the negative direction and a group-blind grant passes"
+    );
+    // The fixture must also grant NOTHING on its own, or "the ineligible member gained
+    // 0" is measuring its own 常時 ability instead of Jump up HIGH's filter. This is not
+    // hypothetical: the previous fixture, 百生 吟子, is not 『Aqours』 and does exactly
+    // that — she earns +2 per cost-4+ non-スリーズブケット member, so two 『Aqours』
+    // members beside her read 4.
+    assert!(
+        !game
+            .db
+            .get_card(outsider)
+            .expect("NOT_AQOURS must be in cards.json")
+            .resolved_abilities()
+            .any(|a| a.triggers.as_deref() == Some("常時")),
+        "{NOT_AQOURS} must have no 常時 ability, or it is not an inert control for a \
+         test that reads blades after recalculate_constants()"
     );
     game.state.player1.stage.stage = [a, b, outsider];
     game.state.player1.live_card_zone.cards.push(live);

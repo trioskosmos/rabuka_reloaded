@@ -194,36 +194,32 @@ void rb_mods_remove_heart(RbMods *m, int cid, int color, int delta) {
     if (m->heart[cid][color].add == 0 && m->heart[cid][color].set == 0) return;
     m->heart[cid][color].add = saturate_modifier((int64_t)m->heart[cid][color].add - delta);
 }
-/* ⛔ PHANTOM — THERE IS NO Rust TWIN. Do not wire this.
-   game_modifiers.rs defines exactly four `remove_*_modifier` methods
-   (remove_blade_modifier :332, remove_heart_modifier :423,
-   remove_score_modifier :460, remove_cost_modifier :548). There is no
-   `remove_need_heart_modifier`; a repo-wide search of engine/src for the
-   identifier returns 0 hits. Rust reverses a need-heart modifier by adding
-   its NEGATION, in the one place that undoes them —
-   game_state/modifiers.rs:615-619, the global-need-heart withdrawal arm of
-   commit_constant_results:
+/* E15 — DELETED. `rb_mods_remove_need_heart` had NO Rust twin and ZERO callers
+   tree-wide (measured 2026-10-03: 0 hits in src/, include/ and tests/ for the
+   identifier, and 0 hits for `remove_need_heart_modifier` in engine/src).
+   game_modifiers.rs defines exactly four `remove_*_modifier` methods —
+   remove_blade_modifier :332, remove_heart_modifier :423, remove_score_modifier
+   :460, remove_cost_modifier :548. There is no `remove_need_heart_modifier`.
+
+   Rust reverses a need-heart delta by adding its NEGATION, in the one place
+   that undoes them — game_state/modifiers.rs:607-610, the global-need-heart
+   withdrawal arm of commit_constant_results:
 
        for (card_id, color_str, delta) in &old_global_nh {
            let hc = crate::card::parse_heart_color(color_str);
            self.mods.add_need_heart_modifier(*card_id, hc, -*delta);
        }
 
-   So the C counterpart of "undo a need-heart delta" is
-   `rb_mods_add_need_heart(&mods, cid, color, -delta)` — which is what
-   turn/triggers.c:1344 and :1306 already do — and this function is a fourth
-   copy of the same arithmetic with a name Rust does not have.
+   which is what turn/triggers.c:1303 and :1341 already do via
+   rb_mods_add_need_heart(&mods, cid, color, -delta). The function was a fifth
+   copy of the same arithmetic under a name Rust does not have, kept alive only
+   by a declaration in include/rabuka.h.
 
-   Kept rather than deleted for two reasons: it is DECLARED in
-   include/rabuka.h:306 (not this file's to change), and a concurrent writer may
-   already be building a caller against that declaration, in which case
-   removing the definition turns their build into a link error instead of
-   steering them. Report-only; see the handover. */
-void rb_mods_remove_need_heart(RbMods *m, int cid, int color, int delta) {
-    if (cid < 0 || cid >= RB_MAX_CARD_IDS || color < 0 || color >= 8) return;
-    if (m->need_heart[cid][color].add == 0 && m->need_heart[cid][color].set == 0) return;
-    m->need_heart[cid][color].add = saturate_modifier((int64_t)m->need_heart[cid][color].add - delta);
-}
+   ⛔ BLOCKED-ON: include/rabuka.h:306 — delete the line
+       void rb_mods_remove_need_heart(RbMods *m, int card_id, int color, int delta);
+   rabuka.h is main's file. Until that line goes the header declares a function
+   with no definition, which is a LINK ERROR for any caller rather than a
+   warning; nothing calls it, so the tree still builds. */
 void rb_mods_remove_score(RbMods *m, int cid, int delta) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
     if (m->score[cid].add == 0 && m->score[cid].set == 0) return;
@@ -340,7 +336,19 @@ void rb_mods_trace_push(RbMods *m, int source_card_id, const char *ability_text,
 }
 
 /* ⛔ WIRE REQUIRED IN src/ability/effects/misc.c — NOT THIS FILE.
-   These two ARE faithful ports and they are the ring's only missing writers.
+   E13. These two ARE faithful ports and they are the ring's only missing writers.
+
+   ⚠ CORRECTION TO A MEASUREMENT THAT WAS WRONG. The reconciliation recorded
+   "blade half wired: rb_mods_add_blade_with_trace def modifiers.c:395, called
+   :371". Line 371 is INSIDE THIS COMMENT BLOCK — it is the illustrative
+   `grant_blade` body the comment shows the reader how to write, not a call.
+   Measured 2026-10-03 over the whole tree:
+     rb_mods_add_blade_with_trace — 0 production callers (the only other hits are
+       this file's comment at :318 and the definition at :395)
+     rb_mods_add_heart_with_trace — 0 production callers; reachable only from
+       tests/test_parity_per_card2.c:1631 / :1633, which use it to hand a
+       fixture a labelled heart bonus
+   So BOTH halves of E13 are unwired, not one.
 
    Rust call sites (all in ability/effects/resource.rs, all passing
    `&mut gs.ability_applications` as the trace and `gs.activating_card
@@ -384,14 +392,21 @@ void rb_mods_trace_push(RbMods *m, int source_card_id, const char *ability_text,
    inside gain_heart's per-colour loop, which the C does not have; that is a
    separate gap in misc.c, not a wiring problem here.
 
-   Consequence while unwired: `mods.trace` receives score/cost/need-heart
-   applications (5 live rb_mods_trace_push sites in game_state_core.c,
-   rules.c and score.c) but NO blade or heart application, so any consumer
-   filtering on RB_EFFECT_BLADE_BONUS / RB_EFFECT_HEART_BONUS sees nothing.
-   rb_mods_trace_len (below) is reachable and correct; it is only the blade and
-   heart effect_types that are missing. That does NOT affect
-   test_condition_evaluation.c's snapshot_has_score_source, which skips
-   everything that is not a score effect_type. */
+Consequence while unwired: `mods.trace` receives score/cost/need-heart
+    applications (5 live rb_mods_trace_push sites in game_state_core.c,
+    rules.c and score.c) but NO blade or heart application, so any consumer
+    filtering on RB_EFFECT_BLADE_BONUS / RB_EFFECT_HEART_BONUS sees nothing.
+    rb_mods_trace_len (below) is reachable and correct; it is only the blade and
+    heart effect_types that are missing. That does NOT affect
+    test_condition_evaluation.c's snapshot_has_score_source, which skips
+    everything that is not a score effect_type.
+
+    ⛔ BLOCKED-ON: src/ability/effects/misc.c — widen `grant_blade`
+    (misc.c:218) and `grant_heart_distribution` (misc.c:224) to take the ability
+    text, then call the two *_with_trace twins. That is F3, and F3 needs the
+    five grant_blade call sites (misc.c:551, :558, :562, :571, :792) plus
+    misc.c:238 (grant_heart_distribution, fed by apply_heart_to_card) widened.
+    misc.c is cluster C's and cluster F's; it is not this file's. */
 void rb_mods_add_blade_with_trace(RbMods *m, int cid, int delta,
                                   int source_card_id, const char *ability_text) {
     if (cid < 0 || cid >= RB_MAX_CARD_IDS) return;
@@ -716,6 +731,25 @@ void rb_record_card_movement(GameState *g, int card_id, int from_zone, int to_zo
     event.source_zone = from_zone;
     event.dest_zone = to_zone;
     event.cause_player_id = causer;
+    /* E16 WRITER. `cause_card_id` (rabuka.h:1440) had ZERO writers tree-wide, so
+       the struct above — a stack local — carried WHATEVER WAS IN THAT STACK SLOT
+       into g->batch_movements and g->turn_area_movements. That is an
+       uninitialised read, not a missing feature, and it is the reason
+       `eval_group`'s temporal this_turn arm could not be ported: Rust
+       (condition/card.rs:1646-1654) tests
+           m.cause_card_id.is_some_and(|cause_cid| groups.iter().any(|g|
+               card_matches_group_str(card_db, cause_cid, Some(g))))
+       on the turn_area_movements entry, and the C had no value to test.
+
+       The value is `self.activating_card`, exactly as Rust's two push sites pass
+       it: modifiers.rs:1843/1851 (record_stage_position_swap) and modifiers.rs
+       :1943 (push_movement_event's own cause_card_id argument, which
+       record_card_movement is the C fold of). C convention for "no activating
+       card" is a negative value (8 call sites test `activating_card >= 0`).
+
+       NOT a regression risk: the field had no reader either, so nothing could
+       observe the old garbage. */
+    event.cause_card_id = g->activating_card;
     event.effect_only = target;
     if (g->n_batch_movements < (int)(sizeof(g->batch_movements) / sizeof(g->batch_movements[0])))
         g->batch_movements[g->n_batch_movements++] = event;
@@ -939,6 +973,362 @@ void rb_remove_revealed_card(GameState *g, int card_id) {
         g->n_revealed--;
         return;
     }
+}
+
+/* -- record_stage_position_swap -- E9
+   Mirror modifiers.rs:1799-1857 (GameState::record_stage_position_swap). This is
+   the SINGLE choke point Rust's three position-change branches each wrote out in
+   full (effects/position.rs:1022 / :1061 / :1102 — an explicit `source_position`,
+   a named `target_member`, and the `this_member` case), and the doc comment at
+   modifiers.rs:1780-1798 says the sequencing is load-bearing.
+
+   ⛔ NOT A DISPLAY/REPLAY GAP. A peer measured E9 that way; that is wrong and
+   the readers are in the GAMEPLAY condition evaluator, not a UI:
+
+     engine/src/ability/condition/state.rs:871   passes
+             &self.game_state.position_change_events
+     engine/src/ability/condition/state.rs:879   ordering comment (batch-scoped)
+     engine/src/ability/condition/state.rs:929   source list for a state condition
+     engine/src/ability/condition/state.rs:938   .position_change_events
+     engine/src/ability/condition/state.rs:1162  .position_change_events
+
+   game/display.rs:1858/1861 is the only DISPLAY reader, and it is a fifth.
+   So every 「このターン、このメンバーがエリアを移動した」 / position-change state
+   condition in the corpus reads an EMPTY vector in the C.
+
+   In the C, g->position_change_events[] (rabuka.h:1534) had ZERO writers — its
+   only mention was the reset at core/game_state_abilities.c:589 — so this
+   function is the missing writer.
+
+   The three steps, in Rust's order:
+     1. the two PositionChangeEvents, BEFORE push_movement_event, because that
+        call consumes the recently-moved snapshot and arms the opponent-caused
+        watcher trigger (modifiers.rs:1788-1790);
+     2. the source is recorded unconditionally, the target only when it is a real
+        card (modifiers.rs:1791-1793) — the source slot is checked non-empty by
+        the caller while the target slot may legitimately be empty;
+     3. push_movement_event for the source, and again for the target when real. */
+static void mods_push_movement_event(GameState *g, int moved_card_id,
+                                      int src_zone, int dst_zone, int effect_only) {
+    if (!g || moved_card_id < 0 || moved_card_id >= RB_MAX_CARD_IDS) return;
+    /* Rust's mover_pid is `ability_queue.current_entry().map(|e| e.player_id)`
+       (modifiers.rs:1812-1816). rb_record_card_movement's `causer` IS that seat
+       — the C's fold of push_movement_event — so the position change inherits the
+       same seat the two Rust push sites pass as `mover_pid`. */
+    rb_record_card_movement(g, moved_card_id, src_zone, dst_zone,
+                            rb_queue_current_entry(g), effect_only);
+}
+
+void rb_record_stage_position_swap(GameState *g, int source_id, int source_index,
+                                   int target_id, int target_index) {
+    if (!g) return;
+    /* Rust does NOT set activating_card here — it READS it (modifiers.rs:1823 /
+       :1834 / :1843 / :1851) and takes the mover seat from the queue's current
+       entry (modifiers.rs:1812-1816). The caller publishes activating_card, the
+       same way rb_recalc_constants publishes it around its own per-card apply
+       (triggers.c:1380-1381). */
+
+    /* 1. the two events (modifiers.rs:1817-1838). effect_only is TRUE on both:
+       modifiers.rs:1825 / :1835 pass `effect_only: true` literally. */
+    int n_events = g->n_position_change_events;
+    int cap_events = (int)(sizeof(g->position_change_events) /
+                           sizeof(g->position_change_events[0]));
+    if (source_id >= 0) {
+        if (n_events < cap_events) {
+            RbPositionChangeEvent *ev = &g->position_change_events[n_events++];
+            ev->card_id   = source_id;
+            ev->position  = target_index;
+        }
+    }
+    if (target_id >= 0) {
+        if (n_events < cap_events) {
+            RbPositionChangeEvent *ev = &g->position_change_events[n_events++];
+            ev->card_id   = target_id;
+            ev->position  = source_index;
+        }
+    }
+    g->n_position_change_events = n_events;
+
+    /* 2. + 3. the movement events (modifiers.rs:1839-1856). Both are
+       stage -> stage with effect_only = true (modifiers.rs:1845 / :1853). */
+    mods_push_movement_event(g, source_id, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 1);
+    if (target_id >= 0)
+        mods_push_movement_event(g, target_id, RB_ZONEID_STAGE, RB_ZONEID_STAGE, 1);
+}
+
+/* -- count_as_multiple_weight -- E10
+   Mirror modifiers.rs:227-301 (GameState::count_as_multiple_weight). Returns how
+   many cards `counted` is worth: 1 normally, `count_as` (>= 1) when the card
+   carries a 常時 `count_as_multiple` whose own condition holds and whose
+   `counted_by` list accepts the counting card.
+
+   REACHABLE, MEASURED: exactly ONE `count_as_multiple` effect node in the 985
+   abilities (count_as=2, counted_by="lily white", self_target=true,
+   duration=as_long_as, plus one condition), on a member card — PL!-pb2-041-L
+   春情ロマンティック. Census tool tools/census_e.c, over 2116 card-ability pairs /
+   4925 effect nodes. Without this function that card is counted as 1 by
+   card.rs:2124 / modifiers.rs:341.
+
+   The `counting_card` resolution order (modifiers.rs:232-241) is: the explicit
+   argument, else the queue's current entry card, else g->activating_card, and a
+   `-1` anywhere in that chain falls through to the next; no card at all means 1. */
+static int mods_effect_count_as(const AbilityEffect *e) {
+    if (!e) return 0;
+    for (int i = 0; i < e->n_extra; i++)
+        if (e->extra_k[i] && !strcmp(e->extra_k[i], "count_as")) return atoi(e->extra_v[i]);
+    return 0;
+}
+
+/* -- E10/E11/E12 shared helpers --------------------------------------------
+   `card_database.get_card(id)` returns None for an id that is not a key, which
+   is what both E10 (modifiers.rs:245-248) and E12 (modifiers.rs:361-363) test.
+   In the C the card index IS the card id, so "is a key" is "does it decode". */
+static int mods_card_exists(int card_id) {
+    if (card_id < 0 || card_id >= RB_MAX_CARD_IDS) return 0;
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    rb_free_card(&c);
+    return 1;
+}
+
+/* GameState::owner_of_card (modifiers.rs:1663-1680), used by E10's condition
+   evaluation (modifiers.rs:267-268) as the `self` player of the rule's own
+   condition. Rust checks SIX zones per seat, in this order, and returns the
+   first seat that holds it — so a card id present in both seats resolves to
+   seat 0, which the C must reproduce rather than "fix". */
+static int mods_owner_of_card(const GameState *g, int card_id) {
+    if (!g) return -1;
+    for (int pl = 0; pl < 2; pl++) {
+        const RbPlayer *P = &g->p[pl];
+        for (int i = 0; i < RB_STAGE_SIZE; i++) if (P->stage[i] == card_id) return pl;
+        for (int i = 0; i < P->hand.n; i++)    if (P->hand.cards[i] == card_id) return pl;
+        for (int i = 0; i < P->live.n; i++)    if (P->live.cards[i] == card_id) return pl;
+        for (int i = 0; i < P->energy.n; i++)  if (P->energy.cards[i] == card_id) return pl;
+        for (int i = 0; i < P->success.n; i++) if (P->success.cards[i] == card_id) return pl;
+        for (int i = 0; i < P->discard.n; i++) if (P->discard.cards[i] == card_id) return pl;
+    }
+    return -1;
+}
+
+unsigned rb_mods_count_as_multiple_weight(const GameState *g, int counted, int counting_card) {
+    if (!g || counted < 0) return 1;
+    /* modifiers.rs:232-244. */
+    if (counting_card <= 0) {
+        counting_card = -1;
+        int cur = rb_queue_current_entry(g);
+        if (cur >= 0 && cur < g->queue.n_entries) {
+            int cid = g->queue.entries[cur].card_id;
+            if (cid > 0) counting_card = cid;
+        }
+    }
+    if (counting_card <= 0 && g->activating_card > 0) counting_card = g->activating_card;
+    if (counting_card <= 0) return 1;               /* modifiers.rs:242-244 */
+    if (!mods_card_exists(counted)) return 1;       /* modifiers.rs:245-248 */
+
+    int n = rb_card_num_abilities((uint32_t)counted);
+    for (int ai = 0; ai < n; ai++) {
+        Ability ab;
+        memset(&ab, 0, sizeof(ab));
+        if (!rb_decode_card_ability((uint32_t)counted, ai, &ab)) continue;
+        /* modifiers.rs:249-255 — the effect must live on a 常時 ability. */
+        int constant = ab.triggers && strstr(ab.triggers, "\xe5\xb8\xb8\xe6\x99\x82") != NULL;
+        const AbilityEffect *e = constant ? ab.effect : NULL;
+        if (!e || !e->action || strcmp(e->action, "count_as_multiple")) {
+            rb_free_ability(&ab);
+            continue;
+        }
+        /* modifiers.rs:265-276 — the rule's OWN condition, evaluated with the
+           COUNTED card's owner as `self`. Evaluated through the engine's own
+           entry point, which is the twin of card.rs's ConditionContext. */
+        int cond_met = !e->has_condition || !e->condition ||
+                       rb_eval_condition_for_host(g, mods_owner_of_card(g, counted),
+                                                  counted, e->condition);
+        if (!cond_met) { rb_free_ability(&ab); continue; }
+
+        /* modifiers.rs:282-297 — `counted_by` is the list of groups whose effects
+           SEE the weight; an empty list means any effect sees it. The extra
+           arrives comma-joined, so it is split per token exactly as the corpus
+           stores it. */
+        const char *seen_by = NULL;
+        for (int i = 0; i < e->n_extra; i++)
+            if (e->extra_k[i] && !strcmp(e->extra_k[i], "counted_by")) seen_by = e->extra_v[i];
+        if (seen_by && *seen_by) {
+            const char *p = seen_by;
+            int ok = 0;
+            for (;;) {
+                const char *comma = strchr(p, ',');
+                size_t len = comma ? (size_t)(comma - p) : strlen(p);
+                if (len > 0 && len < 128) {
+                    char tok[128];
+                    memcpy(tok, p, len); tok[len] = '\0';
+                    if (rb_card_matches_group_str(counting_card, tok)) { ok = 1; break; }
+                }
+                if (!comma) break;
+                p = comma + 1;
+            }
+            if (!ok) { rb_free_ability(&ab); continue; }
+        }
+        /* modifiers.rs:298 — `count_as_any().unwrap_or(2).max(1)`. */
+        int weight = mods_effect_count_as(e);
+        if (weight <= 0) weight = 2;
+        rb_free_ability(&ab);
+        return (unsigned)weight;
+    }
+    return 1;                                        /* modifiers.rs:300 */
+}
+
+/* -- weighted_zone_count -- E11
+   Mirror modifiers.rs:308-343 (GameState::weighted_zone_count): count a zone's
+   cards, honouring each card's count_as_multiple weight, filtered by
+   card_type and group_names exactly as the UNWEIGHTED path does.
+
+   REACHABLE, MEASURED: the single corpus `count_as_multiple` node above is the
+   whole of it — the weight is only ever consulted from this one card, so
+   landing E11 without E10 would have been dead code in one direction and a
+   silent wrong count in the other.
+
+   ⚠ AN EMPTY card_type MEANS "any" (modifiers.rs:317-318). Passing Some("")
+   through the matcher matches nothing and counts zero cards, which is the
+   comment's exact warning; the C's rb_card_matches_type returns 1 for an
+   unrecognised filter, so the empty string is filtered out HERE rather than
+   handed over. */
+unsigned rb_mods_weighted_zone_count(const GameState *g, const int *cards, int n_cards,
+                                     const char *card_type, const char *group_names,
+                                     int counting_card) {
+    if (!g || !cards || n_cards <= 0) return 0;
+    const char *ct = (card_type && *card_type) ? card_type : NULL;
+    char grp[256];
+    const char *groups = NULL;
+    if (group_names && *group_names) {
+        size_t len = strlen(group_names);
+        if (len < sizeof(grp)) { memcpy(grp, group_names, len + 1); groups = grp; }
+    }
+    unsigned total = 0;
+    for (int i = 0; i < n_cards; i++) {
+        int cid = cards[i];
+        if (cid == RB_EMPTY_SLOT) continue;          /* modifiers.rs:323-324 */
+        if (ct && !rb_card_matches_type(cid, ct)) continue;
+        if (groups && *groups) {
+            /* modifiers.rs:330-339 — `.any()` over the WHOLE comma-joined list,
+               and an empty list means no group restriction at all. */
+            const char *p = groups;
+            int ok = 0;
+            for (;;) {
+                const char *comma = strchr(p, ',');
+                size_t len = comma ? (size_t)(comma - p) : strlen(p);
+                if (len > 0 && len < 128) {
+                    char tok[128];
+                    memcpy(tok, p, len); tok[len] = '\0';
+                    if (rb_card_matches_group_str(cid, tok)) { ok = 1; break; }
+                }
+                if (!comma) break;
+                p = comma + 1;
+            }
+            if (!ok) continue;
+        }
+        total += rb_mods_count_as_multiple_weight(g, cid, counting_card);
+    }
+    return total;
+}
+
+/* -- replacement_appear_wait_applies -- E12
+   Mirror modifiers.rs:360-451 (GameState::replacement_appear_wait_applies):
+   does an on-stage 常時 `replacement_appear_wait` rule hold `incoming` in WAIT as
+   it appears in area `area_idx`?
+
+   REACHABLE, MEASURED: TWO such effect nodes in the 985 abilities, both with
+   position=center, heart_total_limit=4, heart_total_operator="<=",
+   card_type=member_card, original_value=true, replacement=appear_wait
+   (PL!-pb2-002-PP 絢瀬絵里 and its twin). Rust calls it from
+   turn/phases.rs:1281 at the moment of placement.
+
+   Every filter below is a Rust `continue`, so the function returns on the FIRST
+   rule that survives all of them — which is why the loop order (both seats, then
+   the three stage slots) is the corpus order and not a set. */
+static int mods_printed_base_heart_total(int card_id) {
+    Card c;
+    if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
+    int total = 0;
+    /* modifiers.rs:367-371 — `card.base_heart.hearts.values().fold(0, saturating_add)`,
+       i.e. the PRINTED base-heart slice only. rb_card_total_hearts is the WRONG
+       total here (it falls back to need_heart). */
+    for (int i = 0; i < c.num_base && i < c.n_hearts; i++) total += c.heart_count[i];
+    rb_free_card(&c);
+    return total;
+}
+
+int rb_mods_replacement_appear_wait_applies(const GameState *g, int incoming, int area_idx) {
+    if (!g || incoming < 0 || !mods_card_exists(incoming)) return 0;
+    if (!rb_card_is_member(incoming)) return 0;      /* modifiers.rs:364-366 */
+    int printed = mods_printed_base_heart_total(incoming);
+
+    for (int pl = 0; pl < 2; pl++) {
+        for (int slot = 0; slot < RB_STAGE_SIZE; slot++) {
+            int stage_id = g->p[pl].stage[slot];
+            if (stage_id == RB_EMPTY_SLOT) continue;
+            /* modifiers.rs:386-388 — a member is never in front of itself. */
+            if (stage_id == incoming) continue;
+            if (!mods_card_exists(stage_id)) continue;
+            int n = rb_card_num_abilities((uint32_t)stage_id);
+            for (int ai = 0; ai < n; ai++) {
+                Ability ab;
+                memset(&ab, 0, sizeof(ab));
+                if (!rb_decode_card_ability((uint32_t)stage_id, ai, &ab)) continue;
+                int constant = ab.triggers && strstr(ab.triggers, "\xe5\xb8\xb8\xe6\x99\x82") != NULL;
+                const AbilityEffect *e = constant ? ab.effect : NULL;
+                if (!e || !e->action ||
+                    strcmp(e->action, "replacement_appear_wait")) {
+                    rb_free_ability(&ab);
+                    continue;
+                }
+                /* modifiers.rs:409-412 — a waited HOST's rule does not apply. */
+                const char *orient = rb_mods_get_orientation((RbMods *)&g->mods, stage_id);
+                if (orient && !strcmp(orient, "wait")) { rb_free_ability(&ab); continue; }
+                /* modifiers.rs:413-426 — the rule governs the AREA the incoming
+                   member is entering, so it is compared against `area_idx` and
+                   NOT against the host's own slot. */
+                const char *pos = NULL;
+                for (int i = 0; i < e->n_extra; i++)
+                    if (e->extra_k[i] && !strcmp(e->extra_k[i], "position")) pos = e->extra_v[i];
+                if (pos) {
+                    int want = rb_stage_position_index(pos);
+                    if (want < 0) { rb_free_ability(&ab); continue; }
+                    if (want != area_idx) { rb_free_ability(&ab); continue; }
+                }
+                /* modifiers.rs:427-431 — card_type must be Member when present. */
+                const char *ect = NULL;
+                for (int i = 0; i < e->n_extra; i++)
+                    if (e->extra_k[i] && !strcmp(e->extra_k[i], "card_type")) ect = e->extra_v[i];
+                if (ect && strcmp(ect, "member_card")) { rb_free_ability(&ab); continue; }
+
+                const char *limit_s = NULL, *op_s = NULL, *blade_s = NULL;
+                for (int i = 0; i < e->n_extra; i++) {
+                    if (!e->extra_k[i]) continue;
+                    if (!strcmp(e->extra_k[i], "heart_total_limit"))    limit_s = e->extra_v[i];
+                    if (!strcmp(e->extra_k[i], "heart_total_operator")) op_s    = e->extra_v[i];
+                    if (!strcmp(e->extra_k[i], "blade_limit"))          blade_s = e->extra_v[i];
+                }
+                if (limit_s && *limit_s) {
+                    /* modifiers.rs:432-441 — default operator "<=", NOT the
+                       compare_counts default (util.rs:1907 `.or(Some("<="))`). */
+                    if (!op_s) op_s = "<=";
+                    if (!rb_compare_counts(op_s, printed, atoi(limit_s))) {
+                        rb_free_ability(&ab);
+                        continue;
+                    }
+                } else if (blade_s) {
+                    /* modifiers.rs:442-445 — a blade-bounded variant is not
+                       modelled in Rust, and guessing one would be worse than
+                       declining, so this is the same decline. */
+                    rb_free_ability(&ab);
+                    continue;
+                }
+                rb_free_ability(&ab);
+                return 1;                            /* modifiers.rs:446 */
+            }
+        }
+    }
+    return 0;                                        /* modifiers.rs:450 */
 }
 
 /* -- clear_revealed_cards --

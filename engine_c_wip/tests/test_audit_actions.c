@@ -119,7 +119,22 @@ static void fatal_handler(int sig)
             g_shared->name[i] = g_case_name[i];
         g_shared->name[i] = 0;
     }
-    _exit(0);
+    /* A crash must be LOUD, and `_exit(0)` was silent: it made the child a
+     * NORMAL exit, so `WIFSIGNALED(status)` in the parent was false and every
+     * status-based reader saw a clean run. The shared-counter branch below did
+     * catch the signal, but nothing OUTSIDE this file could, and the four
+     * sibling FORK suites already re-raise instead (test_parity_recover_hand_a.c,
+     * test_parity_cce_gaps.c, test_audit_triggers.c, test_parity_per_card2.c) --
+     * this file and test_audit_zones.c were the two that had been left on
+     * `_exit(0)`. Restore the default disposition and re-raise so the child
+     * dies FROM the signal; both the shared counters and the wait status then
+     * agree, and `exit status 0` can never again be a crash.
+     * SA_RESETHAND already reset the handler, so a fault INSIDE this handler
+     * terminates the child by the default action and the parent sees the same
+     * signal. `_exit(128 + sig)` is the unreachable backstop. */
+    signal(sig, SIG_DFL);
+    raise(sig);
+    _exit(128 + sig);
 }
 
 /* Variadic on purpose. A two-argument CHECK(cond, "a" "b") silently splits
@@ -796,7 +811,7 @@ static void run_case(const Case *c)
         failures   = 0;
         rb_card_copy_pool_reset();
 
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         c->fn(&tg);
         if (g_shared) {
@@ -826,6 +841,12 @@ static void run_case(const Case *c)
         }
         fprintf(stderr, "FAIL: %s: fatal %s (%d) in child after %d assertion(s)\n",
                 c->name, nm, g_shared->signal, g_shared->assertions);
+        /* The corpus-wide verdict, in the same shape every other FORK suite
+         * prints, so a `^CRASH` scan can see this case. This suite's own
+         * `== <name>: ...` line is a third vocabulary that no scanner matched,
+         * which is why its failing cases used to look like suites with no
+         * failed tests at all. */
+        printf("CRASH: %s (%s in child)\n", c->name, nm);
         failures++; assertions++;
         g_shared->cases++;
         return;
@@ -834,12 +855,18 @@ static void run_case(const Case *c)
         fprintf(stderr, "FAIL: %s: child terminated abnormally (wait status %d) "
                         "after %d assertion(s)\n", c->name, status,
                 g_shared ? g_shared->assertions : 0);
+        printf("CRASH: %s (abnormal child exit)\n", c->name);
         failures++; assertions++;
         if (g_shared) g_shared->cases++;
         return;
     }
 
     int failed = g_shared->failures > 0;
+    /* The corpus verdict line. Additive: the `== <name>: ...` line below keeps
+     * the classification and the red-pinned bookkeeping that this suite's own
+     * convention prints. */
+    printf(failed ? "FAILED: %s\n" : "ok: %s\n", c->name);
+    fflush(stdout);
     if (!c->red_pinned && failed) {
         printf("== %s: GREEN case FAILED -> %s\n", c->name, c->classification);
         if (g_shared) g_shared->cases++;

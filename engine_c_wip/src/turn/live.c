@@ -601,13 +601,24 @@ static int live_build_member_contributions(const GameState *g, int pl,
 
    EXACT SYMBOL NEEDED (src/ability/effects/rules.c, not this file's):
 
-       void rb_rules_clear_turn_state(GameState *g);
+   one exported definition plus its prototype — the declaration text is quoted
+   ONCE, at src/turn/phase.c, and deliberately not repeated here. Until then the
+   blocker has no declaration anywhere in the tree, so a future call site fails
+   at LINK rather than silently resolving to nothing.
 
    clearing `RbRulesState::cannot_live_players[2]` and, in the same frame,
    `cannot_activate_members[2]` (Rust phases.rs:279-280 — both are per-turn sets
    cleared together). It must be called from rb_advance_phase's RB_PHASE_VICTORY
    rollover at src/turn/phase.c:427, next to the player_cannot_activate and
    baton_touch_used clears that are already there.
+
+   ⚠ THIS FILE USED TO SPELL THAT PROTOTYPE OUT, inside a comment, and so did
+   src/turn/phase.c. Two declarations, no definition anywhere in the tree, no
+   caller — while checklist item I2 claimed `[x]`. A caller added later would
+   have hit a LINK ERROR with nothing in the build to catch it, because a
+   comment is not a declaration. The single tombstone for this blocker now lives
+   at src/turn/phase.c in the RB_PHASE_VICTORY rollover; the definition and its
+   prototype must arrive together, in rules.c, in one edit.
 
    Then this file's body is exactly the shape below, in rb_perform_live, after
    build_member_contributions (live.rs:2053-2070 — the bail-out sits between the
@@ -974,9 +985,8 @@ void rb_populate_live_verdicts(GameState *g){
     as p0_wins/p1_wins upstream (no C field); they are accepted for signature
     parity.
 
-    THE THREE REMAINING WRITES OF THIS FUNCTION ARE BLOCKED-ON THE HEADER, and
-    the blocker is a PLACEMENT BUG, not a missing field. Rust writes, after the
-    arms above:
+    THE THREE REMAINING WRITES OF THIS FUNCTION ARE NOW TOMBSTONED, NOT
+    BLOCKED-ON. Rust writes, after the arms above:
 
         snap.lives[i].spare          = spare;                       // live.rs:741
         snap.base_score_total       = Σ passed l.score;            // live.rs:771
@@ -987,20 +997,24 @@ void rb_populate_live_verdicts(GameState *g){
     (rabuka.h:1283) and rb_enrich_from_applications above computes it from the
     ability-application trace, exactly as live.rs:783-800 does.
 
-    The other three are per-SNAPSHOT (and, for spare, per-LIVE-CARD) values, but
-    the header added `spare` / `base_score_total` / `card_bonus_total` to
-    RbMemberContribution (rabuka.h:1288-1290) instead of to RbLiveSnapshot /
-    per-live. Rust's own shapes:
-        PerformanceSnapshot.base_score_total : u8            (types.rs:498)
-        PerformanceSnapshot.card_bonus_total : u8            (types.rs:500)
-        LiveCardResult.spare                : [u8; 8]       (types.rs:512)
-    so the C needs, on RbLiveSnapshot:
-        int base_score_total;      // sum over passed of live_score_detail[i]
-        int card_bonus_total;      // sum over passed of (score - printed score)
-        int live_spare[RB_MAX_LIVE_CARDS][8];
-    With those three fields the bodies are three lines each, except live_spare,
-    which additionally needs the per-allocation `AllocPhase` the encoded
-    allocation stream drops — see the I4 entry in PARITY_CHECKLIST.md.
+    ⛔ The other three were DELETED from RbLiveSnapshot on 2026-10-04 (field
+    census), and this paragraph is the reason that was the right call rather than a
+    loss. The old text here asked the header for
+        int base_score_total; int card_bonus_total; int live_spare[RB_MAX_LIVE_CARDS][8];
+    on the grounds that "with those three fields the bodies are three lines each".
+    The premise was never checked, and it is false: in RUST all three are
+    WRITE-ONLY. `base_score_total` / `card_bonus_total` (types.rs:498 / :500) are
+    written at live.rs:771 / :777 and read NOWHERE in engine/src — not by the
+    condition evaluator, not by the live-success check, not by the display
+    projection; the only readers anywhere are the characterisation test
+    tests/test_modules/characterization/performance_snapshot_audit_test.rs:82/144.
+    `LiveCardResult.spare` (types.rs:512) is written at live.rs:733-741 and
+    initialised empty at live.rs:3153; `spare` appears nowhere else in engine/src
+    outside unrelated bot-local variables. So the C bodies would have written three
+    values that nothing on either side can observe — three lines each, producing
+    nothing, which is precisely the "producer for something nobody consumes" defect
+    the census set out to remove. The `AllocPhase` difficulty described below is
+    real but it was difficulty in service of a dead value.
 
     MEASURED: all three are WRITE-ONLY in Rust. A repo-wide search of
     engine/src finds `spare` at types.rs:512 (declaration), live.rs:741 (this

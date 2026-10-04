@@ -114,21 +114,23 @@ fn stage_and_reach_live_start(
     (game, kanako, blades_before)
 }
 
-/// Drain every prompt the placement raises: which cards, then their order.
-fn drain_placement(game: &mut TestGame) {
-    let mut safety = 0;
-    while game.has_pending_choice() && safety < 30 {
-        safety += 1;
-        match game.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => game.select_indices(&[]),
-            Some("SelectTarget") => game.select_option(0),
-            _ => game.select_indices(&[0]),
-        }
-    }
-    assert!(
-        !game.has_pending_choice(),
-        "the placement must resolve: 「3枚まで好きな順番で」 asks which cards, then their order"
-    );
+/// Answer the placement: which cards from the 控え室.
+///
+/// Written out rather than drained in a loop, because the prompt selects cards
+/// from a named zone and answering it with a blanket index 0 could not tell a
+/// mistyped prompt from a correct answer — the hazard `docs/EDGE_CASE_FINDINGS.md`
+/// C9 records and the drain-loop ratchet in `cards/test_inventory.py` exists to
+/// stop.
+///
+/// KNOWN GAP, deliberately not asserted here: 「好きな順番で」 should also ask the
+/// player to ORDER the cards it just chose. That prompt is raised by
+/// `maybe_prompt_deck_order`, and with this fixture only one card reaches it, so the
+/// order question is not exercised by this file. `is_deck_dest` omitted
+/// `Zone::DeckBottom` entirely, which dropped the order prompt for 「好きな順番で
+/// デッキの下に」 altogether; that is fixed, but pinning it needs a fixture where the
+/// placement actually takes two or more cards.
+fn choose_which_cards_to_place(game: &mut TestGame) {
+    game.drain_choices_strict(&["SelectCard"], &[0, 1]);
 }
 
 /// The count is the batch THIS STEP placed, and the hand is a decoy of a
@@ -147,7 +149,7 @@ fn blades_count_the_cards_this_step_placed_not_the_hand() {
          when ライブ開始時 fires, or step 1 has nothing to place"
     );
 
-    drain_placement(&mut game);
+    choose_which_cards_to_place(&mut game);
 
     assert_eq!(
         game.state.mods.get_blade_modifier(kanako) - blades_before,
@@ -169,7 +171,10 @@ fn nothing_placeable_earns_nothing_despite_a_full_hand() {
     let (mut game, kanako, blades_before) =
         stage_and_reach_live_start(&[LIELLA_WAITROOM], &[HAND_A, HAND_B, HAND_C, HAND_D]);
 
-    drain_placement(&mut game);
+    // Nothing is placeable, so there is no selection to make and no order to pick.
+    // An empty `allowed` list makes any prompt a failure, which is the assertion:
+    // the engine must not offer a choice it has no candidate for.
+    game.drain_choices_strict(&[], &[]);
 
     assert_eq!(
         game.state.mods.get_blade_modifier(kanako) - blades_before,

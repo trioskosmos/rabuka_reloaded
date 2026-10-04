@@ -91,17 +91,34 @@ int rb_zone_draw_multiple(GameState *g, int pl, int n) {
     }
     return drawn;
 }
-/* Mirror Player::refresh (player.rs) -- shuffle the waitroom back into the main
-   deck. Rust's main_deck.cards is a SmallVec with no bound, so the whole
-   waitroom always goes across; the C RbBag is capped at RB_MAX_ZONE, so the
-   surplus has to STAY in the waitroom rather than be dropped. The old body
-   cleared `discard.n` unconditionally after copying only as many cards as
-   fitted, which is the same "card leaves one zone and arrives in none" shape
-   as the three defects fixed today, reached whenever deck.n + discard.n
-   exceeded the bag. */
+/* Mirror Player::refresh (player.rs:634-648) -- shuffle the waitroom back into the
+    main deck. Rust's main_deck.cards is a SmallVec with no bound, so the whole
+    waitroom always goes across; the C RbBag is capped at RB_MAX_ZONE, so the
+    surplus has to STAY in the waitroom rather than be dropped. The old body
+    cleared `discard.n` unconditionally after copying only as many cards as
+    fitted, which is the same "card leaves one zone and arrives in none" shape
+    as the three defects fixed today, reached whenever deck.n + discard.n
+    exceeded the bag.
+
+    RULE 10.2.2.1 PRECONDITION, restored 2026-10-03. Rust's guard is a
+    conjunction (player.rs:636):
+
+        if self.main_deck.is_empty() && !self.waitroom.cards.is_empty() { ... }
+
+    and BOTH halves are load-bearing. This body tested only the second, so it
+    spliced the waitroom into a deck that was NOT empty -- and because
+    Rule 10.2.3 appends ("refreshed cards go to the BOTTOM"), a mid-effect
+    refresh that fires while any card remains above the splice point silently
+    changes the order of a live deck. Every current production caller already
+    tests `deck.n == 0` first (engine.c:187 rb_draw, phase.c:530's
+    rb_player_refresh, effects/look.c:366 and :856), so the corrected guard is
+    behaviour-neutral on the production path; it is the twin-without-the-rule
+    that was wrong. `tests/test_audit_zones.c` test_refresh_conserves_cards
+    pinned the OLD answer and now pins both Rust arms. */
 int rb_zone_refresh(GameState *g, int pl) {
     if (!g) return 0;
     RbPlayer *P = &g->p[pl];
+    if (P->deck.n != 0) return 0;      /* Rule 10.2.2.1: main deck empty */
     if (P->discard.n == 0) return 0;
     rb_shuffle(P->discard.cards, P->discard.n);
     int moved = 0;
@@ -266,9 +283,29 @@ int rb_stage_position_change_with_bags(RbPlayer *P, int from_area, int to_area){
                                          from_area, to_area);
 }
 
+/* Mirror util::stage_first_empty (ability/util.rs:2541-2551). The probe order is
+   CENTRE, then LEFT, then RIGHT -- NOT ascending slot index. The previous body
+   scanned 0,1,2 and therefore answered LEFT whenever both the left and the centre
+   were empty, which is a different SLOT, not a different order of the same slot.
+
+   Why it matters (measured 2026-10-03, 985-ability corpus): this is the slot
+   chooser for every placement that names `stage` / `empty_area` (10 + 8
+   abilities) and for every `same_area` destination that reaches the same arm
+   (7 more), plus `turn/phase.c`'s single-baton area default. `src/ability/util.c`
+   had already noticed the disagreement and worked around it with a private
+   `rb_util_stage_first_empty_rust` (util.c:1111-1116), refusing to fix the root
+   because "zones.c is not this file". It is now, so the root is fixed here and
+   the workaround is redundant (it stays until its owner collapses it; it is
+   byte-identical to this body).
+
+   Rust's `Option<usize>` -> `-1` is the `None` case, exactly as the old body's
+   fallthrough. */
 int rb_stage_first_empty(const int stage[RB_STAGE_SIZE]){
-    for(int i=0;i<RB_STAGE_SIZE;i++) if(stage[i]==RB_EMPTY_SLOT) return i;
-    return -1;
+    if(!stage) return -1;
+    if(stage[1]==RB_EMPTY_SLOT) return 1;   /* Centre first (util.rs:2542) */
+    if(stage[0]==RB_EMPTY_SLOT) return 0;
+    if(stage[2]==RB_EMPTY_SLOT) return 2;
+    return -1;                              /* None (util.rs:2549) */
 }
 
 /* ── Stage under-card helpers (mirror Stage::place_under_card /
@@ -666,11 +703,54 @@ int rb_success_len(const RbPlayer *player){
     return player ? player->success.n : 0;
 }
 
-/* ── ResolutionZone helpers (mirror ResolutionZone; GameState::resolution) ── */
+/* ── ResolutionZone helpers (mirror ResolutionZone; GameState::resolution) ────
 
+   OWNERS. Rust's ResolutionZone is TWO parallel vectors (engine/src/core/zones.rs:
+   1049-1053): `cards: SmallVec<[i16;10]>` and `owners: SmallVec<[u8;10]>`, both
+   appended by add_card_for_owner (zones.rs:1067-1070), both SWAPPED by
+   swap_slots (zones.rs:1089-1090), and owners CLEARED by clear (zones.rs:1095).
+   The C had only the card bag, so the owner of a resolved card was structurally
+   absent and the single drain (rb_check_invalid_resolution_zone, phase.c) had
+   to assume the ACTIVE seat -- which is why a card yelled by the non-active
+   performer came back to the wrong waitroom. include/rabuka.h:1617-1618 now
+   carries `resolution_owners[RB_MAX_ZONE]` + `n_resolution_owners` as the
+   parallel array, and rb_resolution_add_for_owner is the twin of
+   add_card_for_owner.
+
+   THE SENTINEL. RB_RESOLUTION_OWNER_UNKNOWN (0xFF) is stored for a card pushed
+   by rb_resolution_add, i.e. the C's no-owner form. It is the exact observable
+   equivalent of Rust's short `owners` vector: the reader falls back to the
+   active seat (`owners.get(index).copied().unwrap_or(active)`,
+   turn/actions/mod.rs:1867-1868) and cannot distinguish "no owner recorded"
+   from "owner out of range", which is what Rust's Option<i16> = None does.
+   RB_RESOLUTION_OWNER_UNKNOWN is referenced by that reader in src/turn/phase.c;
+   keep the two in step. */
+#define RB_RESOLUTION_OWNER_UNKNOWN 0xFF
+
+void rb_resolution_add_for_owner(GameState *g, int card_id, int owner) {
+    if (!g) return;
+    if (g->resolution.n >= RB_MAX_ZONE) return;   /* saturate, never wrap */
+    g->resolution_owners[g->resolution.n] = (uint8_t)((owner >= 0 && owner <= 1)
+                                                     ? owner
+                                                     : RB_RESOLUTION_OWNER_UNKNOWN);
+    g->resolution.cards[g->resolution.n++] = card_id;
+    /* The two vectors are the same length by construction here, so the count is
+       the parallel-array invariant, not a second index: it is what lets the
+       reader tell "this entry has an owner stamp" from "this entry was poked
+       into g->resolution directly" (several suites do exactly that). */
+    g->n_resolution_owners = g->resolution.n;
+}
+
+/* Rust's add_card (zones.rs:1063-1065) is add_card_for_owner(card_id, 0) -- a
+   literal seat 0, NOT the active seat. The C keeps the ACTIVE-seat behaviour it
+   had before the owners field existed, which is Rust's `unwrap_or(active)`
+   fallback rather than its `add_card`, because the C's only producer
+   (rb_perform_cheer_check, src/core/tracking.c) knows the yeller and passes it
+   only once the call site below is swapped. That call site is reported as
+   BLOCKED-ON tracking.c; until it lands the two forms are behaviourally
+   identical, which is why this is not a silent divergence. */
 void rb_resolution_add(GameState *g, int card_id){
-    if(!g) return;
-    if(g->resolution.n < RB_MAX_ZONE) g->resolution.cards[g->resolution.n++] = card_id;
+    rb_resolution_add_for_owner(g, card_id, RB_RESOLUTION_OWNER_UNKNOWN);
 }
 
 int rb_resolution_clear(GameState *g, int *out, int max){
@@ -678,6 +758,7 @@ int rb_resolution_clear(GameState *g, int *out, int max){
     int n = 0;
     for(int i=0;i<g->resolution.n && n<max;i++) out[n++] = g->resolution.cards[i];
     g->resolution.n = 0;
+    g->n_resolution_owners = 0;   /* zones.rs:1095 `self.owners.clear()` */
     return n;
 }
 
@@ -694,33 +775,29 @@ int rb_resolution_len(const GameState *g){
      2. cards[left]  out of range-> Err "Left ... out of bounds"
      3. cards[right] out of range-> Err "Right ... out of bounds"
      4. owners[left]/[right] absent -> Err "... has no owner"
-   Checks 1-3 map one-for-one onto the RbBag. Check 4 has NO C counterpart and
-   is not a porting omission on this side: Rust's ResolutionZone keeps a
-   PARALLEL `owners: SmallVec` (zones.rs:1059, written by add_card_for_owner at
-   :1067-1070) and the C `GameState::resolution` is a bare RbBag
-   (rabuka.h:1444) with nowhere to put an owner. The owner is already dropped
-   one step earlier, at the insert: Rust tracking.rs:93 calls
-   `add_card_for_owner(card_id, owner)` and engine/src/turn/live.rs:1976 does
-   the same, whereas the C cheer path (tracking.c rb_perform_cheer_check)
-   calls rb_resolution_add, which takes no owner. So in C every stored card
-   carries the implicit owner Rust falls back to when `owners` runs short --
-   the active seat -- which is also what C's only drain
-   (rb_check_invalid_resolution_zone, phase.c:372-379, a file this agent does
-   not own) assumes. That is a rabuka.h modelling gap with a real observable
-   consequence -- a P2 yell card is discarded into P1's waitroom -- and it
-   needs the owners field, not a change here.
+   Checks 1-3 map one-for-one onto the RbBag. Check 4 now has a counterpart too:
+   the owners vector is parallel by construction (rb_resolution_add_for_owner
+   extends both, rb_resolution_clear clears both), so `owners[left]` is absent
+   exactly when `left >= g->n_resolution_owners` -- an entry written straight
+   into g->resolution.cards[] rather than through the zone API. That refusal is
+   reachable, so it is enforced rather than described.
 
-   The two `swap` calls are therefore ONE: the C bag has a single parallel
-   array, so swapping the card ids is the whole of the mutation Rust performs
-   on data the C model can represent. */
+   The MUTATION is no longer just the ids: Rust swaps cards AND owners
+   (zones.rs:1089-1090), and with a real owners vector the second swap is
+   load-bearing -- without it a Rule 5.8 exchange would hand each card to the
+   other seat's waitroom. */
 int rb_resolution_swap_slots(GameState *g, int left_slot, int right_slot){
     if(!g) return -1;
     if(left_slot == right_slot) return -1;
     if(left_slot < 0 || left_slot >= g->resolution.n) return -1;
     if(right_slot < 0 || right_slot >= g->resolution.n) return -1;
+    if(left_slot >= g->n_resolution_owners || right_slot >= g->n_resolution_owners) return -1;
     int tmp = g->resolution.cards[left_slot];
     g->resolution.cards[left_slot] = g->resolution.cards[right_slot];
     g->resolution.cards[right_slot] = tmp;
+    uint8_t otmp = g->resolution_owners[left_slot];
+    g->resolution_owners[left_slot] = g->resolution_owners[right_slot];
+    g->resolution_owners[right_slot] = otmp;
     return 0;
 }
 
@@ -767,26 +844,38 @@ int rb_energy_deck_is_empty(const GameState *g, int pl){
     return g->p[pl].energy_deck.n == 0;
 }
 
-/* Check whether `need` (8-element color counts) is satisfied by `provided`.
- * Mirrors the relevant part of check_heart_requirement for flat arrays. */
-static int local_check_heart_req(const int *need, const int *provided){
-    int total_need = 0, total_prov = 0;
-    for(int c=0;c<8;c++){
-        if(need[c] > 0) total_need += need[c];
-        if(provided && provided[c] > 0) total_prov += provided[c];
-    }
-    if(total_need == 0) return 1;
-    if(total_prov < total_need) return 0;
-    int wildcard = (provided ? provided[0] : 0) + (provided ? provided[7] : 0);
-    for(int c=1;c<7;c++){
-        if(!provided) continue;
-        int deficit = need[c] - provided[c];
-        if(deficit > 0){
-            if(wildcard < deficit) return 0;
-            wildcard -= deficit;
-        }
-    }
-    return 1;
+/* Mirror LiveCardZone::calculate_live_score's heart gate (zones.rs:577-597)
+ * ON TOP OF the one real port of `check_heart_requirement`
+ * (src/ability/effects/state.c:1991 `rb_check_heart_requirement`, twin of
+ * core/card.rs:4360-4403). There is deliberately NO second implementation of
+ * the wildcard/leftover rule here any more.
+ *
+ * The old body was a private `local_check_heart_req` and it DISAGREED with Rust
+ * in three measurable ways:
+ *
+ *  1. Rust iterates `&need.hearts`, a HeartMap whose keys INCLUDE
+ *     `HeartColor::All` (index 7), so a live card whose need is
+ *     「N枚以上のハート」/`heart_type:"all"` is checked against bucket 7.
+ *     The old loop ran `for(c=1;c<7;c++)` and NEVER LOOKED AT INDEX 7, so such
+ *     a requirement was silently treated as absent and the card scored.
+ *  2. Rust tracks a `remaining` copy of the provided table and, after the loop,
+ *     checks `leftover_sum + max(wildcard_remaining,0) >= need[Heart00]`
+ *     (card.rs:4392-4401). The old body had no `remaining` at all, so a
+ *     Heart00 ("heartless") requirement could never be evaluated.
+ *  3. Rust's guard is `if need.hearts.is_empty() { return true }` BEFORE
+ *     anything touches `provided`; the old body reached into `provided` while
+ *     summing `total_prov`.
+ *
+ * The empty-need early-true is reproduced here (it is Rust's line 4361, and it
+ * is what lets a `stage_hearts == NULL` call answer "satisfied" for a card with
+ * no printed requirement). `rb_check_heart_requirement(need, NULL)` returns 0,
+ * which is exactly Rust's `else { false }` for a NON-empty need with no stage
+ * hearts (zones.rs:592-594). */
+static int live_score_hearts_satisfied(const int *need, const int *provided){
+    int any = 0;
+    for(int c=0;c<8;c++) if(need[c] > 0){ any = 1; break; }
+    if(!any) return 1;               /* card.rs:4361-4363 */
+    return rb_check_heart_requirement(need, provided);
 }
 
 /* Mirror LiveCardZone::calculate_live_score (Rule 5.2/8.2). Iterates the live
@@ -809,7 +898,7 @@ int rb_live_calculate_score(const GameState *g, int pl, int cheer_blade_heart_co
         if(card_score > 255) card_score = 255;
         int need[8] = {0};
         rb_effective_need_heart(g, cid, need);
-        int satisfied = local_check_heart_req(need, stage_hearts);
+        int satisfied = live_score_hearts_satisfied(need, stage_hearts);
         rb_free_card(&c);
         if(satisfied) total_score += card_score;
     }
@@ -860,11 +949,15 @@ void rb_stage_get_available_hearts_i32(const GameState *g, int pl, int out[8],
     }
 }
 
-/* Mirror ExclusionZone::add_card — adds a card to the exclusion zone. */
+/* Mirror ExclusionZone::add_card (zones.rs:1038-1041) -- a bare
+   `cards.push(card_id)`. The previous body opened with a membership scan and
+   returned early if the id was already present; Rust has no such guard, so the
+   C silently refused a second push of the same id. Nothing depends on that
+   (0 external callers tree-wide) and `exclusion_zone` is 0 of the 985 corpus
+   zone strings, so removing it cannot move a verdict -- it just makes the twin
+   the one Rust wrote. */
 void rb_exclusion_add(GameState *g, int card_id){
     if(!g || card_id < 0) return;
-    for(int i=0;i<g->exclusion_zone.n;i++)
-        if(g->exclusion_zone.cards[i] == card_id) return;
     if(g->exclusion_zone.n < RB_MAX_ZONE)
         g->exclusion_zone.cards[g->exclusion_zone.n++] = card_id;
 }

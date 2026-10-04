@@ -35,12 +35,14 @@
 # The lock is created with FileMode.CreateNew, which is atomic on NTFS, so the
 # check and the take cannot interleave.
 
-Set-StrictMode -Version Latest
+# NOT setting StrictMode here on purpose: this file is dot-sourced, so it would
+# change the semantics of whatever daemon sources it. The guard's own code is
+# written to be null-safe instead.
 
-# The live tree these daemons are forbidden to touch: whatever repository
-# directory this script lives in.
+# The live tree these daemons are forbidden to touch: the repository directory
+# this script lives in (tools/ -> the repo root).
 function Get-LiveRepoRoot {
-    return (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+    return (Split-Path -Parent $PSScriptRoot)
 }
 
 function Get-NormalizedPath([string]$Path) {
@@ -147,14 +149,20 @@ function Enter-TreeBuildLock {
 
     $path = Get-TreeBuildLockPath $Tree
     $deadline = if ($TimeoutSeconds -gt 0) { (Get-Date).AddSeconds($TimeoutSeconds) } else { (Get-Date).AddSeconds(15) }
+    $holderText = "(unreadable)"
+    $holderPid = 0
 
     while ($true) {
         try {
             # CreateNew is the atomic part: two processes racing here produce one
-            # winner and one IOException, never two owners.
+            # winner and one IOException, never two owners. The share mode is
+            # Read, not None: a contender must be able to OPEN the lock to learn
+            # who holds it. With None the contender's read fails, it concludes
+            # the owner is dead, and it breaks a live lock - which is worse than
+            # not locking at all.
             $stream = [System.IO.File]::Open($path, [System.IO.FileMode]::CreateNew,
                                              [System.IO.FileAccess]::Write,
-                                             [System.IO.FileShare]::None)
+                                             [System.IO.FileShare]::Read)
             $payload = "pid=$PID label=$Label started=$((Get-Date).ToString('s'))"
             $bytes = [System.Text.Encoding]::ASCII.GetBytes($payload)
             $stream.Write($bytes, 0, $bytes.Length)
@@ -164,30 +172,32 @@ function Enter-TreeBuildLock {
         catch [System.IO.IOException] {
             # Someone holds it. Break a lock whose owner is gone or which is old
             # enough that its owner died holding it.
+            $age = [TimeSpan]::FromMinutes(0)
             try {
-                $owner = (Get-Content -LiteralPath $path -Raw -ErrorAction Stop)
+                $holderText = (Get-Content -LiteralPath $path -Raw -ErrorAction Stop).Trim()
                 $age = (Get-Date) - (Get-Item -LiteralPath $path).LastWriteTime
-                $pidText = ($owner -split 'pid=')[1] -split ' ' | Select-Object -First 1
-                $ownerPid = 0
-                if ($pidText) { [void][int]::TryParse($pidText.Trim(), [ref]$ownerPid) }
-                $ownerAlive = $false
-                if ($ownerPid -gt 0) {
-                    try { $ownerAlive = $null -ne (Get-Process -Id $ownerPid -ErrorAction Stop) }
-                    catch { $ownerAlive = $false }
-                }
-                if ($age.TotalMinutes -gt $StaleMinutes -or -not $ownerAlive) {
-                    Write-Warning ("build lock $path is stale (owner='{0}', age {1:N0} min) - breaking it." -f `
-                        $owner.Trim(), $age.TotalMinutes)
-                    Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
-                    continue
-                }
+                $pidText = (($holderText -split 'pid=')[1] -split ' ')[0]
+                if ($pidText) { [void][int]::TryParse($pidText, [ref]$holderPid) }
             }
             catch {
-                # Could not even read the lock; treat it as held and wait.
+                $holderText = "(unreadable)"
+                $holderPid = 0
+            }
+            $ownerAlive = $false
+            if ($holderPid -gt 0) {
+                try { $ownerAlive = $null -ne (Get-Process -Id $holderPid -ErrorAction Stop) }
+                catch { $ownerAlive = $false }
+            }
+            if ($age.TotalMinutes -gt $StaleMinutes -or -not $ownerAlive) {
+                Write-Warning ("build lock {0} is stale (holder '{1}', age {2:N0} min) - breaking it." -f `
+                    $path, $holderText, $age.TotalMinutes)
+                Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+                continue
             }
             if ((Get-Date) -gt $deadline) {
-                throw ("build lock $path is held by a live process (pid $ownerPid). " +
-                       "Wait for it, or point ISOLATED_TREE at a different snapshot.")
+                throw ("build lock {0} is held by a live process (pid {1}, '{2}'). " +
+                       "Wait for it, or point ISOLATED_TREE at a different snapshot.") -f `
+                       $path, $holderPid, $holderText
             }
             Start-Sleep -Milliseconds 250
         }

@@ -1862,7 +1862,11 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         moved_cards: &mut Vec<i16>,
     ) -> bool {
         let is_deck_dest = Zone::from_str(destination) == Some(Zone::Deck)
-            || Zone::from_str(destination) == Some(Zone::DeckTop);
+            || Zone::from_str(destination) == Some(Zone::DeckTop)
+            // 「3枚まで好きな順番でデッキの下に置く」 is a deck placement too. Without
+            // DeckBottom here the player's choice of order was silently dropped and
+            // the cards landed in selection order instead.
+            || Zone::from_str(destination) == Some(Zone::DeckBottom);
         let is_eligible_source = Zone::from_str(source) == Some(Zone::Discard)
             || Zone::from_str(source) == Some(Zone::SelectedCards)
             || Zone::from_str(source) == Some(Zone::Hand)
@@ -3114,7 +3118,8 @@ pub fn execute_selected_cards_from_zone(
         let remaining_cards: SmallVec<[i16; 8]> = core::mem::take(looked_at);
 
         let is_deck_dest = Zone::from_str(&destination) == Some(Zone::DeckTop)
-            || Zone::from_str(&destination) == Some(Zone::Deck);
+            || Zone::from_str(&destination) == Some(Zone::Deck)
+            || Zone::from_str(&destination) == Some(Zone::DeckBottom);
         let needs_order = is_deck_dest
             && placement_order == Some(PlacementOrder::AnyOrder)
             && selected_cards.len() > 1;

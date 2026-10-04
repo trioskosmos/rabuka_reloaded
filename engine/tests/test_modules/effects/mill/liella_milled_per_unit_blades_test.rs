@@ -136,11 +136,23 @@ fn hazuki_ren_bp5_005_mill_liella_blade_blade_duration_live_end() {
     );
 }
 
-/// Ab#0: Pre-existing Liella! members in discard do NOT count — only the 3
-/// just placed by the cost are considered. (discard per_unit counts all matching
-/// in discard, so pre-existing ones inflate the count — known limitation.)
+/// Ab#0: pre-existing 『Liella!』 members in the discard do NOT count — only the 3
+/// the cost just placed are considered.
+///
+/// The name and comment here used to say the opposite. Both were left over from when
+/// the count really was inflated: `per_unit_type` is `"discard"`, which read alone
+/// says "count every matching card in the discard", so a waitroom holding two 『Liella!』
+/// members plus the one the cost milled summed to 3 instead of 1. The fix was
+/// `per_unit_source: "previous_moved_cards"` — the parse keeps BOTH fields, and it is
+/// the source field that scopes the count to this activation's cards.
+///
+/// So this is the test that proves the scoping works, and it is the only one that can:
+/// every other test in this file starts with an empty discard, where "count the zone"
+/// and "count what I just placed" agree. The stale wording was actively harmful in the
+/// test NAME, which is what a reader greps for and what the coverage inventory records —
+/// it advertised a broken case that has been fixed since.
 #[test]
-fn hazuki_ren_bp5_005_mill_liella_blade_preexisting_liella_in_discard_inflates_count() {
+fn hazuki_ren_bp5_005_preexisting_liella_in_discard_does_not_count_toward_the_blades() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -165,19 +177,202 @@ fn hazuki_ren_bp5_005_mill_liella_blade_preexisting_liella_in_discard_inflates_c
 
     game.activate_ability(ren);
 
-    // Without the "those_cards" tracking, engine counts ALL Liella! in discard
-    // = 2 pre-existing + 1 just placed = 3
-    // Expected: 1 (only the 1 placed by cost) — those_cards scoping works.
+    // `per_unit_type: "discard"` on its own would count the whole zone:
+    // 2 pre-existing + 1 just placed = 3. `per_unit_source:
+    // "previous_moved_cards"` scopes it to the 3 this cost placed, and only 1 of
+    // those is a 『Liella!』 member.
     assert_eq!(
         game.state.mods.get_blade_modifier(ren),
         1,
-        "Expected 1 (only the 1 placed by cost) — those_cards scoping works"
+        "Expected 1 — only the 1 placed by the cost counts, not the 2 already \
+         sitting in the discard"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.iter().filter(|&&c| c == liella).count(),
+        3,
+        "all three are in the discard; only the scoping decides how many count"
     );
 }
 
 // ========================================================================
 // Ab#1 tests
 // ========================================================================
+
+/// 「メインフェイズ**の間**」 — a live-phase discard does not trip the watcher.
+///
+/// The clause parses as `temporal_condition { phase: "main", phase_target: "self" }`, and
+/// every other ab#1 test runs in `FirstAttackerNormal`, where that gate and no gate at all
+/// behave identically.
+///
+/// Driving it from ab#0's mill does not work: ab#0 is a 起動 ability, so under
+/// `SecondAttackerNormal` the activation is refused outright ("No activatable ability
+/// found for this card at its current location") and a failure is ambiguous between "the
+/// gate held" and "the driver never ran". `trigger_auto_abilities_for_player` does not
+/// work either — ab#1 is an `each_time` watcher, raised by the EVENT of a card reaching
+/// a discard, and a generic auto scan does not produce it. Nor can the driver be invoked
+/// directly: `execute_main_phase_action` refuses any UseAbility outside a main phase,
+/// which is the very thing under test.
+///
+/// So the driver is 鬼��� 夏美's ライブ開始時, reached by WALKING the turn to LiveStart —
+/// nothing in the harness gates that, and her ability is legal there because it is a live
+/// ability. The discard it performs is therefore a genuine live-phase discard, and the
+/// only thing that can stop the watcher is the clause.
+#[test]
+fn hazuki_ren_bp5_005_a_live_phase_discard_does_not_trip_the_watcher() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ren = game.id("PL!SP-bp5-005-R＋");
+    let natsumi = game.id("PL!SP-bp5-009-R");
+    let performing = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[0] = natsumi;
+    game.state.player1.stage.stage[1] = ren;
+    game.give_energy(5);
+
+    // Top card is what 夏美 mills; the rest is filler so the draw during the walk cannot
+    // reach the waitroom and confuse the count below.
+    for _ in 0..12 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.state.player1.main_deck.cards.insert(0, filler);
+    let waitroom_before = game.state.player1.waitroom.cards.len();
+
+    game.add_to_hand(performing);
+    for _ in 0..5 {
+        game.pass();
+    }
+    game.set_live_card(performing);
+    game.pass();
+    game.pass();
+
+    // 夏美 asks twice per procedure: "mill it?" then "repeat?". Both are SelectTarget, so
+    // they are told apart by ORDER, not by type — the first is the mill (Yes) and every
+    // later one is the repeat (Stop). Answering Yes to the repeat loops until
+    // `max_repeats` is exhausted and then still offers again, which is what an
+    // order-blind drain does.
+    // A loop, for the same reason as the test above: 葉月 恋 has two abilities, so a
+    // `SelectAutoAbility` order prompt precedes the mill and the repeat. The two
+    // SelectTarget prompts are told apart by ORDER — the first is the mill (Yes) and
+    // the second is the repeat (Stop). Answering Yes to the repeat loops until
+    // `max_repeats` is exhausted and then offers again, which is what an
+    // order-blind drain does.
+    let mut targets = 0;
+    let mut guard = 0;
+    while game.has_pending_choice() {
+        guard += 1;
+        assert!(guard < 10, "the driver should settle: one mill prompt, then Stop");
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => game.select_indices(&[0]),
+            Some("SelectTarget") => {
+                targets += 1;
+                game.select_option(if targets == 1 { 1 } else { 0 });
+            }
+            Some("SelectCard") => game.select_indices(&[0]),
+            _ => break,
+        }
+    }
+
+    // The mill DID happen — asserted, so the silence below is the gate and not a driver
+    // that quietly did nothing.
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before + 1,
+        "夏美 milled one card into the discard during Live; without this the next \
+         assertion would be satisfied by a driver that never ran"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "「自分のメインフェイズの間」 — a card reaching my discard during Live must not \
+         raise the watcher, so there is no optional 1-energy cost to offer"
+    );
+}
+
+/// Ab#1: the pool is 「それらのカード」 in MY discard — not the opponent's.
+///
+/// The watcher fires on a card reaching a discard and its clause carries
+/// `target: "self"` with `location: "discard"`, so the zone it scans is the activating
+/// player's. That is the reading the card asks for — 「**自分の**カードが…控え室に置かれるたび」
+/// — and it is the reading that can silently break, because "the discard" is the same
+/// word for both players and a watcher resolved by "whoever's discard changed" would
+/// fire on the opponent's.
+///
+/// `optional_pay_recovery_only_trigger_cards_not_full_discard` already pins the half of
+/// this that excludes MY OWN pre-existing discard cards (Q221). Nothing pinned the other
+/// half: with the opponent's discard populated, the recovery must still only ever offer
+/// the three cards this mill placed.
+#[test]
+fn hazuki_ren_bp5_005_the_opponents_discard_is_never_a_recovery_pool() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ren = game.id("PL!SP-bp5-005-R＋");
+    let liella = game.id("PL!SP-sd1-001-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = ren;
+    game.give_energy(5);
+
+    // The OPPONENT's discard, populated before anything happens. Same card type, same
+    // phase, different player — the only variable.
+    let theirs = game.id("PL!SP-sd1-001-SD");
+    game.state.player2.waitroom.cards.push(theirs);
+
+    game.state.player1.main_deck.cards.insert(0, filler);
+    game.state.player1.main_deck.cards.insert(0, liella);
+    game.state.player1.main_deck.cards.insert(0, liella);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
+    TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::UseAbility,
+        Some(ren),
+        None,
+        None,
+        None,
+    )
+    .expect("Activate ab#0 to mill 3 and trip the watcher");
+
+    // The watcher fired for ME — asserted, so the rest of the test is about scoping
+    // rather than about a watcher that never ran.
+    assert!(
+        game.has_pending_choice(),
+        "ab#1 must fire for my own mill"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectTarget"),
+        "the optional 1-energy cost is the first prompt"
+    );
+    game.select_option(1);
+    // A loop, and the drain-loop ratchet budget for this file records it: 葉月 恋
+    // has TWO abilities, so the mill raises a `SelectAutoAbility` order prompt before
+    // the cost and the select. The sequence is multi-typed and order-dependent, so
+    // fixed arms get it wrong — an earlier attempt assumed the cost came first and
+    // failed on the order prompt.
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => game.select_indices(&[0]),
+            Some("SelectTarget") => game.select_option(1), // pay the optional E
+            Some("SelectCard") => game.select_indices(&[0]),
+            _ => break,
+        }
+    }
+
+    assert!(
+        game.state.player2.waitroom.cards.contains(&theirs),
+        "「自分のカード」 — the opponent's discard is neither a trigger nor a recovery \
+         pool; their card is still there. waitroom {:?}",
+        game.state.player2.waitroom.cards
+    );
+    assert!(
+        !game.state.player1.hand.cards.contains(&theirs),
+        "and their card was not the one recovered into my hand; hand {:?}",
+        game.state.player1.hand.cards
+    );
+}
 
 /// Ab#1: Activate ab#0 (mill 3), then ab#1 auto-triggers. Pay 1 energy,
 /// select 1 card from the 3 milled to recover to hand.

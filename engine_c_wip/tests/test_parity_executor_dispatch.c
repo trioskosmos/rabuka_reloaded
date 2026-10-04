@@ -382,8 +382,15 @@ static void test_look_and_reveal_dispatch(void)
     CHECK_EQ(n, 2, "look_at fills the looked-at pool");
     CHECK(n == 2 && pool[0] == a && pool[1] == b, "look_at peeks from the deck top in order");
     CHECK_EQ(tg.state.p[0].deck.n, 1, "look_at lifts the peeked cards out of the deck");
-    rb_resume_with_choice(&tg.state, -1);
-    CHECK_EQ(tg.state.p[0].deck.n, 3, "the optional look resume returns the pool to the deck");
+    /* look.rs:1055-1096 — execute_look_at fills gs.looked_at_cards and returns
+       Ok(()) without touching gs.awaiting.choice. The prompt a player answers
+       belongs to whatever CONSUMES the pool. */
+    CHECK(!rb_has_pending_choice(&tg.state),
+          "look_at opens no choice of its own (look.rs:1055-1096)");
+    /* choice.c's mode-2 arm routes a DECLINED consumer here with an empty pick;
+       that is the only thing that puts a looked-at pool back (rule 5.7). */
+    rb_look_resume_indices(&tg.state, 0, NULL, 0, NULL, NULL, -1, 0);
+    CHECK_EQ(tg.state.p[0].deck.n, 3, "the declined look returns the pool to the deck");
 
     tg.state.n_revealed = 0;
     e.action = (char *)"reveal_per_group";
@@ -416,9 +423,10 @@ static void test_choice_dispatch(void)
     CHECK(a >= 0 && b >= 0 && c >= 0, "choice fixtures resolve");
     if (a < 0 || b < 0 || c < 0) return;
 
-    /* A bare look_at raises its own SelectCard choice over the looked-at pool
-     * (look.c rb_effect_look_at), so look_at's dispatch is proven by that
-     * prompt; the composite below is what proves select_cards. */
+    /* A bare look_at is proven by its pool fill and by the ABSENCE of a prompt:
+     * look.rs:1055-1096 execute_look_at assigns gs.looked_at_cards and returns
+     * Ok(()) without touching gs.awaiting.choice, so the SelectCard below comes
+     * from select_cards alone. */
     AbilityEffect look;
     memset(&look, 0, sizeof(look));
     look.action = (char *)"look_at";
@@ -426,14 +434,14 @@ static void test_choice_dispatch(void)
     look.count = 2;
     look.target = (char *)"self";
     rb_execute_effect_ex(&tg.state, 0, &look, -1);
-    const RbChoice *lch = rb_get_pending_choice(&tg.state);
-    CHECK(rb_has_pending_choice(&tg.state) && lch &&
-              lch->kind == RB_CHOICE_SELECT_CARD && lch->count == 2,
-          "look_at prompts over the looked-at pool for its own count");
-    CHECK(lch && !strcmp(lch->zone, "looked_at"),
-          "look_at's choice is scoped to the looked-at zone");
-    rb_resume_with_choice(&tg.state, -1);
-    CHECK_EQ(tg.state.p[0].deck.n, 3, "skipping the look prompt returns the pool to the deck");
+    CHECK(!rb_has_pending_choice(&tg.state),
+          "look_at prompts for nothing (look.rs:1055-1096)");
+    int lpool[8];
+    CHECK_EQ(rb_looked_at_pool(0, lpool, 8), 2,
+             "look_at fills the looked_at pool without a choice");
+    rb_look_resume_indices(&tg.state, 0, NULL, 0, NULL, NULL, -1, 0);
+    CHECK_EQ(tg.state.p[0].deck.n, 3,
+             "a declined consumer returns the looked_at pool to the deck");
 
     /* look_and_select is the structural composite that runs look_at and then
      * select_cards (executor.rs:60). */

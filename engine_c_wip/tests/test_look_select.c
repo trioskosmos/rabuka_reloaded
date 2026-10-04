@@ -3,11 +3,30 @@
 #include <stdio.h>
 #include <string.h>
 
+/* ── per-test verdict layer (see test_parity_integration.c for the rationale):
+ * a FLAT suite's FAIL lines name an assertion, never a test, so this suite
+ * reported no per-test verdict and its FAIL lines were unattributable. This
+ * adds exactly one `FAILED: <test body>` per failing test body, in the shape
+ * every FORK suite prints. No assertion is added, removed or relaxed. */
+static const char *g_flat_failed[512];
+static int g_flat_failed_n;
+static void flat_verdict_failed(const char *fn)
+{
+    for (int i = 0; i < g_flat_failed_n; i++)
+        if (g_flat_failed[i] == fn) return;
+    if (g_flat_failed_n >= 512) return;
+    g_flat_failed[g_flat_failed_n++] = fn;
+    printf("FAILED: %s\n", fn);
+    fflush(stdout);
+}
+#define FLAT_VERDICT() flat_verdict_failed(__func__)
+
 static int failures;
 
 #define CHECK(condition, message) do { \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -19,6 +38,7 @@ static int failures;
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -100,7 +120,7 @@ static void test_dynamic_look_count_decodes(void)
     const char *reference = effect_extra(look, "reference");
     CHECK(reference && !strcmp(reference, "total_live_score"),
           "dynamic_count reference is decoded into look_action");
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player_cards(&tg, 0);
     test_add_to_live(&tg, live);
@@ -117,7 +137,7 @@ static void test_dynamic_look_count_decodes(void)
 
 static void test_multi_select_and_followup(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player_cards(&tg, 0);
     int cards[4];
@@ -179,7 +199,7 @@ static void test_type_filtered_selection(void)
     int live_template = rb_find_card_by_no("PL!N-bp1-027-L");
     CHECK(member_template >= 0 && live_template >= 0, "type filter fixtures resolve");
     if (member_template < 0 || live_template < 0) return;
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player_cards(&tg, 0);
     AbilityEffect look = {0};
@@ -219,7 +239,7 @@ static void test_type_filtered_selection(void)
 
 static void test_no_match_runs_followup(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player_cards(&tg, 0);
     int first = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -254,7 +274,7 @@ static void test_no_match_runs_followup(void)
 
 static void test_refresh_and_optional_skip(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player_cards(&tg, 0);
     int cards[3];
@@ -290,7 +310,7 @@ static void test_refresh_and_optional_skip(void)
 
 static void test_opponent_pool_ownership(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player_cards(&tg, 0);
     clear_player_cards(&tg, 1);
@@ -321,7 +341,7 @@ static void test_opponent_pool_ownership(void)
 
 static void test_deck_bottom_order(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player_cards(&tg, 0);
     int cards[3];
@@ -349,7 +369,7 @@ static void test_deck_bottom_order(void)
 
 static void test_reveal_order_and_until_refresh(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_player_cards(&tg, 0);
     int first = test_new_id(&tg, "PL!-sd1-010-SD");

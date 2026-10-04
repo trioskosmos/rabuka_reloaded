@@ -166,11 +166,31 @@ static char *norm_str(const char *s) {
     return out;
 }
 
-/* Mirror util.rs::norm_group_name — normalize fullwidth '！'→'!' and 'µ'→'μ'.
-   Caller must rb_free the result. */
-static char *rb_norm_group_name(const char *s) {
-    return norm_str(s);
-}
+/* ── TOMBSTONE (2026-10-04). `rb_norm_group_name` REMOVED.
+ *
+ * A census classified this DEAD-WRONG: "Rust normalises FULLWIDTH '!' (U+FF01)
+ * and micro (U+00B5). A C norm_group_name that the group gate needs;
+ * unreferenced, so the group gate cannot use it." The second sentence is FALSE
+ * and the whole DEAD-WRONG verdict falls with it.
+ *
+ * This function was a one-line alias: `return norm_str(s);`. `norm_str`
+ * (util.c:150) is LIVE with six call sites -- util.c:425, :494, :514, :541,
+ * :3132, :3137 -- and util.c:494 is inside `rb_card_matches_group_str`
+ * (util.c:491), which IS the group gate. So the U+FF01 / U+00B5 normalisation
+ * the gate needs is implemented AND reached, today, on the live path.
+ *
+ * What was actually dead is the NAME, not the capability. Deleted so the tree
+ * stops carrying a second spelling of norm_str that no one calls.
+ *
+ * Kept deliberately: `norm_str` itself, which does the byte work --
+ *   EF BC 81 -> '!'        (U+FF01 FULLWIDTH EXCLAMATION MARK)
+ *   C2 B5    -> CE BC      (U+00B5 MICRO SIGN -> U+03BC GREEK SMALL MU)
+ * Both are spelled as explicit byte values, never as literal characters, so a
+ * legacy-codepage rewrite of this file cannot silently turn the filter into a
+ * no-op.
+ *
+ * Deadness proved by gcc -Wunused-function: "'rb_norm_group_name' defined but
+ * not used". */
 
 /* Strip ASCII whitespace, mirroring CardDatabase::normalize_name. */
 static void rb_norm_ws(const char *s, char *out, size_t outsz) {
@@ -326,16 +346,83 @@ int rb_card_has_all_blade(const Card *c) {
 
 /* ── Card-type predicate ──────────────────────────────────────────────── */
 
-/* Mirror util::card_matches_type. card_id is a card_no index. */
+/* Rust `str::trim` over `char::is_whitespace` — util.rs:595 does
+   `card_type_filter.map(str::trim)` BEFORE the match, so the EMPTY arm below is
+   reached by a whitespace-only filter and not only by a genuinely empty one.
+   Same predicate as cp_is_rust_whitespace (:226), so U+3000 / U+00A0 /
+   U+2000-200A / U+2028/29 / U+202F / U+205F / U+0085 trim here exactly as
+   there. Returns a NUL-terminated copy; caller frees. */
+static char *rs_str_trim_dup(const char *s) {
+    if (!s) return NULL;
+    const char *p = s;
+    while (*p) {
+        const char *save = p;
+        if (cp_is_rust_whitespace(utf8_next(&p))) { s = save; continue; }
+        break;
+    }
+    const char *end = s + strlen(s);
+    while (end > s) {
+        /* Step back over the last UTF-8 sequence and test its code point. */
+        const char *seq = end - 1;
+        while (seq > s && ((unsigned char)*seq & 0xC0) == 0x80) seq--;
+        const char *probe = seq;
+        uint32_t cp = utf8_next(&probe);
+        if (probe != end || !cp_is_rust_whitespace(cp)) break;
+        end = seq;
+    }
+    size_t n = (size_t)(end - s);
+    char *out = (char *)malloc(n + 1);
+    if (!out) return NULL;
+    memcpy(out, s, n);
+    out[n] = '\0';
+    return out;
+}
+
+/* Mirror util.rs::card_matches_type_for (util.rs:585-621). card_id is a
+ * card_no index.
+ *
+ * Three defects this replaces, all measured — the arms are transcribed from the
+ * Rust, not paraphrased:
+ *
+ *  1. THE `member` ALIAS WAS MISSING. util.rs:598 spells the member arm
+ *     `member_card` OR `member`; the C had only `member_card`, so `member` fell
+ *     through. Rust's own comment (util.rs:589-594) records the observed
+ *     spellings — "member", "Member" and "" — and util.rs:613-616 records the
+ *     consequence: PL!N-bp7-028-L 「自分のステージにいるすべてのグループのメンバーは
+ *     heart01を得る」 arrived as `card_type: "member"` and applied to anything on
+ *     the stage.
+ *  2. THE COMPARISON WAS CASE-SENSITIVE. Every arm is `eq_ignore_ascii_case`;
+ *     the C used `strcmp`, so "Member"/"MEMBER_CARD"/"Live_Card" were all
+ *     fall-throughs.
+ *  3. IT FAILED OPEN. util.rs:607-619 is `Some(other) => false` with the comment
+ *     "Fail CLOSED, and say so" — "I do not know what this means" is not "it
+ *     matches". The C's fall-through was `return 1`, i.e. a filter that should
+ *     REJECT a card ACCEPTED it: a wrong-value bug, not a missing feature.
+ *     This one is VERIFIED-NOOP: 0 on today's corpus — `card_type` filters there
+ *     are exactly `member_card`, `live_card` and `energy_card` — and it is still
+ *     wrong the moment new data ships, which is why it is fixed here rather than
+ *     closed as unreachable.
+ *
+ * `str_ieq` (:208) is the file's existing ASCII-case-insensitive equality, i.e.
+ * Rust's `eq_ignore_ascii_case` without the locale dependence of strcasecmp.
+ * Asserted by tests/test_parity_resolver.c::card_matches_type_covers_every_arm
+ * and ::known_divergences_in_the_cards_matcher. */
 int rb_card_matches_type(int card_id, const char *filter) {
-    if (!filter) return 1;
+    if (!filter) return 1;                      /* Rust: None => true */
+    char *owned = rs_str_trim_dup(filter);
+    const char *f = owned ? owned : filter;
     int is_live   = rb_card_is_live(card_id);
     int is_energy = rb_card_is_energy(card_id);
     int is_member = !is_live && !is_energy;
-    if (!strcmp(filter, "live_card"))        return is_live;
-    if (!strcmp(filter, "member_card"))      return is_member;
-    if (!strcmp(filter, "energy_card"))      return is_energy;
-    return 1;
+    int r;
+    if (str_ieq(f, "live_card"))                     r = is_live;
+    else if (str_ieq(f, "member_card") ||
+             str_ieq(f, "member"))                   r = is_member;
+    else if (str_ieq(f, "energy_card"))               r = is_energy;
+    else if (str_ieq(f, "card") || !*f)              r = 1;
+    else                                             r = 0;  /* fail CLOSED */
+    free(owned);
+    return r;
 }
 
 /* ── Orientation predicate ────────────────────────────────────────────── */
@@ -378,10 +465,38 @@ static int rb_card_series_matches_group(const char *series, const char *group) {
     return 0;
 }
 
-/* Mirror util.rs::debug_group_match — no-op in the C port. */
-static void rb_debug_group_match(int card_id, const char *group_name, int result) {
-    (void)card_id; (void)group_name; (void)result;
-}
+/* ── TOMBSTONE (2026-10-04). `rb_debug_group_match` REMOVED.
+ *
+ * A census classified this DEAD-WRONG: "the C body is empty; Rust
+ * util.rs:652 debug_group_match performs unit/group/name/series checks under
+ * RABUKA_DEBUG_GROUP=1 + trace level; the C comment calls it a 'Mirror' and
+ * then says 'no-op in the C port'; the word Mirror is false." That much is
+ * right, but the prescribed reading -- "implement the checker" -- is not, and
+ * implementing it would have been wrong three ways:
+ *
+ *  (1) RUST HAS TWO OF THESE, AND ONE IS ALSO EMPTY. util.rs:642-649 is
+ *      `#[cfg(feature = "no_std")] fn debug_group_match(...) {}` -- an empty
+ *      body, with the same signature. Only util.rs:651-651's
+ *      `#[cfg(not(feature = "no_std"))]` twin has the real body. So "the Rust
+ *      twin has a real checker" is true of exactly one of the two definitions
+ *      that share the name.
+ *  (2) The real Rust body is PURELY DIAGNOSTIC. It computes four booleans,
+ *      formats them into a debug string, and RETURNS NOTHING. It does not
+ *      mutate state and does not influence `result` -- `result` is an input it
+ *      only prints. There is no parity-visible behaviour for a C port to have
+ *      or lack, so it cannot be a DEAD-WRONG engine function at all.
+ *  (3) It is gated on `log::log_enabled!(Level::Trace)` AND an environment
+ *      variable (`RABUKA_DEBUG_GROUP=1`). This C tree has neither a trace log
+ *      level nor an env-var reader in that path, so a port would be code that
+ *      can never fire in any build that exists here.
+ *
+ * The real defect was the false word "Mirror" in the comment: it read as
+ * "implemented, deliberately" when it was "not implemented, and Rust's real
+ * version needs facilities this port does not have". Deleting the empty body
+ * removes the lie; the reasoning above is the replacement record.
+ *
+ * Deadness proved by gcc -Wunused-function: "'rb_debug_group_match' defined but
+ * not used". */
 
 /* Mirror the constant set_card_identity term of util.rs:628-635: a card whose
    ROOT ability effect has action "set_card_identity" carries every entry of its
@@ -663,19 +778,62 @@ int rb_card_matches_characters(int card_id, const char **names, int n) {
     return r;
 }
 
-/* Mirror util.rs::card_matches_cost_limit_op — live cards match on score,
-   members on cost; comparison defaults to "<=". */
+/* Mirror util.rs::card_matches_cost_limit_op_for (util.rs:1095-1116) — the
+ * compared quantity is `cost.or(score)` and the operator table is Rust's single
+ * canonical one, `compare_with_operator` (util.rs:2301-2311):
+ *
+ *      ">="            => actual >= expected
+ *      ">"             => actual >  expected
+ *      "<="            => actual <= expected
+ *      "<"             => actual <  expected
+ *      "=" | "==" | "exact" => actual == expected
+ *      "!="            => actual != expected
+ *      _               => None
+ *
+ * with two caller-side fallbacks in the same order the Rust chains them
+ * (util.rs:1107-1113): `None` plus `comparison == Some("min")` reads as `>=`
+ * ("a card-text-only spelling of >= that the canonical table does not carry"),
+ * and a still-`None` operator keeps the `<=` reading — "a cost cap defaults to
+ * a ceiling".
+ *
+ * THE MISSING ARM, and it is the REACHABLE one. The table above carries `"=="`
+ * and the C's did not: it had `exact` and `=` only. `cost_limit_operator ==
+ * "=="` appears on exactly ONE condition node in the whole corpus —
+ * PL!S-PR-045-PR (card id 1591), 「コスト7のメンバーからバトンタッチして登場した場合」,
+ * with `cost_limit: 7, cost_limit_operator: "=="`. Rust asks for a
+ * cost-EXACTLY-7 member and the C asked for a cost-AT-MOST-7 one, so a cheaper
+ * member's baton touch satisfied the debut condition in C and not in Rust. The
+ * other three spellings carried by the 40 corpus nodes that have a cost_limit
+ * key (`>=`, `<=`, `=`) were already in the C.
+ *
+ * `"!="` is landed in the same edit because it is the same table: the Rust list
+ * above has six arms and the C had four, and leaving `!=` out would keep the
+ * table short by one arm for the next caller. No corpus node carries it.
+ *
+ * KNOWN DIVERGENCE, NOT FIXED HERE — the QUANTITY, not the operator. Rust
+ * branches on the Option (`c.cost.or(c.score)`, so a card with neither is
+ * `None` and the whole predicate is FALSE); the C branches on card TYPE and
+ * reads a zeroed cost, so a card with neither passes any non-negative limit.
+ * That is a separate change with its own reachability question and it is
+ * asserted red on purpose by
+ * tests/test_parity_resolver.c::known_divergences_in_the_cards_matcher row (c).
+ */
 int rb_card_matches_cost_limit(int card_id, int cost_limit, const char *comparison) {
     Card c;
     if (!rb_decode_card_by_index((uint32_t)card_id, &c)) return 0;
     int value = rb_card_is_live(card_id) ? (int)c.score : (int)c.cost;
     int r;
     if (!comparison || !*comparison)            r = value <= cost_limit;
-    else if (!strcmp(comparison, "min") || !strcmp(comparison, ">=")) r = value >= cost_limit;
-    else if (!strcmp(comparison, "exact") || !strcmp(comparison, "=")) r = value == cost_limit;
-    else if (!strcmp(comparison, ">"))  r = value >  cost_limit;
-    else if (!strcmp(comparison, "<"))  r = value <  cost_limit;
-    else                                 r = value <= cost_limit;
+    else if (!strcmp(comparison, ">="))         r = value >= cost_limit;
+    else if (!strcmp(comparison, ">"))          r = value >  cost_limit;
+    else if (!strcmp(comparison, "<="))         r = value <= cost_limit;
+    else if (!strcmp(comparison, "<"))          r = value <  cost_limit;
+    else if (!strcmp(comparison, "exact") ||
+             !strcmp(comparison, "=")     ||
+             !strcmp(comparison, "=="))        r = value == cost_limit;
+    else if (!strcmp(comparison, "!="))         r = value != cost_limit;
+    else if (!strcmp(comparison, "min"))        r = value >= cost_limit;
+    else                                        r = value <= cost_limit;
     rb_free_card(&c);
     return r;
 }
@@ -910,7 +1068,18 @@ static char *g_ident[RB_MAX_CARD_IDS];
 static int  g_ident_n[RB_MAX_CARD_IDS];
 
 /* Forward declarations for mutually-recursive helpers. */
-static RbBag *zone_bag(RbPlayer *P, const char *zone);
+/* NAMED zone_cards_bag, NOT zone_bag, ON PURPOSE.
+ *
+ * src/test_game.c:723 defines a second static `zone_bag` with a DIFFERENT
+ * zone->bag table (it maps energy_deck -> &P->energy_deck and has no deck_top /
+ * deck_bottom). This one is the port of Rust `zone_cards` (util.rs:2211-2234),
+ * whose table deliberately OMITS energy_deck, so energy_deck resolves to NULL
+ * here. See the full note at the definition. The two are NOT duplicates and
+ * must never be merged -- see that note for why each answer is correct for its
+ * own question -- but while they shared the name `zone_bag`, a grep found two
+ * tables and could not tell which applied, which is exactly how a divergence
+ * stays silent. The rename is what removes the hazard; the table is unchanged. */
+static RbBag *zone_cards_bag(RbPlayer *P, const char *zone);
 /* External linkage on purpose: the definition at ~line 1801 is non-static and
    move.c calls this across translation units. Declaring it `static` here fixed
    the linkage to internal, so the whole tree failed to link with "undefined
@@ -986,7 +1155,7 @@ int rb_count_in_zone(const GameState *g, int pl, const char *zone) {
         for (int s = 0; s < RB_STAGE_SIZE; s++) n += P->under_cards[s].n;
         return n;
     }
-    RbBag *b = zone_bag(P, zone);
+    RbBag *b = zone_cards_bag(P, zone);
     return b ? b->n : 0;
 }
 int rb_count_in_zone_filtered(const GameState *g, int pl, const char *zone,
@@ -1049,8 +1218,44 @@ int rb_count_in_zone_filtered(const GameState *g, int pl, const char *zone,
  * whole-board census can.
  *
  * placement (util.rs:2330-2348) is the only operation Rust performs on
- * energy_deck, and it is handled by its own arm in rb_place_card_in_zone. */
-static RbBag *zone_bag(RbPlayer *P, const char *zone) {
+ * energy_deck, and it is handled by its own arm in rb_place_card_in_zone.
+ *
+ * ── ADJUDICATED AGAINST src/test_game.c's `zone_bag` (the "divergent alias
+ *    tables" finding). DO NOT MERGE THE TWO.
+ *
+ * A global census flagged two static functions named `zone_bag` with different
+ * zone->bag tables and asked for one to be unified or renamed. Checked against
+ * Rust rather than against token similarity, and they are NOT duplicates --
+ * they answer two different questions, each correctly:
+ *
+ *   THIS function ports Rust `zone_cards` (util.rs:2211-2234), whose match arms
+ *   are Hand / Deck+DeckTop+DeckBottom / Discard+Waitroom / EnergyZone+Energy /
+ *   LiveCardZone / SuccessLiveZone. `Zone::EnergyDeck` is NOT among them, so it
+ *   reaches the `_ => &[]` arm and yields an EMPTY slice. Every consumer here
+ *   (rb_count_in_zone, rb_remove_card_from_zone, rb_place_card_in_zone) is
+ *   therefore right to report energy_deck as empty, and this table is correct
+ *   AS IT STANDS. Changing it to include energy_deck would make
+ *   rb_count_in_zone disagree with Rust `count_in_zone` (util.rs:2264-2281),
+ *   which is built on `zone_cards`.
+ *
+ *   test_game.c:723 `zone_bag` is NOT a port of `zone_cards`. It is a test
+ *   INSPECTION helper behind test_zone_len / test_zone_ids /
+ *   test_zone_count_of_id / test_zone_has_id, whose job is "what is physically
+ *   in this collection" -- and `energy_deck` IS a real collection there
+ *   (Rust tests read `player.energy_deck.cards` directly).
+ *
+ * Unifying them would have deleted a correct function, which is the same trap
+ * the census itself recorded for `card_total_hearts`. So the TABLE IS UNCHANGED
+ * and only the NAME moved: `zone_bag` -> `zone_cards_bag`, naming the Rust item
+ * this one ports. That is enough -- the hazard was never the two tables, it was
+ * that one grep returned two tables and no way to tell which applied.
+ *
+ * HAZARD REPORTED, NOT FIXED (test_game.c is not this file's): a C test that
+ * asserts PARITY against a Rust `zone_cards(...)` call using "energy_deck",
+ * "deck_top" or "deck_bottom" gets a different answer from
+ * test_zone_len/test_zone_ids than the Rust reference would give. That is a
+ * measurement hazard in the test harness, not an engine bug. */
+static RbBag *zone_cards_bag(RbPlayer *P, const char *zone) {
     if (!strcmp(zone, "hand")) return &P->hand;
     if (!strcmp(zone, "deck") || !strcmp(zone, "main_deck") ||
         !strcmp(zone, "deck_top") || !strcmp(zone, "deck_bottom")) return &P->deck;
@@ -1082,7 +1287,7 @@ int rb_remove_card_from_zone(GameState *g, int pl, int card_id, const char *zone
     }
     /* Rust's remove_card_from_zone (util.rs:2181-2241) matches Zone::Deck and
      * nothing else among the deck spellings: `deck_top`, `deck_bottom` and
-     * `energy_deck` fall to the `_ => {}` arm and remove NOTHING. zone_bag()
+     * `energy_deck` fall to the `_ => {}` arm and remove NOTHING. zone_cards_bag()
      * above deliberately maps deck_top/deck_bottom onto main_deck, because that
      * is what zone_cards does (util.rs:2073) and place_card_in_zone needs it;
      * this guard is what keeps the two Rust functions' differing scopes from
@@ -1091,7 +1296,7 @@ int rb_remove_card_from_zone(GameState *g, int pl, int card_id, const char *zone
     if (!strcmp(zone, "deck_top") || !strcmp(zone, "deck_bottom") ||
         !strcmp(zone, "energy_deck"))
         return 0;
-    RbBag *b = zone_bag(P, zone);
+    RbBag *b = zone_cards_bag(P, zone);
     if (!b) return 0;
     for (int i = 0; i < b->n; i++)
         if (b->cards[i] == card_id) {
@@ -1148,7 +1353,7 @@ int rb_place_card_in_zone(GameState *g, int pl, int card_id, const char *zone,
              * hand") and still returns `true`.
              *
              * Returning 0 here is the second card-destroying defect of the day
-             * (the first was zone_bag() below missing deck_top/deck_bottom):
+             * (the first was zone_cards_bag() below missing deck_top/deck_bottom):
              * EVERY caller of this function has already lifted the card out of
              * its source zone — rb_move_card at util.c:976 removes first, and
              * the three choice.c call sites (choice.c:962 send_to_dst, :1732
@@ -1171,7 +1376,7 @@ int rb_place_card_in_zone(GameState *g, int pl, int card_id, const char *zone,
      * the bag. util.rs:2345-2348 `Zone::EnergyDeck` -- push onto the energy
      * deck bag.
      *
-     * These three were the card-destroying gap: zone_bag() could not name
+     * These three were the card-destroying gap: zone_cards_bag() could not name
      * deck_bottom, so every caller that had ALREADY removed the card from its
      * source zone got a 0 back and the card ended up in no zone at all. The
      * CHOICE-driven path is the one that measured it (CENSUS 44->41 in
@@ -1265,7 +1470,7 @@ int rb_place_card_in_zone(GameState *g, int pl, int card_id, const char *zone,
         rb_stage_place_under_card(P, target_idx, card_id);
         return 1;
     }
-    RbBag *b = zone_bag(P, zone);
+    RbBag *b = zone_cards_bag(P, zone);
     if (!b) {
         /* util.rs:2442-2449 `_ =>` arm. An unrecognised destination is NOT a
          * failure: Rust parks the card in the HAND, or in the WAITROOM for the
@@ -2891,10 +3096,39 @@ int rb_max_distinct_names(const int *cards, int n) {
     return nseen;
 }
 
-/* Mirror util.rs::max_distinct_names_greedy — delegates to greedy. */
-static int rb_max_distinct_names_greedy(const int *cards, int n) {
-    return rb_max_distinct_names(cards, n);
-}
+/* ── TOMBSTONE (2026-10-04). `rb_max_distinct_names_greedy` REMOVED.
+ *
+ * A census classified this DEAD-WRONG: "Rust returns
+ * DistinctNamesResult{distinct, collision}; the C returns only the count and
+ * silently DROPS had_collision. The C comment says 'delegates to greedy',
+ * which is true and is exactly the problem - the delegate has two outputs."
+ * The mechanical observation is correct and is why this function is gone. But
+ * the interesting part is what it points at, and it is NOT here.
+ *
+ * This function delegated to `rb_max_distinct_names` (util.c:2917). That is
+ * DEAD-ADJACENT but NOT dead and NOT production: it has no caller anywhere under
+ * src/ -- its only callers are tests/test_game.c:1276, reached through a
+ * hand-written `extern` at test_game.c:1273. So the dropped `had_collision` was
+ * unobservable in production even in principle.
+ *
+ * THE REAL GAP, reported rather than fixed here: Rust READS that flag on a live
+ * path, and the C tree has no port of it at all. engine/src/core/card.rs:680-687:
+ *
+ *     let best = util::max_distinct_names(&name_sets);
+ *     if let Some(n) = distinct_only { best.distinct >= n }
+ *     else                          { !best.collision }
+ *
+ * The `else` arm -- "does a collision-free assignment exist" -- has NO C
+ * counterpart, because `rb_max_distinct_names` returns a bare int and its only
+ * callers are tests. This is a missing port on a live Rust path, not a latent
+ * bug in a dead wrapper, and it is worth more attention than the wrapper was.
+ * It is NOT fixed here: giving `rb_max_distinct_names` a second output means
+ * changing a function tests already hand-declare, and the caller that needs the
+ * `else` arm does not exist yet. Wiring it belongs with whoever ports the
+ * card.rs distinct-name filter.
+ *
+ * Deadness proved by gcc -Wunused-function: "'rb_max_distinct_names_greedy'
+ * defined but not used". */
 
 /* Mirror util.rs::prune_dominated (util.rs:1003-1018) — sort, dedup, then for
    each candidate skip it when some already kept mask is a superset (m ⊆ k),

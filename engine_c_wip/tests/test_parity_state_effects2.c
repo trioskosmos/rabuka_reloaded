@@ -12,6 +12,24 @@
 #include <stdio.h>
 #include <string.h>
 
+/* ── per-test verdict layer (see test_parity_integration.c for the rationale):
+ * a FLAT suite's FAIL lines name an assertion, never a test, so this suite
+ * reported no per-test verdict and its FAIL lines were unattributable. This
+ * adds exactly one `FAILED: <test body>` per failing test body, in the shape
+ * every FORK suite prints. No assertion is added, removed or relaxed. */
+static const char *g_flat_failed[512];
+static int g_flat_failed_n;
+static void flat_verdict_failed(const char *fn)
+{
+    for (int i = 0; i < g_flat_failed_n; i++)
+        if (g_flat_failed[i] == fn) return;
+    if (g_flat_failed_n >= 512) return;
+    g_flat_failed[g_flat_failed_n++] = fn;
+    printf("FAILED: %s\n", fn);
+    fflush(stdout);
+}
+#define FLAT_VERDICT() flat_verdict_failed(__func__)
+
 static int failures;
 static int checks;
 
@@ -19,6 +37,7 @@ static int checks;
     checks++; \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -31,6 +50,7 @@ static int checks;
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -116,7 +136,7 @@ static void wipe(GameState *g) {
  * 1. execute_set_cost — state.rs:998-1052
  * ══════════════════════════════════════════════════════════════════════ */
 static void test_set_cost_zones_and_filters(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int live_a = rb_find_card_by_no(NIJIGASAKI);
     int member_a = rb_find_card_by_no(FILLER);
     int member_b = rb_find_card_by_no(LIELLA);
@@ -209,7 +229,7 @@ static void test_set_cost_zones_and_filters(void) {
  * 2. execute_set_card_identity / _all_regions — state.rs:1417-1429, 1559-1583
  * ══════════════════════════════════════════════════════════════════════ */
 static void test_set_card_identity(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int member = rb_find_card_by_no(FILLER);
     CHECK(member >= 0, "set_card_identity fixture resolves");
     if (member < 0) return;
@@ -250,7 +270,7 @@ static void test_set_card_identity(void) {
  * 3. execute_change_state — member branch, state.rs:269-717
  * ══════════════════════════════════════════════════════════════════════ */
 static void test_change_state_all_and_filters(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     int b = rb_find_card_by_no(FILLER_2);
     int c = rb_find_card_by_no(KOTORI);
@@ -384,7 +404,7 @@ static void test_change_state_all_and_filters(void) {
 /* state.rs:79-81 — a per-unit effect that matches nothing must not fall
  * through to "change all". */
 static void test_change_state_per_unit_zero_is_noop(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     int b = rb_find_card_by_no(FILLER_2);
     CHECK(a >= 0 && b >= 0, "per_unit fixtures resolve");
@@ -410,7 +430,7 @@ static void test_change_state_per_unit_zero_is_noop(void) {
 
 /* state.rs:40-78 — per_unit scales count by the number of matching cards. */
 static void test_change_state_per_unit_scales(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     int b = rb_find_card_by_no(FILLER_2);
     int c = rb_find_card_by_no(KOTORI);
@@ -438,7 +458,7 @@ static void test_change_state_per_unit_scales(void) {
 /* state.rs:286-291 + 370-404 — self_cost restricts the effect to the
  * activating member and skips it if it is already in the target state. */
 static void test_change_state_self_target_autoselect(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     int b = rb_find_card_by_no(FILLER_2);
     CHECK(a >= 0 && b >= 0, "self-target fixtures resolve");
@@ -478,7 +498,7 @@ static void test_change_state_self_target_autoselect(void) {
 
 /* state.rs:460-510 + 465-494 — the prompt path and its candidate indices. */
 static void test_change_state_prompts(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     int b = rb_find_card_by_no(FILLER_2);
     int c = rb_find_card_by_no(KOTORI);
@@ -570,7 +590,7 @@ static void test_change_state_optional_gate(void) {
 /* state.rs:279-284,579-586,630-637 — cannot_activate_by_effect blocks
  * wait->active and zeroes the wait->active counter. */
 static void test_change_state_cannot_activate(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     int b = rb_find_card_by_no(FILLER_2);
     CHECK(a >= 0 && b >= 0, "cannot_activate fixtures resolve");
@@ -623,7 +643,7 @@ static void test_change_state_uses_prior_selection(void) {
  * 4. execute_set_blade_type — state.rs:1054-1142
  * ══════════════════════════════════════════════════════════════════════ */
 static void test_set_blade_type(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int nijigasaki = rb_find_card_by_no(NIJIGASAKI);
     int liella = rb_find_card_by_no(LIELLA);
     CHECK(nijigasaki >= 0 && liella >= 0, "blade_type fixtures resolve");
@@ -669,7 +689,7 @@ static void test_set_blade_type(void) {
  * 5. execute_set_heart_type — state.rs:1144-1246
  * ══════════════════════════════════════════════════════════════════════ */
 static void test_set_heart_type(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     int b = rb_find_card_by_no(FILLER_2);
     CHECK(a >= 0 && b >= 0, "heart_type fixtures resolve");
@@ -734,7 +754,7 @@ static void test_set_heart_type(void) {
  * 6. execute_activation_cost — state.rs:1384-1415
  * ══════════════════════════════════════════════════════════════════════ */
 static void test_activation_cost(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     CHECK(a >= 0, "activation_cost fixture resolves");
     if (a < 0) return;
@@ -778,7 +798,7 @@ static void test_activation_cost(void) {
  * 7. execute_modify_cost — state.rs:1626-1870
  * ══════════════════════════════════════════════════════════════════════ */
 static void test_modify_cost(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     int b = rb_find_card_by_no(FILLER_2);
     CHECK(a >= 0 && b >= 0, "modify_cost fixtures resolve");
@@ -846,7 +866,7 @@ static void test_modify_cost(void) {
  *    — state.rs:1431-1448, 1585-1603, 1605-1624
  * ══════════════════════════════════════════════════════════════════════ */
 static void test_small_state_effects(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     CHECK(a >= 0, "small-effect fixture resolves");
     if (a < 0) return;
@@ -886,7 +906,7 @@ static void test_small_state_effects(void) {
  * 9. execute_energy_placement / energy_state_change — state.rs:733-996
  * ══════════════════════════════════════════════════════════════════════ */
 static void test_energy_shapes(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int energy_ids[3];
     int ne = 0;
     for (uint32_t i = 0; i < rb_num_cards() && ne < 3; i++)
@@ -933,7 +953,7 @@ static void test_energy_shapes(void) {
  * 10. execute_set_heart_copy_from_under — state.rs:1314-1382
  * ══════════════════════════════════════════════════════════════════════ */
 static void test_heart_copy_from_under(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     int b = rb_find_card_by_no(FILLER_2);
     CHECK(a >= 0 && b >= 0, "heart-copy fixtures resolve");
@@ -958,7 +978,7 @@ static void test_heart_copy_from_under(void) {
  * 11. execute_specify_heart_color — state.rs:1521-1557
  * ══════════════════════════════════════════════════════════════════════ */
 static void test_specify_heart_color(void) {
-    GameState g; wipe(&g);
+static    GameState g; wipe(&g);
     int a = rb_find_card_by_no(FILLER);
     CHECK(a >= 0, "specify_heart_color fixture resolves");
     if (a < 0) return;

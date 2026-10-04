@@ -60,6 +60,7 @@ static int checks;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -72,6 +73,7 @@ static int checks;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -134,6 +136,7 @@ static const char *ori_name(int v)
         fprintf(stderr, "FAIL: %s (orientation %s, expected %s)\n", message, \
                 ori_name(a), ori_name(e)); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -350,7 +353,7 @@ static int advance_to_live_start(TestGame *tg)
 
 static void test_kanata_n_bp3_debut_active_self_becomes_waited(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kanata = test_id(&tg, "PL!N-bp3-006-R");
     int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -371,7 +374,7 @@ static void test_kanata_n_bp3_debut_active_self_becomes_waited(void)
 
 static void test_wondermates_live_start_activates_waited_nijigasaki(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kanata   = test_id(&tg, "PL!N-bp1-006-R＋");
     int wonder   = test_id(&tg, "PL!N-sd2-025-P");
@@ -417,7 +420,7 @@ static void test_wondermates_live_start_activates_waited_nijigasaki(void)
 
 static void test_wondermates_activates_a_nijigasaki_never_the_outsider(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int wonder   = test_id(&tg, "PL!N-sd2-025-P");
     int first    = test_id(&tg, "PL!N-bp1-006-R＋");
@@ -524,7 +527,7 @@ static void pb1_003_board(TestGame *tg, int *kotori, int *p1m, int *p2m)
 
 static void test_pb1_003_declined_self_wait_preserves_active_energy(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kotori, p1m, p2m;
     pb1_003_board(&tg, &kotori, &p1m, &p2m);
@@ -561,7 +564,7 @@ static void test_pb1_003_paid_self_wait_activates_energy_per_member(void)
 
 static void test_pb1_003_counts_two_physical_instances_separately(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kotori  = test_id(&tg, "PL!-pb1-003-R");
     int kotori2 = test_new_id(&tg, "PL!-pb1-003-R");
@@ -691,7 +694,7 @@ static void test_natsumi_live_start_waits_only_low_original_blade_in_center(void
 
 static void test_natsumi_from_a_side_does_nothing(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int natsumi = test_id(&tg, "PL!SP-bp7-009-R");
     int low     = test_id(&tg, FILLER4);
@@ -735,7 +738,7 @@ static void yoshiko_setup(TestGame *tg, const char *opp_no, int *yoshiko, int *o
 
 static void test_yoshiko_waits_opponent_cost2(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int yoshiko, opp;
     yoshiko_setup(&tg, OPP_C2, &yoshiko, &opp);
@@ -752,7 +755,7 @@ static void test_yoshiko_waits_opponent_cost2(void)
 
 static void test_yoshiko_leaves_cost13_opponent_pristine(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int yoshiko, opp;
     yoshiko_setup(&tg, OPP_C13, &yoshiko, &opp);
@@ -770,7 +773,7 @@ static void test_yoshiko_leaves_cost13_opponent_pristine(void)
 
 static void test_yoshiko_empty_opponent_stage_offers_no_choice(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int yoshiko = test_id(&tg, YOSHIKO);
     int filler  = test_id(&tg, "PL!-sd1-010-SD");
@@ -788,7 +791,7 @@ static void test_yoshiko_empty_opponent_stage_offers_no_choice(void)
 
 static void test_yoshiko_two_cost2_choose_exactly_one(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int yoshiko = test_id(&tg, YOSHIKO);
     int opp1    = test_id(&tg, OPP_C2);
@@ -825,7 +828,7 @@ static void test_yoshiko_two_cost2_choose_exactly_one(void)
 
 static void test_mai_debut_waits_opponent_cost2_member(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int mai   = test_id(&tg, "PL!SP-pb2-029-N");
     int cheap = test_id(&tg, "PL!SP-PR-007-PR");
@@ -848,7 +851,7 @@ static void test_mai_debut_waits_opponent_cost2_member(void)
 
 static void test_mai_debut_ignores_opponent_over_cost2(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int mai    = test_id(&tg, "PL!SP-pb2-029-N");
     int pricey = test_id(&tg, OPP_C13);
@@ -873,7 +876,7 @@ static void test_mai_debut_ignores_opponent_over_cost2(void)
 
 static void test_kozuru_live_start_waits_low_blade_opponent(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int me     = test_id(&tg, "PL!HS-bp6-013-R");
     int victim = test_id(&tg, "PL!N-sd1-010-SD");
@@ -894,7 +897,7 @@ static void test_kozuru_live_start_waits_low_blade_opponent(void)
 
 static void test_kozuru_empty_opponent_stage_is_a_noop(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int me     = test_id(&tg, "PL!HS-bp6-013-R");
     int filler = test_id(&tg, "PL!N-sd1-010-SD");
@@ -933,7 +936,7 @@ static void hanayo_deploy(TestGame *tg, int *hanayo, int *friend)
 
 static void test_hanayo_activate_with_no_other_members(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int hanayo, friend;
     hanayo_deploy(&tg, &hanayo, &friend);
@@ -956,7 +959,7 @@ static void test_hanayo_activate_with_no_other_members(void)
 
 static void test_hanayo_activate_others_all_active_is_a_noop(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int hanayo, friend;
     hanayo_deploy(&tg, &hanayo, &friend);
@@ -974,7 +977,7 @@ static void test_hanayo_activate_others_all_active_is_a_noop(void)
 
 static void test_hanayo_activate_with_wait_member(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int hanayo, friend;
     hanayo_deploy(&tg, &hanayo, &friend);
@@ -996,7 +999,7 @@ static void test_hanayo_activate_with_wait_member(void)
 
 static void test_hanayo_use_limit_blocks_second_activation(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int hanayo, friend;
     hanayo_deploy(&tg, &hanayo, &friend);
@@ -1023,7 +1026,7 @@ static void test_hanayo_use_limit_blocks_second_activation(void)
 
 static void test_kanata_live_success_with_others_waits_self(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kanata = test_id(&tg, KANATA_R);
     int other  = test_id(&tg, "PL!-sd1-001-SD");
@@ -1055,7 +1058,7 @@ static void test_kanata_live_success_with_others_waits_self(void)
 
 static void test_kanata_live_success_no_others_does_not_wait(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kanata = test_id(&tg, KANATA_R);
     int live   = test_id(&tg, "PL!-sd1-019-SD");
@@ -1083,7 +1086,7 @@ static void test_kanata_live_success_no_others_does_not_wait(void)
 
 static void test_kanata_not_auto_activated_in_active_phase_but_others_are(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kanata = test_id(&tg, KANATA_R);
     int other  = test_id(&tg, "PL!-sd1-010-SD");
@@ -1138,7 +1141,7 @@ static int karin_setup(TestGame *tg, int pre_under)
 
 static void test_karin_cost_places_energy_and_waits_below_limit(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int karin = karin_setup(&tg, 0);
     int enemy = test_id(&tg, ENEMY_B1);
@@ -1157,7 +1160,7 @@ static void test_karin_cost_places_energy_and_waits_below_limit(void)
 
 static void test_karin_does_not_wait_above_limit(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int karin = karin_setup(&tg, 0);
     int enemy = test_id(&tg, ENEMY_B4);
@@ -1175,7 +1178,7 @@ static void test_karin_does_not_wait_above_limit(void)
 
 static void test_karin_waits_only_in_limit_when_both_present(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int karin = karin_setup(&tg, 0);
     int low   = test_id(&tg, ENEMY_B1);
@@ -1192,7 +1195,7 @@ static void test_karin_waits_only_in_limit_when_both_present(void)
 
 static void test_karin_dynamic_limit_scales_with_energy_under(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int karin = karin_setup(&tg, 3);
     int enemy = test_id(&tg, ENEMY_B4);
@@ -1211,7 +1214,7 @@ static void test_karin_dynamic_limit_scales_with_energy_under(void)
 
 static void test_karin_two_eligible_members_offers_selection(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int karin = karin_setup(&tg, 0);
     int low_a = test_id(&tg, ENEMY_B1);
@@ -1302,7 +1305,7 @@ static int kanon_deploy(TestGame *tg)
 
 static void test_kanon_pay_and_draw(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card = test_id(&tg, KANON);
     int deck_card = test_id(&tg, "PL!-sd1-010-SD");
@@ -1340,7 +1343,7 @@ static void test_kanon_pay_and_draw(void)
 
 static void test_kanon_pay_and_wait_opponent(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card   = test_id(&tg, KANON);
     int cheap  = test_id(&tg, "PL!-sd1-010-SD");    /* cost 4 — the filter boundary */
@@ -1370,7 +1373,7 @@ static void test_kanon_pay_and_wait_opponent(void)
 
 static void test_kanon_waits_only_members_at_or_below_cost_four(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card   = test_id(&tg, KANON);
     int cheap4 = test_id(&tg, "PL!-sd1-010-SD");    /* cost 4 — inside */
@@ -1434,7 +1437,7 @@ static void test_kanon_decline_cost_no_effect(void)
 
 static void test_kanon_pay_and_choose_draw_is_exclusive(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card      = test_id(&tg, KANON);
     int opponent  = test_id(&tg, "PL!-sd1-010-SD");
@@ -1459,7 +1462,7 @@ static void test_kanon_pay_and_choose_draw_is_exclusive(void)
 
 static void test_kanon_decline_payment_has_no_follow_up(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card      = test_id(&tg, KANON);
     int opponent  = test_id(&tg, "PL!-sd1-010-SD");
@@ -1542,7 +1545,7 @@ static void test_welcome_all_liella_waits_cost2_enemy(void)
 
 static void test_welcome_non_liella_stage_does_not_wait_enemy(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int enemy;
     welcome_board(&tg, "PL!-sd1-010-SD", &enemy); /* a μ's member breaks "all" */
@@ -1629,7 +1632,7 @@ static void test_maki_debut_skip_cost_no_effect(void)
 
 static void test_maki_ab1_draws_on_cost4_opponent_waited(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int maki   = test_id(&tg, MAKI);
     int p2m    = test_id(&tg, MAKI_P2_C4);
@@ -1654,7 +1657,7 @@ static void test_maki_ab1_draws_on_cost4_opponent_waited(void)
 
 static void test_maki_ab1_no_draw_on_cost_over4(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int maki = test_id(&tg, MAKI);
     int p2h  = test_id(&tg, MAKI_P2_C13);
@@ -1683,7 +1686,7 @@ static void test_maki_ab1_no_draw_on_cost_over4(void)
 
 static void test_nozomi_optional_self_wait_keeps_selected_opponent_on_stage(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int nozomi = test_id(&tg, "PL!-PR-007-PR");
     int t1     = test_id(&tg, "PL!-sd1-010-SD");
@@ -1716,7 +1719,7 @@ static void test_nozomi_optional_self_wait_keeps_selected_opponent_on_stage(void
 
 static void test_honoka_self_discard_waits_selected_target_keeps_stage(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int honoka = test_id(&tg, "PL!-bp6-010-N");
     int t1     = test_id(&tg, "PL!-sd1-010-SD");
@@ -1747,7 +1750,7 @@ static void test_honoka_self_discard_waits_selected_target_keeps_stage(void)
 
 static void test_niji_live_start_waits_original_four_blades_only(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int member        = test_id(&tg, "PL!N-bp5-004-R");
     int opponent      = test_id(&tg, "PL!-PR-003-PR");
@@ -1817,7 +1820,7 @@ static void test_sp_pr_021_below_five_hearts_no_opponent_wait(void)
 
 static void test_nico_debut_waits_only_active_opponent_member(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int nico = test_id(&tg, NICO);
     int p2m  = test_id(&tg, "PL!-sd1-010-SD");
@@ -1838,7 +1841,7 @@ static void test_nico_debut_waits_only_active_opponent_member(void)
 
 static void test_nico_debut_choice_is_routed_to_the_opponent(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int nico = test_id(&tg, NICO);
     int p2_a = test_id(&tg, "PL!-sd1-010-SD");
@@ -1873,7 +1876,7 @@ static void test_nico_debut_choice_is_routed_to_the_opponent(void)
 
 static void test_shion_hand_debut_leaves_opponent_unwaited(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int shion = test_id(&tg, "PL!S-bp6-001-R");
     int opp   = test_id(&tg, "PL!-sd1-010-SD");
@@ -1944,7 +1947,7 @@ static int p2_establish_wait_immunity(TestGame *tg)
 
 static void test_katsuraki_all_members_wait_blocked_by_immunity(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int p2_kanan = p2_establish_wait_immunity(&tg);
     if (p2_kanan < 0) { CHECK(0, "p2 can establish the wait immunity"); return; }
@@ -1968,7 +1971,7 @@ static void test_katsuraki_all_members_wait_blocked_by_immunity(void)
 
 static void test_nico_opponent_wait_blocked_by_immunity(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int p2_kanan = p2_establish_wait_immunity(&tg);
     if (p2_kanan < 0) { CHECK(0, "p2 can establish the wait immunity"); return; }
@@ -1987,7 +1990,7 @@ static void test_nico_opponent_wait_blocked_by_immunity(void)
 
 static void test_honoka_cost_limit_wait_blocked_by_immunity(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int p2_kanan = p2_establish_wait_immunity(&tg);
     if (p2_kanan < 0) { CHECK(0, "p2 can establish the wait immunity"); return; }
@@ -2007,7 +2010,7 @@ static void test_honoka_cost_limit_wait_blocked_by_immunity(void)
 
 static void test_maki_opponent_own_wait_blocked_by_immunity(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int p2_kanan = p2_establish_wait_immunity(&tg);
     if (p2_kanan < 0) { CHECK(0, "p2 can establish the wait immunity"); return; }
@@ -2067,7 +2070,7 @@ static void riko_run_live_start(TestGame *tg)
 
 static void test_riko_equal_cost_both_occupied_triggers(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int riko, opp;
     riko_setup(&tg, &riko, &opp);
@@ -2088,7 +2091,7 @@ static void test_riko_equal_cost_both_occupied_triggers(void)
 
 static void test_riko_different_costs_no_trigger(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int riko, opp;
     riko_setup(&tg, &riko, &opp);
@@ -2111,7 +2114,7 @@ static void test_riko_different_costs_no_trigger(void)
 
 static void test_riko_left_empty_no_trigger(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int riko, opp;
     riko_setup(&tg, &riko, &opp);
@@ -2129,7 +2132,7 @@ static void test_riko_left_empty_no_trigger(void)
 
 static void test_riko_right_empty_no_trigger(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int riko, opp;
     riko_setup(&tg, &riko, &opp);
@@ -2147,7 +2150,7 @@ static void test_riko_right_empty_no_trigger(void)
 
 static void test_riko_both_empty_no_trigger(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int riko, opp;
     riko_setup(&tg, &riko, &opp);
@@ -2161,7 +2164,7 @@ static void test_riko_both_empty_no_trigger(void)
 
 static void test_riko_same_cost_two_triggers(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int riko, opp;
     riko_setup(&tg, &riko, &opp);
@@ -2180,7 +2183,7 @@ static void test_riko_same_cost_two_triggers(void)
 
 static void test_riko_waits_all_repeated_opponent_instances(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int riko, opp;
     riko_setup(&tg, &riko, &opp);
@@ -2213,7 +2216,7 @@ static void test_riko_waits_all_repeated_opponent_instances(void)
 
 static void test_yoshiko_wait_is_recorded_in_state_change_log(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int yoshiko, opp;
     yoshiko_setup(&tg, OPP_C2, &yoshiko, &opp);
@@ -2234,7 +2237,7 @@ static void test_yoshiko_wait_is_recorded_in_state_change_log(void)
 
 static void test_hanayo_activation_records_both_flips_in_one_turn(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int hanayo, friend;
     hanayo_deploy(&tg, &hanayo, &friend);

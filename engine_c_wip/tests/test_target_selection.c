@@ -10,6 +10,7 @@ static int failures;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -21,6 +22,7 @@ static int failures;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -32,6 +34,7 @@ static int failures;
     if (strcmp(actual_value, expected_value) != 0) { \
         fprintf(stderr, "FAIL: %s (got %s expected %s)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -59,7 +62,7 @@ static void setup_live_phase_with_hearts(TestGame *tg)
 
 static void target_count_1_gain_resource_chooses_one_of_many(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int member_a = test_id(&tg, "PL!N-PR-003-PR");
     int member_b = test_id(&tg, "PL!N-PR-005-PR");
@@ -87,7 +90,7 @@ static void target_count_1_gain_resource_chooses_one_of_many(void)
    appears twice on stage; picking option 1 must buff the RIGHT-side instance only. */
 static void target_selection_distinguishes_repeated_card_instances(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int target_a = test_id(&tg, "PL!N-PR-003-PR");
     int target_b = test_new_id(&tg, "PL!N-PR-003-PR");
@@ -113,7 +116,7 @@ static void target_selection_distinguishes_repeated_card_instances(void)
 
 static void distinct_card_name_prevents_same_card_twice(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int live_card = test_id(&tg, "PL!SP-bp1-026-L");
     test_add_to_live(&tg, live_card);
@@ -134,7 +137,7 @@ static void distinct_card_name_prevents_same_card_twice(void)
 
 static void target_count_on_draw_until_count(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card = test_id(&tg, "PL!N-PR-028-PR");
     int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -228,7 +231,7 @@ static int stage_two_groups(TestGame *tg)
    pay_energy cost may also carry. Control run first: same board, no modify_cost. */
 static void modify_cost_per_group_discounts_the_energy_cost(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int groups = stage_two_groups(&tg);
     CHECK(groups >= 1, "at least one distinct group is on stage for the discount");
@@ -280,7 +283,7 @@ static void modify_cost_per_group_discounts_the_energy_cost(void)
    action is not PayEnergy, so a move_cards cost keeps its printed count. */
 static void modify_cost_per_group_ignores_a_move_cards_cost(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     stage_two_groups(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -317,7 +320,7 @@ static void modify_cost_per_group_ignores_a_move_cards_cost(void)
    could never be read back. */
 static void condition_verdict_cache_round_trips(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card = test_id(&tg, "PL!N-PR-028-PR");
     int entry = rb_queue_make_entry(&tg.state, card, 0);
@@ -350,7 +353,7 @@ static void condition_verdict_cache_round_trips(void)
    no-ops, so a buffered verdict could never be pushed-and-drained. */
 static void verdict_buffer_drains(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     rb_log_set_enabled(1);
     rb_log_clear_verdicts();
@@ -421,7 +424,7 @@ static int effect_verdicts_for(TestGame *tg, AbilityEffect *e, RbAbilityLogItem 
    verdict entry (conditional_optional is deliberately NOT in it). */
 static void verdict_suppression_matches_the_rust_set(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     rb_log_set_enabled(1);
     static const char *const suppressed[] = {
@@ -465,7 +468,7 @@ static void verdict_suppression_matches_the_rust_set(void)
    count/value and the bare action label when it carries neither. */
 static void verdict_details_use_count_then_value(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     rb_log_set_enabled(1);
     RbAbilityLogItem items[8];

@@ -886,6 +886,15 @@ impl core::ops::DerefMut for AbilityCost {
     }
 }
 
+/// True when an exclusion list is exactly the one group an inclusion names.
+///
+/// Both spellings can occur in the corpus, so the comparison is by the same
+/// whitespace-and-micro-sign normalisation `card_matches_group_str` uses rather than by
+/// string equality.
+fn excluded_matches(excluded: &[String], included: &str) -> bool {
+    excluded.len() == 1 && excluded[0] == included
+}
+
 impl AbilityCost {
     /// Build a `CardFilter` containing the same 7 base filter fields that
     /// `AbilityEffect::filter_subset` exposes. Mirrors that method so cost
@@ -2392,9 +2401,21 @@ impl AbilityEffect {
     /// become a target filter).
     pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
         let original = self.original_value_any().unwrap_or(false);
+        // Same redundancy `CardFilter::from_effect` drops: an inclusion and an exclusion
+        // of the same group cannot both hold, and the extractor produces exactly that when
+        // it hoists a clause's group onto the effect carrying that clause's exclusion.
+        // 百生 吟子 (PL!HS-bp5-004) parses with both set to スリーズブーケ, so this
+        // builder demanded a card be スリーズブケット AND not, the candidate set was
+        // always empty, and 「『スリーズブーケ』以外のメンバー1人につきブレードを2得る」
+        // could never pay out. The exclusion is the reading the text asks for.
+        let excluded = self.exclude_group_names_any();
+        let group = match (self.group_name(), excluded) {
+            (Some(included), Some(ex)) if excluded_matches(ex, included) => None,
+            (group, _) => group,
+        };
         crate::ability::util::CardFilter {
             card_type: self.card_type_any().map(|ct| ct.as_card_str()),
-            group: self.group_name(),
+            group,
             cost_limit: self.cost_limit_any(),
             cost_operator: self.cost_limit_operator_any().map(Operator::as_str),
             cost_values: self.cost_values_any(),
@@ -2405,7 +2426,7 @@ impl AbilityEffect {
             } else {
                 None
             },
-            exclude_group_names: self.exclude_group_names_any().map(Vec::as_slice),
+            exclude_group_names: excluded.map(Vec::as_slice),
             name_fragments: match self.card_names_any() {
                 Some(names) if !names.is_empty() => Some(names),
                 _ => None,

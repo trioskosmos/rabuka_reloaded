@@ -26,6 +26,7 @@ static int checks;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -38,6 +39,7 @@ static int checks;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -408,7 +410,7 @@ static void test_self_to_waitroom_liella_recovery(void)
 
 static void test_self_only_liella_pool_returns_self_to_hand(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int me = test_id(&tg, "PL!SP-bp4-018-N");
@@ -424,7 +426,7 @@ static void test_self_only_liella_pool_returns_self_to_hand(void)
 
 static void test_q123_self_cost_is_paid_without_recoverable_live(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int rin = test_id(&tg, "PL!-sd1-005-SD");
@@ -445,7 +447,7 @@ static void test_q123_self_cost_is_paid_without_recoverable_live(void)
 
 static void test_q79_self_cost_vacates_center_and_recovers_live(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int rin = test_id(&tg, "PL!-sd1-005-SD");
@@ -468,7 +470,7 @@ static void test_q79_self_cost_vacates_center_and_recovers_live(void)
 
 static void test_q79_self_cost_vacates_area_for_new_member(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int eli = test_id(&tg, "PL!-sd1-002-SD");
@@ -502,7 +504,7 @@ static void test_q79_self_cost_vacates_area_for_new_member(void)
 
 static void test_lilywhite_gated_live_recovery(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int me = test_id(&tg, "PL!-pb1-007-R");
@@ -534,7 +536,7 @@ static void test_lilywhite_gated_live_recovery(void)
 
 static void test_no_lilywhite_member_prevents_live_recovery(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int me = test_id(&tg, "PL!-pb1-007-R");
@@ -566,7 +568,7 @@ static void test_no_lilywhite_member_prevents_live_recovery(void)
 
 static void test_heart01_filtered_live_recovery_recovers(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int filler = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -588,7 +590,7 @@ static void test_heart01_filtered_live_recovery_recovers(void)
 
 static void test_heart01_filtered_live_recovery_rejects(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int filler = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -610,7 +612,7 @@ static void test_heart01_filtered_live_recovery_rejects(void)
 
 static void test_three_5yncri5e_members_recover_waitroom_live(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int filler = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -636,7 +638,7 @@ static void test_three_5yncri5e_members_recover_waitroom_live(void)
 
 static void test_only_two_5yncri5e_members_do_not_recover_live(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int filler = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -661,7 +663,7 @@ static void test_only_two_5yncri5e_members_do_not_recover_live(void)
 
 static void test_series_level_and_unit_level_groups_resolve_by_different_routes(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int unitless_live = test_id(&tg, "PL!SP-bp1-023-L");
     int catchu = test_id(&tg, "PL!SP-bp1-004-PR");
@@ -684,7 +686,7 @@ static void test_series_level_and_unit_level_groups_resolve_by_different_routes(
 
 static void probe_liella(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int me = test_id(&tg, "PL!SP-bp4-018-N");
@@ -705,7 +707,7 @@ static void probe_liella(void)
 
 static void probe_proteinbar(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int me = test_id(&tg, "PL!N-sd1-005-PRproteinbar");

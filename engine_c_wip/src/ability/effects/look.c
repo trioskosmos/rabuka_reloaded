@@ -1,4 +1,4 @@
-﻿#include "rabuka.h"
+#include "rabuka.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +29,14 @@ static void look_pool_reset(LookPool *pool, int owner, const char *origin)
     snprintf(pool->origin, sizeof(pool->origin), "%s",
              origin && *origin ? origin : "deck_top");
 }
+
+/* rb_order_prompt_begin lives in src/ability/choice.c: it is the SHARED body of BOTH
+ * deck-order producers (Rust move/mod.rs:2896-2927 for move_cards, and
+ * move/mod.rs:3127-3157 for the look_and_select Finalize arm), reached through
+ * rb_move_handle_order_selection -> choice.rs:2984-3055. Declared locally rather
+ * than via rabuka.h, which is another owner's file. */
+extern int rb_order_prompt_begin(GameState *g, int actor, const int *cards, int n,
+                                int reverse_pool);
 
 void rb_look_clear(int pl)
 {
@@ -384,22 +392,30 @@ static int look_at_fetch(GameState *g, int actor, AbilityEffect *effect)
     return pool->n;
 }
 
+/* look.rs:1055-1096 — execute_look_at FILLS gs.looked_at_cards, records
+ * `carried.looked_at_origin` and returns Ok(()). It opens NO Choice: the ONLY
+ * prompt it can raise is maybe_offer_look_cost_gate (look.rs:995-1013), an
+ * OptionalCost skip gate, and only when the effect carries `optional` —
+ * MEASURED 0 of 200 look_at nodes on this corpus. 見る informs (rule 5.7), so
+ * the prompt the player answers belongs to whatever CONSUMES the pool; for
+ * 「3枚見て好きな順番でデッキの上に置く」 that is the deck-order SelectTarget
+ * (move/mod.rs:1915-1932, raised at :2272), never a card pick over the freshly
+ * revealed pool.
+ *
+ * This body used to emit SelectCard{zone:"looked_at", count} and PARK the queue,
+ * which is why a `sequential` whose step 0 was a look_at never reached step 1
+ * (MEASURED 15 such steps). The pool fill and the origin recording both already
+ * happen in look_at_fetch -> look_pool_reset (:359), which is the C's
+ * `carried.looked_at_origin`, so only the emit + park block goes. */
 void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e)
 {
     int who = look_target_player(g, actor, e);
     int count = look_at_fetch(g, actor, e);
     if (count <= 0) return;
-    rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "looked_at", NULL,
-                   count, e->is_optional ? 1 : 0, NULL);
+    look_push_look_log(g, count);
     g->queue.resume_look_owner = who;
-    rb_queue_pause_for_choice(g, &g->queue.pending);
-    g->queue.resume_mode = 2;
-    g->queue.resume_eff = e;
-    g->queue.resume_is_select = 0;
     g_look_pending_select = NULL;
     g_look_pool_select_offered = 0;
-    g->queue.resume_actor = actor;
-    g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }
 
 void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
@@ -749,6 +765,75 @@ void rb_look_resume_indices(GameState *g, int owner, const int *indices, int n_i
         g_look_pool_select_offered = 0;
         return;
     }
+    /* move/mod.rs:3120-3157 -- the SECOND deck-order producer, and the only
+     * consumer of `placement_order: any_order` in the `look_and_select` arm.
+     *
+     * The FIRST producer is move_missing.c:rb_move_maybe_prompt_deck_order (the
+     * `move_cards` action), reachable from 15 of 985 abilities. This one is the
+     * `look_and_select` effect's own Finalize step, so it fires when the player
+     * picks >= 2 of the looked-at cards AND the select action declares
+     * `placement_order: any_order` AND the destination is a deck. Measured over
+     * cards/abilities.json: EXACTLY 11 look_and_select nodes in the whole corpus
+     * carry placement_order=any_order, and all 11 ALSO carry any_number:true, so
+     * the select's `max_select` is `total_available` (look.rs:867-877) rather
+     * than the `count.unwrap_or(1)` default, and a player CAN hand back 2 or 3
+     * indices. 10 of the 11 declare destination deck_top and 1 declares
+     * deck_bottom, so `is_deck_dest` holds for all 11. (The `count: 1` trap that
+     * killed one node in the FIRST batch does not bite here, and that was checked
+     * rather than assumed.)
+     *
+     * The predicate is Rust's `needs_order` verbatim: is_deck_dest &&
+     * placement_order == AnyOrder && selected_cards.len() > 1. `placement_order`
+     * is read off the select action first and the parked `current` effect second,
+     * which is mod.rs:3035-3046's `select_action.placement_order_any().or_else(
+     * || current.and_then(|c| c.placement_order_any()))`.
+     *
+     * What the arm does, in Rust's order (mod.rs:3127-3157): the looked-at pool
+     * BECOMES the selected cards, the REMAINDER goes to discard (or deck_bottom
+     * when discard_remaining is false), and a `SelectTarget{target: "order",
+     * allow_skip: false}` prompt opens. `rb_order_prompt_begin` is the shared
+     * body of both producers (choice.c, reached through
+     * rb_move_handle_order_selection -> choice.rs:2984-3055's
+     * clear_choice_state_and_resume), and `reverse_pool` is 0 here because Rust's
+     * second producer hands the cards over in the order chosen, not reversed.
+     *
+     * NOTE, PRE-EXISTING, NOT ADDRESSED HERE: Rust retains `selected_cards`
+     * through `card_matches_cost_limit_op` (mod.rs:3107-3116) BEFORE computing
+     * remaining_cards and needs_order. This C function has never applied a
+     * select-action cost_limit to `selected[]` at all (see :719-726, which gate on
+     * `look_card_allowed` only), so `n_selected` here can over-count relative to
+     * Rust when a select action declares cost_limit. None of the 11 nodes
+     * declares one (MEASURED), so it cannot change a verdict on this corpus, and
+     * fixing it would reshape the whole function, which is out of scope here.
+     */
+    {
+        const AbilityEffect *ord_sel =
+            (is_select && g_look_pool_select_offered) ? g_look_pending_select : NULL;
+        const char *po = ord_sel ? look_extra(ord_sel, "placement_order") : NULL;
+        if (!po && g->queue.resume_eff) po = look_extra(g->queue.resume_eff, "placement_order");
+        int is_deck_dest = destination &&
+                           (!strcmp(destination, "deck_top") ||
+                            !strcmp(destination, "deck") ||
+                            !strcmp(destination, "deck_bottom"));
+        if (is_deck_dest && po && !strcmp(po, "any_order") && n_selected > 1) {
+            /* mod.rs:3130-3137: the remainder goes to discard, or deck_bottom
+             * when discard_remaining is false. `discard_remaining == -1` means the
+             * key is absent, and Rust's `explicit_discard.unwrap_or(true)` makes
+             * absent mean discard too, so the plain truthiness test is right. */
+            const char *dest_zone = discard_remaining ? "discard" : "deck_bottom";
+            for (int i = 0; i < n_remainder; i++) {
+                if (!strcmp(dest_zone, "discard"))
+                    look_append_cards(&player->discard, &remainder[i], 1);
+                else
+                    look_append_cards(&player->deck, &remainder[i], 1);
+            }
+            g_look_pending_select = NULL;
+            g_look_pool_select_offered = 0;
+            rb_order_prompt_begin(g, owner, selected, n_selected, 0);
+            return;
+        }
+    }
+
     const char *destination_zone = destination && *destination ? destination : "hand";
     if (!strcmp(destination_zone, "deck") || !strcmp(destination_zone, "deck_top")) {
         int ordered[MAX_LOOKED];
@@ -902,7 +987,13 @@ void rb_effect_reveal_until_live_card(GameState *g, int actor, AbilityEffect *e)
 void rb_effect_reveal_until_chosen_card(GameState *g, int actor, AbilityEffect *e)
 {
     int who = look_target_player(g, actor, e);
-    const char *card_type = look_extra(e, "card_type");
+    /* vm.c:1098-1112 — `card_type` is stored in the STRUCT FIELD and the branch
+       `continue`s, so it is NEVER in the extras table (MEASURED 0 of 1221
+       effect nodes across 1074 abilities carry it as an extra). A bare
+       look_extra(e,"card_type") is therefore permanently NULL. Rust reads the
+       typed `effect.card_type_any()`; the field-first-with-fallback idiom is the
+       shape draw.c:444 and look.c:976 already use. */
+    const char *card_type = look_filter_card_type(e);
     g_reveal_ctype = card_type ? card_type : "live_card";
     reveal_until(g, who, card_type ? card_type_pred : card_is_live_pred);
 }
@@ -914,7 +1005,9 @@ void rb_effect_reveal_until_chosen_card(GameState *g, int actor, AbilityEffect *
 void rb_effect_reveal_until_target(GameState *g, int actor, AbilityEffect *e)
 {
     int who = look_target_player(g, actor, e);
-    const char *card_type = look_extra(e, "card_type");
+    /* Same defect as rb_effect_reveal_until_chosen_card above: `card_type` lives
+       in the struct field, never in the extras table. */
+    const char *card_type = look_filter_card_type(e);
     const char *cost_limit = look_extra(e, "cost_limit");
     const char *cost_operator = look_extra(e, "cost_limit_operator");
     g_reveal_ctype = card_type ? card_type : "live_card";

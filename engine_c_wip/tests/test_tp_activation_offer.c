@@ -18,6 +18,7 @@ static int failures;
     if (!(c)) { \
         fprintf(stderr, "FAIL: %s\n", msg); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", msg); \
     } \
@@ -29,6 +30,7 @@ static int failures;
     if (a_ != e_) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", msg, a_, e_); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", msg); \
     } \
@@ -107,7 +109,7 @@ static void print_stage(const TestGame *game)
 /// and a press it accepts is one activation that must have been charged.
 static void sayaka_activation_charges_energy_and_terminates(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int sayaka = test_id(&game, "PL!HS-bp1-002-R");
@@ -212,7 +214,7 @@ static void sayaka_activation_charges_energy_and_terminates(void)
 /// cleanly — no partial resolution, no energy spent, nothing left pending.
 static void sayaka_unaffordable_not_offered_and_press_rejected(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int sayaka = test_id(&game, "PL!HS-bp1-002-R");

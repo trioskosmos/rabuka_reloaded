@@ -3253,6 +3253,105 @@ static void test_q276_failed_live_does_not_return_cheer(void)
 }
 
 /* ===================================================================== */
+/* 12. ROOT-CAUSE INVARIANTS — cluster N (engine_c_wip/NOZOMI_ROOT_CAUSE.md) */
+/*                                                                       */
+/* These two cases are deliberately ability-independent of the rest of the */
+/* suite. They pin the INVARIANT that ranks 1-5 and rank 6 violate, so a */
+/* future refactor cannot quietly re-open them behind a still-red suite.  */
+/* ===================================================================== */
+
+/* (1) A plain 「N枚見る」 must open NO choice.
+ *
+ *     Rust engine/src/ability/look.rs:1055-1096 — `execute_look_at` fills
+ *     `gs.looked_at_cards` and returns Ok(()). It never touches
+ *     `gs.awaiting.choice`. The prompt the player answers belongs to whatever
+ *     CONSUMES the pool. 見る informs (rule 5.7).
+ *
+ *     The C's `rb_effect_look_at` (look.c:387-403) instead emits
+ *     SelectCard{zone:"looked_at", count} and parks the queue, so EVERY plain
+ *     look shifts the whole prompt sequence by one; and because the answer
+ *     re-enters `rb_drain_ability_queue`, the entry is executed a SECOND time
+ *     from the top (`[QUEUE_EXEC] ... action=sequential`).
+ *
+ *     RED in the live tree on purpose: this is the assertion the fix owes. */
+static void test_nz_look_at_verb_opens_no_choice(void)
+{
+    static TestGame tg;
+    test_game_new(&tg);
+    clear_p1(&tg);
+    clear_p2(&tg);
+    rb_look_reset_all();
+    board_begin();
+
+    int a = test_new_id(&tg, MUS_MEM);
+    int b = test_new_id(&tg, MUS_MEM);
+    int c = test_new_id(&tg, MUS_MEM);
+    const int deck[3] = { a, b, c };
+    set_deck_exact(&tg, 0, deck, 3);
+    set_deck_exact(&tg, 1, deck, 0);
+
+    /* Rust-shaped 「3枚見る」: no destination, no card_type, no placement_order. */
+    AbilityEffect e;
+    memset(&e, 0, sizeof(e));
+    e.action = (char *)"look_at";
+    e.source = (char *)"deck_top";
+    e.target = (char *)"self";
+    e.count = 3;
+
+    int mark = prompt_mark();
+    rb_effect_look_at(&tg.state, 0, &e);
+    /* VACUITY CONTROL: `prompts` counts ANSWERS, so no answer is expected here.
+     * What proves the verb really ran is the pool check below. */
+    CHECK_EQ(prompt_mark(), mark,
+             "nz(1): the look-at control really ran the verb (nothing was answered)");
+
+    int pool[8];
+    int n_pool = rb_looked_at_pool(0, pool, 8);
+    CHECK_EQ(n_pool, 3, "nz(1): look.rs:1055-1096 still FILLS looked_at_cards with 3");
+    CHECK(!rb_has_pending_choice(&tg.state),
+          "nz(1): look.rs:1055-1096 opens NO choice — a plain 「N枚見る」 informs and "
+          "returns Ok(()); any prompt here belongs to whatever CONSUMES the pool "
+          "(the deck-order SelectTarget for 「好きな順番でデッキの上に置く」)");
+}
+
+/* (2) A deck placement carrying placement_order:"any_order" must open a
+ *     SelectTarget whose target is "order".
+ *
+ *     Rust engine/src/ability/effects/move/mod.rs:1855-1933
+ *     (`maybe_prompt_deck_order`), called at :2272 — after the source resolve
+ *     and BEFORE the distinct filter / `place_taken_cards`, returning early so
+ *     the cards are placed by the answer handler instead.
+ *
+ *     The C has NO producer for `Choice::SelectTarget{target:"order"}` at all:
+ *     Rust has two (the deck-order prompt at :1915 and the look_and_select
+ *     `needs_order` arm at :3139), the C has zero, so `RB_STK_ORDER`
+ *     (enums.c:384), the `"order"` answer arm (choice.c:3895) and
+ *     `rb_resolver_handle_order_selection` are all unreachable.
+ *
+ *     Driven through the real ability because `rb_move_execute_move_cards_ported`
+ *     is static. RED in the live tree on purpose: this is the assertion the fix
+ *     owes. */
+static void test_nz_deck_order_prompt_is_select_target_order(void)
+{
+    static TestGame tg;
+    int cards[5], opponent = -1;
+    nozomi_board(&tg, cards, &opponent);   /* fires the ライブ成功時 trigger */
+    if (cards[4] < 0) return;
+
+    CHECK(rb_has_pending_choice(&tg.state),
+          "nz(2): move/mod.rs:1915-1932 opens the mandatory deck-order prompt");
+    const RbChoice *ch = rb_get_pending_choice(&tg.state);
+    CHECK(ch && ch->kind == RB_CHOICE_SELECT_TARGET,
+          "nz(2): move/mod.rs:1926-1931 the deck-order prompt is a SelectTarget "
+          "— NOT the SelectCard{zone:\"looked_at\"} look.c:392 raises");
+    CHECK(ch && ch->target[0] && !strcmp(ch->target, "order"),
+          "nz(2): move/mod.rs:1928 the SelectTarget's target is \"order\" "
+          "(enums.rs:143 SelectTargetKind::Order)");
+    CHECK(ch && !ch->allow_skip,
+          "nz(2): move/mod.rs:1929 allow_skip is false — every card must return");
+}
+
+/* ===================================================================== */
 /* main                                                                    */
 /* ===================================================================== */
 
@@ -3440,6 +3539,12 @@ int main(int argc, char **argv)
         test_q276_control_normal_live_reaches_success_zone);
     run("rt/q276_failed_live_no_return",
         test_q276_failed_live_does_not_return_cheer);
+
+    /* ---- cluster N root-cause invariants ---- */
+    run("nz/look_at_verb_opens_no_choice",
+        test_nz_look_at_verb_opens_no_choice);
+    run("nz/deck_order_prompt_is_select_target_order",
+        test_nz_deck_order_prompt_is_select_target_order);
 
     printf("\n==== test_parity_search_reorder: %d cases ====\n"
            "%d ok, %d failed, %d crashed, %d expected gaps\n"

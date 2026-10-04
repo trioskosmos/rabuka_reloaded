@@ -17,6 +17,7 @@
 /// placed into discard), and the live-card OR branch was dropped — only
 /// `card_type:member_card` survived. These tests pin the correct behavior.
 use crate::helpers::*;
+use rabuka_engine::card::CardType;
 use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::turn::TurnEngine;
 
@@ -25,6 +26,16 @@ const NIJI_LIVE: &str = "PL!N-bp1-026-L"; // 虹ヶ咲 live card (Poppin' Up!)
 const NIJI_MEMBER_NO_BLADE: &str = "PL!N-bp1-001-R"; // 虹ヶ咲 member, no blade heart
 const NIJI_MEMBER_HAS_BLADE: &str = "PL!N-bp7-007-R＋"; // 虹ヶ咲 member, has blade heart
 const NON_NIJI: &str = "PL!SP-sd1-001-SD"; // 澁谷かのん (Liella!, not 虹ヶ咲)
+/// A non-虹ヶ咲 member with NO blade heart — so the group filter is the ONLY reason
+/// it can be rejected.
+///
+/// `NON_NIJI` is not usable for that: it carries a blade heart, so it fails clause 2
+/// on the negation as well as on the group. Every test that used it therefore had
+/// two filters rejecting the same card, and neither was exercised alone. That
+/// matters because group matching is itself known to be lossy
+/// (`success_zone_group_live_success_draw_test.rs` measures a μ's filter silently
+/// ignoring 45% of μ's cards) — a bug there would not have shown up here.
+const NON_NIJI_NO_BLADE: &str = "PL!-sd1-011-SD"; // 絢瀬絵里 (BiBi), no blade heart
 
 /// Put 彼方 on stage and make the top 3 deck cards exactly `top3` (index 0 = top).
 fn setup(game: &mut TestGame, top3: [i16; 3]) -> i16 {
@@ -264,5 +275,138 @@ fn kanata_use_limit_twice_per_turn() {
     assert!(
         try_activate_ab1(&mut game, kanata).is_err(),
         "third activation in the same turn must be blocked by ターン2回"
+    );
+}
+
+/// Fixture invariants: without these, the pair above is not testing the negation.
+///
+/// `kanata_member_without_blade_heart_offers_choice` and
+/// `kanata_member_with_blade_heart_does_not_offer_choice` are the ONLY things in
+/// this file that exercise `card_property: has_blade_heart` with `negation: true`,
+/// and both take the two member constants on faith — they are described in
+/// comments and nothing checks them. A card-data change that gave
+/// `NIJI_MEMBER_NO_BLADE` a blade heart would make the first test fail for a reason
+/// unrelated to the ability, and the tempting fix is to swap the two constants,
+/// which silently inverts the pair and leaves the negation untested.
+///
+/// This guard is not hypothetical.
+/// `debut_look_five_take_blade_heart_less_mus_member_pl_pb2_032_n_test.rs` carries
+/// the same one for the same mechanic, and its header records what happened without
+/// it: both of ITS blade fixtures were once inverted and "the negation was never
+/// exercised at all".
+///
+/// Two blade-heart accessors, and the disagreement is load-bearing here.
+/// `has_blade_heart_strict` is exactly the `blade_heart` key in cards.json, while
+/// the filter goes through `has_blade_heart`, which is also true when
+/// `special_heart` is non-empty. Since this clause is a NOT, a fixture where the
+/// two disagree has no single defensible expected answer — so both are asserted
+/// here, which makes any future disagreement loud instead of interpretive.
+///
+/// Group membership is asserted on `series`, not `unit`: `Card.group` is empty in
+/// the card data, so `card_matches_group_str` falls back to
+/// `card_series_matches_group(series, ..)`, which matches the school name embedded
+/// in the series string. Asserting `unit` would pin the wrong field and pass
+/// vacuously.
+#[test]
+fn the_fixture_invariants_hold() {
+    let db = load_real_database();
+    let game = TestGame::new(db);
+    let card = |c: &str| {
+        game.db
+            .get_card(game.id(c))
+            .unwrap_or_else(|| panic!("{c} not in cards.json"))
+    };
+    let series_of = |c: &str| card(c).series.to_string();
+
+    assert_eq!(
+        card(NIJI_LIVE).card_type,
+        CardType::Live,
+        "{NIJI_LIVE} must be a live card — it is the whole of the first OR branch, \
+         which filters on card_type: live_card"
+    );
+
+    let no_blade = card(NIJI_MEMBER_NO_BLADE);
+    assert_eq!(no_blade.card_type, CardType::Member, "{NIJI_MEMBER_NO_BLADE} must be a member");
+    assert!(
+        !no_blade.has_blade_heart_strict(),
+        "{NIJI_MEMBER_NO_BLADE} must have no `blade_heart` key — it is the qualifier"
+    );
+    assert!(
+        !no_blade.has_blade_heart(),
+        "{NIJI_MEMBER_NO_BLADE} must also answer false to has_blade_heart(), or the \
+         NOT in clause 2 excludes it and this branch has no positive case at all"
+    );
+
+    let has_blade = card(NIJI_MEMBER_HAS_BLADE);
+    assert_eq!(has_blade.card_type, CardType::Member, "{NIJI_MEMBER_HAS_BLADE} must be a member");
+    assert!(
+        has_blade.has_blade_heart_strict(),
+        "{NIJI_MEMBER_HAS_BLADE} must carry a `blade_heart` key — it is the card the \
+         negation has to exclude"
+    );
+
+    let outsider = card(NON_NIJI_NO_BLADE);
+    assert_eq!(outsider.card_type, CardType::Member, "{NON_NIJI_NO_BLADE} must be a member");
+    assert!(
+        !outsider.has_blade_heart_strict(),
+        "{NON_NIJI_NO_BLADE} must have no blade heart, so ONLY the group filter can \
+         exclude it — otherwise the group clause is never the reason it is rejected"
+    );
+
+    // Recorded rather than asserted as desirable: `NON_NIJI` has a blade heart, so
+    // it is rejected twice over. Any test using it as the "wrong group" filler is
+    // testing two filters at once and neither one alone.
+    assert!(
+        card(NON_NIJI).has_blade_heart_strict(),
+        "{NON_NIJI} unexpectedly has no blade heart — if card data changed, \
+         NON_NIJI_NO_BLADE is now redundant and the tests using NON_NIJI need \
+         re-auditing, because they would have stopped pinning the group clause"
+    );
+
+    for (c, should_match) in [
+        (NIJI_LIVE, true),
+        (NIJI_MEMBER_NO_BLADE, true),
+        (NIJI_MEMBER_HAS_BLADE, true),
+        (NON_NIJI, false),
+        (NON_NIJI_NO_BLADE, false),
+    ] {
+        assert_eq!(
+            series_of(c).contains("虹ヶ咲"),
+            should_match,
+            "{c}: series is {:?} — every clause here filters on group_names \
+             [\"虹ヶ咲\"], and the engine resolves that through the series string",
+            series_of(c)
+        );
+    }
+}
+
+/// The group clause on its own: a member of another group that has NO blade heart.
+///
+/// This is the card shape that reaches clause 2 and is rejected only by
+/// `group_names`. `kanata_no_matching_card_does_not_offer_choice` looks like it
+/// covers this, but its filler (`NON_NIJI`) carries a blade heart and so fails the
+/// negation too — with two filters rejecting one card, the group clause was never
+/// the reason, and a regression in group matching would pass that test silently.
+#[test]
+fn kanata_another_groups_blade_heart_less_member_does_not_offer_choice() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let outsider = game.id(NON_NIJI_NO_BLADE);
+    let kanata = setup(&mut game, [outsider, outsider, outsider]);
+
+    activate_ab1(&mut game, kanata);
+
+    assert!(
+        !game.has_pending_choice(),
+        "a BiBi member with no blade heart satisfies clause 2 in every respect but \
+         group — it is a member, it has no blade heart, but it is not 『虹ヶ咲』, so \
+         the choice must not be offered"
+    );
+    // And the cost still mills: a failed condition does not refund the cost.
+    assert_eq!(
+        game.state.player1.waitroom.cards.iter().filter(|&&c| c == outsider).count(),
+        3,
+        "the three milled cards are in the discard regardless of the outcome"
     );
 }

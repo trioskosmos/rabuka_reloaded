@@ -304,16 +304,62 @@ static int r_filter_applies(const AbilityEffect *e)
     return r_has_groups(e) || r_has_exclude_groups(e) ||
            r_has_characters(e) || r_has_exclude_characters(e);
 }
-static int r_distinct(const AbilityEffect *e) { return r_is_true(r_extra(e, "distinct")); }
+static RbDistinctType r_distinct_type(const AbilityEffect *e);
+static int r_distinct(const AbilityEffect *e)
+{
+    /* required_hearts.rs:58-59 -- `is_distinct_names`, the ONE computation Rust
+     * feeds to BOTH `PerUnitFilter.distinct_names` (required_hearts.rs:77) and the
+     * dedupe at :88. Its three spellings are serde's, and serde renames every one
+     * of them to LOWERCASE (core/card.rs:849-856):
+     *     CardName  ->  [serde(rename = "card_name")]
+     *     True      ->  [serde(rename = "true")]
+     *     Distinct  ->  [serde(rename = "distinct")]
+     * The old body was the one-liner `r_is_true(r_extra(e, "distinct"))`, which
+     * matches only a bare boolean true/1 -- so `distinct: "card_name"`, the
+     * spelling the ENTIRE corpus uses (48 of the 53 nodes carrying the key), read
+     * as NOT distinct. FIXED: route it through r_distinct_type, the enum reader,
+     * which is exactly Rust's `matches!`. */
+    return rb_distinct_should_dedupe(r_distinct_type(e));
+}
 static int r_self_target(const AbilityEffect *e) { return r_is_true(e->self_target_field); }
 
 static RbDistinctType r_distinct_type(const AbilityEffect *e)
 {
+    /* core/card.rs:849-856 (serde) + util.rs:2827-2832 (distinct_should_dedupe).
+     * The old body compared "CardName" / "True" / "Distinct" -- the Rust VARIANT
+     * NAMES -- while serde renames all three to lowercase, so this returned
+     * RB_DISTINCT_NONE for EVERY node in the corpus. cost.c's twin reader
+     * (cost.c:171-177, landed by cluster C4) already compared the lowercase
+     * spellings; this one had simply never been fixed. FIXED, and the sibling
+     * r_distinct above with it: both are the same one-token literal bug, and both
+     * are the class that has already turned five cases red elsewhere.
+     *
+     * MEASURED REACHABILITY, 2026-10-04, over cards/abilities.json (985 unique
+     * abilities / 2 116 card-ability pairs / 3 053 walked effect+cost nodes):
+     * 53 nodes carry a `distinct` key, and this function is reachable ONLY
+     * through r_per_unit_units -- its sole caller is rules.c:567, inside
+     * r_per_unit_units, whose only callers are :622 (reduce_required_hearts with
+     * per_unit_heart_colors), :648 and :678 (modify_required_hearts with
+     * per_unit) and :945 (modify_cost with per_unit).
+     * MEASURED COUNT REACHING r_distinct_type: 0.
+     * Every node carrying BOTH `distinct` and a truthy `per_unit` has action
+     * change_state / gain_resource / modify_score / sequential, and the two
+     * modify_required_hearts nodes and the one modify_cost node that carry
+     * `distinct` all have `per_unit` absent, so none of them can reach any of the
+     * four call sites. r_per_unit_filter (the only reader of r_distinct) has the
+     * same single caller, so its `distinct_names` field is equally 0-reachable.
+     *
+     * => this fix is CORRECT and moves ZERO lines on this corpus. It is landed
+     * anyway, because a reader cannot otherwise distinguish a correct-but-
+     * unreachable reader from a wrong one, and because leaving it wrong is what
+     * made it reportable twice. NO PARITY TEST IS POSSIBLE for it: the function
+     * is `static` and nothing on this corpus can reach it, so any test written
+     * against it would be vacuous. That is a VERIFIED-NOOP: 0, not an omission. */
     const char *d = r_extra(e, "distinct");
     if (!d) return RB_DISTINCT_NONE;
-    if (!strcmp(d, "CardName"))  return RB_DISTINCT_CARDNAME;
-    if (!strcmp(d, "True"))      return RB_DISTINCT_TRUE;
-    if (!strcmp(d, "Distinct"))  return RB_DISTINCT_DISTINCT;
+    if (!strcmp(d, "card_name")) return RB_DISTINCT_CARDNAME;
+    if (!strcmp(d, "true"))     return RB_DISTINCT_TRUE;
+    if (!strcmp(d, "distinct")) return RB_DISTINCT_DISTINCT;
     return RB_DISTINCT_NONE;
 }
 
@@ -2275,6 +2321,32 @@ void rb_rules_note_changed_state_members(GameState *g, const int *cids, int n)
     st->n_changed_state_members = 0;
     for (int i = 0; i < n && i < RB_RULES_MOVED_CAP; i++)
         st->changed_state_members[st->n_changed_state_members++] = cids[i];
+}
+
+/* The consuming half of the same latch. `changed_state_members` is a
+ * "last writer wins" list (note: it CLEARS then fills, it does not append), and
+ * rb_rules_execute_restriction CONSUMES it: it reads the list and then sets
+ * `st->n_changed_state_members = 0`, so a second restriction in the same ability
+ * does not re-apply to the same cards.
+ *
+ * This accessor exists because the restriction body is DUPLICATED: the copy in
+ * this file (rb_rules_execute_restriction, :1819) has the arm and the copy that
+ * actually RUNS (misc.c's h_restriction) does not, and `RbRulesState` is this
+ * file's own file-static typedef -- misc.c cannot name the field. Taking the
+ * whole list in one call keeps the "read then clear" atomicity in the file that
+ * owns the storage, which is exactly what the Rust assignment-then-consume pair
+ * does. NOT declared in include/rabuka.h, which is not this change's to edit;
+ * misc.c declares it locally, the pattern state.c:21-26 already uses for
+ * rb_rules_note_changed_state_members. */
+int rb_rules_take_changed_state_members(GameState *g, int *out, int max)
+{
+    if (!g || !out || max <= 0) return 0;
+    RbRulesState *st = rb_rules_state(g);
+    int n = st->n_changed_state_members;
+    if (n > max) n = max;
+    for (int i = 0; i < n; i++) out[i] = st->changed_state_members[i];
+    st->n_changed_state_members = 0;
+    return n;
 }
 
 void rb_rules_note_moved_cards(GameState *g, const int *cids, int n)

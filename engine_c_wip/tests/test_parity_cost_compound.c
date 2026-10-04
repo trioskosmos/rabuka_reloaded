@@ -23,6 +23,7 @@ static int checks;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -35,6 +36,7 @@ static int checks;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -166,7 +168,7 @@ static void test_decoded_cost_shape(void) {
  * halves are observed independently.
  * ═══════════════════════════════════════════════════════════════════════ */
 static void test_cost_paid_then_effect_applied(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg, 0);
     clear_zones(&tg, 1);
@@ -223,7 +225,7 @@ static void test_cost_paid_then_effect_applied(void) {
  * Rust: engine/src/ability/cost/handlers.rs:204-230 (MoveCards leaf).
  * ═══════════════════════════════════════════════════════════════════════ */
 static void test_mandatory_move_cost_validation(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg, 0);
     clear_zones(&tg, 1);
@@ -308,7 +310,7 @@ static void test_sequential_cost_atomicity(void) {
     /* Payable second leg: the first leg is charged, then the second opens its
        selection choice — Rule 9.4.2.2, costs execute in order. */
     {
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         clear_zones(&tg, 0);
         clear_zones(&tg, 1);
@@ -341,7 +343,7 @@ static void test_sequential_cost_atomicity(void) {
  *    Rust: engine/src/ability/cost/handlers.rs:1130-1154.
  * ═══════════════════════════════════════════════════════════════════════ */
 static void test_optional_energy_cost_gate(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg, 0);
     clear_zones(&tg, 1);
@@ -397,7 +399,7 @@ static void test_optional_energy_cost_gate(void) {
  *    Rust: engine/src/ability/cost/handlers.rs:1174-1198.
  * ═══════════════════════════════════════════════════════════════════════ */
 static void test_energy_condition_cost(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg, 0);
     clear_zones(&tg, 1);
@@ -434,7 +436,7 @@ static void test_energy_condition_cost(void) {
  *    :900-952 (payment).
  * ═══════════════════════════════════════════════════════════════════════ */
 static void test_change_state_cost_gate(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg, 0);
     clear_zones(&tg, 1);
@@ -503,7 +505,7 @@ static void test_change_state_cost_gate(void) {
  *    expectations come from reveal_cost_ten_or_twenty_under_member_draw_two_test.rs.
  * ═══════════════════════════════════════════════════════════════════════ */
 static void test_reveal_cost_filtering(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg, 0);
     clear_zones(&tg, 1);
@@ -591,7 +593,7 @@ static void test_conditional_branch_routing(void) {
  *    Rust: engine/src/ability/util.rs:183-322.
  * ═══════════════════════════════════════════════════════════════════════ */
 static void test_modify_cost_operation_split(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg, 0);
     clear_zones(&tg, 1);
@@ -686,7 +688,7 @@ static void test_modify_cost_operation_split(void) {
  *    Rust: engine/src/core/modifiers.rs recalculate_constant_cost_modifiers.
  * ═══════════════════════════════════════════════════════════════════════ */
 static void test_constant_cost_bonus_is_additive(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg, 0);
     clear_zones(&tg, 1);

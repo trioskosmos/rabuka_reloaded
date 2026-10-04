@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 15,
     [string]$WindowTitle = "",
-    [string]$Message = "can you actually improve the bots? not just talk about it, not just suggest, not just leave threads. actually research the game, tcg bots in  general, you have the whole internet as guidance, and get the game mastered by the bots."
+    [string]$Message = "read abilities.json and their tests one by one manually no overviews. understand the engine parser and tests and improve them as needed so it looks planned rather than slapped together ad hoc actually do the work not just talk about plans"
 )
 
 Add-Type -AssemblyName System.Windows.Forms

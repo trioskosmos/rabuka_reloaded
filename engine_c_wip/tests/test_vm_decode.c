@@ -243,6 +243,137 @@ static void test_value_ref(void) {
           "ValueRef kind stringifies back to its wire name");
 }
 
+/* ── 7. `card_type` is a TYPED field (CardType), not a raw string ─────────
+   Rust: effect_decoder_gen.rs:81 `"card_type" => { ek.card_type =
+   bc.read_card_type_value(); Some(true) }`, and read_card_type_value
+   (ability/vm.rs:479-489) is `CardType::from_card_str(get_string(idx)?)`.
+   CardType::from_card_str (engine/src/core/card.rs) has exactly three arms
+   and its miss arm is `_ => None`, so `AbilityEffect::card_type` is
+   `Option<CardType>` and the raw spelling CANNOT survive the decode.
+
+   Measured over the corpus by walking every decoded effect: 817 effects spell
+   card_type inside the vocabulary (member_card 442 / live_card 121 /
+   energy_card 86) and 168 spell it OUTSIDE it (`card` 167, `member` 1) across
+   149 of the 985 abilities. Storing the raw spelling made C disagree with Rust
+   at every consumer that tests the field for mere NON-EMPTINESS:
+   core/card.c:959 copies it into RbCardFilter.card_type, which core/card.c:1107
+   counts in `has_filter`, and util.c:1547 then rejects every card
+   (`card_type == "card"` matches none) -> empty candidate set.
+   The `card_type` extra must stay absent too, because core/card.c:959 and
+   ability/dynamic_count.c:655 both fall back to it when the field is empty. */
+static void ct_walk(const AbilityEffect *e, int depth, int *in_vocab,
+                    const char **changed, const char **sample, int *n_bad,
+                    int *bad_extra, int want_filter) {
+    if (!e || depth > 12) return;
+    const char *ct = e->card_type_field;
+    if (ct[0]) {
+        if (!strcmp(ct, "member_card") || !strcmp(ct, "live_card") ||
+            !strcmp(ct, "energy_card")) {
+            (*in_vocab)++;
+            /* In-vocabulary spellings must still reach the filter builder
+               UNCHANGED: card_filter_from_effect (core/card.c:959) copies the
+               field verbatim, and Rust's util.rs:1839 copies
+               `card_type_any().map(CardType::as_card_str)` -- the same three
+               names, so they must be byte-identical on both sides. */
+            RbCardFilter f;
+            memset(&f, 0, sizeof f);
+            (void)rb_effect_filter_subset(e, &f);
+            if (f.card_type[0] && strcmp(f.card_type, ct) && !*changed)
+                *changed = f.card_type;
+        } else {
+            (*n_bad)++;
+            if (!*sample) *sample = ct;
+            /* Rust holds None, so neither the struct field nor the extras
+               table may carry it: the extras fallback would resurrect it.
+               core/card.c:959 and ability/dynamic_count.c:655 both read
+               `card_type_field[0] ? field : extra("card_type")`, and
+               core/card.c:1107 counts RbCardFilter.card_type in `has_filter`,
+               so a leaked spelling empties the whole candidate set. */
+            if (effect_extra(e, "card_type")) (*bad_extra)++;
+            if (want_filter) {
+                RbCardFilter f;
+                memset(&f, 0, sizeof f);
+                if (rb_effect_filter_subset(e, &f) && f.card_type[0])
+                    (*bad_extra)++;
+            }
+        }
+    }
+    for (int i = 0; i < e->n_child; i++)
+        ct_walk(e->child[i], depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+    for (int i = 0; i < e->n_options; i++)
+        ct_walk(e->options[i], depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+    ct_walk(e->primary_effect, depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+    ct_walk(e->alternative_effect, depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+    ct_walk(e->look_action, depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+    ct_walk(e->select_action, depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+    ct_walk(e->followup_action, depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+    ct_walk(e->optional_action, depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+    ct_walk(e->conditional_action, depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+    ct_walk(e->gained_effect, depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+    ct_walk(e->resource_on_select, depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+    ct_walk(e->opponent_action, depth + 1, in_vocab, changed, sample, n_bad, bad_extra, want_filter);
+}
+
+static void test_card_type_vocabulary(void) {
+    uint32_t total = RBKA_NUM_ABILITIES;
+    int in_vocab = 0, n_bad = 0, bad_extra = 0, abilities_with_bad = 0;
+    /* `changed` = an in-vocabulary spelling that reached the filter ALTERED. */
+    const char *changed = NULL;
+    /* `sample`  = first out-of-vocabulary spelling seen, for the log only. */
+    const char *sample = NULL;
+
+    for (uint32_t i = 0; i < total; i++) {
+        Ability ab;
+        if (!rb_decode_ability(i, &ab)) continue;
+        int before = n_bad;
+        /* The effect side is what feeds the filter builder; only it is checked
+           for a leaked RbCardFilter.card_type term (a cost effect can carry a
+           card_type without ever being used as a card filter). */
+        ct_walk(ab.effect, 0, &in_vocab, &changed, &sample, &n_bad, &bad_extra, 1);
+        ct_walk(ab.cost, 0, &in_vocab, &changed, &sample, &n_bad, &bad_extra, 0);
+        if (n_bad > before) abilities_with_bad++;
+        rb_free_ability(&ab);
+    }
+
+    printf("     card_type in-vocabulary: %d, out-of-vocabulary effects: %d "
+           "(%d abilities)\n", in_vocab, n_bad, abilities_with_bad);
+    if (sample) printf("     first out-of-vocabulary spelling seen: %s\n", sample);
+
+    /* Pinned so a future corpus regeneration is noticed here rather than
+       silently changing what the decoder accepts. The out-of-vocabulary half
+       of the census (168 effects over 149 abilities, `card` 167 + `member` 1)
+       is deliberately NOT pinned as a field count: after this fix the field is
+       empty for all of them by construction, so it can only ever read 0. It is
+       printed instead, and the two spellings the corpus actually uses are
+       pinned where they are still observable -- the decode authority itself,
+       which Rust defines as EffectCardType::from_str's Other(ArcStr) miss arm
+       (ability/enums.rs:735, :744). core/card.c and ability/describe.c both
+       route through it. */
+    CHECK(in_vocab == 649,
+          "card_type: 649 effects spell a name CardType::from_card_str accepts");
+    CHECK(n_bad == 0,
+          "card_type: no out-of-vocabulary spelling reaches the field "
+          "(Rust: CardType::from_card_str miss arm is None)");
+    CHECK(bad_extra == 0,
+          "card_type: out-of-vocabulary spellings leave neither the field nor "
+          "the `card_type` extra, and produce no RbCardFilter.card_type term "
+          "(card.c:959 / :1107, dynamic_count.c:655)");
+    CHECK(abilities_with_bad == 0,
+          "card_type: no ability decodes an out-of-vocabulary card_type");
+    CHECK(changed == NULL,
+          "card_type: an in-vocabulary spelling reaches RbCardFilter.card_type "
+          "byte-identical (util.rs:1839 card_type_any().map(as_card_str))");
+
+    /* The two spellings the corpus actually uses outside the vocabulary. */
+    CHECK(rb_effect_card_type_from_str("card") == RB_ECT_OTHER,
+          "card_type: `card` is EffectCardType::Other (enums.rs:735 miss arm), "
+          "not a fourth named variant");
+    CHECK(rb_effect_card_type_from_str("member") == RB_ECT_OTHER,
+          "card_type: `member` is EffectCardType::Other (enums.rs:744 miss arm)");
+    CHECK(rb_effect_card_type_from_str("member_card") == RB_ECT_MEMBER_CARD,
+          "card_type: `member_card` is still CardType::Member");
+}
+
 int main(void) {
     if (!load_card_db()) {
         fprintf(stderr, "FAIL: card database load\n");
@@ -255,6 +386,7 @@ int main(void) {
     test_keyword_decode();
     test_empty_bytecode_audit();
     test_value_ref();
+    test_card_type_vocabulary();
 
     rb_unload();
     if (failures) {

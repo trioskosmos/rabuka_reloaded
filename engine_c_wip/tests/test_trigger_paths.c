@@ -39,6 +39,7 @@ static int checks;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -417,7 +418,7 @@ static void q159_positive_select_prompt_appears(void) {
 #define BLADE_MEMBER "PL!-sd1-008-SD"    /* has b_heart03 */
 
 static void reina_fires_after_non_blade_member_left_live_zone(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int reina = test_id(&game, REINA);
@@ -452,7 +453,7 @@ static void reina_fires_after_non_blade_member_left_live_zone(void) {
 }
 
 static void reina_silent_when_blade_heart_member_left_live_zone(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int reina = test_id(&game, REINA);
@@ -618,7 +619,7 @@ static void riko_responds_only_to_own_side_live_zone(void) {
 
 static void miyamiya_baton_touch_case(const char *newcomer_no, const char *label,
                                       int expect_draw) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int ai = test_id(&game, MIYAMIYA);
@@ -675,7 +676,7 @@ static void miyamiya_baton_touch_cost13_newcomer_energy_only(void) {
 static void miyamiya_baton_touch_blade_heart_newcomer_nothing(void) {
     /* Negative: the replacing member HAS a blade heart, so the negated
        property fails and nothing is activated or drawn. */
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int ai = test_id(&game, MIYAMIYA);
@@ -770,7 +771,7 @@ static void cost11_baton_replacement_does_not_arm_debut_watcher(void) {
 }
 
 static void cost11_debut_with_watcher_retains_nonempty_energy_zone(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int ranju = test_id(&game, RANJU);
@@ -811,7 +812,7 @@ static void cost11_debut_with_watcher_retains_nonempty_energy_zone(void) {
 }
 
 static void cost10_baton_replacement_does_not_draw_from_departed_watcher(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int miya = test_id(&game, MIYASHITA);
@@ -856,7 +857,7 @@ static void cost10_baton_replacement_does_not_draw_from_departed_watcher(void) {
 }
 
 static void cost10_debut_with_watcher_draws_to_replace_played_card(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int miya = test_id(&game, MIYASHITA);
@@ -899,7 +900,7 @@ static void cost10_debut_with_watcher_draws_to_replace_played_card(void) {
 #define NIJI_MEMBER "PL!N-sd1-001-SD"
 
 static void hand_activation_empty_stage_resolves_draw_after_discard_choices_q196(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int shizuku = test_id(&game, SHIZUKU);
@@ -936,7 +937,7 @@ static void hand_activation_empty_stage_resolves_draw_after_discard_choices_q196
 }
 
 static void hand_activation_draw_and_lone_nijigasaki_blade_resolve_q196(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int shizuku = test_id(&game, SHIZUKU);
@@ -1083,7 +1084,7 @@ static void kasumi_turn1_ability_available_again_next_turn(void) {
 }
 
 static void kasumi_limit_is_per_instance(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int k1 = test_new_id(&game, KASUMI);

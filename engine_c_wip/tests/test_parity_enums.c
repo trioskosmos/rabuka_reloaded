@@ -496,6 +496,142 @@ static void test_effect_card_type_and_state(void)
           "EffectState: as_str of an unknown value is NULL");
 }
 
+/* ── Corpus-driven decode completeness ───────────────────────────────────
+   The tables above prove each row round-trips in isolation.  What they cannot
+   prove is that every string the REAL 985-ability corpus actually feeds into a
+   decoder is a row the table knows.  A table that is complete in isolation and
+   incomplete against the data is a silent wrong-value bug, not an error, so
+   this walks the corpus and pushes every decoded value through the same table
+   Rust uses.  Measured with rb_decode_ability over the shipped blobs
+   (985 abilities / 2230 effects); the counts are pinned so a regeneration is
+   noticed here instead of silently changing what decodes.
+
+   Zones get a second table on purpose: vm.c's `rb_zone_from_source_str`
+   delegates to `rb_zone_id_from_str` (core/types.rs ZoneId), NOT to
+   `rb_ability_zone_from_str` (ability/enums.rs Zone).  Two different Rust
+   types with two different vocabularies, and the substitution is invisible at
+   the call site.  They differ on exactly seven strings -- Zone accepts
+   "center" / "left" / "left_side" / "right" / "right_side" (enums.rs:104-111)
+   and ZoneId accepts none of them, plus ZoneId's "live_total" and its
+   fullwidth "\xE3\x82\xB9\xE3\x83\x86\xE3\x83\xBC\xE3\x82\xB8" alias, which
+   Zone does not.  None of the seven occurs in the corpus, which is what makes
+   the substitution harmless TODAY; asserting both tables agree on every corpus
+   value is what keeps it that way. */
+extern const uint32_t RBKA_NUM_ABILITIES;
+
+static int corpus_actions, corpus_action_unknown;
+static int corpus_zones, corpus_zone_unknown, corpus_zone_table_disagree;
+static int corpus_states, corpus_state_unknown;
+static int corpus_abfilters, corpus_abfilter_unknown;
+
+static void corpus_effect(const AbilityEffect *e, int depth) {
+    if (!e || depth > 12) return;
+    if (e->action && e->action[0]) {
+        corpus_actions++;
+        if (rb_action_type_from_str(e->action) < 0) {
+            corpus_action_unknown++;
+            printf("     unknown ActionType in corpus: %s\n", e->action);
+        }
+    }
+    const char *zs[2];
+    zs[0] = e->source;
+    zs[1] = e->destination;
+    for (int i = 0; i < 2; i++) {
+        if (!zs[i] || !zs[i][0]) continue;
+        corpus_zones++;
+        int zone = rb_ability_zone_from_str(zs[i]);   /* ability::enums::Zone */
+        int zid = rb_zone_id_from_str(zs[i]);         /* core::types::ZoneId  */
+        if (zone == RB_ABILITY_ZONE_UNKNOWN) corpus_zone_unknown++;
+        /* Cross-table check via the canonical name each table prints.  A zone
+           that decodes on one side and not the other, or that the two tables
+           spell differently, is what makes the substitution observable. */
+        const char *n_zone = rb_ability_zone_as_str(zone);
+        const char *n_zid = rb_zone_id_as_str(zid);
+        if (!n_zone || !n_zid || strcmp(n_zone, n_zid)) {
+            corpus_zone_table_disagree++;
+            printf("     Zone/ZoneId disagree on \"%s\": Zone=%s ZoneId=%s\n",
+                   zs[i], n_zone ? n_zone : "(null)", n_zid ? n_zid : "(null)");
+        }
+    }
+    for (int i = 0; i < e->n_extra; i++) {
+        if (!e->extra_k[i] || !e->extra_v[i]) continue;
+        if (!strcmp(e->extra_k[i], "state") || !strcmp(e->extra_k[i], "state_change")) {
+            corpus_states++;
+            if (rb_effect_state_from_str(e->extra_v[i]) < 0) {
+                corpus_state_unknown++;
+                printf("     unknown EffectState in corpus: %s\n", e->extra_v[i]);
+            }
+        }
+        if (!strcmp(e->extra_k[i], "ability_filter")) {
+            corpus_abfilters++;
+            /* vm.rs:1086-1099 read_ability_filter_value knows exactly four. */
+            const char *v = e->extra_v[i];
+            if (strcmp(v, "has_ability") && strcmp(v, "has_ability_type") &&
+                strcmp(v, "no_ability_type") && strcmp(v, "no_ability")) {
+                corpus_abfilter_unknown++;
+                printf("     unknown ability_filter in corpus: %s\n", v);
+            }
+        }
+    }
+    for (int i = 0; i < e->n_child; i++) corpus_effect(e->child[i], depth + 1);
+    for (int i = 0; i < e->n_options; i++) corpus_effect(e->options[i], depth + 1);
+    corpus_effect(e->primary_effect, depth + 1);
+    corpus_effect(e->alternative_effect, depth + 1);
+    corpus_effect(e->look_action, depth + 1);
+    corpus_effect(e->select_action, depth + 1);
+    corpus_effect(e->followup_action, depth + 1);
+    corpus_effect(e->optional_action, depth + 1);
+    corpus_effect(e->conditional_action, depth + 1);
+    corpus_effect(e->gained_effect, depth + 1);
+    corpus_effect(e->resource_on_select, depth + 1);
+    corpus_effect(e->opponent_action, depth + 1);
+}
+
+static void test_corpus_decode_completeness(void) {
+    if (rb_load("src") != 0 && rb_load("../cards/build") != 0) {
+        fprintf(stderr, "FAIL: corpus decode completeness could not load the card db\n");
+        checks++; failures++;
+        return;
+    }
+    for (uint32_t i = 0; i < RBKA_NUM_ABILITIES; i++) {
+        Ability ab;
+        if (!rb_decode_ability(i, &ab)) continue;
+        corpus_effect(ab.effect, 0);
+        corpus_effect(ab.cost, 0);
+        rb_free_ability(&ab);
+    }
+    rb_unload();
+
+    printf("     corpus: %d actions, %d zone values, %d states, %d ability_filters\n",
+           corpus_actions, corpus_zones, corpus_states, corpus_abfilters);
+
+    /* 2228 of the 2230 decoded effects carry a non-empty action; the other 2
+       spell it as the empty string, which is Rust's `ArcStr::from("")` default
+       rather than a wire value. */
+    CHECK(corpus_actions == 2228,
+          "corpus: 2228 of 2230 effects carry a non-empty action");
+    CHECK(corpus_action_unknown == 0,
+          "corpus: every action spelling is a row ActionType::from_str knows "
+          "(enums.rs:379-458) - none falls through to the Custom default");
+    /* 996 non-null sources + 786 non-null destinations = 1782. */
+    CHECK(corpus_zones == 1782,
+          "corpus: 1782 non-null source/destination values across 2230 effects");
+    CHECK(corpus_zone_unknown == 0,
+          "corpus: every source/destination is a row ability::enums::Zone knows "
+          "(enums.rs:79-167)");
+    CHECK(corpus_zone_table_disagree == 0,
+          "corpus: ability::enums::Zone and core::types::ZoneId agree on every "
+          "value, so vm.c's substitution of ZoneId for Zone is inert here");
+    CHECK(corpus_states == 208,
+          "corpus: 208 state/state_change values (wait 147, active 61)");
+    CHECK(corpus_state_unknown == 0,
+          "corpus: every state is a row EffectState::from_str knows "
+          "(enums.rs:799-821) - no Other(ArcStr) fallback needed");
+    CHECK(corpus_abfilter_unknown == 0,
+          "corpus: every ability_filter is one of the four names "
+          "read_ability_filter_value accepts (vm.rs:1086-1099)");
+}
+
 int main(void)
 {
     test_zone();
@@ -504,6 +640,7 @@ int main(void)
     test_condition_type();
     test_select_target_kind();
     test_effect_card_type_and_state();
+    test_corpus_decode_completeness();
 
     printf("parity_enums: %d assertions, %d failures\n", checks, failures);
     if (failures) return 1;

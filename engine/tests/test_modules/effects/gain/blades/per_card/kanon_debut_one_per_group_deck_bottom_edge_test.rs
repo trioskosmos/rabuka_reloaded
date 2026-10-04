@@ -83,6 +83,32 @@ fn kanon_select_three_any_order_and_draws_nothing() {
         );
     }
 
+    // Narrowing the KNOWN GAP — and the answer is not the one I expected.
+//
+// The ordering prompt is never raised. `move/mod.rs:3120-3125` raises
+// `SelectTarget { target: "order" }` when the destination is a deck zone,
+// `placement_order` is `AnyOrder`, and more than one card was selected — all three
+// hold for this card — and `game_setup.rs:899-921` would generate the per-position
+// "Move card N to top" options. Yet the loop above consumed zero follow-up prompts:
+// the selection resolves and the effect ends, with nothing placed and nothing drawn.
+//
+// So the gap is UPSTREAM of the ordering prompt. `placement_order: "any_order"` on a
+// `source: "discard"` move never reaches the any_order branch at all — the deck-
+// destination check there is written against a looked_at-driven flow, and this card's
+// cards come from the waitroom. Chasing it inside `resolver::handle_select_target` (my
+// first guess, since that function routes only by `choice_card_no` and has no
+// `target == "order"` arm) would have been the wrong place to start.
+//
+// Asserted because it is the fact that decides where to look, and the KNOWN GAP pins
+// below pass identically either way — they cannot distinguish "the prompt is raised and
+// mishandled" from "the prompt never appears". INVERT THIS when the placement works.
+assert_eq!(
+    extra_prompts, 0,
+    "diagnostic: no ordering prompt is raised after selecting the three cards, so \
+     the any_order branch at move/mod.rs:3120 is never reached. INVERT THIS when \
+     「それらを好きな順番でデッキの下に置いてもよい」 resolves."
+);
+
     // KNOWN GAP: the whole ability is a no-op after the selection prompt.
     //
     // The card reads 「それらを好きな順番でデッキの下に置いてもよい。そうした

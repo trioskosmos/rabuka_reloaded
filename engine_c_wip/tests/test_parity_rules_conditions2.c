@@ -677,12 +677,14 @@ static void a5_turn_number_gate_is_an_equality_not_a_comparison(void)
  * ======================================================================= */
 
 /* B1 -- Rust invalid_live_card_discard_records_turn_movements. Rust pushes a
- * non-live member into P1's live card zone, runs check_timing, and asserts the
- * LAST turn_movement is {moved_card_id, "live_card_zone", "waitroom",
- * player1}. C has no face_up field, so the Rust fixture's face_up = true is
- * simply the default C board -- stated, not hidden. The movement fields are
- * read from the ENGINE log; the zone outcome is asserted too, because the
- * vacuous sibling case gets that part right. */
+ * non-live member into P1's live card zone, sets `live_card_zone.face_up = true`
+ * (:113), runs check_timing, and asserts the LAST turn_movement is
+ * {moved_card_id, "live_card_zone", "waitroom", player1}. The C GameState does
+ * carry that state -- commit 2130769d added `GameState.live_face_up[2]`, one
+ * flag per seat, read by the gate at src/turn/phase.c:703 -- so the flag is now
+ * set explicitly in the fixture below, as the Rust twin sets it. The movement
+ * fields are read from the ENGINE log; the zone outcome is asserted too,
+ * because the vacuous sibling case gets that part right. */
 static void b1_invalid_live_discard_records_turn_movements(void)
 {
     static TestGame tg;
@@ -699,13 +701,11 @@ static void b1_invalid_live_discard_records_turn_movements(void)
     set_stage(&tg, 0, filler, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
     fill_decks(&tg, filler, 30);
 
-    DIAG("B1: C GameState has no live_card_zone.face_up field, so Rust's "
-         "face_up = true is the default C board");
-
     CHECK_EQ(live_has(&tg, 0, member), 1, "B1 CONTROL: the card is in the live zone before check_timing");
     CHECK_EQ(n_movements(&tg), 0, "B1 CONTROL: the ENGINE log is empty before check_timing");
 
     int census_before = test_total_card_count(&tg);
+    tg.state.live_face_up[0] = 1;   /* Rust sets this at live_card_zone_movement_test.rs:113 */
     rb_check_timing(&tg.state);
     int census_after = test_total_card_count(&tg);
 
@@ -765,6 +765,10 @@ static void b1p_valid_live_card_records_no_movement(void)
     CHECK_EQ(n_movements(&tg), 0, "B1p CONTROL: the ENGINE log is empty before check_timing");
 
     int census_before = test_total_card_count(&tg);
+    /* Rust's B1 twin sets face_up at :113; B1p is the SAME board, so it needs
+     * the SAME precondition or the `good` card's survival would be satisfied by
+     * a check_timing that never looked at the live zone at all. */
+    tg.state.live_face_up[0] = 1;
     rb_check_timing(&tg.state);
     int census_after = test_total_card_count(&tg);
 
@@ -807,6 +811,12 @@ static void b2_check_invalid_live_cards_distinguishes_players(void)
     CHECK_EQ(n_movements(&tg), 0, "B2 CONTROL: the ENGINE log is empty before check_timing");
 
     int census_before = test_total_card_count(&tg);
+    /* Rust's twin check_invalid_live_cards_distinguishes_players sets face_up
+     * for BOTH seats -- :347 (P1) and :348 (P2) -- and that is the whole point
+     * of the test: the gate is per SEAT, so a one-seat fixture could not tell a
+     * correct per-seat read from a hardcoded one. */
+    tg.state.live_face_up[0] = 1;
+    tg.state.live_face_up[1] = 1;
     rb_check_timing(&tg.state);
     int census_after = test_total_card_count(&tg);
 
@@ -896,6 +906,13 @@ static void b4_invalid_energy_in_live_zone_goes_to_energy_deck(void)
     fill_decks(&tg, filler, 30);
 
     int census_before = test_total_card_count(&tg);
+    /* Rust's twin invalid_energy_card_in_live_zone_goes_to_energy_deck sets
+     * `player1.live_card_zone.face_up = true` at :282. Without it the gate at
+     * src/turn/phase.c:703 returns early, the energy card never reaches the
+     * energy deck, and the "the two illegal paths take different destinations"
+     * claim at the bottom of this test -- the reason B4 exists -- would be
+     * vacuous. */
+    tg.state.live_face_up[0] = 1;
     rb_check_timing(&tg.state);
     int census_after = test_total_card_count(&tg);
 
@@ -1327,6 +1344,10 @@ static void run(const Case *c)
         failures++;
         assertions++;
     }
+    /* The corpus verdict, in the shape every other FORK suite prints. The
+     * `== case ...` line below stays for its per-case counts; nothing that
+     * matched `^FAILED` could see it. */
+    printf(g_shared->failures > 0 ? "FAILED: %s\n" : "ok: %s\n", c->name);
     printf("== case %-46s assertions=%d failures=%d\n",
            c->name, g_shared->assertions, g_shared->failures);
     fflush(stdout);

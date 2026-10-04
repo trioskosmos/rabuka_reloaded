@@ -219,7 +219,7 @@ static void test_repeated_drains_stay_consistent(void) {
 /* 4. The peer call site: rb_resolver_drain_verdicts_since on the condition-gate
  * success path must keep the pre-snapshot head, not free it. */
 static void test_resolver_drain_preserves_head(void) {
-    GameState g;
+static    GameState g;
     memset(&g, 0, sizeof(g));
     rb_log_set_enabled(1);
     rb_log_clear_verdicts();

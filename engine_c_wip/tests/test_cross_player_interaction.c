@@ -30,6 +30,7 @@ static int failures;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -41,6 +42,7 @@ static int failures;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -52,6 +54,7 @@ static int failures;
     if (actual_value == unexpected_value) { \
         fprintf(stderr, "FAIL: %s (got %d)\n", message, actual_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -63,6 +66,7 @@ static int failures;
     if (strcmp(actual_value, expected_value) != 0) { \
         fprintf(stderr, "FAIL: %s (got %s expected %s)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -90,7 +94,7 @@ static int stage_contains(const int stage[3], int card_id)
 
 static void himeko_debut_repositions_opponent_member_and_koko_responds(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int rurino = test_id(&game, MIRAKURA_RURINO);
     int himeko = test_id(&game, HIMEKO);
@@ -127,7 +131,7 @@ static void himeko_debut_repositions_opponent_member_and_koko_responds(void)
 
 static void himeko_gate_blocked_no_reposition_no_koko_response(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int himeko = test_id(&game, HIMEKO);
     int koko = test_id(&game, KOKO);
@@ -206,7 +210,7 @@ static int heart_col(TestGame *game, int card_id, int color)
    Heart02 = 2 = RB_HEART_YELLOW, Heart03 = 3 = RB_HEART_GREEN. */
 static void koko_self_effect_triggers(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int koko = test_id(&game, KOKO_SD2);
     int filler = test_id(&game, NON_MIRAKURA_MEMBER);
@@ -222,7 +226,7 @@ static void koko_self_effect_triggers(void)
 
 static void koko_opponent_effect_triggers(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int koko = test_id(&game, KOKO_SD2);
     int filler = test_id(&game, NON_MIRAKURA_MEMBER);
@@ -239,7 +243,7 @@ static void koko_opponent_effect_triggers(void)
 
 static void koko_turn1_blocks_second(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int koko = test_id(&game, KOKO_SD2);
     int filler = test_id(&game, NON_MIRAKURA_MEMBER);
@@ -255,7 +259,7 @@ static void koko_turn1_blocks_second(void)
 
 static void natsume_opponent_draw(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int natsume = test_id(&game, NATSUME);
     int filler = test_id(&game, NON_MIRAKURA_MEMBER);
@@ -277,7 +281,7 @@ static void natsume_opponent_draw(void)
    use limit, so her hand size reads the arm count out directly. */
 static void opp_cause_arms_once_per_move(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int natsume = test_id(&game, NATSUME);
     int filler = test_id(&game, NON_MIRAKURA_MEMBER);
@@ -306,7 +310,7 @@ static void opp_cause_arms_once_per_move(void)
 
 static void tomari_opponent_blade(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int tomari = test_id(&game, TOMARI);
     int filler = test_id(&game, NON_MIRAKURA_MEMBER);
@@ -321,7 +325,7 @@ static void tomari_opponent_blade(void)
 
 static void kanon_opponent_heart02(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int kanon = test_id(&game, KANON);
     int filler = test_id(&game, NON_MIRAKURA_MEMBER);
@@ -336,7 +340,7 @@ static void kanon_opponent_heart02(void)
 
 static void fuyumari_opponent_heart03(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int fuyu = test_id(&game, FUYUMARI);
     int filler = test_id(&game, NON_MIRAKURA_MEMBER);
@@ -351,7 +355,7 @@ static void fuyumari_opponent_heart03(void)
 
 static void chisato_opponent_blades(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int chisato = test_id(&game, CHISATO);
     int filler = test_id(&game, NON_MIRAKURA_MEMBER);

@@ -1127,7 +1127,7 @@ static int rb_activate_act_depth = 0;
    `ab` is NOT consumed: the keepalive is a by-value copy of the struct, and on
    the prompt-open path choice.c owns the release of that copy. The caller keeps
    whatever it allocated. */
-static void activate_resolved_ability(GameState *g, int pl, int card_id,
+static int activate_resolved_ability(GameState *g, int pl, int card_id,
                                       int ability_index, const Ability *ab) {
     /* turn/actions/mod.rs:548-550 — `game_state.activating_card =
        Some(card_id)` is published BEFORE any cost logic, with the comment
@@ -1142,6 +1142,52 @@ static void activate_resolved_ability(GameState *g, int pl, int card_id,
        ability believe it is paying its own self_cost. */
     int saved_act = g->activating_card;
     g->activating_card = card_id;
+
+    /* DEFECT FIX — turn/actions/mod.rs:553-564, the mandatory-cost refusal the
+     * C did not have at all. Rust, immediately after publishing
+     * activating_card and BEFORE the hand removal:
+     *     // Mandatory costs must be fully payable BEFORE anything happens
+     *     // (Rule 9.4.2.3 / Q56): a mandatory-unpayable activation is refused
+     *     // here, never fizzled at resolution. Optional components skip at pay
+     *     // time (wakana bp2-008, umi Q228) and are excluded from this check;
+     *     // energy stays owned by check_mandatory_activation_cost above.
+     *     if let Some(ref cost) = ability.cost {
+     *         AbilityResolver::validate_mandatory_cost(
+     *             game_state, &cost.0, Some(card_id))?;
+     *     }
+     * `?` propagates out of handle_use_ability, so nothing is paid and the
+     * effect never runs. The C instead built the cost+effect tree and ran it
+     * (engine.c:1149 onward), so `rb_pay_cost` paid whatever leg it could and
+     * the EFFECT STILL RAN on a partially-paid mandatory cost, and the hand
+     * removal at mod.rs:570-573 had already happened.
+     *
+     * REACHABILITY: 100 of the 985 corpus abilities are 起動 carrying a
+     * mandatory non-energy cost (measured over cards/abilities.json; the leaves
+     * are move_cards / change_state / reveal, not pay_energy). 100 of 985.
+     *
+     * Two concrete differences, both live on real cards:
+     *   - card_id is passed EXPLICITLY (handlers.rs:192-196), because
+     *     gs.activating_card is not set when the offer is generated. The pay-time
+     *     twin rb_validate_cost passes RB_ACTIVATING_DERIVED instead, so every
+     *     `self_cost` filter resolved against a derived card rather than the
+     *     activating one — e.g. PL!-bp4-003-P's "put THIS member from the stage
+     *     to the waitroom" and PL!SP-bp7-008-{P,R}'s "put THIS member to WAIT".
+     *   - a whole optional / any_number / max cost resolves to pay-zero-or-skip
+     *     (handlers.rs:286-291) and a ChoiceCondition leg passes (handlers.rs
+     *     :302), so a 「…してもよい」 leg can never withhold the activation.
+     *     rb_validate_cost walks both, so it refuses activations Rust offers.
+     *
+     * NOTE for the offer-side twin (game_setup.c:1199 — cluster C's file, and
+     * NOT landed, see engine_c_wip/AUDIT_actions_setup.md 5-2): it is the same
+     * gate Rust calls at game_setup.rs:2188 and :2295. One of the 100 —
+     * ability 325, PL!-pb2-012-P+(ab#1) — is a `sequential_cost` whose second
+     * leg IS a `choice_condition`, and 325 is also one of the two abilities K7
+     * flagged as decoding from a different byte slice in Rust than in C. That
+     * landing needs a 325-specific A/B before it lands. */
+    if (ab->cost && !rb_validate_mandatory_cost(g, pl, ab->cost, card_id)) {
+        g->activating_card = saved_act;
+        return 0;
+    }
     /* rb_cost_optional_skipped() (cost.c:47) is a STICKY latch: a
        decline sets it, the next cost PAYMENT clears it. Sample it before
        the tree runs so only a 0->1 transition can be attributed to THIS
@@ -1227,6 +1273,12 @@ static void activate_resolved_ability(GameState *g, int pl, int card_id,
     if (ab->use_limit > 0 && !declined)
         rb_record_use(&g->queue, card_id, ability_index, g->turn);
     g->activating_card = saved_act;
+    /* 1 = the activation ran. 0 = refused by the mandatory-cost gate above,
+     * which is Rust's `?` at actions/mod.rs:559-563: the caller must then NOT
+     * count the ability as matched, so rb_activate_card neither reports success
+     * nor lets the default-ability fallback claim a card whose 起動 was
+     * refused. */
+    return 1;
 }
 
 /* turn/actions/mod.rs:430-454 find_gained_activation.
@@ -1300,7 +1352,9 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
             if (ab.use_limit > 0 &&
                 rb_use_limit_reached(&g->queue, card_id, a, ab.use_limit, g->turn))
                 continue;
-            activate_resolved_ability(g, pl, card_id, a, &ab);
+            /* Rust actions/mod.rs:559-563 `?` — a mandatory-unpayable 起動 is
+             * REFUSED, so it is not a match and contributes nothing. */
+            if (!activate_resolved_ability(g, pl, card_id, a, &ab)) continue;
             any = 1;
             matched++;
         }
@@ -1318,14 +1372,20 @@ int rb_activate_card(GameState *g, int pl, int card_id) {
             Ability gab;
             if (rb_resolve_card_ability_at(g, card_id,
                                            RB_GAINED_ABILITY_INDEX_BASE + gidx, &gab)) {
-                activate_resolved_ability(g, pl, card_id,
-                                          RB_GAINED_ABILITY_INDEX_BASE + gidx, &gab);
                 /* Deliberately NOT rb_free_ability'd: on the prompt-open path
                    choice.c has already released the keepalive copy, and on the
                    closed path the copy is released and this probe's own deep
                    clone is the same shape the printed loop above leaves. */
-                any = 1;
-                matched++;
+                /* Same refusal rule as the printed arm (actions/mod.rs:559-563).
+                 * `continue` is unavailable here because this is not a loop, so a
+                 * refusal simply leaves any = 0 / matched = 0, which is exactly
+                 * what the printed arm's `continue` achieves. */
+                if (activate_resolved_ability(g, pl, card_id,
+                                               RB_GAINED_ABILITY_INDEX_BASE + gidx,
+                                               &gab)) {
+                    any = 1;
+                    matched++;
+                }
             }
         }
     }

@@ -555,6 +555,39 @@ impl<'a> ConditionContext<'a> {
         if !self.check_phase_gate(condition) {
             return false;
         }
+        // activation_position gate: a requirement on the ACTIVATING card's own stage
+        // slot — the 「{{center.png|センター}}」 / 「{{left.png|左}}」 icon at the head of an
+        // ability — as opposed to `position`, which constrains the zone the condition
+        // inspects. Like the phase gate above, and for the same reason, this has to run
+        // BEFORE the type dispatch so it applies to every condition type.
+        //
+        // It used to be checked only inside the location evaluator, which made it
+        // unreachable for every other type. 高坂穂乃果's 「{{center.png|センター}}自分のライブ
+        // カード置き場に『µ's』のカードがある場合…」 parses to a `group_condition`, so her
+        // centre gate never ran: playing her live in a side area still granted the
+        // blade 「すべての『μ's』のメンバーはブレードを得る」 to every qualifying member.
+        // She is the shape, not the only case — any card whose position icon rides on a
+        // non-location condition was ungated.
+        //
+        // The player is resolved as `self` rather than from the condition's own
+        // `target`: the activating card is by definition on the activating player's
+        // stage, so a condition with `target: "opponent"` would otherwise test the
+        // activating card against the opponent's slots and always fail.
+        if let Some(act_pos) = condition.get_activation_position() {
+            let player = self.resolve_condition_player("self");
+            let passes = act_pos.split(',').any(|p| {
+                let Some(idx) = crate::ability::util::activation_position_index(p) else {
+                    return false;
+                };
+                idx < player.stage.stage.len()
+                    && self
+                        .activating_card_id
+                        .is_some_and(|cid| player.stage.stage[idx] == cid)
+            });
+            if !passes {
+                return false;
+            }
+        }
         // For all other types: run evaluator, then push generic verdict
         let result: bool = match condition {
             Condition::Appearance { .. } => self.evaluate_appearance_condition(condition),

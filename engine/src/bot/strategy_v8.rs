@@ -418,6 +418,37 @@ pub fn choose_mulligan_v8(gs: &GameState, actions: &[Action], db: &CardDatabase)
 pub use choose_action_v8_entry as choose_action;
 pub use choose_live_set_v8_entry as choose_live_set;
 pub use choose_live_set_v8_wide_entry as choose_live_set_wide;
+
+/// v8's live set with rule 8.4.13's turn-order term priced at `V8_TURNORDER`.
+/// This is v12's whole difference from stock `choose_live_set`.
+pub use super::v8_live::choose_live_set_v8_order as choose_live_set_order;
+pub use super::v8_live::choose_live_set_v8_counter as choose_live_set_counter;
+pub use super::v8_live::choose_live_set_v8_br as choose_live_set_br;
+
+/// v9's Main phase with `V7_CHECK_PRESSURE` / `V7_BLADE_ARITH` installed for
+/// THIS seat only. This is v16's whole difference from stock v9.
+///
+/// The guard is why this is a function rather than an env var: the two weights
+/// are process-global, so setting them from a switch would change both seats of
+/// a head-to-head and the matchup would measure nothing.
+pub fn choose_action_v16(
+    gs: &GameState,
+    actions: &[Action],
+    me: u8,
+) -> Action {
+    let num = |key: &str| {
+        std::env::var(key)
+            .ok()
+            .and_then(|v| v.trim().parse::<f64>().ok())
+            .filter(|v: &f64| v.is_finite() && *v >= 0.0)
+            .unwrap_or(0.0)
+    };
+    let _guard = crate::bot::v7_main::LookaheadGuard::new(
+        num("V7_CHECK_PRESSURE"),
+        num("V7_BLADE_ARITH"),
+    );
+    crate::bot::strategy_v7::choose_action(gs, actions, me)
+}
 pub use choose_mulligan_v8 as choose_mulligan;
 pub use score_actions_v8 as score_actions;
 

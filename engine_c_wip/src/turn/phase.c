@@ -93,6 +93,68 @@ int rb_setup_live_card_candidates(const GameState *g, RbSetupHandCandidate *out,
    executed twice (first then second attacker) before LiveSet → Performance
    → Victory → rollover. Hosts that don't need mulligan can skip it. */
 
+/* Defined at phase.c:735; activate_wait_members below needs it first. */
+static const char *ptc_effect_extra(const AbilityEffect *e, const char *key);
+
+/* DEFECT FIX — the missing `constant_cannot_activate_members` filter.
+ *
+ * Rust actions/mod.rs:125-131, the Active-phase `to_activate` filter in
+ * phases.rs:
+ *     if game_state.constant_cannot_activate_members.iter()
+ *         .any(|x| x.parse::<i16>() == Ok(cid)) { return None; }
+ * That set is built by the CONSTANT scan in
+ * core/game_state/modifiers.rs:1081-1092: for every CONSTANT ability effect with
+ * restriction_type "cannot_activate",
+ *     let tgt = effect.target_any().unwrap_or("self");
+ *     if rt == "cannot_activate" {
+ *         if tgt == "self" { self.constant_cannot_activate_members
+ *                                 .push(card_id.to_string()); }
+ *         else { self.constant_cannot_activate_members
+ *                     .push(resolve_target_player(tgt).id.to_string()); }
+ *     }
+ * and it is CLEARED at the top of every scan (modifiers.rs:671).
+ *
+ * The C had neither the GameState field nor the filter, so a member under a
+ * 「このメンバーは自分のアクティブフェイズにアクティブにしない」 constant
+ * restriction was flipped to "active" by activate_wait_members on its
+ * controller's Active phase — the exact card text says it must not activate.
+ *
+ * Only the SELF-target half is observable: a non-self target pushes a PLAYER id
+ * ("player1"/"player2"), and `"player1".parse::<i16>()` fails, so the
+ * `== Ok(cid)` comparison at phases.rs:126 never matches it. That half is a
+ * no-op in Rust too and is not reimplemented.
+ *
+ * The predicate is recomputed locally here instead of stored, because the set is
+ * filled ONLY by recalculate_constants (modifiers.c, not this file's) and
+ * include/rabuka.h — which has no such field — is not this file's to edit. The
+ * recomputation is exact: same trigger kind (RB_TK_CONSTANT), same action name,
+ * same restriction_type, same target default. The effect's own `condition`
+ * (both corpus abilities carry a temporal_condition on phase=active_phase) is
+ * deliberately NOT evaluated, because modifiers.rs:1081-1092 never evaluates it
+ * either. */
+static int has_constant_cannot_activate(int card_id) {
+    if (card_id < 0) return 0;
+    int n = rb_card_num_abilities((uint32_t)card_id);
+    for (int i = 0; i < n; i++) {
+        Ability ab;
+        if (!rb_decode_card_ability((uint32_t)card_id, i, &ab)) continue;
+        int keep = 0;
+        if (rb_ability_has_trigger(&ab, RB_TK_CONSTANT) && ab.effect &&
+            ab.effect->action && !strcmp(ab.effect->action, "restriction")) {
+            const char *rt = ptc_effect_extra(ab.effect, "restriction_type");
+            if (!rt) rt = ptc_effect_extra(ab.effect, "type");
+            const char *tg = ab.effect->target;
+            if (!tg) tg = ptc_effect_extra(ab.effect, "target");
+            if (rt && !strcmp(rt, "cannot_activate") &&
+                (!tg || !strcmp(tg, "self")))
+                keep = 1;
+        }
+        if (keep) { rb_free_ability(&ab); return 1; }
+        rb_free_ability(&ab);
+    }
+    return 0;
+}
+
 static void activate_wait_members(GameState *g, int pl) {
     RbPlayer *P=&g->p[pl];
     int owned[RB_MAX_CARD_IDS]; int n_owned=0;
@@ -103,6 +165,10 @@ static void activate_wait_members(GameState *g, int pl) {
         (P->stage_wait[q] || (rb_mods_get_orientation(&g->mods, P->stage[q]) &&
                              !strcmp(rb_mods_get_orientation(&g->mods, P->stage[q]), "wait")))) {
         if(rb_mods_is_delayed_cannot_active(&g->mods,P->stage[q])) continue;
+        /* phases.rs:125-131 — a card the constant scan put in
+           constant_cannot_activate_members keeps its wait orientation. See
+           has_constant_cannot_activate above for why this is computed here. */
+        if(has_constant_cannot_activate(P->stage[q])) continue;
         P->stage_wait[q]=0;
         rb_mods_set_orientation(&g->mods, P->stage[q], "active");
     }
@@ -216,7 +282,22 @@ if (g->phase == RB_PHASE_LIVE_SET) {
             g->phase = RB_PHASE_LIVE_SET_SECOND;
             return;
         }
-        g->active = g->first_attacker;
+g->active = g->first_attacker;
+        /* DEFECT FIX - phases.rs:232-233, the FIRST two statements of the
+           LiveCardSetSecondAttacker arm, before its check_timing at :240:
+             game_state.player1.live_card_set_limit_reduction = 0;
+             game_state.player2.live_card_set_limit_reduction = 0;
+           execute_reduce_live_card_set_limit (ability/effects/restriction.rs
+           :217-234) does `player.live_card_set_limit_reduction += count`, and the
+           two corpus abilities that reach it say "the NEXT live-card-set phase
+           can set one fewer card". The C incremented
+           g->live_set_limit_reduction at both writers (ability/effects/rules.c
+           :1952 and ability/effects/state.c:1296) and NEVER cleared it, so once
+           either card fired the player's live-card-set limit was permanently
+           shrunk for the rest of the game. Rust honours "next"; the C honoured
+           "forever". */
+        g->live_set_limit_reduction[0] = 0;
+        g->live_set_limit_reduction[1] = 0;
         /* Load-bearing: re-evaluates constant abilities before performance (mirrors
            engine/src/turn/phases.rs:222 check_timing at LiveCardSetSecond→FirstPerformance).
            Without this q127_wien leaves_stage_modifier_removed breaks.
@@ -437,7 +518,7 @@ baton_touch_used — C-LOCAL, no Rust clear site. Rust passes
                 cleared from here (`rb_rules_state` is static in rules.c). That
                 half is BLOCKED-ON, together with cannot_live_players below.
 
-              cannot_live_players.clear()         phases.rs:280
+cannot_live_players.clear()         phases.rs:280
                 BLOCKED-ON src/ability/effects/rules.c (not this file's, and not
                 under src/ability ownership this task holds). It lives in the
                 file-static RbRulesState at rules.c:72; `rb_rules_state` is
@@ -446,6 +527,18 @@ baton_touch_used — C-LOCAL, no Rust clear site. Rust passes
                 EXACT SYMBOL NEEDED —
 
                     void rb_rules_clear_turn_state(GameState *g);
+
+                ⚠ THE DECLARATION IS DELIBERATELY ABSENT FROM BOTH FILES THAT
+                USED TO CARRY IT. src/turn/phase.c and src/turn/live.c each
+                spelled this prototype out inside a comment block, so the symbol
+                had TWO declarations, NO definition anywhere in the tree, and NO
+                caller — and checklist item I2 still claimed `[x]`. Any future
+                call site would have been a LINK ERROR with no compiler warning
+                along the way, because both declarations were inside comments
+                and therefore only ever documentation. So neither comment
+                declares it now: this tombstone is the single record, and the
+                definition has to arrive with the prototype, in rules.c, in one
+                edit. Do NOT re-add the prototype here before the body exists.
 
                 clearing `cannot_live_players[2]` and `cannot_activate_members[2]`
                 in the same frame (Rust clears them adjacently, phases.rs:279-280),
@@ -457,6 +550,12 @@ baton_touch_used — C-LOCAL, no Rust clear site. Rust passes
                 Until it exists, live.c's `discard_live_on_cannot_live`
                 (live.rs:1832) cannot be wired either — see PARITY_CHECKLIST.md
                 I2, where the whole reader/writer/clear chain is written out.
+                ⚠ `cannot_live_players[2]` (rules.c:72, written rules.c:1878) is
+                STILL never cleared: it latches 1 on the first restriction that
+                forbids a live ("ライブできない", the `cannot_live` arm of
+                r_apply_restriction, rules.c:1876-1878) and no rollover ever
+                zeroes it. That is the
+                concrete reason this item is still open.
 
               wait_immune_members.clear()         phases.rs:281
                 there is no writer for it anywhere in the tree (the header says
@@ -575,6 +674,33 @@ void rb_check_victory_condition(GameState *g) {
 
 void rb_check_invalid_live_cards(GameState *g, int is_p1) {
     RbPlayer *P = is_p1 ? &g->p[0] : &g->p[1];
+    /* THE FACE-UP GATE (was missing; Rust turn/actions/mod.rs:1732-1736).
+         fn check_invalid_live_cards(game_state: &mut GameState, is_p1: bool) {
+             let seat = if is_p1 { 0 } else { 1 };
+             if !game_state.seat_player(seat).live_card_zone.face_up { return; }
+
+       The eviction is only legal while that seat's live-card zone is REVEALED.
+       The C had no gate, so it evicted a wrongly-set non-live card from the
+       live zone during the live-card-SET phase, where Rust does not -- which is
+       the "Rust evicts a wrongly-set member AFTER the live, the C evicts BEFORE"
+       divergence. Reachable, not a no-op: `face_up` starts false
+       (core/zones.rs:514), is set false again by every set_live_card /
+       live-card confirmation (phases.rs:832/:887) and true only at the
+       performance (phases.rs:343), so between a seat's live-card set and its
+       own performance Rust's early return fires and the C's body used to run.
+
+       WHY THE INDEX IS THE SEAT AND NOT A SLOT. The field is declared
+       `uint8_t live_face_up[RB_MAX_LIVE_CARDS]` (include/rabuka.h:1801) with a
+       comment calling it a per-CARD parallel array beside `live`, but Rust's
+       `LiveCardZone.face_up` (core/zones.rs:501) is ONE flag for the whole
+       zone, and `LiveCardZone::add_card(&mut self, card_id, _face_up: bool)`
+       (zones.rs:1038) IGNORES its flag (hence the underscore) -- so no per-card
+       value ever exists to store and a per-card array cannot represent it. The
+       two seat flags are written at live_face_up[0] and [1] here. If the header
+       owner reshapes the declaration to `uint8_t live_face_up[2];` (the exact
+       patch is reported) this code compiles and behaves identically; the header
+       COMMENT is what needs correcting, not the storage. */
+    if (!g->live_face_up[is_p1 ? 0 : 1]) return;
     /* collect indices of non-live cards in the live zone (iterate backwards) */
     for (int i = P->live.n - 1; i >= 0; i--) {
         int cid = P->live.cards[i];
@@ -606,7 +732,22 @@ void rb_check_orphaned_under_cards(GameState *g, int pl) {
         if (P->stage[a] == RB_EMPTY_SLOT && P->under_cards[a].n > 0) {
             for (int i = P->under_cards[a].n - 1; i >= 0; i--) {
                 int cid = bag_remove_at_local(&P->under_cards[a], i);
-                if (rb_card_is_energy(cid)) bag_push_local(&P->energy, cid);
+                /* DEFECT FIX. Rust actions/mod.rs:1851-1856 (check_orphaned_
+                   under_cards) sends an orphaned ENERGY card to `player.energy_
+                   deck`, NOT to the player's active energy zone:
+                       if card_db.get_card(cid).is_some_and(|c| c.is_energy()) {
+                           player.energy_deck.cards.push(cid);
+                       } else {
+                           player.waitroom.cards.push(cid);
+                       }
+                   The C pushed it into `P->energy`, i.e. the ACTIVE ENERGY ZONE,
+                   which makes the card immediately usable as energy and never
+                   returns it to the deck. Rule 10.5.3 (member leaves the stage,
+                   card under it is orphaned) and Rule 10.5.4 (energy card in
+                   waitroom -> energy deck) are the same rule: the energy card
+                   goes back to the energy DECK, so it must be re-drawn to be
+                   used. Same routing as rb_check_invalid_live_cards above. */
+                if (rb_card_is_energy(cid)) bag_push_local(&P->energy_deck, cid);
                 else                        bag_push_local(&P->discard, cid);
             }
         }
@@ -614,18 +755,76 @@ void rb_check_orphaned_under_cards(GameState *g, int pl) {
 }
 
 void rb_check_invalid_resolution_zone(GameState *g) {
-    if (g->resolution.n == 0) return;
-    RbPlayer *P = &g->p[g->active];
+    if (g->resolution.n == 0) { g->n_resolution_owners = 0; return; }
+    /* Rust actions/mod.rs:1864-1895 (check_invalid_resolution_zone):
+           let cards  = core::mem::take(&mut game_state.resolution_zone.cards);
+           let owners = core::mem::take(&mut game_state.resolution_zone.owners);
+           for (index, card_id) in cards.into_iter().enumerate() {
+               let owner = owners.get(index).copied().unwrap_or(active);
+               let owner_player = game_state.seat_player_mut(owner);
+               if card_db.get_card(cid).is_some_and(|c| c.is_energy()) {
+                   owner_player.energy_deck.cards.push(card_id);
+               } else {
+                   owner_player.waitroom.cards.push(card_id);
+               }
+           }
+
+       BOTH halves now land. The ENERGY half was closed earlier (it used to push
+       every resolved card into the active player's discard, so an energy card
+       pulled in by a yell went to the DISCARD and died there). The OWNER half
+       was structurally absent until include/rabuka.h:1617-1618 added
+       `resolution_owners[]` + `n_resolution_owners` and
+       rb_resolution_add_for_owner (zones.c) added the writer; this drain is the
+       reader. Each card goes back to the seat that YELLED it, not to the
+       active seat, which is the difference the non-active performer's revealed
+       yell cards are measured on (tests/test_parity_rules_extra.c
+       test_c_rule_5_8_returns_to_owner_not_active_seat).
+
+       `unwrap_or(active)` is reproduced, not approximated: an entry with no
+       owner stamp -- written straight into g->resolution.cards[] rather than
+       through rb_resolution_add(_for_owner), which several suites do -- falls
+       back to g->active, and the 0xFF sentinel that
+       rb_resolution_add_for_owner stores for "owner unknown" lands in the same
+       branch (see RB_RESOLUTION_OWNER_UNKNOWN in src/core/zones.c). Iterating
+       from the end keeps every `i` equal to the index Rust's forward
+       enumerate() saw, which is what pairs a card with its owner. */
     for (int i = g->resolution.n - 1; i >= 0; i--) {
+        int owner = (i < g->n_resolution_owners) ? (int)g->resolution_owners[i] : -1;
+        if (owner < 0 || owner > 1) owner = g->active;   /* unwrap_or(active) */
+        RbPlayer *OP = &g->p[owner];
         int cid = bag_remove_at_local(&g->resolution, i);
-        bag_push_local(&P->discard, cid);
+        if (rb_card_is_energy(cid)) bag_push_local(&OP->energy_deck, cid);
+        else                        bag_push_local(&OP->discard, cid);
     }
+    g->n_resolution_owners = 0;
 }
 
 void rb_check_timing(GameState *g) {
-    rb_player_refresh(g, 0);
-    rb_player_refresh(g, 1);
+    /* DEFECT FIX. Rust actions/mod.rs:1632-1638 (check_timing) refreshes in
+       FIRST-ATTACKER order, and Player::refresh (core/player.rs:634-648) draws
+       from the global RNG (`crate::rng::shuffle_slice`) whenever a deck is empty
+       and the waitroom is not:
+           if game_state.player1.is_first_attacker {
+               game_state.player1.refresh();
+               game_state.player2.refresh();
+           } else {
+               game_state.player2.refresh();
+               game_state.player1.refresh();
+           }
+       `player1.is_first_attacker` is exactly `g->first_attacker == 0` in the C
+       (g->first_attacker holds the SEAT index; rb_game_init seeds 0/1). The C
+       refreshed p1 then p2 unconditionally, so whenever player 2 was the first
+       attacker AND both players had an empty deck with a non-empty waitroom, the
+       two shuffles consumed the shared RNG stream in the opposite order and both
+       deck orders came out different from Rust's. */
+    if (g->first_attacker == 0) { rb_player_refresh(g, 0); rb_player_refresh(g, 1); }
+    else                         { rb_player_refresh(g, 1); rb_player_refresh(g, 0); }
     rb_check_victory_condition(g);
+    /* actions/mod.rs:1646-1648 — once check_victory_condition has ended the game
+       Rust RETURNS and every step below is skipped. The C has no `game_ended`
+       field; g->winner is the equivalent the phase machine already gates on
+       (rb_advance_phase:118 returns on g->winner!=-1), so this early-out is
+       redundant here rather than divergent. Left as-is; see AUDIT §4-7. */
     rb_check_invalid_live_cards(g, true);
     rb_check_invalid_live_cards(g, false);
     rb_check_invalid_energy_cards(g, 0);
@@ -1143,8 +1342,18 @@ int rb_handle_set_live_card(GameState *g, int card_id) {
     if (idx < 0) return 0;
     if (P->hand.n <= 0 || idx >= P->hand.n) return 0;
     if (P->live.n >= RB_MAX_LIVE_CARDS) return 0;
-    int card = rb_hand_remove_card(P, idx);
+int card = rb_hand_remove_card(P, idx);
     if (card < 0) return 0;
+    /* phases.rs:830-832 — the card is taken out of the hand face DOWN:
+         let card = player.hand.cards.remove(idx);
+         player.live_card_zone.face_up = false;
+       which re-closes the gate rb_check_invalid_live_cards reads. Noted, not
+       fixed: Rust takes this write BEFORE the `live_cards.len() >= MAX_LIVE_CARDS`
+       refusal at :834 and therefore also consumes the hand card on that
+       refusal, while the C refuses at :1288 with the card still in hand. Moving
+       the capacity check would change hand contents, which is outside this
+       item; the face-up value agrees on every path both engines reach. */
+    g->live_face_up[g->active] = 0;
     rb_live_add_card(P, card);
     return 1;
 }
@@ -1215,7 +1424,12 @@ int rb_handle_live_card_confirmation(GameState *g, const int *indices, int n_ind
             if (deduped[j] == live_indices[i]) { dup = 1; break; }
         if (!dup) deduped[n_deduped++] = live_indices[i];
     }
-    RbPlayer *P = &g->p[g->active];
+RbPlayer *P = &g->p[g->active];
+    /* phases.rs:886-887 — the confirmed set goes down face DOWN, the same
+       single statement the set_live_card path takes, so a seat that confirms an
+       empty selection still re-closes the gate (Rust writes it before looking
+       at `placed` at all). */
+    g->live_face_up[g->active] = 0;
     int max_live = RB_MAX_LIVE_CARDS - P->live.n;
     if (max_live < 0) max_live = 0;
     int placed = 0;
@@ -1429,13 +1643,25 @@ void rb_execute_performance_phase(GameState *g, int is_first) {
     int performer = is_first ? g->first_attacker : g->second_attacker;
     if (performer < 0 || performer > 1) performer = g->active;
 
+/* phases.rs:343 — `performer.live_card_zone.face_up = true;`, the FIRST
+       statement of the performance window and the reason
+       check_invalid_live_cards may evict at all. ORDER IS LOAD-BEARING: Rust
+       writes it at :343 and calls Self::check_timing(game_state) at :349, so the
+       gate is already OPEN for the timing pass that opens the window. Writing it
+       after the check_timing below is the bug this comment exists to prevent —
+       it leaves the eviction to the NEXT timing pass, which is one phase later
+       and not the same board, so a non-live card forced into the live slot
+       survives ライブ開始時 (measured: tests/test_parity_jidou_watch.c Q213
+       ハナムスビ). The old comment here claimed the reveal "is the yell inside
+       rb_perform_live"; that is the YELL, not the face-up flag, and the flag is
+       separate state the C had no home for until include/rabuka.h:1801. */
+    g->live_face_up[performer] = 1;
+
     /* phases.rs:240/352 — constants must be freshly registered before the
        window opens, or heart modifiers go stale (q127_wien). */
     rb_recalc_constants(g);
     rb_check_timing(g);
 
-    /* phases.rs:346 — the live card zone is turned face up; the C RbBag has no
-       face-up flag, the reveal is the yell inside rb_perform_live. */
     /* phases.rs:382-527 + 630-641 */
     g->active = performer;
     rb_perform_live(g, performer);
@@ -1913,3 +2139,4 @@ RbBatonActionList rb_generate_possible_actions(const GameState *state) {
     result.count = generated.count;
     return result;
 }
+

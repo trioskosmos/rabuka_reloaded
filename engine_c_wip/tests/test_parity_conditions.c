@@ -61,7 +61,7 @@ static int set_live_card(TestGame *game, int card_id) {
 }
 
 static void diag_scenario(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int nonfiction = test_id(&game, "PL!SP-bp4-024-L");
     int self_center = test_id(&game, "PL!SP-pb1-001-R");
@@ -95,7 +95,7 @@ static void diag_scenario(void) {
 }
 
 static void diag_both_players(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int p1_card = test_id(&game, "PL!SP-bp4-024-L");
     int p2_card = test_new_id(&game, "PL!SP-bp4-024-L");

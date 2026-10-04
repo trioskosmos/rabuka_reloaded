@@ -100,6 +100,100 @@ pub enum BotKind {
     /// pure opponent - and that head-to-head is what refuted this, where the
     /// mirror had it at +1.10 pp and p=0.036.
     V11,
+    /// v9's Main and mulligan with a live set that prices rule 8.4.13.
+    /// CLI name `v12`. **A measured null - nothing selects it.**
+    ///
+    /// 8.4.13 gives the 先攻 (first-attacker) slot to whoever placed ALONE last
+    /// turn, and the two slots are not equivalent: per-check calibration puts
+    /// the first attacker at 0.161 placements per check against the second
+    /// attacker's 0.441, because 8.2.2 lets the second attacker see the first
+    /// attacker's set COUNT before committing. So banking a placement alone also
+    /// surrenders the better slot, and `check_outcome` - which prices one check
+    /// in isolation - cannot see it at all.
+    ///
+    /// This kind exists so that consequence can be priced on ONE seat and
+    /// measured against a pure `v9`. The weight is `V8_TURNORDER`, read at the
+    /// v12 entry point only, so sweeping it leaves the opponent's policy
+    /// untouched and `v12 vs v9` stays a genuine asymmetric matchup.
+    ///
+    /// A mirror cannot run this experiment at all: both seats changing together
+    /// cannot move a symmetric win rate off 50%, which is why nine earlier
+    /// process-global switches all read null in mirrors while some of them were
+    /// moving placements measurably.
+    V12,
+    /// v9's Main and mulligan with a live set that prices our OWN set size as
+    /// the public signal it is. CLI name `v13`. **Nothing selects it.**
+    ///
+    /// 8.2.2 sets our cards face-down, 8.2.4 lets the opponent set theirs, and
+    /// 8.3 is where anything is revealed. The only thing that crosses the
+    /// boundary is a COUNT - and in a deck whose four lives score 1/2/4/7 a
+    /// count is most of the information there is. Every other part of
+    /// `OppModel` holds the opponent's score distribution fixed, which means
+    /// the bot cannot see that publishing a bigger set *invites* a bigger
+    /// counter. That is a Nash-within-one-head error rather than a mistuned
+    /// weight, which is why it survived every scalar sweep.
+    ///
+    /// `V8_COUNTER` is score points per published card, read at the v13 entry
+    /// point only. It applies to the forecast case only (us attacking first):
+    /// when we attack second their size is already observed and already inside
+    /// the model, so shifting it again would double count.
+    V13,
+    /// v9 with v8's forward-walk MULLIGAN instead of v7's curve rule.
+    /// CLI name `v15`.
+    ///
+    /// The mulligan is the highest-leverage single decision in a card game - it
+    /// fixes the resources the whole game is played from - and it is the one
+    /// decision in this project that has never been measured head-to-head. It
+    /// fires on ~17% of hands, and both implementations have only ever been
+    /// compared in mirrors, which cannot see a one-seat change.
+    ///
+    /// v8's is the more principled of the two: it enumerates every legal
+    /// opening and scores it with a three-turn forward walk, where v7's is a
+    /// static curve. The recorded comparison ("-3.4 from v8 and -5.8 from v9")
+    /// is a mirror figure and therefore not evidence either way.
+    ///
+    /// A kind rather than a switch because `V9_MULLIGAN` is process-global: both
+    /// seats would change together and a mirror would read 50% by symmetry.
+    V15,
+    /// ## EVALUATION TOOL — CHEATS. NOT A LEGAL BOT.
+    /// CLI name `vbr`. v9's Main and mulligan with an omniscient live set.
+    ///
+    /// This reads the opponent's real board, hand and committed zone. It is a
+    /// best-response instrument in the sense of Timbers et al., IJCAI 2022:
+    /// a best response must see what it responds to, and cheating is what makes
+    /// the result a lower bound instead of a guess.
+    ///
+    /// It exists because of a structural blind spot in the whole project. Every
+    /// measurement on record is self-play, and a symmetric change cannot move a
+    /// symmetric win rate off 50% — so none of them can see a defect BOTH seats
+    /// share, and `v9` is compared almost exclusively against itself. Fourteen
+    /// interventions produced fourteen nulls for that reason, not because there
+    /// was nothing wrong.
+    ///
+    /// `vbr` can win by exploiting a shared mistake, and the traces then name
+    /// which decisions to encode. **Never wire this into a shipped policy**: a
+    /// legal opponent has the same blind spot it does, and the whole result is
+    /// worthless if it reaches a real game.
+    Vbr,
+    /// v9 with a Main phase that prices the position through the REAL live-set
+    /// evaluator. CLI name `v16`.
+    ///
+    /// `V7_CHECK_PRESSURE` and `V7_BLADE_ARITH` both default to **0.0**. They
+    /// are the only terms in `v7_main` that evaluate a candidate action by
+    /// asking the 256-draw pass model whether the NEXT check will actually
+    /// pass - and they are switched off, so the Main phase that carries the 58%
+    /// between the component halves scores everything by feature deltas toward a
+    /// proxy instead.
+    ///
+    /// This is the same error `vbr` proved is wrong in the live set: one-phase
+    /// greedy toward place-probability is not the objective, because 8.4.13
+    /// makes a placement change next turn's attacker slot and 1.2.1.1 makes the
+    /// game a race to three. The best action for THIS check is often not the best
+    /// action for the game.
+    ///
+    /// Everything on record for these weights was read in mirrors, which cannot
+    /// detect a one-seat change, so they have never had a valid test.
+    V16,
     Neural,
     Conductor,
     Random,
@@ -121,6 +215,11 @@ impl BotKind {
         "v9",
         "v10",
         "v11",
+        "v12",
+        "v13",
+        "v15",
+        "vbr",
+        "v16",
         "neural",
         "conductor",
         "random",
@@ -141,6 +240,11 @@ impl BotKind {
             "v9" => BotKind::V9,
             "v10" => BotKind::V10,
             "v11" => BotKind::V11,
+            "v12" => BotKind::V12,
+            "v13" => BotKind::V13,
+            "v15" => BotKind::V15,
+            "vbr" => BotKind::Vbr,
+            "v16" => BotKind::V16,
             "neural" => BotKind::Neural,
             "conductor" => BotKind::Conductor,
             _ => BotKind::Random,
@@ -162,6 +266,11 @@ impl BotKind {
             BotKind::V9 => "v9",
             BotKind::V10 => "v10",
             BotKind::V11 => "v11",
+            BotKind::V12 => "v12",
+            BotKind::V13 => "v13",
+            BotKind::V15 => "v15",
+            BotKind::Vbr => "vbr",
+            BotKind::V16 => "v16",
             BotKind::Neural => "neural",
             BotKind::Conductor => "conductor",
             BotKind::Random => "random",
@@ -245,6 +354,11 @@ impl BotKind {
             // v9's unchanged. Isolating the live-set width is the whole point: a
             // candidate that also moved the Main phase could not be read.
             BotKind::V11 => strategy_v7::choose_action(gs, actions, me),
+            BotKind::V12 => strategy_v7::choose_action(gs, actions, me),
+            BotKind::V13 => strategy_v7::choose_action(gs, actions, me),
+            BotKind::V15 => strategy_v7::choose_action(gs, actions, me),
+            BotKind::Vbr => strategy_v7::choose_action(gs, actions, me),
+            BotKind::V16 => strategy_v8::choose_action_v16(gs, actions, me),
             // v10 is v8's Main, which becomes the confirmed configuration when
             // `V8_ALL_TERMS` is set. It is not forced on here: a bot's identity
             // should not depend on whether the caller remembered an env var, and
@@ -346,6 +460,11 @@ impl BotKind {
             BotKind::V10 => strategy_v8::choose_live_set(gs, actions, db),
             // The one difference from `V9`. See the enum.
             BotKind::V11 => strategy_v8::choose_live_set_wide(gs, actions, db),
+            BotKind::V12 => strategy_v8::choose_live_set_order(gs, actions, db),
+            BotKind::V13 => strategy_v8::choose_live_set_counter(gs, actions, db),
+            BotKind::V15 => strategy_v8::choose_live_set(gs, actions, db),
+            BotKind::Vbr => strategy_v8::choose_live_set_br(gs, actions, db),
+            BotKind::V16 => strategy_v8::choose_live_set(gs, actions, db),
             BotKind::Neural => actions.first().cloned().unwrap_or(Action {
                 description: "pass".into(),
                 description_ja: None,
@@ -416,6 +535,11 @@ impl BotKind {
             // is not a context problem.
             BotKind::V10 => strategy_v7::choose_mulligan(gs, actions, db),
             BotKind::V11 => strategy_v7::choose_mulligan(gs, actions, db),
+            BotKind::V12 => strategy_v7::choose_mulligan(gs, actions, db),
+            BotKind::V13 => strategy_v7::choose_mulligan(gs, actions, db),
+            BotKind::V15 => strategy_v8::choose_mulligan(gs, actions, db),
+            BotKind::Vbr => strategy_v7::choose_mulligan(gs, actions, db),
+            BotKind::V16 => strategy_v7::choose_mulligan(gs, actions, db),
         }
     }
 }

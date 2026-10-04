@@ -52,6 +52,7 @@ static int checks;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -64,6 +65,7 @@ static int checks;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -234,7 +236,7 @@ static void par_drain(TestGame *tg)
 
 static void test_trigger_registry(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -273,7 +275,7 @@ static void test_trigger_registry(void)
 
 static void test_trigger_auto_ability_string_key(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -363,7 +365,7 @@ static void test_trigger_auto_ability_string_key(void)
 
 static void test_trigger_auto_ability_gained(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -416,7 +418,7 @@ static void test_trigger_auto_ability_gained(void)
 
 static void test_trigger_auto_ability_by_index(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -493,7 +495,7 @@ static int par_tas(TestGame *tg, int pl, const int *moved, int n_moved)
 
 static void test_tas_condition_shapes(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -534,7 +536,7 @@ static void test_tas_condition_shapes(void)
 
 static void test_tas_live_zone_self_trigger(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -574,7 +576,7 @@ static void test_tas_live_zone_self_trigger(void)
 
 static void test_tas_discard_guard(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -599,7 +601,7 @@ static void test_tas_discard_guard(void)
 
 static void test_tas_batch_dedupe(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -624,7 +626,7 @@ static void test_tas_batch_dedupe(void)
 
 static void test_each_time_resolution_watcher(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -687,7 +689,7 @@ static void test_each_time_resolution_watcher(void)
 
 static void test_stage_activation_position_gate(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -730,7 +732,7 @@ static void test_stage_activation_position_gate(void)
 
 static void test_preceding_moved_multiplicity(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -770,7 +772,7 @@ static void test_preceding_moved_multiplicity(void)
 
 static void test_pending_auto_resolution(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 
@@ -816,7 +818,7 @@ static void test_pending_auto_resolution(void)
 
 static void test_use_accounting(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     GameState *g = &tg.state;
 

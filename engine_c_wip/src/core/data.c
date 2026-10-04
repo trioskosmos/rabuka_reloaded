@@ -503,19 +503,48 @@ static int card_no_contains_lowest(const char *needle, const char *narrow) {
    parameter, so it warns without asking whether the derived ranges intersect.
    That heuristic is exactly right for `memcpy(dst, dst+n, k)` and exactly wrong
    here. Measured: it fires under the project's own `-Wall` (gcc 15, data.c
-   :535/:563/:570), not only under -Wextra.
+   :543/:571/:578), not only under -Wextra.
 
-   Do NOT silence it. There is no in-source way to tell GCC "same object, but
-   disjoint sub-ranges" — it only compares object identity — so the options are
-   a `#pragma GCC diagnostic` (destroys the diagnostic for exactly the range
-   arithmetic documented above) or hand-rolling the join with memcpy (replaces
-   a well-defined snprintf with 10 lines of truncation logic on the hottest
-   lookup path in the file). Neither is worth it: the code is correct for every
-   len, and the warning is the only tripwire that would notice a future edit to
-   the offsets making it incorrect. Noise that catches a real corruption class
-   is cheaper than silence that cannot. */
-static size_t card_no_scratch_bytes(size_t len) {
+   So the invariant is not left as prose. `rb_card_no_scratch_layout_ok` below
+   EVALUATES it, for one len, from the same arithmetic this function uses to
+   place the four buffers, and `tools/audit_w_gate.c` calls it for every len in
+   0..=256. The claim "the snprintf source and destination cannot overlap" is
+   therefore machine-checked instead of asserted, which is the only form of
+   proof that survives the next edit to the offsets.
+
+   Do NOT silence the diagnostic. There is no in-source way to tell GCC "same
+   object, but disjoint sub-ranges" — it only compares object identity — so the
+   options are a `#pragma GCC diagnostic` or hand-rolling the join with memcpy
+   (replaces a well-defined snprintf with 10 lines of truncation logic on the
+   hottest lookup path in the file). Neither is worth it. `make warnings-audit`
+   is the tripwire that notices a future edit: it fails on -Wrestrict here, and
+   it deliberately does not have this file in its baseline allowlist. */
+size_t rb_card_no_scratch_bytes(size_t len) {
     return 3 * (len + 1) + 2 + 3 * len + 4 + 1;
+}
+
+/* The layout invariant, as CODE rather than as a comment. For one `len`:
+   every sub-range is inside the allocation and no two sub-ranges intersect.
+   `base` is the only buffer the three snprintf calls read, so disjointness of
+   {base} from {variant} is exactly the property -Wrestrict cannot see. */
+int rb_card_no_scratch_layout_ok(size_t len) {
+    size_t alloc = rb_card_no_scratch_bytes(len);
+    size_t off_norm = 0;              size_t cap_norm = len + 1;
+    size_t off_base = len + 1;        size_t cap_base = len + 1;
+    size_t off_var  = 2 * len + 2;    size_t cap_var  = len + 2;
+    size_t off_nar  = 3 * len + 4;    size_t cap_nar  = 3 * len + 4;
+    const size_t off[4] = { off_norm, off_base, off_var, off_nar };
+    const size_t cap[4] = { cap_norm, cap_base, cap_var, cap_nar };
+    for (int i = 0; i < 4; i++) {
+        if (off[i] > alloc || cap[i] > alloc - off[i]) return 0;   /* inside */
+        for (int j = i + 1; j < 4; j++)
+            if (off[i] < off[j] + cap[j] && off[j] < off[i] + cap[i]) return 0;
+    }
+    /* and the premise the argument leans on: `base_len <= len`, because
+       rb_card_normalize_no never expands (card.c:223 writes 1 byte per folded
+       code point and copies n bytes otherwise). `base` has len+1 bytes, so a
+       base of len bytes still leaves room for its NUL. */
+    return cap_base >= 1;
 }
 
 static int card_no_resolve_chain(const char *card_no, char *scratch, size_t len) {
@@ -603,7 +632,7 @@ int rb_find_card_by_no(const char *card_no) {
     if (id >= 0) return id;
 
     size_t len = strlen(card_no);
-    size_t need = card_no_scratch_bytes(len);
+    size_t need = rb_card_no_scratch_bytes(len);
     char stack_scratch[CARD_NO_STACK_SZ];
     if (need <= sizeof(stack_scratch))
         return card_no_resolve_chain(card_no, stack_scratch, len);

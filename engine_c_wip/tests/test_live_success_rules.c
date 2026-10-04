@@ -43,7 +43,7 @@ static void run_performance(TestGame *tg) {
 }
 
 static void test_insufficient_hearts_failure(void) {
-    TestGame tg; test_game_new(&tg);
+static    TestGame tg; test_game_new(&tg);
     int live = test_id(&tg, "PL!-sd1-019-SD");
     CHECK(rb_card_is_live(live), "insufficient-heart fixture is a live card");
     test_add_to_live(&tg, live);
@@ -53,7 +53,7 @@ static void test_insufficient_hearts_failure(void) {
 }
 
 static void test_both_player_score_comparison_and_tie(void) {
-    TestGame tg; test_game_new(&tg);
+static    TestGame tg; test_game_new(&tg);
     int live = test_id(&tg, "PL!-sd1-019-SD");
     int member = test_id(&tg, "PL!-sd1-001-SD");
     int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -80,7 +80,7 @@ static void test_both_player_score_comparison_and_tie(void) {
 }
 
 static void test_score_zero_success_and_single_live(void) {
-    TestGame tg; test_game_new(&tg);
+static    TestGame tg; test_game_new(&tg);
     int live = test_id(&tg, "PL!-sd1-019-SD");
     int member = test_id(&tg, "PL!-sd1-001-SD");
     int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -96,7 +96,7 @@ static void test_score_zero_success_and_single_live(void) {
 }
 
 static void test_no_live_no_success(void) {
-    TestGame tg; test_game_new(&tg);
+static    TestGame tg; test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     int member = test_id(&tg, "PL!S-sd1-003-SD");
     stage_member(&tg, 0, 0, member);
@@ -107,7 +107,7 @@ static void test_no_live_no_success(void) {
 }
 
 static void test_multiple_live_all_fail(void) {
-    TestGame tg; test_game_new(&tg);
+static    TestGame tg; test_game_new(&tg);
     int live = test_id(&tg, "PL!-sd1-019-SD");
     stage_member(&tg, 0, 0, test_id(&tg, "PL!S-sd1-003-SD"));
     test_add_to_live(&tg, live);
@@ -119,7 +119,7 @@ static void test_multiple_live_all_fail(void) {
 
 static void test_winner_placement_and_second_selection(void) {
     for (int selected = 0; selected < 2; selected++) {
-        TestGame tg; test_game_new(&tg);
+static        TestGame tg; test_game_new(&tg);
         int rin = test_id(&tg, "PL!-sd1-014-SD");
         int hanayo = test_id(&tg, "PL!-sd1-017-SD");
         int live = test_id(&tg, "PL!HS-bp1-019-L");
@@ -143,7 +143,7 @@ static void test_winner_placement_and_second_selection(void) {
 }
 
 static void test_success_zone_legality_and_selection(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int restricted = test_id(&tg, "PL!S-bp2-024-L");
     int legal = test_id(&tg, "PL!HS-bp1-019-L");
@@ -172,7 +172,7 @@ static void test_success_zone_legality_and_selection(void) {
 }
 
 static void test_single_restricted_live_goes_to_waitroom(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int restricted = test_id(&tg, "PL!S-bp2-024-L");
     test_add_to_live(&tg, restricted);
@@ -188,7 +188,7 @@ static void test_single_restricted_live_goes_to_waitroom(void) {
 }
 
 static void test_success_choice_resumes_second_winner(void) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int restricted = test_id(&tg, "PL!S-bp2-024-L");
     int legal = test_id(&tg, "PL!HS-bp1-019-L");
@@ -224,7 +224,7 @@ static void test_success_choice_resumes_second_winner(void) {
 }
 
 static void test_success_replacement_choice(int accept) {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     /* `original` must be 錯覚CROSSROADS, whose 常時 reads
        「このカードを成功ライブカード置き場に置く場合、代わりに自分の控え室にある
@@ -318,7 +318,7 @@ static void test_daydream_mermaid_choices(void) {
 
 static void test_shared_heart_pool(void) {
     for (int count = 1; count <= 3; count++) {
-        TestGame tg; test_game_new(&tg);
+static        TestGame tg; test_game_new(&tg);
         int energy = test_id(&tg, "LL-E-001-SD");
         int rin = test_id(&tg, "PL!-sd1-014-SD");
         int live = test_id(&tg, "PL!HS-bp1-019-L");

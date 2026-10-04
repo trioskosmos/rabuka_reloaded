@@ -35,6 +35,16 @@
  * REWRITES action/source/destination on the copy and must not write through to
  * the decoded tree.
  *
+ * Making it live exposed a SECOND defect in this copy, fixed here by
+ * custom_set_owned() below: a deep clone OWNS text/action/source/destination/
+ * target (alloc.c:224-228) and rb_effect_free frees those five with rb_free
+ * (alloc.c:69-70), so the old
+ * `routed->action = (char *)"move_cards"; ... rb_effect_free(routed);` handed
+ * free() a string literal and killed the process (SIGABRT, no diagnostic) on
+ * the first custom effect that parked a continuation.
+ * tests/test_parity_custom_misc.c's test_custom_placement_order_any_routes_move
+ * reproduces it; h_custom did not hit it because it never freed its struct.
+ *
  * The two remaining copies differed, and the difference was not cosmetic:
  *   arm 1  Rust: `let mut routed = effect.clone();` — a FULL clone, so `count`
  *             and every selection filter reach the routed move_cards. This file
@@ -223,6 +233,31 @@ static void custom_keep_settle(GameState *g, AbilityEffect *slot) {
     }
 }
 
+/* Replace one of a pooled clone's heap-owned string fields.
+ *
+ * A clone produced by rb_effect_deep_clone OWNS text/action/source/destination/
+ * target (each is rb_strdup_heap'd, alloc.c:224-228) and rb_effect_free releases
+ * exactly those five with rb_free (alloc.c:69-70). Assigning a string LITERAL or
+ * a pointer borrowed from the decoded ability tree straight into one of them
+ * therefore hands rb_free a pointer it did not get from the allocator: the pool
+ * frees the slot later and the process dies in free() with no diagnostic.
+ * That is exactly what this file used to do
+ * (`routed->action = (char *)"move_cards"`, then `rb_effect_free(routed)`), and
+ * it is why the copy could not simply be promoted — the crash was real, not
+ * theoretical, and tests/test_parity_custom_misc.c's
+ * test_custom_placement_order_any_routes_move reproduces it.
+ *
+ * rb_strdup2 is the matching pair with rb_free (both are rb_malloc/free behind
+ * the RB_NO_MALLOC switch, alloc.c:12-33), and it is declared in rabuka.h:164;
+ * alloc.c's own rb_strdup_heap is file-static, so this is the exported spelling
+ * of the same allocation. */
+static void custom_set_owned(char **slot, const char *value)
+{
+    if (!slot) return;
+    rb_free(*slot);
+    *slot = rb_strdup2(value);
+}
+
 static void custom_log_parser_gap(GameState *g) {
     char act_name[96];
     act_name[0] = '\0';
@@ -257,9 +292,9 @@ int rb_execute_custom_effect(GameState *g, int actor, AbilityEffect *effect,
            the answer is read back after this frame is gone. */
         AbilityEffect *routed = custom_keep_push(g, effect);
         if (!routed) return 0;
-        routed->action      = (char *)"move_cards";
-        if (!routed->source)       routed->source      = (char *)"looked_at";
-        if (!routed->destination)  routed->destination = (char *)"deck_top";
+        custom_set_owned(&routed->action, "move_cards");
+        if (!routed->source)      custom_set_owned(&routed->source, "looked_at");
+        if (!routed->destination) custom_set_owned(&routed->destination, "deck_top");
         rb_effect_move_cards(g, actor, routed);
         custom_keep_settle(g, routed);
         return 1;
@@ -276,8 +311,8 @@ int rb_execute_custom_effect(GameState *g, int actor, AbilityEffect *effect,
                         : (action_str ? action_str : "");
         AbilityEffect *ge = custom_keep_push(g, effect);
         if (!ge) return 0;
-        ge->text = (char *)text;
-        if (!ge->target) ge->target = (char *)"self";
+        custom_set_owned(&ge->text, text);
+        if (!ge->target) custom_set_owned(&ge->target, "self");
         rb_gain_ability(g, actor, ge);
         custom_keep_settle(g, ge);
         return 1;

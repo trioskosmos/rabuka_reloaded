@@ -287,7 +287,7 @@ static void on_fatal_signal(int sig)
         if (tal) tal->assertions++;                                       \
         if (!tal || tal->prompts <= (int)(control)) {                     \
             if (tal) tal->failures++;                                     \
-            fprintf(stderr, "FAIL (VACUOUS): ");                          \
+            fprintf(stderr, "FAIL: [VACUOUS]  ");                          \
             fprintf(stderr, __VA_ARGS__);                                 \
             fprintf(stderr, " - %d prompt(s) offered, control was %d, so the negative proves nothing\n", tal ? tal->prompts : -1, (int)(control)); \
         }                                                                 \

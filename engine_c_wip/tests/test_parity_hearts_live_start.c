@@ -66,6 +66,7 @@ static int assertions;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -78,6 +79,7 @@ static int assertions;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %lld expected %lld)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -1147,7 +1149,28 @@ static void a_fire_bird_four_blade_group_heart02(void)
  *   game.state.player1.main_deck.cards.clear();   (in the hand-cost tests)
  *   finish_live_setup(game);
  * `hand` must already contain `live` as its LAST entry; set_live_card lifts it
- * out of hand into the live zone. */
+ * out of hand into the live zone.
+ *
+ * `live` MUST BE A REAL ライブ CARD. This is the precondition the bp6 fixtures
+ * were silently violating: they passed the deck/hand FILLER
+ * ("PL!N-sd1-010-SD", type メンバー per cards/cards.json) as the live-slot
+ * occupant. A member in the live slot is an ILLEGAL live-card-set state, and
+ * measured in an isolated snapshot with only the live-slot occupant changed to
+ * "PL!-sd1-020-SD" (type ライブ), three assertions flipped from red to green and
+ * none the other way:
+ *     bp6 should prompt for the any-number discard
+ *     bp6 prompts for the any-number discard
+ *     bp6 prompts even with one eligible card
+ * So the non-live occupant was suppressing the cost prompt outright, not merely
+ * counting an extra live-zone card -- live.n is 1 either way at ライブ開始時,
+ * measured. Every other caller in this file already passes a ライブ print
+ * ("PL!SP-bp5-024-L", "PL!-sd1-020-SD"); bp6 was the outlier.
+ *
+ * This is deliberately NOT a live_face_up flag question. Rust's gate
+ * (actions/mod.rs:1734) leaves a face-down non-live card in the live zone
+ * until the performance phase, so a member CAN legally be sitting there at
+ * ライブ開始時 -- and the C now matches Rust. A fixture that depends on the
+ * eviction instead is depending on the bug Q213 is filed against. */
 static void hl_walk_to_live_start(TestGame *tg, const int *hand, int hand_n,
                                    int live, int clear_decks_after)
 {
@@ -1572,8 +1595,13 @@ static void b_bp6_001_r_discard_distinct_heart_colors(void)
     fill_decks(&tg, filler, 10);
     test_give_energy(&tg, 10);
 
-    int hand[3] = { kosuzu, dia, filler };
-    hl_walk_to_live_start(&tg, hand, 3, filler, 0);
+    /* The live-slot occupant must be a ライブ card, NOT the filler -- see the
+     * hl_walk_to_live_start note. bp6's prompt is suppressed outright by a
+     * member in the live slot, which is what the three prompts below measure. */
+    int live0 = mid(&tg, "PL!-sd1-020-SD");
+    if (!ident(&tg, live0, "PL!-sd1-020-SD")) return;
+    int hand[4] = { kosuzu, dia, filler, live0 };
+    hl_walk_to_live_start(&tg, hand, 4, live0, 0);
 
     const RbChoice *c0 = rb_get_pending_choice(&tg.state);
     int cost_is_hand = c0 && c0->kind == RB_CHOICE_SELECT_CARD && c0->zone[0] &&
@@ -1602,14 +1630,35 @@ static void b_bp6_001_r_discard_distinct_heart_colors(void)
     int dia2 = mid(&tg2, "PL!S-bp3-004-R");
     int kotori2 = mid(&tg2, "PL!-bp3-003-R");
     int filler2 = mid(&tg2, "PL!N-sd1-010-SD");
+    /* ALL FIVE cards are identity-pinned.  kosuzu2 and dia2 were not, which
+     * left this fixture with a guard missing two of its five legs: mid() is
+     * forgiving (rb_find_card_by_no falls back to base+rarity rebuild, then
+     * lowest-prefix, then a SUBSTRING search -- data.c:446), so a mistyped
+     * card number does not return -1, it returns SOME OTHER REAL CARD, and
+     * ident() was never asked about it.  The two assertions that carry this
+     * whole case expect 0, so about the wrong cards they still pass:
+     *
+     *   CHECK_EQ(heart_of(&tg2, joint2, H01), 0, "H01 must NOT come from ...")
+     *   CHECK_EQ(heart_of(&tg2, joint2, H03), 0, "H03 must NOT come from ...")
+     *
+     * That is the mechanism that turns a negative assertion into a vacuous
+     * one.  Fixtures 1 (:1569-1572) and 3 (:1638-1641) pin every card; this one
+     * now does too.  The fixture DATA was verified correct against
+     * cards/cards.json -- PL!HS-pb1-005-R is heart04/05/06, PL!S-bp3-004-R is
+     * heart02/05, PL!-bp3-003-R is heart01/03/06 -- so only the guard was
+     * wrong. */
     if (!ident(&tg2, joint2, "LL-bp6-001-R＋")) return;
+    if (!ident(&tg2, kosuzu2, "PL!HS-pb1-005-R")) return;
+    if (!ident(&tg2, dia2, "PL!S-bp3-004-R")) return;
     if (!ident(&tg2, kotori2, "PL!-bp3-003-R")) return;
     if (filler2 < 0) return;
     set_stage3(&tg2, 0, RB_EMPTY_SLOT, joint2, RB_EMPTY_SLOT);
     fill_decks(&tg2, filler2, 10);
     test_give_energy(&tg2, 10);
-    int hand2[4] = { kosuzu2, dia2, kotori2, filler2 };
-    hl_walk_to_live_start(&tg2, hand2, 4, filler2, 0);
+    int live2 = mid(&tg2, "PL!-sd1-020-SD");
+    if (!ident(&tg2, live2, "PL!-sd1-020-SD")) return;
+    int hand2[5] = { kosuzu2, dia2, kotori2, filler2, live2 };
+    hl_walk_to_live_start(&tg2, hand2, 5, live2, 0);
     const RbChoice *c1 = rb_get_pending_choice(&tg2.state);
     int cost2 = c1 && c1->kind == RB_CHOICE_SELECT_CARD && c1->zone[0] &&
                 !strcmp(c1->zone, "hand");
@@ -1641,8 +1690,10 @@ static void b_bp6_001_r_discard_distinct_heart_colors(void)
     set_stage3(&tg3, 0, RB_EMPTY_SLOT, joint3, RB_EMPTY_SLOT);
     fill_decks(&tg3, filler3, 10);
     test_give_energy(&tg3, 10);
-    int hand3[2] = { kosuzu3, filler3 };
-    hl_walk_to_live_start(&tg3, hand3, 2, filler3, 0);
+    int live3 = mid(&tg3, "PL!-sd1-020-SD");
+    if (!ident(&tg3, live3, "PL!-sd1-020-SD")) return;
+    int hand3[3] = { kosuzu3, filler3, live3 };
+    hl_walk_to_live_start(&tg3, hand3, 3, live3, 0);
     const RbChoice *c3 = rb_get_pending_choice(&tg3.state);
     int cost3 = c3 && c3->kind == RB_CHOICE_SELECT_CARD && c3->zone[0] &&
                 !strcmp(c3->zone, "hand");

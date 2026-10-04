@@ -26,6 +26,31 @@
 #include <string.h>
 #include <stdlib.h>
 
+/* ── per-test verdict layer ────────────────────────────────────────────────
+ * A FLAT suite runs every test body in ONE process, so its FAIL lines named an
+ * ASSERTION and nothing else: this suite could report no per-test verdict at
+ * all, and the corpus-wide "failed tests" figure had to be a range rather than
+ * a number because dozens of suites hid their FAIL lines this way.
+ * flat_verdict_failed() names the enclosing test body via __func__ (C11
+ * 6.4.2.2) and emits exactly one `FAILED: <test body>` line per failing test,
+ * in the same shape every FORK suite already prints, so a `^FAILED` scan can
+ * score it. __func__ is the same array object at every expansion inside one
+ * function, so pointer identity is the dedupe key -- no string compare needed.
+ * This only ADDS a verdict line; no assertion is added, removed or relaxed.
+ */
+static const char *g_flat_failed[512];
+static int g_flat_failed_n;
+static void flat_verdict_failed(const char *fn)
+{
+    for (int i = 0; i < g_flat_failed_n; i++)
+        if (g_flat_failed[i] == fn) return;
+    if (g_flat_failed_n >= 512) return;
+    g_flat_failed[g_flat_failed_n++] = fn;
+    printf("FAILED: %s\n", fn);
+    fflush(stdout);
+}
+#define FLAT_VERDICT() flat_verdict_failed(__func__)
+
 static int failures;
 static int assertions;
 static int gaps;
@@ -34,6 +59,7 @@ static int gaps;
     assertions++; \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -46,6 +72,7 @@ static int gaps;
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \

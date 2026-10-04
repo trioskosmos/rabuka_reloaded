@@ -46,6 +46,13 @@ static const char *cmf_extra(const AbilityEffect *e, const char *k);
 static int extra_true(const AbilityEffect *e, const char *k);
 void rb_move_execute_move_cards_both(GameState *g, int actor, AbilityEffect *e);
 
+/* rb_order_prompt_begin lives in src/ability/choice.c (it is the shared body of
+ * BOTH Rust producers) and include/rabuka.h is owned elsewhere, so the prototype
+ * is declared here verbatim from its definition. `rb_move_handle_order_selection`
+ * is reached from choice.c's own SelectTarget dispatcher and needs no decl here. */
+extern int rb_order_prompt_begin(GameState *g, int actor, const int *cards, int n,
+                                  int reverse_pool);
+
 static int move_port_remove_any(GameState *g, int pl, int cid) {
     RbPlayer *P = &g->p[pl];
     for (int i = 0; i < P->hand.n; i++) if (P->hand.cards[i] == cid) {
@@ -122,6 +129,88 @@ static int cmf_distinct_dedupe(const AbilityEffect *e) {
 
 int rb_dedupe_by_normalized_name(const int *items, int n, int *out, int max);
 
+/* ── maybe_prompt_deck_order ────────────────────────────────────────────────
+ * Rust twin: engine/src/ability/effects/move/mod.rs, `maybe_prompt_deck_order`
+ * (doc comment read in the live tree 2026-10-03: "Deck-order prompt for
+ * multi-card moves to the deck with AnyOrder. Returns true when the prompt was
+ * issued (caller must return early)."), called from `execute_move_cards` at the
+ * position after the two `taken.is_empty()` early-outs and BEFORE the distinct
+ * dedupe. Rust reference, cited by content because that file is being edited:
+ *
+ *   let is_deck_dest = Zone::from_str(destination) == Some(Zone::Deck)
+ *       || Zone::from_str(destination) == Some(Zone::DeckTop)
+ *       || Zone::from_str(destination) == Some(Zone::DeckBottom);
+ *   let is_eligible_source = Zone::from_str(source) == Some(Zone::Discard)
+ *       || Zone::from_str(source) == Some(Zone::SelectedCards)
+ *       || Zone::from_str(source) == Some(Zone::Hand)
+ *       || (Zone::from_str(source) == Some(Zone::LookedAt)
+ *           && hint.all_any.unwrap_or(false));
+ *   if !(is_eligible_source && is_deck_dest
+ *        && hint.placement_order == Some(PlacementOrder::AnyOrder)
+ *        && taken.len() > 1) { return false; }
+ *   moved_cards.extend(taken.iter().copied());
+ *   let mut order_pool = taken.to_vec();
+ *   if Zone::from_str(source) == Some(Zone::Hand) { order_pool.reverse(); }
+ *   gs.looked_at_cards = order_pool.into();
+ *   self.awaiting.choice = Some(Choice::SelectTarget { target: "order", ... });
+ *   self.in_flight.execution_context = LookAndSelect { Finalize { deck } };
+ *   true
+ *
+ * `DeckOrderHint::of(effect)` is exactly `{ all_any: effect.all_any(),
+ * placement_order: effect.placement_order_any() }`, and only AnyOrder reaches the
+ * prompt; vm.c's effect_decode_placement_order only ever writes the literal
+ * "any_order" into the extras table, so the string comparison below IS the
+ * `== Some(PlacementOrder::AnyOrder)` test.
+ *
+ * The three statements that actually do something are the shared body of BOTH
+ * Rust producers and already exist in choice.c as rb_order_prompt_begin, which
+ * also owns the prompt's answer state (the file-static ordered list and the
+ * looked_at pool owner). So this function is the PRODUCER's predicate and
+ * nothing else: it decides whether the prompt is due and forwards the cards.
+ *
+ * `moved_cards.extend(taken)` is deliberately NOT mirrored: `moved_cards` in
+ * Rust is a LOCAL `Vec::new()` in `execute_move_cards` and the caller returns
+ * `Ok(())` immediately after a true, so the accumulator is dropped unread. It is
+ * dropped in the C too.
+ *
+ * Returns 1 when the prompt was issued (the caller must return early), 0
+ * otherwise. `actor` must be the SEAT whose zones the cards were taken from —
+ * in Rust that is implicit (one global `gs.looked_at_cards`), in C it selects
+ * which g_look[] pool rb_order_prompt_begin fills and which deck the answer
+ * handler inserts into. */
+static int cmf_zone_is_deck_dest(const char *destination) {
+    if (!destination) return 0;
+    return !strcmp(destination, "deck") ||
+           !strcmp(destination, "deck_top") ||
+           !strcmp(destination, "deck_bottom");
+}
+
+static int cmf_zone_is_order_eligible_source(const char *source,
+                                             const AbilityEffect *e) {
+    if (!source || !*source) return 0;
+    if (!strcmp(source, "discard") ||
+        !strcmp(source, "selected_cards") ||
+        !strcmp(source, "hand")) return 1;
+    /* LookedAt is eligible ONLY with an explicit 「〜すべて〜」; `all_any` is
+     * `effect.all_any()`, which vm.c stores in the extras table. */
+    if (!strcmp(source, "looked_at")) return extra_true(e, "all");
+    return 0;
+}
+
+int rb_move_maybe_prompt_deck_order(GameState *g, int actor, const AbilityEffect *e,
+                                   const int *taken, int n_taken) {
+    if (!g || !e || !taken) return 0;
+    if (n_taken <= 1) return 0;              /* `taken.len() > 1` */
+    if (!cmf_zone_is_deck_dest(e->destination)) return 0;
+    const char *source = (e->source && e->source[0]) ? e->source : "";
+    if (!cmf_zone_is_order_eligible_source(source, e)) return 0;
+    const char *po = cmf_extra(e, "placement_order");
+    if (!po || strcmp(po, "any_order") != 0) return 0;
+    /* `order_pool.reverse()` for a Hand source (Rust mod.rs:1906-1908). */
+    return rb_order_prompt_begin(g, actor, taken, n_taken,
+                                 !strcmp(source, "hand") ? 1 : 0);
+}
+
 void rb_move_execute_move_cards_ported(GameState *g, int actor, AbilityEffect *e) {
     if (!g || !e) return;
     /* move/mod.rs:2105-2112 — `source` and `destination` are the effect's own
@@ -190,6 +279,17 @@ void rb_move_execute_move_cards_ported(GameState *g, int actor, AbilityEffect *e
         }
         return;
     }
+
+    /* Rust `execute_move_cards` calls maybe_prompt_deck_order HERE — after the
+     * optional / all-or-nothing `taken.is_empty()` guards above and BEFORE the
+     * distinct dedupe below (mod.rs:2272 against :2284, read in the live tree
+     * 2026-10-03). A true return is Rust's `return Ok(())`: the take is never
+     * placed, because the cards are still in the pool waiting for the order, and
+     * rb_move_handle_order_selection is what puts them on the deck. `pl` is the
+     * seat rb_move_resolve_cards_from_source searched — in Rust that choice is
+     * implicit (one global gs.looked_at_cards) and made from ability_master_id;
+     * here it is the same seat this function already computed at the top. */
+    if (rb_move_maybe_prompt_deck_order(g, pl, e, ids, n)) return;
 
     /* Rust move_cards.rs:2030-2037 — distinct card-name filter; if the deduped
        take is short of `count` the whole move is dropped. */
@@ -341,6 +441,26 @@ static int extra_true(const AbilityEffect *e, const char *k) {
     return v && (!strcmp(v, "true") || !strcmp(v, "1"));
 }
 
+/* TOMBSTONE (2026-10-03). A private duplicate of `remove_card_from_any_zone`
+ * used to sit here with ZERO call sites in this file (gcc -Wunused-function).
+ * DELETED, after measuring deadness three ways rather than trusting the flag:
+ *   (1) whole-tree grep over every .c and .h: this file's copy had 1 hit, its own
+ *       definition; move.c:476 holds the other copy and THAT one has two real
+ *       call sites (move.c:1212 / :1772);
+ *   (2) it is `static`, so it cannot be reached from any other translation unit
+ *       — zero C callers therefore does not leave a hidden user here, and the
+ *       name is file-local so there is no other symbol to collide with;
+ *   (3) Rust has exactly ONE `util::remove_card_from_any_zone` and one
+ *       `move_port_remove_any` shape in this file is a separate, LIVE twin
+ *       (called from rb_move_execute_move_cards_ported), so nothing that the
+ *       deleted copy could have served is now unserved.
+ * ⚠ The live twin in THIS file is `move_port_remove_any`, and it is NOT
+ * byte-equivalent to move.c's copy or to Rust's: it omits the `last_vacated`
+ * out-parameter write and it additionally scans the deck and success-live bags.
+ * That divergence is pre-existing and belongs to whoever owns the relay-source
+ * arm, not to a deletion. */
+
+/*
 static void remove_card_from_any_zone(RbPlayer *P, int *last_vacated, int cid) {
     int i;
     for (i = 0; i < P->hand.n; i++) if (P->hand.cards[i] == cid) {
@@ -365,9 +485,7 @@ static void remove_card_from_any_zone(RbPlayer *P, int *last_vacated, int cid) {
         P->live.n--; return;
     }
 }
-
-
-
+*/
 
 int rb_move_ask_optional_move_gate(GameState *g, int actor, AbilityEffect *e,
                                     const char *source_zone_str,

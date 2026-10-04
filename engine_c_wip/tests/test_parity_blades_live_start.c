@@ -42,6 +42,7 @@ static int assertions;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -54,6 +55,7 @@ static int assertions;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -661,18 +663,24 @@ static void a_lone_member_branches(void)
 }
 
 /* Second half of lone_member_constant_blade_branches_test.rs.
- * NOTE / RED BY DESIGN: cards/cards.json has no `PL!HS-pb6-002-R` entry, so
- * mid() resolves to -1 and ident() below records the failure.  The Rust file
- * names the same card_no, so the Rust test cannot be exercising the printed
- * card either -- a wrong card_no in the test source, not an engine behaviour.
- * The assertion is left strict rather than swapped for a different card. */
+* THE CARD NO WAS A TYPO, NOT A RED-BY-DESIGN CASE (fixed 2026-10-04). This
+ * file read `PL!HS-pb6-002-R`. cards.json carries PL!HS-bp6-002-P and
+ * PL!HS-bp6-002-R (4 occurrences) and ZERO `pb6` spellings, so mid() returned
+ * -1 and ident() turned the whole case into `SETUP BUG: expected card
+ * PL!HS-pb6-002-R, resolved id=-1 (<none>)` -- two assertions that proved
+ * nothing while inflating the suite's apparent coverage. The Rust twin settles
+ * which spelling is right: lone_member_constant_blade_branches_test.rs
+ * `pl_hs_bp6_002_r_gains_two_blades_only_while_alone` reads
+ * `game.id("PL!HS-bp6-002-R")`. So the C print was wrong, bp6 is the card, and
+ * the case now exercises it. Nothing here is red by design any more. */
+
 static void a_lone_member_sayaka_bp6_002(void)
 {
     static TestGame tg;
     test_game_new(&tg);
-    int sayaka = mid(&tg, "PL!HS-pb6-002-R");
-    if (!ident(&tg, sayaka, "PL!HS-pb6-002-R")) return;
-    CHECK_EQ(printed_blade(sayaka), 2, "setup: PL!HS-pb6-002-R prints blade 2");
+    int sayaka = mid(&tg, "PL!HS-bp6-002-R");
+    if (!ident(&tg, sayaka, "PL!HS-bp6-002-R")) return;
+    CHECK_EQ(printed_blade(sayaka), 2, "setup: PL!HS-bp6-002-R prints blade 2");
     test_add_to_stage(&tg, 1, sayaka);
     test_recalc(&tg);
     CHECK_EQ(blade(&tg, sayaka), 2, "lone on stage -> blade+2");
@@ -1439,8 +1447,8 @@ static void b_cl1_010_hasunosora_cost_threshold(void)
     static TestGame tg2;
     test_game_new(&tg2);
     int live2 = mid(&tg2, "PL!HS-cl1-010-CL");
-    int low = mid(&tg2, "PL!HS-bp1-002-CL");
-    if (!ident(&tg2, low, "PL!HS-bp1-002-CL")) return;
+    int low = mid(&tg2, "PL!HS-cl1-002-CL");
+    if (!ident(&tg2, low, "PL!HS-cl1-002-CL")) return;
     fill_decks(&tg2, test_new_id(&tg2, "PL!-sd1-010-SD"));
     test_add_to_live(&tg2, live2);
     tg2.state.p[0].stage[1] = low;

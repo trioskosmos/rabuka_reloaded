@@ -46,6 +46,30 @@ extern void        rb_queue_push_constant_context(GameState *g, const char *play
 extern void        rb_queue_iter(const GameState *g, void (*fn)(const RbQueueEntry *, void *), void *ctx);
 extern void        rb_queue_dump_state(const GameState *g, char *buf, size_t buf_sz);
 
+/* ── per-test verdict layer ────────────────────────────────────────────────
+ * A FLAT suite runs every test body in ONE process, so its FAIL lines named an
+ * ASSERTION and nothing else: this suite could report no per-test verdict at
+ * all, and the corpus-wide "failed tests" figure had to be a range rather than
+ * a number because dozens of suites hid their FAIL lines this way.
+ * flat_verdict_failed() names the enclosing test body via __func__ (C11
+ * 6.4.2.2) and emits exactly one `FAILED: <test body>` line per failing test,
+ * in the shape every FORK suite already prints. __func__ is the same array
+ * object at every expansion inside one function, so pointer identity is the
+ * dedupe key. Only a verdict line is ADDED; no assertion changes.
+ */
+static const char *g_flat_failed[512];
+static int g_flat_failed_n;
+static void flat_verdict_failed(const char *fn)
+{
+    for (int i = 0; i < g_flat_failed_n; i++)
+        if (g_flat_failed[i] == fn) return;
+    if (g_flat_failed_n >= 512) return;
+    g_flat_failed[g_flat_failed_n++] = fn;
+    printf("FAILED: %s\n", fn);
+    fflush(stdout);
+}
+#define FLAT_VERDICT() flat_verdict_failed(__func__)
+
 static int failures;
 static int assertions;
 
@@ -53,6 +77,7 @@ static int assertions;
     assertions++; \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -65,6 +90,7 @@ static int assertions;
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
+        FLAT_VERDICT(); \
         failures++; \
     } else { \
         printf("ok: %s\n", message); \
@@ -134,16 +160,28 @@ static int drain_by_skip(GameState *g, int limit)
     return guard;
 }
 
-/* A look_at + select_cards pair; the select is optional so a skip is legal. */
+/* A look_at + select_cards pair; the select is optional so a skip is legal.
+ *
+ * The string fields MUST be heap-owned. rb_effect_free (src/core/alloc.c:67-89)
+ * releases `text / action / source / destination / target` with rb_free(), and
+ * the engine's own decoder always populates them with malloc'd copies
+ * (vm.c:699-717 rd_string_val -> rb_strdup). Assigning string LITERALS here and
+ * then calling rb_effect_free in free_optional_look_select was free() on .rodata:
+ * msvcrt aborted the process (SIGABRT) inside
+ * test_optional_look_select_skip_terminates, which — because this suite is FLAT
+ * and single-main — killed the whole binary. The five tests after it plus
+ * rb_unload() never ran and the suite emitted zero stdout.
+ * `parent` itself is a caller-owned STACK AbilityEffect that is never passed to
+ * rb_effect_free, so its `action` may stay a literal. */
 static void fill_optional_look_select(AbilityEffect *parent)
 {
     AbilityEffect *look = (AbilityEffect *)calloc(1, sizeof(AbilityEffect));
     AbilityEffect *select = (AbilityEffect *)calloc(1, sizeof(AbilityEffect));
-    look->action = "look_at";
-    look->source = "deck_top";
+    look->action = rb_strdup2("look_at");
+    look->source = rb_strdup2("deck_top");
     look->count = 2;
-    select->action = "select_cards";
-    select->destination = "hand";
+    select->action = rb_strdup2("select_cards");
+    select->destination = rb_strdup2("hand");
     select->count = 1;
     select->is_optional = 1;
     parent->action = "look_and_select";
@@ -782,7 +820,17 @@ static void test_skip_chain_does_not_grow_the_queue(void)
              "a resolved/skipped choice does not add a queue entry");
     CHECK_EQ(tg.state.queue.cur, 0,
              "a resolved/skipped choice leaves the current entry in place");
-    CHECK_EQ(rb_queue_get_entry(&tg.state, 0)->effect_started, 1,
+    /* rb_queue_get_entry returns NULL for index >= n_entries
+     * (src/ability/ability_queue.c:192-195), and after the drain this queue
+     * really is empty, so the old `rb_queue_get_entry(...)->effect_started`
+     * dereferenced NULL and took the whole binary down with SIGSEGV — which,
+     * in a single-main FLAT suite, cost test_baton_touch_skip_chain_terminates
+     * and rb_unload() as well. Guard the read and keep the assertion: the
+     * sentinel -1 FAILS the equality when the entry is absent, so nothing is
+     * hidden by the guard. */
+    const RbQueueEntry *e0 = rb_queue_get_entry(&tg.state, 0);
+    CHECK(e0 != NULL, "the drained entry is still in the queue after the skip");
+    CHECK_EQ(e0 ? e0->effect_started : -1, 1,
              "the drained entry is marked effect_started so it is not re-run");
     free_optional_look_select(&parent);
 }

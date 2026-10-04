@@ -83,6 +83,7 @@ static int checks;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -95,6 +96,7 @@ static int checks;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -350,7 +352,7 @@ static Condition mk_cond(int variant, const char *loc, const char *target,
 
 static void test_check_self_location_follows_the_card(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int self_card  = test_id(&tg, "PL!HS-sd1-008-SD");
     int other_card = test_id(&tg, "PL!HS-sd1-010-SD");
@@ -380,7 +382,7 @@ static void test_check_self_location_follows_the_card(void)
 
 static void test_check_self_comparison_container_hand(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int self_card = test_id(&tg, "PL!HS-sd1-008-SD");
     int other_card = test_id(&tg, "PL!HS-sd1-010-SD");
@@ -421,7 +423,7 @@ static void test_check_self_comparison_container_hand(void)
    メンバーカードの場合、heart04を得る」 */
 static void test_ginko_all_heart04_gives_heart04(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int ginko = test_id(&tg, GINKO);
     int a = test_new_id(&tg, GINKO_H4);
@@ -445,7 +447,7 @@ static void test_ginko_all_heart04_gives_heart04(void)
 
 static void test_ginko_one_wrong_heart_skips_heart04(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int ginko = test_id(&tg, GINKO);
     int a = test_new_id(&tg, GINKO_H4);
@@ -498,7 +500,7 @@ static void test_umi_opponent_success_score_threshold(void)
     }
     /* accepting arm: total 6 >= 6 */
     {
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         int umi = test_id(&tg, UMI);
         int s6 = test_id(&tg, SCORE6);
@@ -520,7 +522,7 @@ static void test_umi_opponent_success_score_threshold(void)
    empty hand — the unpayable cost must not reach across into the waitroom. */
 static void test_emma_unpayable_cost_leaves_board_untouched(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int emma = test_id(&tg, EMMA);
     int wait_member = test_id(&tg, WAIT_MEMBER);
@@ -586,7 +588,7 @@ static int try_baton(TestGame *tg, const char *replaced_no, int area, int *out_h
 
 static void test_pr045_baton_over_cost7_draws_two(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int replaced = test_id(&tg, "PL!-sd1-007-SD");
     int had = 0;
@@ -647,7 +649,7 @@ static void test_pr045_non_baton_does_not_draw(void)
 
 static void test_pr045_baton_hand_size_is_net_unchanged(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int replaced = test_id(&tg, "PL!-sd1-007-SD");
     int filler   = test_id(&tg, FILLER);
@@ -683,7 +685,7 @@ static void test_pr045_baton_hand_size_is_net_unchanged(void)
 
 static void test_yoshiko_006_from_hand_draws_two_no_blade(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int yoshiko = test_id(&tg, YOSHIKO_006);
     int filler  = test_id(&tg, FILLER);
@@ -704,7 +706,7 @@ static void test_yoshiko_006_from_hand_draws_two_no_blade(void)
 
 static void test_yoshiko_006_revived_from_waitroom_gains_blade(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int yoshiko = test_id(&tg, YOSHIKO_006);
     int mari    = test_id(&tg, MARI_008);
@@ -794,7 +796,7 @@ static void opponent_waits_with_sonoda(TestGame *tg)
 
 static void test_kanan_option1_blocks_opponent_blade_limited_wait(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kanan = test_id(&tg, KANAN);
     if (kanan < 0) { CHECK(0, "PL!S-bp7-003-R＋ resolves"); return; }
@@ -812,7 +814,7 @@ static void test_kanan_option1_blocks_opponent_blade_limited_wait(void)
 
 static void test_kanan_option1_blocks_opponent_wait(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kanan = test_id(&tg, KANAN);
     if (kanan < 0) { CHECK(0, "PL!S-bp7-003-R＋ resolves"); return; }
@@ -829,7 +831,7 @@ static void test_kanan_option1_blocks_opponent_wait(void)
 
 static void test_kanan_option2_does_not_block_opponent_wait(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kanan = test_id(&tg, KANAN);
     if (kanan < 0) { CHECK(0, "PL!S-bp7-003-R＋ resolves"); return; }
@@ -844,7 +846,7 @@ static void test_kanan_option2_does_not_block_opponent_wait(void)
 
 static void test_kanan_self_wait_still_works(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kanan = test_id(&tg, KANAN);
     if (kanan < 0) { CHECK(0, "PL!S-bp7-003-R＋ resolves"); return; }
@@ -864,7 +866,7 @@ static void test_kanan_self_wait_still_works(void)
 
 static void test_hs_bp5_016_n_waits_two_cheap_and_grants_heart06(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card   = test_id(&tg, HS_BP5_016);
     int filler = test_id(&tg, FILLER);
@@ -913,7 +915,7 @@ static void test_hs_bp5_016_n_waits_two_cheap_and_grants_heart06(void)
 
 static void test_hs_bp5_016_n_single_victim_grants_no_heart06(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card   = test_id(&tg, HS_BP5_016);
     int filler = test_id(&tg, FILLER);
@@ -946,7 +948,7 @@ static void test_hs_bp5_016_n_single_victim_grants_no_heart06(void)
 
 static void test_hs_bp5_016_n_waits_at_most_two_of_three(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card   = test_id(&tg, HS_BP5_016);
     int filler = test_id(&tg, FILLER);
@@ -984,7 +986,7 @@ static void test_hs_bp5_016_n_waits_at_most_two_of_three(void)
 
 static void test_hs_bp5_016_n_decline_grants_no_heart06(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int card   = test_id(&tg, HS_BP5_016);
     int filler = test_id(&tg, FILLER);
@@ -1011,7 +1013,7 @@ static void test_hs_bp5_016_n_decline_grants_no_heart06(void)
 
 static void test_kaleidoscore_trio_grants_heart06_and_blade(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_new_id(&tg, FILLER);
     int koko = test_id(&tg, KOKO);
@@ -1039,7 +1041,7 @@ static void test_kaleidoscore_trio_grants_heart06_and_blade(void)
 
 static void test_kaleidoscore_two_grants_nothing(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_new_id(&tg, FILLER);
     int koko = test_id(&tg, KOKO);
@@ -1077,7 +1079,7 @@ static void test_kaleidoscore_two_grants_nothing(void)
 
 static void test_live_start_bottom_three_mills_the_bottom_cards(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int yoshiko = test_id(&tg, "PL!S-bp7-006-R");
     int filler  = test_id(&tg, FILLER);
@@ -1201,7 +1203,7 @@ static int mill_group_setup(TestGame *tg, int wrong_index, int *member)
 
 static void test_mill_four_all_group_cards_grants_one_blade_until_live_end(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int member = -1;
     if (!mill_group_setup(&tg, -1, &member)) return;
@@ -1223,7 +1225,7 @@ static void test_mill_four_all_group_cards_grants_one_blade_until_live_end(void)
 static void test_mill_any_wrong_group_card_prevents_blade(void)
 {
     for (int wrong = 0; wrong < 4; wrong++) {
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         int member = -1;
         if (!mill_group_setup(&tg, wrong, &member)) return;
@@ -1244,7 +1246,7 @@ static void test_mill_any_wrong_group_card_prevents_blade(void)
 
 static void bp4_021_run(const int *cards, int n, int *out_need, int *out_score)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int hb = test_id(&tg, "PL!-bp4-021-L");
     if (hb < 0) return;
@@ -1315,7 +1317,7 @@ static void trigger_kuroe_live_start(TestGame *tg, int kuroe)
 
 static void test_kuroe_two_live_cards_offers_the_pick(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kuroe = test_id(&tg, KUROE);
     int la = test_id(&tg, PLAIN_LIVE);
@@ -1336,7 +1338,7 @@ static void test_kuroe_two_live_cards_offers_the_pick(void)
 
 static void test_kuroe_one_live_card_no_pick(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kuroe = test_id(&tg, KUROE);
     int live = test_id(&tg, PLAIN_LIVE);
@@ -1353,7 +1355,7 @@ static void test_kuroe_one_live_card_no_pick(void)
 
 static void test_kuroe_live_start_cards_are_excluded(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kuroe = test_id(&tg, KUROE);
     int ls1 = test_id(&tg, LIVE_START_L1);
@@ -1375,7 +1377,7 @@ static void test_kuroe_live_start_cards_are_excluded(void)
 
 static void test_kuroe_selected_live_goes_to_deck_top(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kuroe = test_id(&tg, KUROE);
     int selectable = test_id(&tg, PLAIN_LIVE);
@@ -1401,7 +1403,7 @@ static void test_kuroe_selected_live_goes_to_deck_top(void)
 
 static void test_kuroe_skip_keeps_the_live_zone(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int kuroe = test_id(&tg, KUROE);
     int la = test_id(&tg, PLAIN_LIVE);
@@ -1430,7 +1432,7 @@ static void test_kuroe_skip_keeps_the_live_zone(void)
 
 static void q254_run(int n_success, int stage_members)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int live = test_id(&tg, SD2_023);
     if (live < 0) { CHECK(0, "PL!SP-sd2-023-SD2 resolves"); return; }
@@ -1487,7 +1489,7 @@ static void test_q254_success_count_thresholds(void)
 
 static void test_q254_p_variant_same_mandatory_threshold(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int live = test_id(&tg, "PL!SP-sd2-023-P");
     if (live < 0) { CHECK(0, "PL!SP-sd2-023-P resolves"); return; }
@@ -1531,7 +1533,7 @@ static void trigger_live_start_all_on_stage(TestGame *tg)
 
 static void test_karin_topdeck_with_two_waited_opponents(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int karin = test_id(&tg, KARIN_BP4);
     int niji1 = test_id(&tg, NIJIGASAKI);
@@ -1630,7 +1632,7 @@ static void test_karin_topdeck_loses_at_most_the_draw(void)
 
 static void test_riko_opponent_discards_live_blocks_the_score(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int source = test_id(&tg, RIKO);
     int live   = test_id(&tg, SCORE1);
@@ -1673,7 +1675,7 @@ static void test_riko_opponent_discards_live_blocks_the_score(void)
 
 static void test_riko_opponent_declines_grants_the_score(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int source = test_id(&tg, RIKO);
     int live   = test_id(&tg, SCORE1);
@@ -1705,7 +1707,7 @@ static void test_riko_opponent_declines_grants_the_score(void)
 
 static void test_riko_opponent_without_live_card_grants_score_no_prompt(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int source = test_id(&tg, RIKO);
     int member = test_id(&tg, FILLER);
@@ -1727,7 +1729,7 @@ static void test_riko_opponent_without_live_card_grants_score_no_prompt(void)
 
 static void test_riko_opponent_empty_hand_grants_score_no_prompt(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int source = test_id(&tg, RIKO);
     CHECK(source >= 0, "PL!S-pb1-002-R empty-hand fixture resolves");
@@ -1747,7 +1749,7 @@ static void test_riko_opponent_empty_hand_grants_score_no_prompt(void)
 
 static void test_riko_score_is_lost_when_riko_is_discarded(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int source  = test_id(&tg, RIKO);
     int yoshiko = test_id(&tg, "PL!S-bp3-006-R＋");
@@ -1803,7 +1805,7 @@ static MirakuResult miraku_run(const char *const *a_no, const int *boosts, int n
 {
     MirakuResult out;
     out.need = -999; out.drawn = -999;
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int live = test_id(&tg, MIRAKU_LIVE);
     int filler = test_id(&tg, FILLER);
@@ -1887,7 +1889,7 @@ static KarinOutcome karin_reveal_run(const char *deck_top_no)
     KarinOutcome o;
     memset(&o, 0, sizeof o);
     o.karin_center = -1;
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int karin     = test_id(&tg, KARIN_N_PB1);
     int filler    = test_id(&tg, FILLER);
@@ -2000,7 +2002,7 @@ static void test_karin_revealed_card_lands_in_exactly_one_zone(void)
 
 static void test_n_bp5_028_l_heart02_member_boosts_and_rewrites_need(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_new_id(&tg, "PL!N-sd1-010-SD");
     int live = test_id(&tg, "PL!N-bp5-028-L");
@@ -2025,7 +2027,7 @@ static void test_n_bp5_028_l_heart02_member_boosts_and_rewrites_need(void)
 
 static void test_n_bp5_028_l_wrong_group_member_does_not_trigger(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int live = test_id(&tg, "PL!N-bp5-028-L");
     int wrong = test_id(&tg, "PL!-sd1-013-SD");

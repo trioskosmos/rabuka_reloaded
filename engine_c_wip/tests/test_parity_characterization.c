@@ -24,6 +24,10 @@
  */
 #include "rabuka.h"
 #include "gen_data.h"
+/* For FLAT_VERDICT() only: this is a FLAT suite (every body runs in one
+   process out of one main), so its FAIL lines name an assertion and not a
+   test, and without the verdict layer a failing test here is unattributable. */
+#include "test_game.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,6 +42,7 @@ static long assertions;   /* every assertion evaluated (CHECK or EXPECTED_GAP) *
         assertions++;                                                      \
         if (!(cond)) {                                                     \
             failures++;                                                    \
+            FLAT_VERDICT(); \
             fprintf(stderr, "FAIL: ");                                     \
             fprintf(stderr, __VA_ARGS__);                                 \
             fputc('\n', stderr);                                           \

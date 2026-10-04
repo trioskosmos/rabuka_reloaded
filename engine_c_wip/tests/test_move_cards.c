@@ -6,7 +6,7 @@
 static int failures;
 
 #define CHECK(condition, message) do { \
-    if (!(condition)) { fprintf(stderr, "FAIL: %s\n", message); failures++; } \
+    if (!(condition)) { fprintf(stderr, "FAIL: %s\n", message); failures++;FLAT_VERDICT();  } \
     else printf("ok: %s\n", message); \
 } while (0)
 #define CHECK_EQ(actual, expected, message) do { \
@@ -14,11 +14,12 @@ static int failures;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else printf("ok: %s\n", message); \
 } while (0)
 
 static void test_mandatory_selection_takes_count(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int member = test_new_id(&game, "PL!-sd1-010-SD");
     int other = test_new_id(&game, "PL!-sd1-002-SD");
@@ -37,7 +38,7 @@ static void test_mandatory_selection_takes_count(void) {
 }
 
 static void test_deck_bottom_and_top_placement(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int member = test_new_id(&game, "PL!-sd1-010-SD");
     int second = test_new_id(&game, "PL!-sd1-002-SD");
@@ -58,7 +59,7 @@ static void test_deck_bottom_and_top_placement(void) {
 }
 
 static void test_under_member_single_host(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int host = test_new_id(&game, "PL!-sd1-010-SD");
     int energy = test_new_id(&game, "LL-E-001-SD");
@@ -77,7 +78,7 @@ static void test_under_member_single_host(void) {
 }
 
 static void test_success_replacement_move(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int original = test_new_id(&game, "PL!-bp6-024-L");
     /* Rust fixture: engine/tests/test_modules/effects/conditional/zone_source/
@@ -106,7 +107,7 @@ static void test_success_replacement_move(void) {
 }
 
 static void test_looked_at_remainder(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int member = test_new_id(&game, "PL!-sd1-010-SD");
     int live = test_new_id(&game, "PL!N-bp1-027-L");

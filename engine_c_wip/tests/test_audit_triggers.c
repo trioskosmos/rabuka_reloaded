@@ -66,6 +66,14 @@
  * not this suite's to change); cost.c:47 defines it. */
 int rb_cost_optional_skipped(void);
 
+/* queue accessors that exist in src/ability/ability_queue.c but are not
+ * declared in rabuka.h. Signatures copied verbatim from the definitions, the
+ * same way tests/test_parity_queue_resume.c:33-47 does it, so this suite needs
+ * no header edit owned by another agent. */
+extern void rb_queue_init(RbAbilityQueue *q);
+extern int  rb_queue_len(const GameState *g);
+extern const RbQueueEntry *rb_queue_get_entry(const GameState *g, int index);
+
 /* ── shared counters, zeroed in the CHILD and read by the PARENT after
  *    waitpid, so a child that dies mid-assertion still reports honestly. */
 
@@ -98,6 +106,11 @@ static void on_fatal_signal(int sig)
                 tal->assertions, tal->failures);
     fflush(stdout);
     fflush(stderr);
+    /* Re-raise under the DEFAULT disposition: run()'s CRASH verdict is only
+     * reachable when WIFSIGNALED(status) holds, and _Exit(128 + sig) turned the
+     * crash into an ordinary exit so it was silently counted as a failure. */
+    signal(sig, SIG_DFL);
+    raise(sig);
     _Exit(128 + sig);
 }
 
@@ -115,14 +128,36 @@ static void install_handlers(void)
 }
 
 /* Variadic: a two-argument CHECK(cond, "a" "b") would splice adjacent
- * literals into the format string and silently lose the second one. */
+ * literals into the format string and silently lose the second one.
+ *
+ * The `FAIL: ` prefix is the corpus-wide shape (test_p1_helpers.c:11,
+ * test_parity_draw_flat.c:124, test_parity_cce_gaps.c and every FORK suite):
+ * a `^FAIL:` scan and a `^FAIL` scan both have to see it. The old spelling was
+ * `FAIL [<row>] <test>: `, so a `^FAIL:` verifier matched nothing here and this
+ * suite reported FAIL_OUT=0 FAIL_ERR=0 while running 11 cases with real
+ * failures. The row and test name stay in the text -- only the colon moves. */
 #define CHECK(cond, ...) do {                                               \
         if (tal) tal->assertions++;                                         \
         if (!(cond)) {                                                      \
             if (tal) tal->failures++;                                       \
-            fprintf(stderr, "FAIL [%s] %s: ", current_row, current_test);   \
+            fprintf(stderr, "FAIL: [%s] %s: ", current_row, current_test); \
             fprintf(stderr, __VA_ARGS__);                                   \
             fputc('\n', stderr);                                            \
+        }                                                                   \
+    } while (0)
+
+/* Integer form, for the "got X expected Y" rows. Never used to relax an
+ * existing CHECK -- the existing suite spells the expectation inline. */
+#define CHECK_EQ(actual, expected, ...) do {                                \
+        int aq_actual = (actual);                                           \
+        int aq_expected = (expected);                                       \
+        if (tal) tal->assertions++;                                         \
+        if (aq_actual != aq_expected) {                                     \
+            if (tal) tal->failures++;                                       \
+            fprintf(stderr, "FAIL: [%s] %s: ", current_row, current_test); \
+            fprintf(stderr, __VA_ARGS__);                                   \
+            fprintf(stderr, " (got %d expected %d)\n",                      \
+                    aq_actual, aq_expected);                                \
         }                                                                   \
     } while (0)
 
@@ -394,7 +429,7 @@ static void test_a2_debut_activation_position(void)
 {
     current_row = "A2.debut_position_center";
     {
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         int cid = test_new_id(&tg, "PL!SP-bp4-003-P");
         Ability ab;
@@ -428,9 +463,20 @@ static void test_a2_debut_activation_position(void)
         test_add_to_stage(&tg, 0, cid);          /* area 0 == left side */
         int queued = rb_trigger_debut(&tg.state, 0, cid);
         int used = rb_use_count(&tg.state.queue, cid, 0, tg.state.turn);
-        CHECK(queued == 1 && used == 1,
-              "PAIRED POSITIVE: the same ability MUST fire from the LEFT area "
-              "(queued=%d use_count=%d)", queued, used);
+        /* use_count MUST still be 0 here. Rust's enqueue_printed_ability
+         * (abilities.rs:1282-1326) constructs the entry with
+         * use_limit_recorded: false (abilities.rs:270) and ends in a bare
+         * enqueue that records nothing; the only writer of
+         * turn_limited_abilities_used is record_ability_use (abilities.rs:216-231),
+         * reached from resolution (gates.rs:301-310). The engine says so in its
+         * own words at src/turn/triggers.c:108-129. The old `used == 1` here
+         * asserted an enqueue-time spend that Rust does not perform, so this
+         * PAIRED POSITIVE could never be green. Asserting 0 pins the faithful
+         * value: the ability was enqueued AND its use is still unspent. */
+        CHECK(queued == 1 && used == 0,
+              "PAIRED POSITIVE: the same ability MUST fire from the LEFT area, "
+              "and an enqueue must NOT spend its use (queued=%d use_count=%d)",
+              queued, used);
     }
 }
 
@@ -456,7 +502,7 @@ static void test_a3_debut_baton_touch_gate(void)
 {
     current_row = "A3.debut_baton_touch";
     {
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         int cid = test_new_id(&tg, "PL!S-bp5-001-P");
         Ability ab;
@@ -496,9 +542,12 @@ static void test_a3_debut_baton_touch_gate(void)
             test_add_to_stage(&tg, 1, cid);
             int queued = rb_trigger_debut(&tg.state, 0, cid);
             int used = rb_use_count(&tg.state.queue, cid, 0, tg.state.turn);
-            CHECK(queued == 1 && used == 1,
+            /* used == 0, not 1: an enqueue records nothing (see A2's note and
+             * src/turn/triggers.c:108-129). The use is spent at resolution. */
+            CHECK(queued == 1 && used == 0,
                   "PAIRED POSITIVE: an ungated debut ability MUST fire on a "
-                  "plain debut (queued=%d use_count=%d)", queued, used);
+                  "plain debut, and an enqueue must NOT spend its use "
+                  "(queued=%d use_count=%d)", queued, used);
         }
     }
 }
@@ -527,7 +576,7 @@ static void test_a3_debut_baton_touch_gate(void)
 static void test_a4_live_success_scan_order(void)
 {
     current_row = "A4a.live_success_order";
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
 
     Ability ls;
@@ -591,18 +640,22 @@ static void test_a4_live_success_seen_dedupe(void)
 
     int queued = rb_trigger_live_success(&tg.state, 0);
     int used = rb_use_count(&tg.state.queue, cid, LS_AB, tg.state.turn);
-    CHECK(queued == 1 && used == 1,
+    /* used == 0, not 1: the ライブ成功時 scan also only ENQUEUES. Rust's
+     * enqueue_printed_ability records nothing and builds the entry with
+     * use_limit_recorded: false; the use is spent at resolution by
+     * record_ability_use (src/turn/triggers.c:108-129). */
+    CHECK(queued == 1 && used == 0,
           "RUST trigger_scan.rs:394-396 inserts (card_id, ability_index) into "
           "`seen` before collecting, so a card that is both a stage member and "
-          "a live card fires its live-success ability exactly ONCE "
-          "(queued=%d use_count=%d)", queued, used);
+          "a live card fires its live-success ability exactly ONCE, without an "
+          "enqueue spending its use (queued=%d use_count=%d)", queued, used);
 
     /* Non-vacuity: the same card in the stage ALONE fires once. The live zone
      * must still hold a card, because rb_should_trigger_live_success
      * (triggers.c:289) requires live.n > 0 before the stage is even visited;
      * the live filler must NOT carry a live-success ability so the entry count
      * is attributable to the stage card alone. */
-    TestGame tg2;
+static    TestGame tg2;
     test_game_new(&tg2);
     int cid2 = test_new_id(&tg2, LS_STAGE_CARD);
     int filler = test_new_id(&tg2, "PL!SP-pb1-018-N");
@@ -616,9 +669,10 @@ static void test_a4_live_success_seen_dedupe(void)
     tg2.state.live_success[0] = 1;
     int queued1 = rb_trigger_live_success(&tg2.state, 0);
     int used1 = rb_use_count(&tg2.state.queue, cid2, LS_AB, tg2.state.turn);
-    CHECK(queued1 == 1 && used1 == 1,
+    CHECK(queued1 == 1 && used1 == 0,
           "PAIRED POSITIVE: the same card in the stage ALONE must fire exactly "
-          "once (queued=%d use_count=%d)", queued1, used1);
+          "once, without an enqueue spending its use (queued=%d use_count=%d)",
+          queued1, used1);
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -704,7 +758,7 @@ static void test_a5_stage_gate_exclude_characters(void)
     /* --- positive 1: same card + one non-excluded Liella! member --- */
     current_row = "A5.stage_gate_exclude_positive";
     {
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         int fuyu = test_new_id(&tg, FUYU_CARD);
         int other = test_new_id(&tg, LIELLA_OTHER);
@@ -752,7 +806,7 @@ static void test_a5_stage_gate_exclude_characters(void)
      * uses and does not blanket-suppress optional stage gates. */
     current_row = "A5.stage_gate_group_only_positive";
     {
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         int rush = test_new_id(&tg, RUSH_CARD);
         int other = test_new_id(&tg, MU_MEMBER);
@@ -826,7 +880,7 @@ static void test_a6_same_unit_name_prompt(void)
 {
     current_row = "A6.same_unit_prompt";
     {
-        TestGame tg;
+static        TestGame tg;
         test_game_new(&tg);
         /* Two separate instances of the SAME card number: that is what
          * 「同じユニット名のカードを2枚」 means, and it is the only way to be
@@ -1000,6 +1054,300 @@ static void test_a7_reveal_cost_values(void)
  * main
  * ══════════════════════════════════════════════════════════════════════ */
 
+/* ══════════════════════════════════════════════════════════════════════
+ * A8 -- the enqueue-time movement snapshot the 登場 scan must carry.
+ *
+ * RUST turn/trigger_scan.rs:148:
+ *     let moved_snapshot = game_state.recently_moved_cards.clone();
+ * taken ONCE before the loop and cloned into EVERY enqueued 登場 ability
+ * (:156, :166, :180, :190, :205, :215, :221).  That snapshot is what
+ * `GameState::entry_trigger_moved_cards` (abilities.rs:2377-2384) hands back,
+ * and every `moved_card_pool` / `those_cards` condition PREFERS it over the
+ * live `recently_moved_cards` global -- condition/card.rs:1703-1711,
+ * :1780-1790, :3884-3893, :4375-4381.
+ *
+ * It is load-bearing rather than decorative: rb_drain_ability_queue zeroes
+ * g->n_recently_moved (ability_queue.c:1420) BEFORE the cost runs, so by the
+ * time the effect asks "those cards" the live global is already empty and the
+ * entry snapshot is the only surviving evidence that this card's move caused
+ * the trigger. The C used to pass NULL/0 for all three scans, so the 登場 scan
+ * resolved against an EMPTY set where Rust sees the batch. Reachability:
+ * n > 0 -- 3 of the 281 登場 abilities carry `source: "those_cards"` and up
+ * to 22 carry `type: "movement_condition"`.
+ *
+ * The ライブ開始時 and ライブ成功時 scans pass `None` (trigger_scan.rs:345-346
+ * and :525-526), so A8b pins that asymmetry in the other direction: the fix
+ * must not leak the batch into the two scans that pass None.
+ * ══════════════════════════════════════════════════════════════════════ */
+
+static void test_a8_debut_moved_snapshot(void)
+{
+    current_row = "A8.debut_carries_moved_snapshot";
+    {
+static        TestGame tg;
+        test_game_new(&tg);
+        int cid = test_new_id(&tg, "PL!SP-bp4-003-P");
+        Ability ab;
+        int ok = ability_of("PL!SP-bp4-003-P", 0, &ab);
+        CHECK(ok, "premise: PL!SP-bp4-003-P ab#0 must decode");
+        if (ok) {
+            CHECK(ab.triggers && rb_trigger_is(ab.triggers, T_DEBUT),
+                  "premise: PL!SP-bp4-003-P ab#0 must be a debut ability");
+            rb_free_ability(&ab);
+        } else {
+            return;
+        }
+        /* Any area is fine -- the assertion is about what the ENTRY carries.
+         * Area 0 (left) is used because A2 proved ab#0 fires from the left. */
+        test_add_to_stage(&tg, 0, cid);
+
+        /* Arm the live movement batch BEFORE the scan, exactly as
+         * set_recently_moved_batch would have for the batch that placed the
+         * member (Rust: modifiers.rs set_recently_moved_batch). */
+        tg.state.recently_moved[0] = cid;
+        tg.state.n_recently_moved = 1;
+
+        int queued = rb_trigger_debut(&tg.state, 0, cid);
+
+        int n_snap = 0;
+        const int *snap = rb_entry_trigger_moved_cards(&tg.state, &n_snap);
+        CHECK(queued == 1,
+              "RUST trigger_scan.rs:148/:156: the debut scan must enqueue "
+              "exactly the one printed debut ability (got %d)", queued);
+        CHECK(n_snap == 1 && snap && snap[0] == cid,
+              "RUST trigger_scan.rs:148 + abilities.rs:2377-2384: the debut "
+              "entry carries the ENQUEUE-TIME recently_moved_cards snapshot "
+              "(n=%d)", n_snap);
+        CHECK_EQ(tg.state.n_recently_moved, 1,
+                 "RUST trigger_scan.rs:148: snapshotting does not consume "
+                 "recently_moved_cards");
+    }
+
+    current_row = "A8b.live_start_carries_no_moved_snapshot";
+    {
+        /* Rust trigger_scan.rs:345-346 passes `None` for `moved`; the C twin
+         * must pass NULL/0 rather than reusing the debut scan's batch. */
+static        TestGame tg;
+        test_game_new(&tg);
+        int cid = test_new_id(&tg, "PL!SP-bp4-003-P");
+        test_add_to_live(&tg, cid);
+        /* trigger_scan.rs:202-212 only short-circuits for the SECOND attacker
+         * (pl != first_attacker) with an empty live zone. */
+        tg.state.first_attacker = 0;
+
+        tg.state.recently_moved[0] = cid;
+        tg.state.n_recently_moved = 1;
+
+        rb_trigger_live_start(&tg.state, 0);
+
+        int n_snap = 0;
+        const int *snap = rb_entry_trigger_moved_cards(&tg.state, &n_snap);
+        /* Whether this fixture happens to own a ライブ開始時 ability or not,
+         * no ライブ開始時 ENTRY may carry a snapshot. */
+        CHECK(n_snap == 0 && snap == NULL,
+              "RUST trigger_scan.rs:345-346: a ライブ開始時 entry carries NO "
+              "movement snapshot (n=%d)", n_snap);
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+ * A9 -- the 登場 scan must NEVER fire a gained 登場 ability.
+ *
+ * RUST trigger_debut_abilities (trigger_scan.rs:23-139) walks
+ * `card.abilities.iter().enumerate()` and NOTHING ELSE.  There is no
+ * `gained_card_abilities` loop, so `trigger_auto_ability_by_index_refs` is
+ * only ever reached with a PRINTED ability_index from this scan.
+ *
+ * The C used to end the scan with
+ *     queued += queue_gained_trigger(g, pl, card_id, "登場");
+ * firing a runtime-GAINED 登場 ability Rust never fires -- the 登場 twin of the
+ * ライブ開始時 divergence already removed.  Measured reachability of the C
+ * path: 0 of 985 -- of the 24 gain_ability / gain_ability_from_source nodes
+ * the distinct `ability_gain_trigger` values are 常時 (20) and ライブ成功時
+ * (2), never 登場.  So this row is a FAITHFULNESS assertion, not a
+ * regression guard: it holds before and after any corpus change, and if it
+ * ever fails the C has re-acquired an arm Rust does not have.
+ *
+ * The live ライブ成功時 gained arm (trigger_scan.rs:462-514) is a DIFFERENT
+ * arm and must keep working -- `ability_gain_trigger` = ライブ成功時 really is
+ * in the corpus (2 nodes) -- so A9b pins that half too.  A9/A9b together are
+ * what make the A9 removal safe rather than a blanket "gained abilities never
+ * fire".
+ * ══════════════════════════════════════════════════════════════════════ */
+
+static void test_a9_gained_debut_never_fires(void)
+{
+    current_row = "A9.gained_debut_never_fires";
+    {
+static        TestGame tg;
+        test_game_new(&tg);
+        int cid = test_new_id(&tg, "PL!SP-bp4-003-P");
+
+        /* rb_register_gained_ability is the C of Rust's add_gained_ability and
+         * DEEP-COPIES the struct (game_state_abilities.c:216-228), so these
+         * locals may go out of scope. */
+        char trg[] = T_DEBUT;
+        char txt[] = "gained debut ability";
+        Ability gained;
+        memset(&gained, 0, sizeof(gained));
+        gained.full_text = txt;
+        gained.triggerless_text = txt;
+        gained.triggers = trg;
+        gained.use_limit = -1;
+        gained.effect = NULL;
+        CHECK_EQ(rb_register_gained_ability(&tg.state, cid, &gained), 0,
+                 "premise: a gained 登場 ability can be attached");
+        CHECK_EQ(rb_card_num_gained_abilities(&tg.state, cid), 1,
+                 "premise: the gained ability is registered on the card");
+
+        test_add_to_stage(&tg, 0, cid);
+        rb_trigger_debut(&tg.state, 0, cid);
+
+        int gained_entries = 0;
+        int printed_entries = 0;
+        for (int i = 0; i < rb_queue_len(&tg.state); i++) {
+            const RbQueueEntry *e = rb_queue_get_entry(&tg.state, i);
+            if (!e) continue;
+            if (e->ability_idx >= RB_GAINED_ABILITY_INDEX_BASE) gained_entries++;
+            else printed_entries++;
+        }
+        CHECK_EQ(gained_entries, 0,
+                 "RUST trigger_scan.rs:78-139: the 登場 scan NEVER enqueues a "
+                 "GAINED ability index; the C must not fire what Rust cannot");
+        CHECK_EQ(printed_entries, 1,
+                 "RUST trigger_scan.rs:78-139: exactly the one PRINTED debut "
+                 "ability is enqueued, unchanged by the gained arm's removal");
+        CHECK(!rb_has_pending_choice(&tg.state),
+              "RUST trigger_scan.rs:23-139: the 登場 scan opens no prompt itself");
+    }
+
+    current_row = "A9b.gained_live_success_still_fires";
+    {
+        /* Rust trigger_scan.rs:462-514 -- the ライブ成功時 scan DOES have a
+         * gained arm, and it is reachable from the corpus. Same construction:
+         * the C must enqueue the gained ライブ成功時 ability here, at a gained
+         * index.  This is the PAIRED POSITIVE that keeps A9 from being read as
+         * "gained abilities never fire". */
+static        TestGame tg;
+        test_game_new(&tg);
+        int cid = test_new_id(&tg, "PL!SP-bp4-003-P");
+
+        char trg[] = T_LSUCC;
+        char txt[] = "gained live-success ability";
+        Ability gained;
+        memset(&gained, 0, sizeof(gained));
+        gained.full_text = txt;
+        gained.triggerless_text = txt;
+        gained.triggers = trg;
+        gained.use_limit = -1;
+        gained.effect = NULL;
+        CHECK_EQ(rb_register_gained_ability(&tg.state, cid, &gained), 0,
+                 "premise: a gained ライブ成功時 ability can be attached");
+
+        test_add_to_stage(&tg, 0, cid);
+        /* rb_should_trigger_live_success requires a non-empty live-card zone
+         * (RUST abilities.rs:2879-2881), so the premise needs a live card. */
+        int live_probe = test_new_id(&tg, LS_LIVE_CARD);
+        CHECK(live_probe >= 0, "premise: the live-card probe must resolve");
+        test_add_to_live(&tg, live_probe);
+        /* Same premise A4a establishes: `rb_should_trigger_live_success` reads
+         * g->live_success[pl] (the C's cached answer for
+         * RUST abilities.rs:2870's recomputation -- see T4-11), so the flag has
+         * to be set for the scan to run at all. */
+        tg.state.live_success[0] = 1;
+        int queued = rb_trigger_live_success(&tg.state, 0);
+
+        int gained_entries = 0;
+        for (int i = 0; i < rb_queue_len(&tg.state); i++) {
+            const RbQueueEntry *e = rb_queue_get_entry(&tg.state, i);
+            if (e && e->ability_idx >= RB_GAINED_ABILITY_INDEX_BASE) gained_entries++;
+        }
+        CHECK_EQ(gained_entries, 1,
+                 "RUST trigger_scan.rs:462-514: the ライブ成功時 scan DOES fire "
+                 "a gained ライブ成功時 ability, at RB_GAINED_ABILITY_INDEX_BASE+n "
+                 "(queued=%d)", queued);
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+ * A10 -- the use-limit key must not alias a GAINED index onto a PRINTED one.
+ *
+ * RUST keys spent uses on the FULL triple:
+ *     turn_limited_abilities_used: HashMap<(i16, usize, u32), u8>
+ * read back by `ability_uses_used` (abilities.rs:146-151).
+ *
+ * The C keyed on `(card_id << 4) | (ability_idx & 0xF)` -- a FOUR-BIT ability
+ * index.  RB_GAINED_ABILITY_INDEX_BASE is 10000 (rabuka.h:3028) and
+ * 10000 & 0xF == 0, so a GAINED ability at index 10000+g hashed to the same
+ * slot as the PRINTED ability #g on the same card.  Concretely C could refuse a
+ * printed 「{{ターン1回}}」 自動 ability because an unrelated gained ability had
+ * resolved, and rb_use_count could report a non-zero count for an ability that
+ * never resolved at all.
+ *
+ * Measured reachability today: 0 of 985 -- a collision needs a gained ability
+ * carrying 自動 or 起動, and the only use-limited families in the corpus are
+ * 自動 (53) and 起動 (80); no gain in the corpus grants either.  That is the
+ * latent-bug-in-a-wired-path case, so the key was widened rather than the
+ * divergence documented.
+ *
+ * No card data is needed; this is the pure queue accessor level, and every
+ * assertion is paired in both directions so a partial fix cannot pass.
+ * ══════════════════════════════════════════════════════════════════════ */
+
+static void test_a10_use_limit_key_does_not_alias_gained(void)
+{
+    current_row = "A10.gained_and_printed_use_keys_are_distinct";
+    {
+        static GameState g;
+        memset(&g, 0, sizeof(g));
+        g.winner = -1;
+        g.turn = 7;
+        g.active = 0;
+        g.cheer_check_base = -1;
+        rb_queue_init(&g.queue);
+
+        const int card = 42;
+        const int printed_idx = 3;
+        const int gained_idx = RB_GAINED_ABILITY_INDEX_BASE + printed_idx;
+        const int turn = g.turn;
+
+        CHECK_EQ(rb_use_limit_reached(&g.queue, card, printed_idx, 1, turn), 0,
+                 "RUST gates.rs:102: nothing used yet, so the limit is not "
+                 "reached");
+
+        rb_record_use(&g.queue, card, printed_idx, turn);
+        CHECK_EQ(rb_use_count(&g.queue, card, printed_idx, turn), 1,
+                 "RUST abilities.rs:216-231: record_ability_use bumps the "
+                 "PRINTED key");
+
+        /* The gained index with the same low nibble must be untouched. */
+        CHECK_EQ(rb_use_count(&g.queue, card, gained_idx, turn), 0,
+                 "RUST abilities.rs:146-151: a GAINED index must not read the "
+                 "PRINTED ability's use count (Rust keys the full triple)");
+        CHECK_EQ(rb_use_limit_reached(&g.queue, card, gained_idx, 1, turn), 0,
+                 "RUST gates.rs:93-111: spending ability #g must NOT exhaust a "
+                 "GAINED ability at RB_GAINED_ABILITY_INDEX_BASE+g on the same "
+                 "card");
+
+        /* And the reverse direction. */
+        rb_record_use(&g.queue, card, gained_idx, turn);
+        CHECK_EQ(rb_use_count(&g.queue, card, gained_idx, turn), 1,
+                 "RUST abilities.rs:216-231: record_ability_use bumps the "
+                 "GAINED key");
+        CHECK_EQ(rb_use_limit_reached(&g.queue, card, gained_idx, 1, turn), 1,
+                 "RUST gates.rs:102-107: the gained ability's own limit IS "
+                 "reached");
+        CHECK_EQ(rb_use_count(&g.queue, card, printed_idx, turn), 1,
+                 "RUST abilities.rs:146-151: the printed count is unchanged by "
+                 "the gained record -- no aliasing in either direction");
+
+        /* The turn member still scopes the whole table. */
+        CHECK_EQ(rb_use_count(&g.queue, card, printed_idx, turn + 1), 0,
+                 "RUST abilities.rs:146-151: a different turn reads a fresh "
+                 "table");
+    }
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IOLBF, 0);
@@ -1020,6 +1368,9 @@ int main(void)
     run("A5_stage_gate_exclude_chars",   test_a5_stage_gate_exclude_characters);
     run("A6_same_unit_name_prompt",      test_a6_same_unit_name_prompt);
     run("A7_reveal_cost_values",         test_a7_reveal_cost_values);
+    run("A8_debut_moved_snapshot",     test_a8_debut_moved_snapshot);
+    run("A9_gained_debut_never_fires", test_a9_gained_debut_never_fires);
+    run("A10_use_limit_key_no_alias",  test_a10_use_limit_key_does_not_alias_gained);
 
     printf("\n=== %d ok, %d FAILED, %d crashed ===\n", n_ok, n_failed, n_crashed);
     printf("Every [TRIGGER-MISS] line above is a byte dump of what the engine\n"

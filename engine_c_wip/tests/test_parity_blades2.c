@@ -307,7 +307,7 @@ static void on_fatal_signal(int sig)
         if (tal) tal->prompts++;                                          \
         if (!tal || tal->prompts < (n)) {                                 \
             if (tal) tal->failures++;                                     \
-            fprintf(stderr, "FAIL (VACUOUS): ");                          \
+            fprintf(stderr, "FAIL: [VACUOUS]  ");                          \
             fprintf(stderr, __VA_ARGS__);                                 \
             fprintf(stderr, " - only %d prompt(s) offered, need %d\n",   \
                     tal ? tal->prompts : -1, (int)(n));                   \

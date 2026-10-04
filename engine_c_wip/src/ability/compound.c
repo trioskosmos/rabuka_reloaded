@@ -207,8 +207,11 @@ static int cond_is_always_true(const Condition *c) {
 static int cond_is_all_revealed(const Condition *c) {
     return c && c->variant == RB_COND_ALL_REVEALED;
 }
-/* stable hash for condition cache (resolver.rs cond_cache_key) */
-static int cond_cache_key(const Condition *c) {
+/* cond_cache_key — the ONE cache key. resolver.c used to hold a byte-identical
+   static copy of this FNV-1a; it now calls this one instead. Both copies hashed
+   `variant`, `n_fields` and the low 24 bits of the pointer, so the two agreed by
+   construction and the duplication bought nothing. */
+int rb_cond_cache_key(const Condition *c) {
     if (!c) return 0;
     int h = 2166136261;
     h ^= (int)c->variant; h *= 16777619;
@@ -216,17 +219,25 @@ static int cond_cache_key(const Condition *c) {
     h ^= (int)(uintptr_t)c & 0xFFFFFF; h *= 16777619;
     return h;
 }
+static int cond_cache_key(const Condition *c) { return rb_cond_cache_key(c); }
+
+/* cond_get_cache_flag — the ONE cache gate. This used to be a hand-rolled
+   re-read of the condition's "cache" field, and it disagreed with the
+   rb_condition_get_cache that resolver.c's twin used (card.c:682) on two tag
+   shapes: for RB_TAG_I64 this one reported the field ABSENT while
+   rb_condition_get_cache reported it PRESENT, and for RB_TAG_STR it was the
+   other way round. Both helpers share one `e->cond_cache_keys[]` table on the
+   current queue entry, so a disagreement let the SAME condition carry a cached
+   verdict on the resolver.c path and an uncached one on the compound.c path.
+   The Rust generator reads this field with read_bool_value
+   (condition_decoder_gen.rs: read_bool_value -> TAG_NULL/TAG_TRUE/TAG_FALSE), so
+   the divergent tags are unreachable from the shipped blobs today — which is
+   exactly why the two copies drifted unnoticed. Delegating makes the answer
+   independent of which file asks. */
+extern int rb_condition_get_cache(const Condition *c, int *out);
 static int cond_get_cache_flag(const Condition *c) {
-    /* rb_condition_get_cache is in resolver.c scope but we re-read via extra “cache” */
-    const char *v = NULL;
-    for (uint32_t i=0;i<c->n_fields;i++) if (c->fields[i].key && !strcmp(c->fields[i].key,"cache")) {
-        if (c->fields[i].v.tag==RB_TAG_TRUE) return 1;
-        if (c->fields[i].v.tag==RB_TAG_FALSE) return 0;
-        if (c->fields[i].v.tag==RB_TAG_STR && c->fields[i].v.s) return atoi(c->fields[i].v.s)!=0;
-        break;
-    }
-    (void)v;
-    return 0;
+    int out = 0;
+    return rb_condition_get_cache(c, &out) ? out : 0;
 }
 static int cached_condition_verdict(const GameState *g, const Condition *c, int *out) {
     if (!g || !c || !out) return 0;
@@ -465,8 +476,16 @@ int rb_compound_sequential(GameState *g, int actor, const AbilityEffect *eff, in
                     const char *first_ct = eff_card_type_any(repeat_actions[0]);
                     const char *cur_ct = eff_card_type_any(action);
                     if(first_ct && cur_ct && !strcmp(first_ct,"member_card") && !strcmp(cur_ct,"member_card")) inheritable=0;
-                    /* Rust checks CardType::Member exact; we use string */
-                    if(first_ct && !strcmp(first_ct,"member") && cur_ct && !strcmp(cur_ct,"member")) inheritable=0;
+                    /* The former second arm — `!strcmp(first_ct,"member")` — is GONE.
+                     * It was a stand-in for CardType::Member that could never fire:
+                     * the canonical spelling of CardType::Member is "member_card"
+                     * (card.c:23/:31 and card.c:554 both return exactly that, and
+                     * vm.c:1102 tests only "member_card"), and `card_type` is never
+                     * carried as an extra (MEASURED: 0 effect nodes over 2639 cards
+                     * / 2116 ability pairs / 3703 reachable effect objects), so
+                     * eff_card_type_any can only ever return the decoded struct
+                     * field. The "member_card" test above is the real
+                     * CardType::Member test and is the one that stays. */
                 }
                 if(inheritable && supports_self(action->action)){
                     const char *eff_st = eff_self_target_any(eff);

@@ -38,6 +38,7 @@ static int gaps;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -50,6 +51,7 @@ static int gaps;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -238,7 +240,7 @@ static void stage_leave_to_waitroom(TestGame *tg, int area, int cid)
 
 static void test_baton_displaced_self_places_under_arriver(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int kanon = test_id(&game, KANON);
@@ -262,7 +264,7 @@ static void test_baton_displaced_self_places_under_arriver(void)
 
 static void test_baton_displaced_self_no_baton_touch_stays_in_waitroom(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int kanon = test_id(&game, KANON);
@@ -284,7 +286,7 @@ static void test_baton_displaced_self_no_baton_touch_stays_in_waitroom(void)
 
 static void test_baton_displaced_self_as_arriver_not_displaced(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int kanon = test_id(&game, KANON);
@@ -306,7 +308,7 @@ static void test_baton_displaced_self_as_arriver_not_displaced(void)
 
 static void test_baton_displaced_self_placed_under_specific_arriver_slot(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int kanon = test_id(&game, KANON);
@@ -535,7 +537,7 @@ static void test_group_baton_replacement_places_energy_under_arriving_member(voi
 
 static void test_hs_cl1_already_wait_no_blade(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int card = test_id(&game, CL_RURINO);
@@ -559,7 +561,7 @@ static void test_hs_cl1_already_wait_no_blade(void)
 
 static void test_hs_cl1_turn_limit_blocks_second(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int card = test_id(&game, CL_RURINO);
@@ -652,7 +654,7 @@ static int blade_recipient(TestGame *tg, int pick, int *out_asked)
 
 static void test_hs_cl1_choice_among_multiple_mirakura(void)
 {
-    TestGame g1, g2;
+static    TestGame g1, g2;
     int asked1 = 0, asked2 = 0;
 
     test_game_new(&g1);
@@ -710,7 +712,7 @@ static void niji_partner_scenario(TestGame *tg, int partner, int *out_hand,
 
 static void test_niji_partner_cost10_noblade_energizes_2(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int partner = test_id(&game, "PL!N-bp3-009-P");
@@ -723,7 +725,7 @@ static void test_niji_partner_cost10_noblade_energizes_2(void)
 
 static void test_niji_partner_cost15_noblade_energizes_2_and_draws_1(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int partner = test_id(&game, "PL!N-pb1-009-P+");
@@ -737,7 +739,7 @@ static void test_niji_partner_cost15_noblade_energizes_2_and_draws_1(void)
 
 static void test_niji_partner_with_blade_heart_nothing_fires(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int partner = test_id(&game, "PL!N-bp1-003-P");
@@ -751,7 +753,7 @@ static void test_niji_partner_with_blade_heart_nothing_fires(void)
 
 static void test_niji_partner_low_cost_nothing_fires(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int partner = test_id(&game, "PL!N-bp4-001-P");
@@ -765,7 +767,7 @@ static void test_niji_partner_low_cost_nothing_fires(void)
 
 static void test_niji_partner_not_nijigasaki_nothing_fires(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int partner = test_id(&game, FILLER);

@@ -1847,6 +1847,24 @@ impl<'a> CardFilter<'a> {
         let original_blade_operator = effect.blade_limit_operator_any().map(Operator::as_str);
         let ability_filter = effect.ability_filter_any().map(AbilityFilter::as_str);
         let card_property = effect.card_property_any();
+        // An inclusion and an exclusion of the SAME group set cannot both be
+        // satisfied, and when the extractor hoists a clause's group onto the effect that
+        // also carries the clause's `exclude_group_names`, that is exactly what it
+        // produces. 百生 吟子 (PL!HS-bp5-004) parses with both
+        // `group_names: ["スリーズブーケ"]` and `exclude_group_names: ["スリーズブーケ"]`
+        // on one effect object (cards/abilities.json:8144-8153), so `matches` demanded a
+        // card be スリーズブケット AND not スリーズブケット: the candidate set was always
+        // empty and the ability could never grant anything.
+        //
+        // The exclusion is the intended reading — the text is 『スリーズブーケ以外』, an
+        // exclusion — so where the two sets are equal the inclusion is redundant and is
+        // dropped. There is no card that is both, so no reading is lost; and a card that
+        // is neither still fails the exclusion.
+        let exclude_group_names = effect.exclude_group_names_any();
+        let group_names = match (group_names, exclude_group_names) {
+            (Some(included), Some(excluded)) if included == excluded => None,
+            (included, _) => included,
+        };
         CardFilter {
             card_type,
             group: group_names
@@ -1863,7 +1881,7 @@ impl<'a> CardFilter<'a> {
             cost_total_operator,
             characters: effect.characters_any(),
             exclude_characters: effect.exclude_characters_any(),
-            exclude_group_names: effect.exclude_group_names_any().map(Vec::as_slice),
+            exclude_group_names: exclude_group_names.map(Vec::as_slice),
             heart_colors: effect.heart_colors_any(),
             require_all_heart_colors: effect.require_all_heart_colors_any().unwrap_or(false),
             heart_color_count: effect.heart_color_count_any(),

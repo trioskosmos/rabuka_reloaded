@@ -25,6 +25,13 @@ int  test_id(TestGame *tg, const char *card_no); /* card index or -1, like Rust 
    is under test; test_id stays forgiving because most of the corpus needs it. */
 int  test_id_exact(TestGame *tg, const char *card_no);
 int  test_new_id(TestGame *tg, const char *card_no); /* distinct copy or -1 */
+/* PEEK, not a consume — mirror Rust TestGame::id_ref (helpers/mod.rs:245-253).
+   Answers "what would the next id() hand out for this card_no?" WITHOUT
+   advancing anything. DIVERGENCE, stated: in the C this returns the shared
+   TEMPLATE id, which is also exactly what C's test_id() returns on every call,
+   because C's test_id has no per-card counter at all. So in the C the peek and
+   the consume always agree; in Rust they differ by one pool position. */
+int  test_id_ref(TestGame *tg, const char *card_no);
 /* Release every card-copy id back to the pool (data.c:279). The pool is
    process-global and MONOTONIC and nothing in the corpus resets it, so it
    runs dry after 4096-2639 = 1457 allocations -- and
@@ -54,6 +61,13 @@ void test_set_energy_active(TestGame *tg, int pl, int n);
 void test_add_to_revealed(TestGame *tg, int card_id);
 void test_give_energy(TestGame *tg, int count);
 int  test_play_to_stage(TestGame *tg, int card_id, int area);
+/* Mirror Rust TestGame::play_to_stage_baton (helpers/mod.rs:404): play into an
+   area that MAY be occupied — the opt-in twin of test_play_to_stage, which
+   warns when the swap was not asked for. */
+int  test_play_to_stage_baton(TestGame *tg, int card_id, int area);
+/* Mirror Rust TestGame::play_to_stage_double_baton (helpers/mod.rs:418): replace
+   TWO members and land in a third. The only path that records two touches. */
+int  test_play_to_stage_double_baton(TestGame *tg, int card_id, int area_a, int area_b, int land_in);
 int  test_try_play_to_stage(TestGame *tg, int card_id, int area); /* returns 1 on success */
 void test_recalc(TestGame *tg);
 void test_clear_mods_for_card(TestGame *tg, int card_id);
@@ -76,6 +90,11 @@ void test_spend_energy(TestGame *tg, int n);
 /* choice / pending-choice shims (mirror helpers/mod.rs has_pending_choice /
    select_indices / select_option / pending_choice_count) */
 int  test_has_pending_choice(TestGame *tg);
+/* Mirror Rust pending_choice_count (helpers/choices.rs:421-428): HOW MANY CARDS
+   THE PROMPT ASKS FOR, not "is one standing". A SelectCard answers its own
+   `count`; every other kind answers 0 (SelectHeartColor / SelectAutoAbility /
+   SelectLiveSuccess ask for no cards). It used to answer a constant 1 whenever
+   any prompt existed, which was right only for a `SelectCard { count: 1 }`. */
 int  test_pending_choice_count(TestGame *tg);/* live shim (mirror helpers/mod.rs set_live_card).
    Rust's set_live_card(card_id) takes ONE argument and the engine APPENDS the
    card to the live card zone. `slot` exists only because tools/port_one.py
@@ -231,6 +250,21 @@ int  test_get_cost_modifier(TestGame *tg, int cid);
    happened to hold the value. It is now a plain passthrough. */
 int  test_get_heart_modifier(TestGame *tg, int cid, int color);
 int  test_filler_hand(TestGame *tg);
+/* DO NOT confuse with test_filler_hand, which RETURNS a filler card id and
+   mutates nothing. These two are the Rust `fill_decks` / `fill_energy_deck`
+   twins (helpers/mod.rs:564-583) and they MUTATE: fill_decks clears both main
+   decks and leaves 30 copies of `filler` in each (the clear is load-bearing —
+   a deck the fixture meant to be empty otherwise keeps the setup's cards);
+   fill_energy_deck pushes `count` copies of "LL-E-001-SD" into seat `pl`'s
+   ENERGY DECK (the draw pile) and does NOT raise energy_active. */
+void test_fill_decks(TestGame *tg, int filler);
+void test_fill_energy_deck(TestGame *tg, int pl, int count);
+/* Mirror Rust stage_occupant (mod.rs:440-444): the card in `area` of P1's stage
+   that is NOT `card_id`, or -1. This is the assertion that catches the
+   baton-touch-into-your-own-fixture trap (docs/PBLL02_ABILITY_REVIEW.md §8.3,
+   137 affected tests) — before this existed a test could not check its own
+   setup even when it wanted to. */
+int  test_stage_occupant(TestGame *tg, int card_id, int area);
 /* EXACT card-number compare (never the forgiving rb_find_card_by_no chain).
    An empty `no` is refused: rb_card_string returns the shared "" literal for
    an out-of-range index, so "" used to match EVERY card. */
@@ -317,7 +351,30 @@ int  test_fire_trigger_on_card_seat(TestGame *tg, int cid, const char *trig, int
 /* Rust `fire_trigger_nth`: the Nth printed ability carrying the trigger. */
 int  test_fire_trigger_on_card_nth(TestGame *tg, int cid, const char *trig, int nth);
 /* ABSOLUTE ability index, for a suite isolating one leg of a multi-leg watcher.
-   Not the same as _nth. Refuses an ability that does not print a trigger. */
+    Not the same as _nth. Refuses an ability that does not print a trigger. */
 int  test_fire_trigger_at_index(TestGame *tg, int cid, int ability_idx);
+
+/* ── FLAT-suite per-test verdict layer ─────────────────────────────────────
+    A FLAT suite runs every test body in ONE process out of ONE main(), so its
+    `FAIL:` lines name an ASSERTION and not a test. A suite that adopts this
+    puts ONE line in the failure branch of EVERY assertion macro it defines:
+
+        #define CHECK(cond, msg) do {                        \\
+            if (!(cond)) {                                  \\
+                fprintf(stderr, "FAIL: %s\n", (msg));       \\
+                failures++; FLAT_VERDICT();                  \\
+            }                                               \\
+        } while (0)
+
+    `FLAT_VERDICT()` prints `FAILED: <enclosing function>` exactly once per
+    function, so the failing tests in a FLAT suite become countable. Put it in
+    `CHECK` AND in `CHECK_EQ` -- patching only `CHECK` silently loses the
+    majority of a suite's failures, because most FLAT suites fail through
+    CHECK_EQ. For a suite that forks per case, use the `FAILED:`/`ok:` verdict
+    the FORK harness already prints instead; this is for the FLAT shape only.
+    Defined once, in src/test_game.c, so the dedupe cannot drift per suite. */
+void test_flat_verdict_failed(const char *fn);
+int  test_flat_failed_count(void);
+#define FLAT_VERDICT() test_flat_verdict_failed(__func__)
 
 #endif

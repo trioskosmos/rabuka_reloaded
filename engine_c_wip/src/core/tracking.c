@@ -151,7 +151,32 @@ int rb_perform_cheer_check(GameState *g, const char *player_id, uint8_t blade_co
            blades, skipping their draws, their cheer_checks_done increments and
            the trailing cheer_check_completed update. Saturating keeps every
            card accounted for and can never walk off the array. */
-        rb_resolution_add(g, card_id);
+        /* OWNER STAMP. tracking.rs:92-93 is
+              self.resolution_zone.add_card_for_owner(card_id, owner);
+           where `owner` is the seat that YELLED — the same `pl` this loop's
+           yell_from_bottom / deck draw above already resolved at :115, and
+           Rust's own tracking.rs hands the caller's seat in rather than
+           reading game_state.active_player. The C called the 2-argument
+           rb_resolution_add, which stamps RB_RESOLUTION_OWNER_UNKNOWN (0xFF)
+           (zones.c:752-753), so the owner was NEVER recorded and
+           rb_check_invalid_resolution_zone (turn/phase.c, the drain named at
+           its :777) fell back to g->active for every card — the wrong waitroom
+           for whichever seat was not attacking.
+
+           Measured: rb_resolution_add's ONLY production caller is this line
+           (the other 8 hits are tests/test_parity_rules*.c and
+           test_live_card_zone_movement.c calling it directly), so this was
+           every owner the drain ever saw in a played game.
+
+           Two tests were affected and are now honest rather than coincidental:
+             * d2_invalid_resolution_card_returns_to_its_owner calls the plain
+               2-argument form, so it still exercises the UNKNOWN -> g->active
+               fallback (Rust's twin adds for owner 1 explicitly:
+               live_card_zone_movement_test.rs:93), and
+             * D4 was passing only because it sets g->active = 1, which makes
+               both routings coincide. It is still correct after this change;
+               it is just no longer passing by coincidence. */
+        rb_resolution_add_for_owner(g, card_id, pl);
         g->cheer_checks_done++;
     }
     if(g->cheer_checks_done >= g->cheer_checks_required){

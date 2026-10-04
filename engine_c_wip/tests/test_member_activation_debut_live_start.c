@@ -39,7 +39,7 @@ static void drain_choices(TestGame *game) {
 }
 
 static void test_bp3_005_debut_activates_all_waited_members(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int card = test_id(&game, "PL!-bp3-005-R");
@@ -68,7 +68,7 @@ static void test_bp3_005_debut_activates_all_waited_members(void) {
 }
 
 static void test_combo_bp3_005_mass_activate_readies_self_waited_ability_member(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int mass = test_id(&game, "PL!-bp3-005-R");
@@ -106,7 +106,7 @@ static void test_combo_bp3_005_mass_activate_readies_self_waited_ability_member(
 }
 
 static void test_bp3_001_live_start_activates_one_chosen_member(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int card = test_id(&game, "PL!-bp3-001-R");
@@ -166,7 +166,7 @@ static void test_bp3_001_live_start_activates_one_chosen_member(void) {
 }
 
 static void test_bp3_001_live_start_can_skip_activation(void) {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int card = test_id(&game, "PL!-bp3-001-R");
@@ -216,7 +216,7 @@ static int discard_has(TestGame *game, int card_id)
 
 static void test_kinako_baton_recovery(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int kinako = test_id(&game, "PL!SP-bp2-006-P");
     int liela = test_id(&game, "PL!SP-pb1-001-R");
@@ -235,7 +235,7 @@ static void test_kinako_baton_recovery(void)
 }
 
 static void test_suppress_ability_trigger_is_persistent(void) {
-    GameState state;
+static    GameState state;
     memset(&state, 0, sizeof(state));
     state.p[0].stage[0] = 1;
     AbilityEffect effect;

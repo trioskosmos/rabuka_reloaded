@@ -165,11 +165,15 @@ static void on_fatal_signal(int sig)
 {
     fprintf(stderr,
             "\n*** FATAL SIGNAL %d inside test: %s\n"
-            "*** The engine, not this test, is at fault.\n"
             "*** Assertions evaluated before the fault: %d, failures: %d, "
             "prompts: %d\n",
             sig, current_test, assertions, failures, prompts);
     fflush(stderr);
+    /* Re-raise under the DEFAULT disposition: run()'s CRASH verdict is only
+     * reachable when WIFSIGNALED(status) is true, and _Exit(128 + sig) turned
+     * the crash into an ordinary exit instead. */
+    signal(sig, SIG_DFL);
+    raise(sig);
     _Exit(128 + sig);
 }
 
@@ -220,7 +224,7 @@ static void on_fatal_signal(int sig)
         if (pending(tg_arg)) prompts++;                                   \
         if (prompts < (n)) {                                              \
             failures++;                                                   \
-            fprintf(stderr, "FAIL (VACUOUS): ");                          \
+            fprintf(stderr, "FAIL: [VACUOUS]  ");                          \
             fprintf(stderr, __VA_ARGS__);                                 \
             fprintf(stderr, " - only %d prompt(s) were offered, need %d\n",\
                     prompts, (n));                                        \
@@ -1479,10 +1483,22 @@ static int nahone_resolver_path(TestGame *tg, int nahone, int pay_cost)
             tg->state.queue.deferred = ab.effect;
             tg->state.queue.resume_host = nahone;
             tg->state.queue.resume_eff = ab.effect;
+            /* The keep-alive handoff must be TOTAL, exactly as the engine's own
+             * rb_drain_keep_alive (ability_queue.c:1302-1318) documents: it is a
+             * by-value copy of an OWNING Ability, so nulling only ab.cost /
+             * ab.effect left full_text / triggerless_text / triggers owned by
+             * BOTH copies. rb_free_ability(&ab) below released those three
+             * blocks, and the keep-alive release at the end of the prompt
+             * (choice.c:5289 rb_free_ability(&g->activation_keepalive)) then
+             * freed the SAME three blocks a second time -> heap double free ->
+             * mingw abort -> SIGABRT (signal 6) with zero failures recorded.
+             * That is verbatim the defect ability_queue.c:1306-1312 records as
+             * already fixed engine-side; this test was re-introducing it by
+             * hand. Zeroing the local makes the local release a no-op and
+             * leaves one owner. */
             tg->state.activation_keepalive = ab;
             tg->state.activation_keepalive_valid = 1;
-            ab.cost = NULL;
-            ab.effect = NULL;
+            memset(&ab, 0, sizeof(ab));
         }
     }
     if (ab.effect && !test_has_pending_choice(tg))
@@ -3183,7 +3199,19 @@ static void j7_no_niji_no_peek(void)
     TestGame *tg = &t_j7;
     fresh(tg);
     int tsunagaru, non_niji, filler;
-    if (!fx(tg, &non_niji, HONOKA) ||
+    /* W9. `tsunagaru` was NEVER assigned in this test: the
+       `fx(tg, &tsunagaru, TSUNAGARU)` leg that every sibling (j1 :3005, j2
+       :3063, j5 :3139, j6 :3171, j8 :3235) has in its guard was missing here.
+       gcc predicted it and nobody read the log --
+       `tests/test_parity_cce_gaps.c:438` is where the -Wmaybe-uninitialized
+       came from, `-Werror=maybe-uninitialized` now gates tests/.
+       The consequence was a live assertion running on an indeterminate value:
+       :3212 put that garbage into the hand and :3218 scanned for it, so
+       "j7: the ライブ開始時 was queued" could never pass and was failing for a
+       setup reason rather than an engine reason. Adding the leg STRENGTHENS
+       the test; no assertion is weakened, deleted or ignored. */
+    if (!fx(tg, &tsunagaru, TSUNAGARU) ||
+        !fx(tg, &non_niji, HONOKA) ||
         !fx(tg, &filler, HONOKA)) return;
     CHECK(!card_unit_is(tg, non_niji, NIJI_SERIES),
           "j7: the staged member's UNIT is not 虹ヶ咲 (unit='%s')", card_unit_of(non_niji));

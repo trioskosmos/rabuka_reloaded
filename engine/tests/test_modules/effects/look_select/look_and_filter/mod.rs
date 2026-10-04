@@ -5,6 +5,7 @@ pub mod card_filter_test;
 pub mod look_at_deck_top_optional_discard_test;
 pub mod look_count_from_total_live_score_test;
 pub mod look_seven_select_three_heart_member_test;
+pub mod mei_debut_optional_cost_look_five_take_one_liella_member_test;
 pub mod no_blade_heart_group_look_test;
 pub mod or_card_types_heart05_threshold_look_test;
 pub mod per_group_take_one_from_look_five_test;

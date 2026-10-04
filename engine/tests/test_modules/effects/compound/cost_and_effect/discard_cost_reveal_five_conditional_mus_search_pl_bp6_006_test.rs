@@ -276,6 +276,85 @@ fn maki_bp6_blade_expires_at_live_end() {
     );
 }
 
+/// Run 西木野真姫's activation up to the point where only the branch-specific
+/// prompt remains, and report `(the staged card, the waitroom size)`.
+///
+/// It returns the card id `maki_bp6_setup` STAGED. `TestGame::id` consumes a slot
+/// from the 11-copy pool per call, so a second `game.id("PL!-bp6-006-R+")` yields a
+/// different instance — and activating an instance that is not the one on stage
+/// fails with 「No activatable ability found」.
+fn run_to_branch(game: &mut TestGame, deck_top: &[i16]) -> (i16, usize) {
+    let maki = maki_bp6_setup(game, deck_top);
+    game.activate_ability(maki);
+    drain_cost_and_color(game);
+    (maki, game.state.player1.waitroom.cards.len())
+}
+
+/// 「公開した残りのカードを控え室に置く」 on the branch where the 「〜場合」 clause
+/// does NOT run.
+///
+/// When fewer than 5 revealed cards carry the chosen heart colour, no selection is
+/// offered and no blade is granted — but the cleanup clause is NOT inside that
+/// conditional. It is the third step of the outer `sequential`, a sibling of the
+/// `conditional_on_result`, so it fires either way and every revealed card ends in
+/// the waitroom.
+///
+/// This is the branch where the clause is easiest to get wrong and hardest to
+/// notice, because nothing about this ability's own outcome depends on it.
+/// `gs.revealed_cards` is SHARED game state, not a per-ability buffer: cards left
+/// there are visible to every later effect on the turn, to the opponent, and to the
+/// next card that looks at 「公開したカード」. A stranded reveal does not fail any
+/// other assertion in this file — it corrupts the turn after this one. So the
+/// assertions are on the zone being emptied AND the cards arriving in the waitroom,
+/// not on the blade.
+#[test]
+fn maki_bp6_all_revealed_cards_go_to_waitroom_when_condition_fails() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ruby = game.id("PL!S-bp2-009-R"); // heart02 ✓
+    let filler = game.id("PL!-sd1-010-SD"); // heart01+heart03, no heart02 ✗
+
+    // 4 of 5 match: `all_revealed_match_heart_color` is `count >= 5`, so a single
+    // non-matching card fails the whole condition.
+    let (maki, _waitroom_at_branch) = run_to_branch(&mut game, &[ruby, ruby, ruby, ruby, filler]);
+
+    // The failed condition offered nothing at all — not even a skippable prompt.
+    // A prompt here would mean the failed branch is asking the player to choose
+    // from cards it has already thrown away.
+    assert!(
+        !game.has_pending_choice(),
+        "a failed result condition must offer nothing, not even a skip; got {:?}",
+        game.pending_choice_summary()
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(maki),
+        0,
+        "no blade: the 「〜場合」 clause did not run"
+    );
+
+    assert!(
+        game.state.revealed_cards.is_empty(),
+        "the cleanup clause runs whether or not the condition held; the reveal \
+         zone is left with {:?}",
+        game.state.revealed_cards
+    );
+    // Absolute counts, not a delta against a baseline: the cost also discards into
+    // this zone, so a baseline taken before the cost silently credits the cleanup
+    // with the cost's own card.
+    assert_eq!(
+        game.state.player1.waitroom.cards.iter().filter(|&&c| c == ruby).count(),
+        4,
+        "the four heart02 cards revealed go to the waitroom; waitroom is {:?}",
+        game.state.player1.waitroom.cards
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&filler),
+        "the non-matching card is discarded as well — it was revealed, so it is \
+         a 「残りのカード」; waitroom is {:?}",
+        game.state.player1.waitroom.cards
+    );
+}
+
 #[test]
 fn maki_bp6_cost_discard_works() {
     let db = load_real_database();

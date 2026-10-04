@@ -74,7 +74,16 @@ static Ability g_current_ability;
 static int     g_current_ability_valid = 0;
 static int     g_current_ability_idx = -1;
 static int     g_activating_card_id = -1;
-static char    g_last_offered_sig[512] = {0};
+/* The dedup signature buffer must be able to hold the WORST CASE the writer can
+   produce, or the signature truncates and two different offers that share a long
+   prefix compare equal -- `last_offered_sig` would then suppress a prompt it
+   should have shown. Worst case: "skip=1;" (7) + "[0]" (3) + the whole
+   `RbChoice::description` (char[512], so 511 chars) + NUL = 522. The old `char
+   sig[512]` / `static char g_last_offered_sig[512]` were both one byte too small
+   for that, which is what gcc's -Wformat-truncation at :243 was pointing at
+   (up to 515 bytes into the 505 that remain after the "skip=N;" prefix). */
+#define RB_CHOICE_SIG_MAX 544
+static char    g_last_offered_sig[RB_CHOICE_SIG_MAX] = {0};
 static int     g_has_last_sig = 0;
 
 /* ── Helpers ── */
@@ -203,16 +212,13 @@ static void overlay_release(Condition *scratch) {
 
 /* Stable hash for condition cache key (mirrors format!("{:?}", condition) hash)
    Use pointer + variant + field count as cheap stable key; bytecode conditions
-   are interned per ability so pointer identity is sufficient. */
-static int cond_cache_key(const Condition *c) {
-    if (!c) return 0;
-    /* FNV-1a over variant + n_fields + first field key if present */
-    int h = 2166136261;
-    h ^= (int)c->variant; h *= 16777619;
-    h ^= (int)c->n_fields; h *= 16777619;
-    h ^= (int)(uintptr_t)c & 0xFFFFFF; h *= 16777619;
-    return h;
-}
+   are interned per ability so pointer identity is sufficient.
+
+   The body lives in compound.c (rb_cond_cache_key) because compound.c used to
+   hold a byte-identical static copy of it; this file called its own, so the two
+   implementations had to be kept in step by hand. One definition now. */
+extern int rb_cond_cache_key(const Condition *c);
+static int cond_cache_key(const Condition *c) { return rb_cond_cache_key(c); }
 
 /* The string-keyed twin of cond_cache_key, for the exported
  * rb_resolver_{cached,store}_condition_verdict entry points, whose callers hold
@@ -357,7 +363,7 @@ void rb_resolver_store_pending_choice(GameState *g) {
     g->queue.snapshot_requested = 1;
     g->queue.state = RB_QUEUE_AWAITING_CHOICE;
     /* Dedup last_offered_sig (mirrors Rust last_offered_sig) */
-    char sig[512];
+    char sig[RB_CHOICE_SIG_MAX];
     choice_offer_sig(&g->queue.pending, sig, sizeof(sig));
     if (g_has_last_sig && !strcmp(sig, g_last_offered_sig)) return;
     strncpy(g_last_offered_sig, sig, sizeof(g_last_offered_sig)-1);
@@ -592,8 +598,16 @@ static void apply_per_unit_cost_reduction(GameState *g, AbilityEffect *cost,
                                           const AbilityEffect *mod_cost,
                                           int *inserted_index) {
     int per_unit_count = 1;
-    const char *puc = eff_extra(mod_cost, "per_unit_count");
-    if (puc) per_unit_count = atoi(puc);
+    /* resolver.rs:1497 reads `mod_cost.per_unit_count_any()` — a TYPED field.
+       vm.c:1040-1043 stores `per_unit_count` in AbilityEffect::per_unit_count and
+       `continue`s, so it is NEVER in the extras table (MEASURED 0 of 155 effect
+       nodes across 136 abilities carry it as an extra). This read was therefore
+       permanently NULL and every per-unit cost reduction divided by 1. The
+       struct field is authoritative and wins; the extras read is kept only as
+       the fallback so a future decoder change cannot lose the value. */
+    const char *puc = mod_cost->per_unit_count > 0 ? NULL : eff_extra(mod_cost, "per_unit_count");
+    if (mod_cost->per_unit_count > 0) per_unit_count = mod_cost->per_unit_count;
+    else if (puc) per_unit_count = atoi(puc);
     if (per_unit_count < 1) per_unit_count = 1;
     int unit = mod_cost->count >= 0 ? mod_cost->count : 1;
     const char *per_unit_type = eff_extra(mod_cost, "per_unit_type");

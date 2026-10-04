@@ -26,11 +26,13 @@ _trigger event hand-pushed with no real ability resolution in the same fn (weake
 
 None.
 
-## pendency_only (0)
+## pendency_only (1)
 
 _has_pending_choice asserted without choice identity (pending_choice_type/summary/answer) or outcome asserts_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/position/area_gated/love_wing_bell_all_mus_stage_offers_position_change_test.rs` | `love_wing_bell_offers_the_change_with_an_empty_area` | 128 |  |
 
 ## assert_only_negative (0)
 
@@ -60,7 +62,7 @@ _file CALLS trigger_live_success_abilities on a live whose printed need_heart no
 
 None.
 
-## drain_zero_may_decline (53)
+## drain_zero_may_decline (54)
 
 _file drains a prompt with index [0] AND asserts an absence, while naming a card whose select_cards is `optional`. On a skippable prompt [0] is NOT reliably 'take' and NOT reliably 'skip' — it depends on the PROMPT KIND and the harness does not say which. An optional-COST prompt takes the card on [0] (look_at_deck_top_optional_discard_test.rs proves it: two tests differing only in [0] vs []); a `looked_at` selection behaves differently again. So the hazard is AMBIGUITY: a test intending to take and instead declines passes silently when its assertion is an absence, which a positive assertion would have caught. `assert_select_card(zone, n, allow_skip)` states the prompt. EXPECTED YIELD IS LOW and measured, not hoped: 30 of these files assert absence directly about a look or selection, and the two read to check are both exemplars that state the prompt before answering and pair every absence with a positive twin. Read a row as 'spend five minutes here', not as 49 problems_
 
@@ -79,7 +81,8 @@ _file drains a prompt with index [0] AND asserts an absence, while naming a card
 | `engine/tests/test_modules/effects/look_select/look_and_filter/card_filter_test.rs` | `PL!-bp6-002-R,PL!-bp6-004-R` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/look_at_deck_top_optional_discard_test.rs` | `PL!-sd1-015-SD` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/look_count_from_total_live_score_test.rs` | `PL!-sd1-015-SD` | 1 |  |
-| `engine/tests/test_modules/effects/look_select/look_and_filter/look_seven_select_three_heart_member_test.rs` | `PL!S-sd1-003-SD` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/look_seven_select_three_heart_member_test.rs` | `PL!S-sd1-003-SD,PL!SP-bp5-007-AR` | 1 |  |
+| `engine/tests/test_modules/effects/look_select/look_and_filter/mei_debut_optional_cost_look_five_take_one_liella_member_test.rs` | `PL!SP-bp2-007-P` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/no_blade_heart_group_look_test.rs` | `PL!N-bp7-018-N` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/or_card_types_heart05_threshold_look_test.rs` | `PL!S-pb1-015-N` | 1 |  |
 | `engine/tests/test_modules/effects/look_select/look_and_filter/per_group_take_one_from_look_five_test.rs` | `PL!SP-bp5-007-R` | 1 |  |
@@ -132,13 +135,14 @@ _prompts answered by ORDINAL position (if step <= 2 { select 2 cards }) instead 
 
 None.
 
-## blind_phase_stepping (3)
+## blind_phase_stepping (4)
 
 _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or losing a step silently shifts the window the test thinks it is standing in; step to the phase by name instead_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/effects/invalidate/live_success/pb2_invalidate_live_success_gains_heart03_pl_pb2_003_pp_test.rs` | `our_own_live_success_abilities_are_not_invalidated` | 136 |  |
+| `engine/tests/test_modules/effects/mill/liella_milled_per_unit_blades_test.rs` | `hazuki_ren_bp5_005_a_live_phase_discard_does_not_trip_the_watcher` | 220 |  |
 | `engine/tests/test_modules/effects/modify_need_heart/pb2_need_heart_minus_3_minus_2_minus_1_per_activated_pl_pb2_040_l_test.rs` | `a_member_waited_again_after_being_activated_still_counts` | 247 |  |
 | `engine/tests/test_modules/effects/yell/pb2_yell_plus_ten_when_two_mus_success_pl_pb2_039_l_test.rs` | `the_opponents_success_zone_does_not_count` | 157 |  |
 
@@ -194,8 +198,10 @@ _every assertion is an INEQUALITY on a count and there is no assert_eq anywhere 
 
 None.
 
-## unresolvable_card_id (0)
+## unresolvable_card_id (1)
 
 _a card-number literal that is not in the database — either written inline in a `game.id("…")` or bound to a name (`const X: &str = "…"` / `let x: &str = "…"`), because const-bound card numbers are the dominant idiom here and the call-site form alone cannot see them. get_card_id's lenient fallback silently substitutes a DIFFERENT PRINT of the same card, so the test stages the wrong card and passes: `PL!SP-bp1-014-PR` resolved to `PL!SP-bp1-014-N` and left a "three DISTINCT names" premise unpinned_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/effects/compound/cost_and_effect/baton_touch_self_to_waitroom_recovers_liella_member_pl_sp_pb2_006_test.rs` | `<literal>` | 9 | PL!SP-pb2-001-P |

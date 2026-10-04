@@ -38,7 +38,7 @@ static void advance_to_live_success(TestGame *game)
 
 static void q36_live_success_timing(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int live = test_id(&game, "PL!-sd1-019-SD");

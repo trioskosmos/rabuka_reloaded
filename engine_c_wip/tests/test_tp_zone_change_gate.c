@@ -24,6 +24,7 @@ static int failures;
     if (!(c)) { \
         fprintf(stderr, "FAIL: %s\n", msg); \
         failures++; \
+        FLAT_VERDICT(); \
     } else printf("ok: %s\n", msg); \
 } while (0)
 
@@ -32,6 +33,7 @@ static int failures;
     if (a_ != e_) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", msg, a_, e_); \
         failures++; \
+        FLAT_VERDICT(); \
     } else printf("ok: %s\n", msg); \
 } while (0)
 
@@ -41,6 +43,7 @@ static int failures;
     if (strcmp(actual_, expected_) != 0) { \
         fprintf(stderr, "FAIL: %s (got %s expected %s)\n", msg, actual_, expected_); \
         failures++; \
+        FLAT_VERDICT(); \
     } else printf("ok: %s\n", msg); \
 } while (0)
 
@@ -122,7 +125,7 @@ static int card_cost(int card_id)
 
 static void riko_aqours_live_leaving_live_zone_offers_deck_placement(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int riko   = test_id(&game, RIKO);
@@ -155,7 +158,7 @@ static void riko_aqours_live_leaving_live_zone_offers_deck_placement(void)
 
 static void riko_ignores_non_aqours_live_leaving_live_zone(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int riko     = test_id(&game, RIKO);
@@ -181,7 +184,7 @@ static void riko_ignores_non_aqours_live_leaving_live_zone(void)
 
 static void riko_responds_only_to_own_side_live_zone(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int riko_p1 = test_id(&game, RIKO);
@@ -324,7 +327,7 @@ static void miyamiya_baton_touch_cost15_newcomer_full_payoff(void)
 
 static void miyamiya_baton_touch_cost13_newcomer_energy_only(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int ai        = test_id(&game, MIYAMIYA);
@@ -349,7 +352,7 @@ static void miyamiya_baton_touch_cost13_newcomer_energy_only(void)
 
 static void miyamiya_baton_touch_blade_heart_newcomer_nothing(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int ai        = test_id(&game, MIYAMIYA);

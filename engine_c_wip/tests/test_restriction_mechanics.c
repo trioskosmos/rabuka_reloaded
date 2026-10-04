@@ -43,7 +43,7 @@ static int trigger_auto(TestGame *tg, int cid, const char *trigger_str)
 
 static void test_ll_bp2001_cannot_be_baton_touched_out(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int protected_card = test_id(&tg, "LL-bp2-001-R＋");
     int attacker = test_id(&tg, "PL!-pb1-021-PR");
@@ -60,7 +60,7 @@ static void test_ll_bp2001_cannot_be_baton_touched_out(void)
 
 static void test_himena_bp6006_baton_only_with_murasakipark(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int himena = test_id(&tg, "PL!HS-bp6-006-R＋");
     int outsider = test_id(&tg, "PL!-pb1-021-PR");
@@ -76,7 +76,7 @@ static void test_himena_bp6006_baton_only_with_murasakipark(void)
 
 static void test_niko_pb1009_suppresses_effect_activations_for_the_turn(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int nico = test_id(&tg, "PL!-pb1-009-R");
     int mass_activator = test_id(&tg, "PL!-bp3-005-R");
@@ -117,7 +117,7 @@ static void test_niko_pb1009_suppresses_effect_activations_for_the_turn(void)
 
 static void test_ruby_bpb7009_front_blade_loss_respects_mirror_and_cost(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int ruby = test_id(&tg, "PL!S-bp7-009-R");
     int cheap = test_id(&tg, "PL!-sd1-010-SD");
@@ -146,7 +146,7 @@ static void test_ruby_bpb7009_front_blade_loss_respects_mirror_and_cost(void)
 
 static void test_mijuku_dreamer_refresh_condition_scores(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int live = test_id(&tg, "PL!S-bp2-022-L");
 
@@ -168,7 +168,7 @@ static void test_mijuku_dreamer_refresh_condition_scores(void)
 
 static void test_himena_bp6006_murasakipark_partner_baton_succeeds(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int himena = test_id(&tg, "PL!HS-bp6-006-R＋");
     int partner = test_id(&tg, "PL!HS-PR-018-PR");
@@ -190,7 +190,7 @@ static void test_himena_bp6006_murasakipark_partner_baton_succeeds(void)
 
 static void test_sumire_bpb4004_double_baton_removes_both_and_clamps_cost(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int sumire = test_id(&tg, "PL!SP-bp4-004-R＋");
     int big_a = test_id(&tg, "PL!S-bp5-009-R");

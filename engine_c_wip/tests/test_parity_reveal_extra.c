@@ -48,6 +48,7 @@ static int checks;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -60,6 +61,7 @@ static int checks;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -654,7 +656,7 @@ static void test_kanon_stage_full_falls_back_to_hand(void)
 
 static void test_nozomi_empty_hand_skips_discard_cost_and_look(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -687,7 +689,7 @@ static void test_nozomi_empty_hand_skips_discard_cost_and_look(void)
 
 static void test_live_success_reveals_member_without_blade_heart_scores(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -827,7 +829,7 @@ static void test_live_success_live_card_scores_nothing(void)
 
 static void test_p2_live_success_reveals_only_p2_top(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1538,7 +1540,7 @@ static int izumi_setup(TestGame *tg, int n_eligible, int eligible_is_first)
 
 static void test_izumi_pay_cost_waits_and_discards(void)
 {
-    TestGame tg;
+static    TestGame tg;
     int izumi = izumi_setup(&tg, 0, 0);
     if (izumi < 0) return;
     int wait_before = tg.state.p[0].discard.n;
@@ -1555,7 +1557,7 @@ static void test_izumi_pay_cost_waits_and_discards(void)
 
 static void test_izumi_skip_cost_no_wait_no_discard(void)
 {
-    TestGame tg;
+static    TestGame tg;
     int izumi = izumi_setup(&tg, 0, 0);
     if (izumi < 0) return;
     play_to_stage(&tg, izumi, 1, 0);
@@ -1567,7 +1569,7 @@ static void test_izumi_skip_cost_no_wait_no_discard(void)
 
 static void test_izumi_look_with_eligible_selects(void)
 {
-    TestGame tg;
+static    TestGame tg;
     int izumi = izumi_setup(&tg, 1, 1);
     if (izumi < 0) return;
     int hasu9 = test_id(&tg, "PL!HS-sd1-001-SD");
@@ -1583,7 +1585,7 @@ static void test_izumi_look_with_eligible_selects(void)
 
 static void test_izumi_look_with_eligible_skip_keeps_hand(void)
 {
-    TestGame tg;
+static    TestGame tg;
     int izumi = izumi_setup(&tg, 1, 1);
     if (izumi < 0) return;
     int hasu9 = test_id(&tg, "PL!HS-sd1-001-SD");
@@ -1598,7 +1600,7 @@ static void test_izumi_look_with_eligible_skip_keeps_hand(void)
 
 static void test_izumi_look_no_eligible_auto_discards(void)
 {
-    TestGame tg;
+static    TestGame tg;
     int izumi = izumi_setup(&tg, 0, 0);
     if (izumi < 0) return;
     int wait_before = tg.state.p[0].discard.n;
@@ -1618,7 +1620,7 @@ static void test_izumi_look_no_eligible_auto_discards(void)
 
 static void test_sbp6_016_waitroom_debut_looks_three_takes_one(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1670,7 +1672,7 @@ static void test_sbp6_016_hand_debut_no_look(void)
 
 static void test_sbp6_016_no_appearance_record_no_look(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1686,7 +1688,7 @@ static void test_sbp6_016_no_appearance_record_no_look(void)
 
 static void test_sbp6_016_short_deck_takes_one_discards_remainder(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);

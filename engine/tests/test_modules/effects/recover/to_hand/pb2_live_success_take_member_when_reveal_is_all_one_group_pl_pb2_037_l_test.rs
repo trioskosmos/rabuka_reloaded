@@ -18,23 +18,32 @@
 //! the MIXED case below is the discriminating test: under the old parse it would have
 //! passed, and under the correct one it must not.
 //!
-//! # Why the three positives are recorded rather than asserted
+//! # What is broken, precisely
 //!
-//! The reveal condition is met, the dynamic count (`previous_reveal`) reads the same
-//! set as `revealed_cards` (`ability/dynamic_count.rs:57`), and the move is typed —
-//! yet nothing is taken in any of the three positive cases. So the OR of the three
-//! branches, or the move's source resolution, is not firing. Which one is not yet
-//! isolated.
+//! The positive fires for a SINGLE revealed member and fails for two or more.
+//! `a_single_member_of_one_group_qualifies_but_two_do_not` is the evidence: one
+//! Printemps member is taken, two Printemps members are not, with the group held
+//! constant. So the gate is not "the condition never matches" — it matches at one card
+//! and stops matching past it.
 //!
-//! **The four negatives below are therefore VACUOUS** — they assert "nothing was taken"
-//! and would pass whether or not the condition works. They are kept because they encode
-//! the required behaviour, and they are written to fail the moment the positive lands.
-//! This is the same trap as `PL!-pb2-038-L` (docs §8.4): a negative that can only fail
-//! if the positive path runs is not yet a test.
+//! This header used to say the opposite — that "nothing is taken in any of the three
+//! positive cases", and that "the four negatives below are therefore VACUOUS". Both
+//! were wrong, and the second consequence was serious: it mislabelled which negatives
+//! could fail. A negative whose positive analogue fires is real evidence. The
+//! negatives that pair with the two-and-more cases ARE vacuous; the one that pairs with
+//! the single-card case is not.
 //!
-//! One structural limitation, pinned below: `all_members` is a field of the GROUP
-//! VARIANT, not of `ConditionCommon`, so the first branch — a `revealed_cards`
-//! LOCATION condition — cannot carry the 「すべて」 at all.
+//! The three `open_gap_*` tests assert the CURRENT (broken) behaviour on purpose —
+//! they are a baseline, not a specification. They were previously named `*_qualifies*`
+//! and `all_printemps_qualifies_and_the_member_is_taken`, i.e. named for the behaviour
+//! the card is supposed to have while asserting the opposite. That mismatch is worse
+//! than an absent test: names said covered, assertions said broken, and the suite was
+//! green either way.
+//!
+//! Structural note, and the likely cause: `all_members` is a field of the GROUP VARIANT,
+//! not of `ConditionCommon`, so the first branch — a `revealed_cards` LOCATION
+//! condition — cannot carry the 「すべて」 at all. That predicts trouble exactly where
+//! the count exceeds one.
 
 use crate::helpers::*;
 use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
@@ -89,8 +98,14 @@ fn hand_gained_with(revealed: &[&str]) -> bool {
         .any(|id| game.db.get_card(*id).is_some_and(|c| c.is_member()))
 }
 
+/// OPEN GAP — the name this test used to carry said "qualifies_and_the_member_is_taken",
+/// which is the exact opposite of what it asserts. Nothing is taken.
+///
+/// Kept as a negative because that is the current behaviour, but the mismatch was the
+/// dangerous part: a reader scanning test names saw three branches covered and a member
+/// being taken, and the suite was green. The bug was invisible from either side.
 #[test]
-fn all_printemps_qualifies_and_the_member_is_taken() {
+fn open_gap_all_printemps_takes_nothing() {
     assert!(
         !hand_gained_with(&[P, P]),
         "OPEN GAP: two Printemps members revealed must take one to hand; nothing is taken"
@@ -98,7 +113,7 @@ fn all_printemps_qualifies_and_the_member_is_taken() {
 }
 
 #[test]
-fn all_lily_white_qualifies() {
+fn open_gap_all_lily_white_takes_nothing() {
     assert!(
         !hand_gained_with(&[LW, LW]),
         "OPEN GAP: all lily white is the second branch of the three-way choice"
@@ -106,10 +121,37 @@ fn all_lily_white_qualifies() {
 }
 
 #[test]
-fn all_bibi_qualifies() {
+fn open_gap_all_bibi_takes_nothing() {
     assert!(
         !hand_gained_with(&[BB, BB]),
         "OPEN GAP: all BiBi is the third branch of the three-way choice"
+    );
+}
+
+/// The asymmetry that makes the gap diagnosable: ONE member of a group is taken,
+/// TWO are not.
+///
+/// This is the only positive in the file that actually fires, and it is what proves the
+/// three `open_gap_*` tests above are a real defect rather than a uniformly dead path.
+/// Whatever gates the two-card case is not "the condition never matches" — it matches
+/// fine at one card. So the failure is in how the ALL reading scales past a single
+/// card, which is exactly where the header's structural note predicts trouble:
+/// `all_members` lives on the GROUP variant, so the first branch — a `revealed_cards`
+/// LOCATION condition — has nowhere to carry 「すべて」.
+///
+/// Before this test the file claimed the positive "never fires in any of the three
+/// cases", which this contradicts.
+#[test]
+fn a_single_member_of_one_group_qualifies_but_two_do_not() {
+    assert!(
+        hand_gained_with(&[P]),
+        "one Printemps member is all Printemps, and it IS taken — this is the positive \
+         that works"
+    );
+    assert!(
+        !hand_gained_with(&[P, P]),
+        "but TWO Printemps members are not taken, even though they are equally 'all \
+         Printemps'. The count is the variable, not the group."
     );
 }
 
@@ -134,16 +176,6 @@ fn a_non_mus_member_does_not_qualify() {
         !hand_gained_with(&[NON_MUS, NON_MUS]),
         "neither Printemps, lily white nor BiBi — a reveal of one other group is out \
          of scope of all three branches"
-    );
-}
-
-/// A single member of one group is vacuously "all of" that group.
-/// VACUOUS while the positive never fires (see the header).
-#[test]
-fn a_single_member_of_one_group_qualifies() {
-    assert!(
-        hand_gained_with(&[P]),
-        "すべて『Printemps』 — one Printemps member is all Printemps"
     );
 }
 

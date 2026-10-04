@@ -8,44 +8,68 @@
  * text passes vacuously and hides exactly the decode divergence the Rust test
  * exists to catch, so every arm below is reproduced verbatim -- spacing,
  * punctuation, the Japanese particles and the " then " / "、その後" joins
- * included. test_output/describe_dump.json (engine/src/bin/describe_dump.rs)
- * is the byte-level oracle: 936 (describe_en, describe_ja) pairs.
+ * included.
  *
- * ORACLE MEASUREMENT (re-measured 2026-10-02, out-of-tree dumper linked against
- * describe.o + the existing object set; 985 abilities compiled from the tree vs
- * 936 rows in the golden, so the comparison is a MULTISET, never positional --
- * only 30 of 936 indexes even agree positionally):
+ * ORACLE MEASUREMENT (re-measured 2026-10-03 from scratch, and the earlier
+ * number this file used to carry has been REMOVED because it cannot be
+ * reproduced):
  *
- *   936 golden rows, 985 compiled abilities
- *   multiset intersection      : 933
- *   golden-only                : 3   (all stale, see below)
- *   C-only                     : 0
+ *   The previous header claimed "933 of 936 golden rows match, the other 3 are
+ *   stale goldens". That claim is not checkable. `test_output/describe_dump.json`
+ *   -- the golden it refers to -- is not in this repository, in `engine/`, or in
+ *   `cards/`, and engine/src/bin/describe_dump.rs cannot produce a 936-row file:
+ *   describe_dump.rs:33-37 writes one record per ability over 0..NUM_ABILITIES
+ *   and NUM_ABILITIES is 985 on both sides (abilities_gen.rs:18, gen_data.c:4),
+ *   with no filter, no dedup and no cap. "985 abilities vs 936 rows, only 30 of
+ *   936 indexes agree positionally" is also arithmetically impossible against a
+ *   985-index dumper.
  *
- * The 3 residuals are ALL the same one stale-golden case, NOT defects. They are
- * the `gain_resource` JA shorthand: Rust emits a bare resource word only when
- * `count_any() == Some(1)`, otherwise `format!("{} {}", c.unwrap_or(1), r)`.
- * Three abilities in the corpus LOST their `"count": 1` key in commit fef2bf1f
- * ("feat(cards): add PBLL02 expansion data"), so today count_any() is None and
- * both engines render "1 ブレード ..." while the golden still holds the
- * pre-commit "ブレード ..." form. Card-level proof (git show
- * fef2bf1f^:cards/abilities.json vs cards/abilities.json, matched by effect
- * text):
- *   now[125] "自分のステージにいる、メンバーカードが下に置かれている『Aqours』…"
- *        before[141] had `count: 1`, now has no `count` key
- *   now[202] "自分のステージにいるほかの『虹ヶ咲』のメンバーは…"
- *        before[185] had `count: 1`, now has no `count` key
- *   now[897] "自分のステージにいる『Aqours』のメンバーは…"
- *        before[775] had `count: 1`, now has no `count` key
- * No other ability changed shape: of the 11 `gain_resource` effects without a
- * `count` key in the current corpus, exactly those 3 had one before. Regenerate
- * the golden to close the gap; do NOT "fix" this file for it.
+ * What IS true, and is now pinned by tests/test_describe_golden.c against a
+ * fixture generated from the committed Rust dumper:
  *
- * ARM-BY-ARM VERIFICATION (not assumed): all 46 `describe_effect` dispatch
- * arms and all 4 `describe_cost` arms of describe.rs are present here in the
- * same order, with the JA and EN bodies matching Rust's format strings. The one
+ *   985 abilities, 985 records from each side, compared byte for byte in BOTH
+ *   languages (the fields are hex-encoded in the fixture so no multi-byte
+ *   literal in this repo is hand-transcribed):
+ *
+ *   983 identical        983 of 985, both languages, zero byte differences
+ *   1 divergence         ability 325
+ *   2 excluded from the fixture
+ *
+ * The single divergence (ability 325) is NOT a defect in this file. The C renders
+ * "Place 2 cards from hand to the waiting room; then Rest 2 Printemps group;
+ * then Place 1 live card from the waiting room to hand" and Rust renders
+ * "Place 1 live card from the waiting room to hand". Both strings are CORRECT for
+ * the tree each engine actually holds: the C's raw bytecode slice for 325 is a
+ * `sequential` with two actions, and describe.rs:555-573 formats exactly the
+ * string the C emits. The two offset tables disagree: RBKA_OFFSET_DELTAS
+ * (gen_data.c:7, sums to 98737 == RBKA_BYTECODE_LEN) vs OFFSET_DELTAS
+ * (abilities_gen.rs:25, sums to 98725 against a 98733-byte
+ * cards/build/abilities.bin) differ in length at 2 of 985 slices, 325 and 805.
+ * abilities_gen.rs:17,55 include_bytes! cards/build/{abilities.bin,
+ * abilities_strings.bin}, so Rust reads the STALE 726649-byte string blob while
+ * the C reads the canonical 726831-byte src/abilities_strings.bin. Two engines,
+ * two data sets. Do NOT "fix" this file for ability 325.
+ *
+ * The `gain_resource` shorthand the old header described IS real and IS in this
+ * file (the arm at the bottom, mirroring describe.rs:303-311): Rust emits a bare
+ * resource word only when `count_any() == Some(1)`, otherwise
+ * `format!("{} {}", c.unwrap_or(1), r)`. The current corpus has 294
+ * `gain_resource` nodes, 10 of which carry no `count` key; C and Rust agree on
+ * every one of them, rendering the "1 ブレード ..." form. What cannot be shown is
+ * that a golden once held the other form, because that golden is gone.
+ *
+ * ARM-BY-ARM VERIFICATION (not assumed): all 47 `describe_effect` action keys
+ * and all 4 `describe_cost` arms of describe.rs are present here in the same
+ * order, with the JA and EN bodies matching Rust's format strings. The one
  * structural difference is deliberate and output-identical: `look_at` and
  * `reveal` share a single C branch, because the two Rust arms differ only in the
  * pair 見る/公開する and Look at/Reveal.
+ *
+ * UTF-8: all 143 distinct non-ASCII literals in describe.rs were extracted
+ * mechanically and compared byte for byte against this file -- all match. Note
+ * that describe.rs uses U+6255 (not the canonical U+6C1B) for 払 in both
+ * pay_energy renderings, and the C matches it; tests/test_describe_golden.c
+ * pins that byte so a re-typing pass cannot silently "fix" one side only.
  *
  * ALIASES ARE NORMALISED DOWNSTREAM, NOT HERE: `energy_count` and `repeat_limit`
  * are read with d_u8_extra(e, "energy_count") / rb_effect_repeat_limit_any(e)
@@ -1839,6 +1863,16 @@ const char *rb_desc_resource_label_ja(const char *resource) {
 
 const char *rb_desc_duration_label(const char *duration, int ja) {
     return d_duration_label(duration, ja);
+}
+
+/* rabuka.h:3215 declares rb_desc_duration_label_ja next to the other four
+   _ja wrappers (zone/card_type/state_verb/resource_label) but this file never
+   defined it, so any translation unit that called it failed to LINK rather than
+   failing a test. Rust's twin is duration_label_inner(d, true) (describe.rs:148-156),
+   reached from every JA duration arm; it is not dead code, and the wrapper keeps
+   the public surface symmetric with the four siblings. */
+const char *rb_desc_duration_label_ja(const char *duration) {
+    return d_duration_label(duration, 1);
 }
 
 /* ====================================================================

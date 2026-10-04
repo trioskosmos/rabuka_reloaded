@@ -139,7 +139,7 @@ static int run_round(TestGame *tg)
 
 static void test_active_phase_stands_only_the_turn_players_cards(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int p1_member = test_id(&tg, "PL!-sd1-010-SD");
     int p2_member = test_id(&tg, "PL!N-PR-008-PR");
@@ -185,7 +185,7 @@ static void test_active_phase_stands_only_the_turn_players_cards(void)
 
 static void test_energy_phase_draws_one_and_empty_deck_skips(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
 
@@ -214,7 +214,7 @@ static void test_energy_phase_draws_one_and_empty_deck_skips(void)
 
 static void test_draw_phase_on_empty_main_deck_refreshes_then_draws(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
 
     tg.state.p[0].deck.n = 0;
@@ -242,7 +242,7 @@ static void test_draw_phase_on_empty_main_deck_refreshes_then_draws(void)
 
 static void test_live_card_set_refill_draws_placed_count(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     int live1 = test_id(&tg, "PL!-sd1-020-SD");
@@ -382,7 +382,7 @@ static void test_first_attacker_survives_a_win_that_placed_nothing(void)
    disables the promotion. */
 static void test_first_attacker_follows_a_placed_success_card(void)
 {
-    TestGame tg;
+static    TestGame tg;
     int live_p1 = -1;
     setup_sole_winner_places_nothing(&tg, &live_p1);
     tg.state.n_prohibition = 0; /* lift the restriction: P1 can now place */

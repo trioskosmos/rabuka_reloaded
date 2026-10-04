@@ -7,12 +7,17 @@
 //!   自分のセンターエリアにコスト11以上の『BiBi』のメンバーがいる場合、相手のステージに
 //!   いる元々持つハートの数が4つ以下のメンバー1人をウェイトにする。
 //!
-//! **The four NEGATIVE tests below are currently VACUOUS.** They assert "no wait",
-//! and they pass — but the positive does not fire, so they are not evidence the
-//! filters work. This is the same trap as `PL!-pb2-038-L` (see
-//! docs/PBLL02_ABILITY_REVIEW.md §8.4): a negative can only constrain a filter once
-//! the positive path is known to run. Treat the fixture pins as the real content here
-//! until `all_clauses_met_waits_the_foe` passes.
+//! **The four negative tests below are LIVE evidence, not vacuous.** This header used
+//! to say the opposite — that they asserted "no wait" and passed only because the
+//! positive did not fire, with an instruction to "treat the fixture pins as the real
+//! content until `all_clauses_met_waits_the_foe` passes". That warning went stale in
+//! the dangerous direction the moment the positive was fixed (see its doc comment:
+//! CLOSED 2026-10-02), and it had exactly the effect
+//! `characterization/strict_engine_bug_expected_fail_test.rs` warns about in its own
+//! header: a reader told these tests prove nothing will dismiss a real regression as
+//! "the known vacuous one" instead of reading the failure. The positive fires
+//! (`foe waited = true`), so each negative below is the positive with exactly one
+//! clause broken — which is what makes it evidence that THAT clause is load-bearing.
 //!
 //! What is NOT a decode problem: `bytecode_no_silent_decode_fallbacks` reports no
 //! fallback for this ability, so all four clauses reach the engine intact.
@@ -48,6 +53,10 @@ const ERI: &str = "PL!-pb2-002-PP"; // 絢瀬絵里, cost 4
 /// A 17-cost BiBi member — clears コスト11以上 in the CENTRE.
 const CENTRE_DEAR: &str = "PL!-PR-015-PR"; // 西木野真姫, cost 17
 /// A 2-cost BiBi member — under the コスト11以上 bound.
+///
+/// Read together with `open_gap_bibi_group_matching_is_by_unit_string_not_by_game_group`,
+/// this case is pinned correctly; the bound itself is not tightly pinned, see the note
+/// on that test.
 const CENTRE_CHEAP: &str = "PL!-pb2-006-PP"; // cost 2
 /// An 11+-cost member that is NOT BiBi — clears the cost bound, fails the group.
 const CENTRE_NON_BIBI: &str = "PL!-pb1-026-N";
@@ -185,11 +194,15 @@ fn dropping_any_one_of_the_three_named_characters_stops_it() {
     }
 }
 
-/// THE test for the centre-clause location leak: the 11-cost BiBi must be found on
-/// the STAGE. While the clause carried `revealed_cards`, putting a cost-17 BiBi among
-/// the revealed cards satisfied it and a centre member of the right cost did not.
+/// THE test for the centre-clause location leak: the cost-qualified BiBi must be found
+/// on the STAGE. While the clause carried `revealed_cards`, putting a cost-17 BiBi
+/// among the revealed cards satisfied it and a centre member of the right cost did not.
+///
+/// Renamed from `the_eleven_cost_bibi_…`: there is no eleven-cost BiBi in this test. It
+/// stages a cost-2 member in the centre and puts the cost-17 in the reveal, so the
+/// "eleven" was doing no work and naming a bound this test never exercises.
 #[test]
-fn the_eleven_cost_bibi_must_be_in_the_centre_not_the_reveal() {
+fn the_cost_qualified_bibi_must_be_in_the_centre_not_the_reveal() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let filler = game.id(FILLER);
@@ -232,6 +245,39 @@ fn the_eleven_cost_bibi_must_be_in_the_centre_not_the_reveal() {
     );
 }
 
+/// Extra copies of a named character do not change anything.
+///
+/// Each of the three name clauses parses as its own `location_condition` with
+/// `count: 1` and `operator: ">="`, and the text says 「…のメンバーカードがあり」 —
+/// each name must be PRESENT, not accounted for. Two readings of the same three
+/// clauses would both satisfy the tests above and are distinguished only here:
+///
+///   * present-at-least-once, which is what the parse says; and
+///   * an exact multiset, i.e. exactly one にこ, exactly one 真姫, exactly one 絵里,
+///     which would fail on a duplicate and which the `>=` operator rules out.
+///
+/// `dropping_any_one_of_the_three_named_characters_stops_it` cannot catch that
+/// difference: it removes a name entirely, and both readings agree a missing name
+/// fails. Two にこ revealed alongside one 真姫 and one 絵里 must still wait the foe.
+#[test]
+fn extra_copies_of_a_named_character_still_satisfy_its_clause() {
+    assert!(
+        run(CENTRE_DEAR, &[NICO, NICO, MAKI, ERI], OPP_2),
+        "count: 1 with operator >= per name — 「矢澤にこ」と「西木野真姫」と「絢瀬絵里」の\
+         メンバーカードがあり is a presence test, so a second にこ is redundant, not fatal"
+    );
+    // The control, and the reason the pair above is worth having. THREE cards, two
+    // distinct names, no 絵里: the same card count as a passing reveal, so a rule
+    // that read 「3 member cards among the reveal」 would pass this and is wrong.
+    // `dropping_any_one_of_the_three_named_characters_stops_it` cannot catch that:
+    // it drops to TWO cards, where every candidate rule agrees.
+    assert!(
+        !run(CENTRE_DEAR, &[NICO, NICO, MAKI], OPP_2),
+        "three cards is not the clause — all THREE NAMES must be present. A duplicate \
+         of one name does not make up for a missing one"
+    );
+}
+
 /// The cost bound on the centre clause.
 #[test]
 fn a_cheap_centre_bibi_does_not_satisfy_the_cost_bound() {
@@ -240,6 +286,23 @@ fn a_cheap_centre_bibi_does_not_satisfy_the_cost_bound() {
         "コスト11以上 — a cost-2 BiBi in the centre is under the bound"
     );
 }
+
+/// Remaining coverage gap, recorded rather than filled: the コスト11以上 bound is pinned
+/// by cost 17 (passes) and cost 2 (fails), which admits any threshold in `3..=17`.
+///
+/// Closing it needs a `unit: "BiBi"` member costing exactly 11 (or 10, for the nearest
+/// miss). Note what this is NOT: a group-matching defect.
+///
+/// `PL!-bp3-003-P` (南ことり, cost 11 — exactly the bound) looks like the card this
+/// needs, and it was used here to claim an off-by-one on the bound and then a
+/// group-matching bug. Both were wrong. 南ことり is a μ's member whose `unit` field
+/// says `"Printemps"`; `PL!-pb2-002-PP` (絢瀬絵里) is a genuinely different character
+/// whose `unit` says `"BiBi"`. Group membership is matched on that string, so the
+/// engine is CORRECT to exclude 南ことり from a 『BiBi』 clause. Two characters in two
+/// groups, not one character in two printings.
+///
+/// So the bound stays loosely pinned until a `unit: "BiBi"` card at cost 11 turns up.
+///
 
 /// The group on the centre clause.
 #[test]

@@ -3,18 +3,30 @@
 
 #include <stdio.h>
 
+static int failures;
+static int checks;
+
+/* The common corpus shape (tests/test_parity_draw_flat.c:119-129 is the twin):
+ * a `FAIL: ` prefix a `^FAIL` scan can see, a running failure counter, and an
+ * `ok:` echo on success. The previous macro printed a bare
+ * "<message>: got N, expected M" line with no prefix, bumped no counter, and
+ * `return`ed from the TEST FUNCTION - so this suite emitted 0 bytes on both
+ * streams and a failure was indistinguishable from a pass. */
 #define ASSERT_EQ(actual, expected, message) do { \
+    checks++; \
     int actual_value = (actual); \
     int expected_value = (expected); \
     if (actual_value != expected_value) { \
-        fprintf(stderr, "%s: got %d, expected %d\n", message, actual_value, expected_value); \
-        return; \
+        fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
+        failures++; \
+    } else { \
+        printf("ok: %s\n", message); \
     } \
 } while (0)
 
 static void test_draw_phase_no_unwanted_discards(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int filler = test_id(&game, "PL!-sd1-010-SD");
@@ -45,11 +57,13 @@ static void test_draw_phase_no_unwanted_discards(void)
 int main(void)
 {
     if (rb_load("src") != 0) {
-        fprintf(stderr, "database load failed\n");
+        fprintf(stderr, "FAIL: database load failed\n");
+        failures++;
         return 1;
     }
 
     test_draw_phase_no_unwanted_discards();
     rb_unload();
-    return 0;
+    printf("%d checks, %d failures\n", checks, failures);
+    return failures ? 1 : 0;
 }

@@ -170,6 +170,12 @@ static void on_fatal_signal(int sig)
             "*** Assertions before the fault: %d, failures: %d, prompts: %d\n",
             sig, current_test, assertions, failures, prompts);
     fflush(stderr);
+    /* Re-raise under the DEFAULT disposition so the parent's WIFSIGNALED(status)
+     * branch -- the only path that emits a CRASH verdict -- is reachable.
+     * _Exit(128 + sig) made the child exit normally and the crash was scored as
+     * an ordinary pass. */
+    signal(sig, SIG_DFL);
+    raise(sig);
     _Exit(128 + sig);
 }
 
@@ -226,7 +232,7 @@ static void on_fatal_signal(int sig)
         assertions++;                                                     \
         if (prompts < (n)) {                                              \
             failures++;                                                   \
-            fprintf(stderr, "FAIL (VACUOUS): ");                          \
+            fprintf(stderr, "FAIL: [VACUOUS]  ");                          \
             fprintf(stderr, __VA_ARGS__);                                 \
             fprintf(stderr, " - only %d prompt(s) were offered, need %d\n",\
                     prompts, (n));                                        \
@@ -1878,10 +1884,18 @@ static void run_all(const char *only)
         printf("--- case %s\n", cases[i].name);
         fflush(stdout);
         current_test = cases[i].name;
+        /* The counters are shared, so the parent can read how many assertions
+         * THIS case failed -- which is what makes a per-test verdict possible.
+         * Without the delta below the runner only printed `--- case <name>`
+         * headers, which no verdict scanner can read, so a failing case was
+         * invisible to the failed-test count. */
+        int fails_before = failures;
         pid_t pid = fork();
         if (pid < 0) {
             fprintf(stderr, "fork() failed for %s -- running inline\n", cases[i].name);
             cases[i].fn();
+            printf(failures > fails_before ? "FAILED: %s\n" : "ok: %s\n", cases[i].name);
+            fflush(stdout);
             continue;
         }
         if (pid == 0) {
@@ -1902,10 +1916,16 @@ static void run_all(const char *only)
                 failures++;
                 fprintf(stderr, "FAIL: case %s died on signal %d (the ENGINE, not this test)\n",
                         cases[i].name, sig);
+                printf("CRASH: %s (signal %d in child)\n", cases[i].name, sig);
             } else {
                 fprintf(stderr, "case %s died on signal %d\n", cases[i].name, sig);
+                printf("CRASH: %s (signal %d in child)\n", cases[i].name, sig);
             }
+        } else {
+            /* The corpus verdict, in the shape every other FORK suite prints. */
+            printf(failures > fails_before ? "FAILED: %s\n" : "ok: %s\n", cases[i].name);
         }
+        fflush(stdout);
         current_test = "(none)";
     }
 }

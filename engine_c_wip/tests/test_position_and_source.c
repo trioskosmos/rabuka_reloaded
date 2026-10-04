@@ -495,7 +495,7 @@ static void decode_appearance_source_carries_field(void)
 
 static void positions_characters_all_correct_awards(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int host = full_board(&tg);
     CHECK(host >= 0, "the full board (three named areas, all occupied) was built");
@@ -539,7 +539,7 @@ static void positions_characters_wrong_character_does_not_award(void)
 
 static void positions_characters_swapped_characters_do_not_award(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int host = full_board(&tg);
     if (host < 0 || !fixture_names_are_independent()) return;
@@ -619,7 +619,7 @@ static void positions_characters_empty_slot_does_not_award(void)
 
 static void positions_characters_unknown_area_does_not_award(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int host = host_only_board(&tg, 1, RB_ZONE_HAND);
     if (host < 0) return;
@@ -656,7 +656,7 @@ static void positions_characters_absent_is_a_no_op(void)
 
 static void positions_characters_malformed_entry_does_not_award(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int host = full_board(&tg);
     if (host < 0) return;
@@ -736,7 +736,7 @@ static int source_board(TestGame *tg, int zone)
 
 static void appearance_source_waitroom_debut_awards(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int host = source_board(&tg, RB_ZONE_DISCARD);
     CHECK(host >= 0, "waitroom-debut host placed on stage");
@@ -750,7 +750,7 @@ static void appearance_source_waitroom_debut_awards(void)
 
 static void appearance_source_hand_debut_does_not_award(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int host = source_board(&tg, RB_ZONE_HAND);
     CHECK(host >= 0, "hand-debut host placed on stage");
@@ -772,7 +772,7 @@ static void appearance_source_hand_debut_does_not_award(void)
 
 static void appearance_source_unrecorded_does_not_award(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     test_add_to_stage(&tg, 0, test_id(&tg, FX_LEFT));
     int host = test_new_id(&tg, FX_HOST);
@@ -803,7 +803,7 @@ static void appearance_source_absent_is_a_no_op(void)
 
 static void appearance_source_skipped_when_characters_present(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int friend = test_id(&tg, FX_CENTER);
     test_add_to_stage(&tg, 0, friend);
@@ -842,7 +842,7 @@ static void appearance_source_skipped_when_characters_present(void)
 
 static void appearance_source_cleared_with_appearance_tracking(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
     int host = source_board(&tg, RB_ZONE_DISCARD);
     if (host < 0) return;

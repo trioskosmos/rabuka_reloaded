@@ -56,6 +56,7 @@ static int gaps;
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -68,6 +69,7 @@ static int gaps;
     if (actual_value != expected_value) { \
         fprintf(stderr, "FAIL: %s (got %d expected %d)\n", message, actual_value, expected_value); \
         failures++; \
+        FLAT_VERDICT(); \
     } else { \
         printf("ok: %s\n", message); \
     } \
@@ -250,7 +252,7 @@ static void test_kanan_grants_only_at_exactly_two_members(void)
 
 static void test_komari_grants_only_when_both_stages_together_hold_six(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int komari = test_id(&game, KOMARI);
@@ -296,7 +298,7 @@ static void test_komari_grants_only_when_both_stages_together_hold_six(void)
 
 static void test_wakana_same_condition_different_colours(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int wakana = test_id(&game, WAKANA);
@@ -328,7 +330,7 @@ static void test_wakana_same_condition_different_colours(void)
 
 static void test_hime_name_keyed_constants_fire_independently(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int hime = test_id(&game, HIME);
@@ -424,7 +426,7 @@ static void test_tomari_jidou_opponent_move_triggers(void)
 
 static void test_tomari_jidou_natural_move_no_trigger(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int tomari = test_id(&game, TOMARI);
@@ -477,7 +479,7 @@ static void test_keke_jidou_self_effect_move_triggers(void)
 
 static void test_debut_energy_watcher_remains_on_center(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int ren = test_id(&game, REN_TWICE);
@@ -496,7 +498,7 @@ static void test_debut_energy_watcher_remains_on_center(void)
 
 static void test_energy_return_scan_leaves_watcher_on_stage(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int ren = test_id(&game, REN_TWICE);
@@ -550,7 +552,7 @@ static void energy_watch_scenario(TestGame *tg, const char *watcher_no, int *out
 static void test_energy_watcher_own_effect_places_energy_gains_blade(void)
 {
     /* PL!SP-bp7-016-N (ターン1回) */
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int blade = 0;
     energy_watch_scenario(&game, REN_ONCE, &blade);
@@ -666,7 +668,7 @@ static void test_own_effect_area_swap_does_not_trigger_energy_placement_blade(vo
 
 static void test_energy_parked_under_member_does_not_trigger_energy_zone_blade(void)
 {
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int ren = test_new_id(&game, REN_TWICE);

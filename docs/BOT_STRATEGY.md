@@ -96,6 +96,29 @@ From source 3's tournament match logs (mirapax aggro, shop wins) and sources
 - **Placement expectation: ~1 success per live phase per side from T2 on.**
   A placement rate of ≲0.33/live-phase (measured for older bots) produces
   T12+ games and is a defect, not an archetype.
+
+> **Correction (measured 2026-10-02, twice — read before using either number).**
+>
+> *The ~1.0/phase/side expectation above is the guides' prose and is wrong as a
+> rule bound.* 8.4.7 pays exactly one card per won check, so one live phase can
+> place **one** card for a **single** side; the per-side ceiling is 1.0, not
+> 0.5. Winning outright is three checks in a row — 3 placements in 3 phases, a
+> per-side pace of exactly 1.000, which is the number `bot_arena`'s own
+> `multiple placements per phase is legal` test asserts. An earlier correction in
+> this file divided the ~1.0 **combined** ceiling by two seats and called the
+> quotient a per-side rule limit; that conflated an average of two players with
+> a bound on one, and it is the arithmetic behind a claim that no live-set work
+> could raise the win rate.
+>
+> *But placement rate is still the wrong metric, for a different reason.*
+> Placements are a **zero-sum race to three** (1.2.1.1). `v11` sets two lives
+> instead of one: it raises the placement rate on both seats by 0.002–0.004 per
+> phase (two cells significant), lengthens games from 5.93 to 5.79 turns, and
+> moves the win rate by **nothing** — 50.1% and 47.6% head-to-head against `v9`
+> at n=4000 each, null on fresh mirrors. A number both seats can raise by the
+> same amount is not the objective. Keep ≲0.33 as a *smell* for a
+> do-nothing policy, which is what it ever was a test for; do not rank a backlog
+> on it.
 - Healthy bot targets: median game length T5–T8, hard band 5–9.
 
 ## 2. GAME FACTS THAT DRIVE STRATEGY (rules)
@@ -388,14 +411,13 @@ After un-stalling, trace analysis (150-game samples, mirrored deck) showed:
 > **Correction to the "~0.5–1" above (measured 2026-10-02).** That reading of
 > the guides came from their prose, and it is the origin of the wrong ceiling
 > that later made pace look like the project's biggest gap. The guides are
-> talking about their own deck's success rate; the *rule* ceiling is lower than
-> 1.0 per side. 8.4.7 moves exactly one card per won check, and a check pays
-> twice only on an 8.4.6.2 tie with both players below 2 successes (8.4.7.1
-> withholds the move from a player at 2+). So the ceiling is 1.0 **combined**
-> per live phase and 0.5 per side. See "Open, and worth more than any further
-> tuning" for the full arithmetic and the measurement. The 63% of phases
-> conceding empty was a real defect and was fixed; the target it was measured
-> against was not.
+> talking about their own deck's success rate. §1 above now carries the full
+> correction, and it goes one better: the per-side rule ceiling is **1.0**
+> (8.4.7 moves exactly one card per won check), not 0.5 — while placement rate
+> remains the wrong target anyway, because placements are a zero-sum race and
+> `v11` raised it on both seats by a measurable amount for **zero** win-rate
+> change. The 63% of phases conceding empty was a real defect and was fixed; the
+> target it was measured against was not meaningful.
 
 
 Root cause: v4/v5 ranked portfolios "fewest passing lives first" ("zerg")

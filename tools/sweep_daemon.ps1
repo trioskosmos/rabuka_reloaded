@@ -29,8 +29,16 @@
 #     seeds. Seed 11 is the seed every other measurement in
 #     docs/V8_IMPROVEMENT_LOG.md was found on, so it cannot confirm anything.
 #
-# Usage: pwsh tools/sweep_daemon.ps1 [-Rounds 0] [-Games 1200] [-Parallel 10] [-PauseMin 5]
+# Usage: ISOLATED_TREE=C:\snapshots\enginescan pwsh tools/sweep_daemon.ps1 [-Rounds 0] [-Games 1200] [-Parallel 10] [-PauseMin 5]
 #   -Rounds 0 means "loop until stopped".
+#
+# ⛔ IT ONLY RUNS AGAINST A SNAPSHOT. tools/isolated_tree_guard.ps1 hard-fails
+# unless ISOLATED_TREE names a directory that is not the live tree, and the
+# per-round binary snapshot is taken under an exclusive per-tree lock. A daemon
+# pointed at the live tree makes every in-tree measurement unsound while it runs:
+# a foreground `make clean` deletes the .o files this round's measurements were
+# taken against, and a half-copied data blob is a byte-spliced ability string
+# table rather than a build error. See the guard's header for the incidents.
 
 param(
     [int]$Rounds = 0,
@@ -40,15 +48,31 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$root = Split-Path -Parent $PSScriptRoot
-$arena = "C:\rust_targets\release\bot_arena.exe"
-$outDir = Join-Path $root "test_output\sweep"
+
+. (Join-Path $PSScriptRoot "isolated_tree_guard.ps1")
+$tree = Assert-IsolatedTree -Purpose "sweep_daemon"
+
+$outDir = Join-Path $tree "test_output\sweep"
 $workDir = Join-Path $outDir "work"
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 New-Item -ItemType Directory -Force -Path $workDir | Out-Null
+
+# Cargo's target dir is process-global, so reading the installed arena from
+# C:\rust_targets means reading a binary some other build may be overwriting.
+# Take it from inside the snapshot instead, and let RB_ARENA_EXE override.
+$env:CARGO_TARGET_DIR = Join-Path $tree ".cargo_target"
+$arena = if ($env:RB_ARENA_EXE) { $env:RB_ARENA_EXE }
+         else { Join-Path $env:CARGO_TARGET_DIR "release\bot_arena.exe" }
+if (-not (Test-Path -LiteralPath $arena)) {
+    Write-Error @"
+sweep_daemon: no arena binary at $arena
+Build it inside the snapshot first, or set RB_ARENA_EXE to one.
+"@
+    exit 2
+}
 # The arena resolves its decklist as ../web_ui/decks relative to the process CWD
 # and hard-errors on a missing deck rather than falling back.
-Set-Location (Join-Path $root "engine")
+Set-Location (Join-Path $tree "engine")
 $results = Join-Path $outDir "results.txt"
 $selectSeed = 11
 $holdoutSeeds = @(23, 31)
@@ -190,8 +214,16 @@ $round = 0
 while ($Rounds -le 0 -or $round -lt $Rounds) {
     $round++
     # Snapshot the binary so the workspace stays rebuildable during the round.
-    $snap = Join-Path $workDir "arena_snap.exe"
-    Copy-Item $arena $snap -Force
+    # Under the tree lock: copying an arena another process is still linking is
+    # how a "measurement" ends up describing no build at all.
+    $lock = Enter-TreeBuildLock -Tree $tree -Label "sweep_daemon:round$round"
+    try {
+        $snap = Join-Path $workDir "arena_snap.exe"
+        Copy-Item $arena $snap -Force
+    }
+    finally {
+        Exit-TreeBuildLock -Lock $lock
+    }
     $stamp = (Get-Item $snap).LastWriteTime
     "--- round $round  snapshot $stamp ---" | Add-Content $results
 

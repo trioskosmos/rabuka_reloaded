@@ -1039,6 +1039,10 @@ static void c_q37_live_start_grant_does_not_stack_on_refire(void)
  *
  *   D1  face_down_non_live_card_survives_live_card_set_check
  *   D1b (added control) the removal path IS capable of running
+ *   D1p (added) the gate's POSITIVE at one-card scale: same board as D1 with
+ *       live_face_up[0] = 1, the card IS evicted -- Rust's
+ *       invalid_live_card_discard_records_turn_movements (:105-132) at the scale
+ *       of the twin D1 actually translates.
  *   D2  invalid_resolution_card_returns_to_its_owner
  *   D4  (added control) the owner decides, not the active seat
  *   D3  rule_10_5_2_non_energy_card_in_energy_zone_goes_to_owners_waitroom
@@ -1060,14 +1064,20 @@ static void d1_face_down_non_live_card_survives_live_card_set_check(void)
     set_stage(&tg, 0, filler, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
     fill_decks(&tg, filler, 30);
 
-    /* Rust leaves live_card_zone.face_up at its default (false) and asserts the
-     * card SURVIVES check_timing, because Rust's check_invalid_live_cards
-     * returns early on a face-DOWN zone (engine/src/turn/actions/mod.rs:1702:
-     * `if !...face_up { return }`). The C RbPlayer has NO face_up field at all,
-     * so the Rust board is reproduced as faithfully as the struct allows:
-     * there is nothing that could be set. */
-    DIAG("D1: C GameState has no live_card_zone.face_up field, so the face-down "
-         "state of the Rust fixture is not representable");
+    /* Rust leaves live_card_zone.face_up at its default (false) -- it never
+     * assigns it anywhere in this test -- and asserts the card SURVIVES
+     * check_timing, because Rust's check_invalid_live_cards returns early on a
+     * face-DOWN zone (engine/src/turn/actions/mod.rs:1734-1736:
+     * `if !game_state.seat_player(seat).live_card_zone.face_up { return }`).
+     *
+     * The C GameState DOES carry that state: commit 2130769d added
+     * `GameState.live_face_up[2]`, one flag per seat, and the gate at
+     * src/turn/phase.c:703 reads it. So the Rust board is now representable, and
+     * leaving the flag at zero IS the faithful port of the twin -- this test is
+     * the negative half of the gate, and D1p below is its paired positive on
+     * the same board with the one line flipped. (Before 2130769d this fixture
+     * carried a DIAG saying the state was unrepresentable; that claim is now
+     * false and leaving it is how the next agent re-derives this bug.) */
 
     CHECK_EQ(live_has(&tg, 0, member), 1,
              "D1 CONTROL: the non-live card is in the live zone before check_timing");
@@ -1100,17 +1110,66 @@ static void d1b_removal_path_control(void)
     fill_decks(&tg, filler, 30);
     CHECK_EQ(tg.state.p[0].live.n, 2, "D1b CONTROL: two non-live cards are in the live zone");
 
-    rb_check_timing(&tg.state);
-
     /* D1's survival assertion is only worth something if the removal path is
      * capable of running at all. This is its paired positive: the SAME
-     * non-live card in the SAME zone, on a board where the only difference is
-     * that C cannot represent face-down, IS removed. If D1 and D1b ever agree
-     * on the outcome, D1 is vacuous. */
+     * non-live cards in the SAME zone, on the same board as D1, with the ONE
+     * difference being that Rust's twins open `face_up` before check_timing
+     * (live_card_zone_movement_test.rs:113 and :282). With the gate shut, both
+     * D1 and D1b would agree and D1 would be vacuous; with the gate open they
+     * disagree, which is the rule. */
+    tg.state.live_face_up[0] = 1;
+    rb_check_timing(&tg.state);
+
     CHECK_EQ(tg.state.p[0].live.n, 0,
              "D1b CONTROL: a non-live card IS removed from the live zone by check_timing");
     CHECK_EQ(waitroom_has(&tg, 0, a), 1, "D1b: the removed card lands in P1's waitroom");
     CHECK_EQ(waitroom_has(&tg, 0, b), 1, "D1b: both removed cards land in P1's waitroom");
+}
+
+/* D1p -- the paired POSITIVE of D1, and the assertion whose NAME states the
+ * rule. D1 proves a FACE-DOWN non-live card survives; this proves the SAME card
+ * on the SAME board is EVICTED to the waitroom the moment the zone is face-up.
+ * One fixture line apart (`live_face_up[0]`), opposite outcomes -- so neither
+ * half can pass by accident, and the only thing separating them is the gate at
+ * src/turn/phase.c:703, which is Rust's mod.rs:1734 arm for arm.
+ *
+ * This is the C translation of the positive half of Rust's GATE TEST PAIR:
+ *   face_down_non_live_card_survives_live_card_set_check  (:69-83, no face_up)
+ *   invalid_live_card_discard_records_turn_movements     (:105-132, face_up at :113)
+ * D1 translates the first; D1b translates the second at two-card scale. Neither
+ * C suite had this at one-card scale beside D1, which is why the gate's own
+ * positive was unasserted anywhere the name said what it measured. */
+static void d1p_face_up_non_live_card_evicted_by_check_timing(void)
+{
+    static TestGame tg;
+    case_begin(&tg);
+    clear_p1(&tg);
+
+    int member = mid(&tg, MEMBER4);
+    int filler = mid(&tg, FILLER);
+    if (!pin_id(member, MEMBER4)) return;
+    if (!pin_id(filler, FILLER)) return;
+    CHECK(!rb_card_is_live(member), "D1p: the planted card is NOT a live card");
+
+    /* Byte-for-byte D1's board: one non-live card in P1's live zone, one on
+     * stage, 30 deck fillers. ONLY the flag below differs from D1. */
+    test_add_to_live(&tg, member);
+    set_stage(&tg, 0, filler, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
+    fill_decks(&tg, filler, 30);
+
+    CHECK_EQ(live_has(&tg, 0, member), 1,
+             "D1p CONTROL: the non-live card is in the live zone before check_timing");
+
+    tg.state.live_face_up[0] = 1;   /* Rust sets this at live_card_zone_movement_test.rs:113 */
+    rb_check_timing(&tg.state);
+
+    CHECK_EQ(live_has(&tg, 0, member), 0,
+             "D1p: a FACE-UP non-live card does NOT survive the live-card-set timing check");
+    CHECK_EQ(waitroom_has(&tg, 0, member), 1,
+             "D1p: the face-UP non-live card is sent to the waitroom -- the exact "
+             "opposite of D1, one fixture line apart");
+    dump_live_zone(&tg, 0);
+    fprintf(stderr, "        p1 waitroom n=%d\n", tg.state.p[0].discard.n);
 }
 
 /* Rust pushes the resolution card for OWNER 1 while P1 is the first attacker,
@@ -1389,6 +1448,7 @@ int main(void)
     printf("--- D. live card zone movement (rule 10.5.2 / resolution owner) ---\n");
     run("D1_face_down_survives",         d1_face_down_non_live_card_survives_live_card_set_check);
     run("D1b_removal_path_control",      d1b_removal_path_control);
+    run("D1p_face_up_evicted",           d1p_face_up_non_live_card_evicted_by_check_timing);
     run("D2_resolution_to_owner",        d2_invalid_resolution_card_returns_to_its_owner);
     run("D4_owner_control",              d4_resolution_owner_decides_not_the_active_seat);
     run("D3_rule_10_5_2_energy_zone",    d3_rule_10_5_2_non_energy_card_in_energy_zone);

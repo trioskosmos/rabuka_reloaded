@@ -61,7 +61,7 @@ static void dump_snapshots(const TestGame *tg)
 
 static void p2_owned_trapper_scores_from_p1_success_in_real_round(void)
 {
-    TestGame tg;
+static    TestGame tg;
     test_game_new(&tg);
 
     int p1_member = test_id(&tg, P1_MEMBER);

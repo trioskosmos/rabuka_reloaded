@@ -509,61 +509,31 @@ void rb_tick_gained(GameState *g){
     rb_check_expired_effects(g, RB_TEMP_TURN_END);
 }
 
-/* Mirror ability_effects.rs:536-681 execute_gain_ability_from_source.
-   「このメンバーの下にあるカードから能力を得る」 COPIES each source card's
-   abilities onto the activating member (as synthetic gained abilities); it
-   does NOT execute the source's effect. Prior gains on the activating card
-   are cleared first, the under-card list is filtered by card_type /
-   cost_limit+operator / group_names, and trigger_filter (when present)
-   restricts which of the source card's abilities are copied. */
-static void s_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e) {
-    if (!g || !e) return;
-    int cid = g->activating_card;
-    if (cid < 0) return;
-
-    /* Rust: gs.gained_abilities.remove(&activating_card) — drop the previous
-       copy set so a re-resolve does not stack duplicates. */
-    while (rb_card_num_gained_abilities(g, cid) > 0)
-        rb_remove_gained_ability(g, cid, 0);
-
-    RbPlayer *P = &g->p[actor];
-    int area = -1;
-    for (int q = 0; q < RB_STAGE_SIZE; q++) if (P->stage[q] == cid) { area = q; break; }
-    if (area < 0) return;
-
-    RbCardFilter filter;
-    memset(&filter, 0, sizeof(filter));
-    rb_effect_filter_subset(e, &filter);
-
-    for (int u = 0; u < P->under_cards[area].n; u++) {
-        int src = P->under_cards[area].cards[u];
-        if (src < 0) continue;
-        if (rb_count_matching_filter(&filter, &src, 1) == 0) continue;
-
-        int n_abilities = rb_card_num_abilities((uint32_t)src);
-        for (int i = 0; i < n_abilities; i++) {
-            Ability ability;
-            memset(&ability, 0, sizeof(ability));
-            if (!rb_decode_card_ability((uint32_t)src, i, &ability)) continue;
-
-            /* trigger_filter: keep the ability when ANY filter appears in (or
-               contains) its trigger string. */
-            int should_copy = 1;
-            const char *tf = gain_extra(e, "trigger_filter");
-            if (tf && *tf) {
-                should_copy = ability.triggers &&
-                              (strstr(ability.triggers, tf) || strstr(tf, ability.triggers));
-            }
-            if (should_copy && rb_register_gained_ability(g, cid, &ability) < 0)
-                should_copy = 0;
-            rb_free_ability(&ability);
-        }
-    }
-}
+/* ability_ops.rs:593-700 execute_gain_ability_from_source — the CONSTANT (常時)
+ * twin, reached from src/turn/triggers.c:1181, i.e. the scan that mirrors
+ * core/game_state/modifiers.rs:1148-1176.
+ *
+ * This used to be a SECOND, INDEPENDENT implementation of that one Rust
+ * function; the executor-dispatch twin lived in ability_effects.c. They had
+ * drifted on the trigger_filter comparison (whole CSV against the whole trigger
+ * string vs. Rust's per-token LIST `any`), on how the activating card's owner is
+ * located (`g->p[actor].stage` vs. Rust's player1-then-player2 probe), and on
+ * how group_names is resolved (rb_effect_filter_subset's single-name
+ * check_group vs. Rust's any-of-the-list). Both files belong to this audit, so
+ * the surviving implementation is the faithful one and this entry point now
+ * delegates to it. See ability_effects.c's block comment above
+ * rb_ability_gain_from_source_core for the full divergence list and the corpus
+ * measurement that says all three are inert on today's 985 abilities.
+ *
+ * The ONE thing this entry point must keep doing differently is NOT recalculate:
+ * the 常時 scan runs from INSIDE rb_recalc_constants (modifiers.rs:1148), so
+ * calling it back from here re-enters the scan it is already inside. The recalc
+ * stays in the executor wrapper, where Rust has it (ability_ops.rs:685-687). */
+extern int rb_ability_gain_from_source_core(GameState *g, int actor,
+                                            AbilityEffect *e, int host_cid);
 
 void rb_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e, int host_cid){
-    (void)host_cid;
-    s_gain_ability_from_source(g, actor, e);
+    (void)rb_ability_gain_from_source_core(g, actor, e, host_cid);
 }
 
 /* DELETED 2026-10-02: rb_set_card_identity_effect.

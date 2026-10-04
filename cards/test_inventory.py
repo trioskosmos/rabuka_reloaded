@@ -445,6 +445,183 @@ DRAIN_LOOP_RE = re.compile(
 )
 DRAIN_LOOP_BASELINE = ROOT / "engine" / "tests" / "DRAIN_LOOP_BASELINE.json"
 
+# ── Test-name honesty ratchets ───────────────────────────────────────────────
+#
+# Two classes that coverage cannot see, because both leave a test passing while it
+# says the opposite of what its name claims.
+#
+# 1. A test whose NAME promises an effect ("grants", "qualifies", "is_taken") but whose
+#    FIRST assertion denies one. `pb2_037` shipped three of these at once: named for
+#    the behaviour the card is supposed to have, asserting the behaviour it actually
+#    had, with "OPEN GAP" in the message. Scanning names said the branch was covered;
+#    running them said green; the card was visibly broken.
+#
+#    The check is a RATCHET, not a rule, and its baseline is not a list of acceptable
+#    tests. What survives is one irreducible ambiguity: `assert!(!x)` states a positive
+#    claim whenever NOT-holding-x is the desired outcome, and only the message says
+#    which case it is. `mari_bottom_kanan_added_to_hand` opens with
+#    `assert!(!deck.contains(&bottom), "果南 should leave the deck")` — exactly that.
+#    Four syntax-level exclusions remove the cases that ARE decidable (names carrying
+#    their own negation, the "nothing is pending yet" precondition, assertions labelled
+#    "precondition", and "neither/nor"); beyond those, intent is not recoverable from
+#    syntax and the remaining sites have to be read by hand. Baseline them; do not add
+#    more patterns to force the number down, which over-fits to these files and stops
+#    the check generalising to new ones.
+#
+# 2. A test name carrying defect vocabulary ("inflates", "known limitation", "VACUOUS",
+#    "suspected bug"). Names are what a reader greps for and what this inventory
+#    records, so a stale one advertises a bug that has been fixed — or hides one that
+#    has not. `hazuki_ren_bp5_005_..._inflates_count` asserted the CORRECT value under
+#    a name promising the wrong one, and its own comment called it a "known limitation"
+#    twelve lines above an assertion that proved otherwise.
+#
+# Scoped to names, not comments: a name is a claim, a comment is prose. Comment
+# scanning is noisier and would drown the signal.
+NAME_MISMATCH_BASELINE = ROOT / "engine" / "tests" / "NAME_MISMATCH_BASELINE.json"
+DEFECT_NAME_BASELINE = ROOT / "engine" / "tests" / "DEFECT_NAME_BASELINE.json"
+
+# Verbs that make a test name a claim that the effect HAPPENS.
+AFFIRMATIVE_NAME_RE = re.compile(
+    r"(grant|gain|works|fires|qualif|increase|is_taken|are_taken|can_|applies"
+    r"|activate|succeed|happen|occur|add|enable|allow|keep)",
+    re.IGNORECASE,
+)
+# …but most of those verbs also appear in names that claim the effect does NOT
+# happen, which is the majority of a well-built suite and perfectly legitimate.
+# A name is only a claim that something DID happen once it carries no negation of
+# its own: `energy_threshold_zero_grants_no_heart06` is a correct test, and
+# `kosuzu_live_start_can_keep_zero_cards` asserts an empty pool.
+NEGATED_NAME_RE = re.compile(
+    r"(no_|_not_|^not_|not_|does_not|do_not|dont|never|cannot|can't|without"
+    r"|fails|blocks|prevent|denies|excludes|prevented|denied|excluded"
+    r"|unchanged|untouched|unaffected|ignored|skipped|declin|refus|zero"
+    r"|empty|absent|nothing|_0$|open_gap|takes_nothing"
+    r"|neither|_nor_|nor_grant|nor_the)",
+    re.IGNORECASE,
+)
+# A first assertion that DENIES the effect: `assert!(!x)`, `assert!(!x, …)`,
+# `assert_eq!(x, false)`, or `assert_eq!(x, 0)`.
+DENYING_FIRST_ASSERT_RE = re.compile(
+    r"assert!\s*\(\s*!"
+    r"|assert_eq!\s*\(\s*[^,()]+,\s*(false|0)\s*[,)]",
+)
+# …except when it is the "nothing is pending yet" precondition every driven test
+# opens with, which says nothing about whether the effect works.
+PRECONDITION_ASSERT_RE = re.compile(
+    r"assert!\s*\(\s*!\s*[\w\.]*has_pending_choice"
+    r"|assert_eq!\s*\(\s*[\w\.]*has_pending_choice\(\)\s*,\s*false",
+)
+# …or when the assertion is explicitly labelled a precondition. The suite already
+# marks these deliberately — `sumire_real_yell_grants_exactly_one_heart06` opens
+# with `assert!(!…revealed.is_empty(), "precondition: a REAL yell revealed cards")`,
+# which denies something about a DIFFERENT variable from the one its name claims.
+# Reading that as a name/assertion mismatch is exactly the false positive that
+# made this check noisy.
+LABELLED_PRECONDITION_RE = re.compile(r'"[^"]*\bprecondition\b', re.IGNORECASE)
+# Defect vocabulary in a test name. Deliberately narrow — each entry is a phrase that
+# should not survive as a description of a passing test.
+DEFECT_NAME_RE = re.compile(
+    r"(known_limitation|inflates|vacuous|open_gap|suspected_bug"
+    r"|does_not_work|still_broken|broken_assert|todo|fixme|xxx_hack)",
+    re.IGNORECASE,
+)
+
+
+def _test_body(text, start):
+    """The text of one test function, from `start` to the next test or top-level fn."""
+    nxt = re.search(r"\n(?:#\[test\]|(?:pub\s+)?fn\s)", text[start:])
+    return text[start : start + nxt.start()] if nxt else text[start:]
+
+
+def count_name_assertion_mismatches():
+    """`{file: [test names]}` whose name promises an effect the body first denies."""
+    out = {}
+    for path in TESTS_DIR.rglob("*.rs"):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        rel = path.relative_to(ROOT).as_posix()
+        for m in FN_TEST_RE.finditer(text):
+            name = m.group(1)
+            if not AFFIRMATIVE_NAME_RE.search(name) or NEGATED_NAME_RE.search(name):
+                continue
+            body = _test_body(text, m.end())
+            first = re.search(r"\b(assert!\s*\(|assert_eq!\s*\()", body)
+            if not first:
+                continue
+            head = body[first.start() : first.start() + 200]
+            # A test may legitimately OPEN with the universal precondition "nothing is
+            # pending yet" — that denies nothing about the effect. Half the sites that
+            # survive the negation guard are exactly that.
+            if PRECONDITION_ASSERT_RE.match(head):
+                continue
+            if LABELLED_PRECONDITION_RE.search(head):
+                continue
+            if DENYING_FIRST_ASSERT_RE.match(head):
+                out.setdefault(rel, []).append(name)
+    return out
+
+
+def count_defect_names():
+    """`{file: [test names]}` carrying defect vocabulary."""
+    out = {}
+    for path in TESTS_DIR.rglob("*.rs"):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        rel = path.relative_to(ROOT).as_posix()
+        for m in FN_TEST_RE.finditer(text):
+            if DEFECT_NAME_RE.search(m.group(1)):
+                out.setdefault(rel, []).append(m.group(1))
+    return out
+
+
+def _ratchet(current, baseline_path, label, advice, counts_only=False):
+    """Shared ratchet: fail on growth over the baseline, warn when a site clears."""
+    if not baseline_path.exists():
+        return []
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    violations = []
+    for path, found in sorted(current.items()):
+        n = len(found)
+        # The baseline stores the NAMES, not a count, so a site that is fixed shows
+        # up as a shrinking list and can be deleted rather than hand-edited.
+        allowed = len(baseline.get(path, []))
+        if n > allowed:
+            detail = ", ".join(sorted(found)[:3])
+            violations.append(f"{path}: {n} {label} (baseline allows {allowed}): {detail}")
+    for path in sorted(baseline):
+        if path not in current and baseline[path]:
+            print(
+                f"{label} ratchet: {path} dropped to 0 — remove it from the baseline "
+                f"(python cards/test_inventory.py --update-name-baselines)"
+            )
+    return violations
+
+
+def check_name_ratchets():
+    return _ratchet(
+        count_name_assertion_mismatches(),
+        NAME_MISMATCH_BASELINE,
+        "name/assertion mismatches",
+        "a test named for an effect that must happen but opening by denying it "
+        "reports a covered branch that is not covered",
+    ) + _ratchet(
+        count_defect_names(),
+        DEFECT_NAME_BASELINE,
+        "defect-vocabulary test names",
+        "a name carrying defect vocabulary advertises a bug to the next reader",
+    )
+
+
+def write_name_baselines():
+    mism = count_name_assertion_mismatches()
+    NAME_MISMATCH_BASELINE.write_text(
+        json.dumps(mism, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(f"Wrote {NAME_MISMATCH_BASELINE.name} ({sum(len(v) for v in mism.values())} sites)")
+    defect = count_defect_names()
+    DEFECT_NAME_BASELINE.write_text(
+        json.dumps(defect, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(f"Wrote {DEFECT_NAME_BASELINE.name} ({sum(len(v) for v in defect.values())} sites)")
+
 
 def count_soft_guards():
     """Per-file counts of soft-guard `if` sites across the test corpus."""
@@ -550,10 +727,150 @@ def write_drain_loop_baseline():
     )
 
 
+# Select filters observed to leave the remainder stranded. Kept NARROW deliberately.
+#
+# `heart_colors` is the only filter confirmed to strand: on 渡辺曜 `PL!S-bp2-005-P`
+# (look 7, select 3 by `card_type: member_card` + `heart_colors`) taking one left the
+# six filter-excluded cards in `gs.looked_at_cards`.
+#
+# `card_type` alone is NOT on this list. 高坂穂乃果 `PL!-bp3-010-N` has the same shape
+# with a `card_type: live_card` filter and a five-card look containing four members,
+# and the 「残り」 is discarded correctly — 5 cards reach the waitroom, 1 cost plus 4
+# remainder. So an excluding filter is necessary but not sufficient, and listing every
+# filtered ability (there are ~50) overstates the risk badly.
+#
+# `group_names` is unconfirmed in either direction.
+STRANDED_REMAINDER_FILTERS = ("heart_colors",)
+
+
+def member_has_hearts(need, count, all_of):
+    """Whether any メンバー in the pool satisfies a select's heart requirement.
+
+    `need` is the colour list, `count` an optional per-colour minimum
+    (`heart_color_count`), `all_of` the `require_all_heart_colors` flag. Counts
+    required and blade hearts together, because 「ハートに…」 does not say which.
+
+    Data fact, recomputed rather than hard-coded. It decides what comes OFF the risk
+    list: a select that can never match cannot strand anything, because with no
+    candidate the take-nothing path runs and 「残り」 is then the whole look, which is
+    discarded correctly. Two shapes hit this:
+
+      * 国木田花丸 `PL!S-bp5-007-*` — `heart_color_count: 2`, and every card reaching
+        two heart04s is a ライブ while the select filters `card_type: member_card`.
+      * 渡辺曜 `PL!S-bp6-005-*` — `require_all_heart_colors` over heart02+04+05, and no
+        member carries all three (or even two).
+    """
+    cards = json.loads(CARDS_JSON.read_text(encoding="utf-8"))
+    pool = cards.get("card_pool", cards)
+    colours = [c for c in (need or []) if c]
+    if not colours:
+        return True
+    for c in pool.values():
+        if not isinstance(c, dict) or c.get("type") != "メンバー":
+            continue
+        nh = c.get("need_heart") or {}
+        bh = c.get("blade_heart") or {}
+        totals = [nh.get(col, 0) + bh.get("b_" + col, 0) for col in colours]
+        if all_of:
+            if all(t > 0 for t in totals):
+                return True
+        elif count:
+            if totals and totals[0] >= int(count):
+                return True
+        elif any(t > 0 for t in totals):
+            # A plain presence filter: reachable, and NOT a reason to drop the row.
+            # 渡辺曜 `PL!S-bp2-005-P` is exactly this shape and is the one confirmed
+            # stranding, so excluding on presence would delete the only real finding.
+            return True
+    return False
+
+
+def stranded_remainder_risk():
+    """Abilities whose 「残り」 can strand cards in the looked-at buffer.
+
+    `discard_remaining` is implemented at `ability/choice.rs:1763` by taking the
+    remainder from `gs.revealed_cards`. 「残りを控え室に置く」 means the rest of the cards
+    that were looked at, which is larger when the select's filter leaves something
+    outside that set.
+
+    CONFIRMED stranding: `PL!S-bp2-005-P | 渡辺 曜 (ab#0)`, pinned by
+    `open_gap_you_taking_one_of_seven_leaves_the_rest_stranded_in_looked_at` in
+    `look_seven_select_three_heart_member_test.rs`. Its file's only pre-existing
+    waitroom assertion covered the take-NOTHING case, where 「残り」 and "everything"
+    coincide — which is why the class was invisible.
+
+    CLEAN control: 米女 `PL!SP-bp5-007-AR` — identical `count`, `optional`, `reveal`
+    and `discard_remaining`, no excluding filter, and it mills correctly.
+
+    This list is a starting point, not a count of broken cards.
+    """
+    out = []
+    for u in load_abilities()[0]:
+        e = u.get("effect") or {}
+        if e.get("action") != "look_and_select":
+            continue
+        sel = e.get("select_action") or {}
+        if not sel.get("discard_remaining"):
+            continue
+        excl = [k for k in STRANDED_REMAINDER_FILTERS if sel.get(k)]
+        if not excl:
+            continue
+        # NO reachability prune here, deliberately — one was tried and reverted.
+        #
+        # Pruning selects that card data says can never match looks like a free
+        # refinement, and it deleted the ONLY confirmed stranding in the table.
+        # 渡辺曜 `PL!S-bp2-005-P` carries a plain presence filter over
+        # heart02/04/05, and no メンバー in the pool has ANY of those colours — so a
+        # data-driven reachability test calls it unreachable and drops it. Yet that
+        # exact ability is the one pinned as broken: its test takes
+        # `PL!S-sd1-001-SD` through the same filter, and passes.
+        #
+        # Data and engine disagree because the filter is applied at a LATER stage than
+        # the offer — which is the defect itself. So reachability is not knowable from
+        # card data, and any predicate built on it silently drops real findings.
+        # Over-inclusion costs one test run per row; under-inclusion hides a bug.
+        out.append((u.get("card_count", 0), u["cards"][0], excl))
+    out.sort(key=lambda r: (-r[0], r[1]))
+    return out
+
+
+def render_stranded_remainder_risk():
+    rows = stranded_remainder_risk()
+    w = []
+    w.append("")
+    w.append("## 「残り」 discard risk — `look_and_select` + `discard_remaining`")
+    w.append("")
+    w.append(
+        "`discard_remaining` is implemented at `ability/choice.rs:1763` by taking the "
+        "remainder from `gs.revealed_cards`. 「残りを控え室に置く」 means the rest of the "
+        "cards that were LOOKED AT, which is larger when the select's filter leaves "
+        "something outside that set — those cards are stranded in `gs.looked_at_cards`, in "
+        "no zone, yet still readable as shared state."
+    )
+    w.append("")
+    w.append(
+        "**Only `heart_colors` is confirmed to do this.** An excluding filter is "
+        "necessary but not sufficient: `PL!-bp3-010-N` filters on `card_type: live_card` "
+        "over a five-card look containing four members and discards its 「残り」 "
+        "correctly, so `card_type` and `group_names` are deliberately NOT listed here. "
+        "`per_group` never applies — it limits how many are taken per group, not which "
+        "cards are eligible."
+    )
+    w.append("")
+    if rows:
+        w.append("| Cards | Ability | Confirmed-risk filter |")
+        w.append("|------:|---------|------------------------|")
+        for n, card, excl in rows:
+            w.append(f"| {n} | `{card}` | {', '.join(f'`{k}`' for k in excl)} |")
+    else:
+        w.append("_No abilities carry a `heart_colors`-filtered `discard_remaining`._")
+    return "\n".join(w) + "\n"
+
+
 def load_abilities():
     with open(CARDS_JSON, encoding="utf-8") as f:
         data = json.load(f)
-        return data["unique_abilities"], data.get("statistics", {})
+    return data["unique_abilities"], data.get("statistics", {})
 
 
 def card_numbers_with_optional_select():
@@ -2926,6 +3243,12 @@ def main():
         action="store_true",
         help="re-record the `while has_pending_choice()` drain-loop baseline",
     )
+    ap.add_argument(
+        "--update-name-baselines",
+        action="store_true",
+        help="re-record the test-name honesty baselines (name/assertion mismatch, "
+        "defect vocabulary)",
+    )
     args = ap.parse_args()
 
     if args.update_softguard_baseline:
@@ -2934,6 +3257,9 @@ def main():
 
     if args.update_drain_loop_baseline:
         write_drain_loop_baseline()
+        return 0
+    if args.update_name_baselines:
+        write_name_baselines()
         return 0
 
     inv = build_inventory()
@@ -2955,7 +3281,7 @@ def main():
     families_text = render_families(inv, families)
 
     # render
-    coverage_text = render_coverage(inv)
+    coverage_text = render_coverage(inv) + render_stranded_remainder_risk()
     matrix_text = render_matrix(inv)
     inventory_md_text = render_inventory_md(inv)
     quality_text = render_quality(
@@ -3078,12 +3404,23 @@ def main():
         for violation in check_drain_loop_ratchet():
             print(f"DRAIN LOOP RATCHET FAIL: {violation}", file=sys.stderr)
             ok = False
+        for violation in check_name_ratchets():
+            print(f"TEST NAME RATCHET FAIL: {violation}", file=sys.stderr)
+            ok = False
         sys.exit(0 if ok else 1)
 
     if not args.json_only:
         OUT_COVERAGE.parent.mkdir(parents=True, exist_ok=True)
         OUT_COVERAGE.write_text(coverage_text, encoding="utf-8")
         print(f"Wrote {OUT_COVERAGE.relative_to(ROOT)} ({len(coverage_text)} bytes)")
+        # `docs/ABILITY_FAMILIES.md` is part of the `--check` set (see `checked`
+        # above), so the plain regenerate has to write it too. It used to be written
+        # only under `--families`, which returns before this block — so the documented
+        # command in AGENTS.md could never clear a staleness failure the check itself
+        # reported, and every added test left the file permanently behind.
+        OUT_FAMILIES.parent.mkdir(parents=True, exist_ok=True)
+        OUT_FAMILIES.write_text(families_text, encoding="utf-8")
+        print(f"Wrote {OUT_FAMILIES.relative_to(ROOT)} ({len(families_text)} bytes)")
         OUT_QUALITY.parent.mkdir(parents=True, exist_ok=True)
         OUT_QUALITY.write_text(quality_text, encoding="utf-8")
         print(f"Wrote {OUT_QUALITY.relative_to(ROOT)} ({len(quality_text)} bytes)")

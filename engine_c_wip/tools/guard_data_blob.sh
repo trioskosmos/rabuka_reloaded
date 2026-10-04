@@ -92,9 +92,21 @@ elif command -v python >/dev/null 2>&1; then
 fi
 
 sha256_of() {
+    # WINDOWS PATH HAZARD, measured 2026-10-03: with an ABSOLUTE path, MSYS
+    # sha256sum emits
+    #     \6225b9b5...  C:\\Users\\...\\blob
+    # i.e. it prefixes the hash with a BACKSLASH and marks the file as binary with
+    # `*`. `cut -d' ' -f1` therefore yields "\6225b9b5..." - leading backslash and
+    # all - which matches no expected digest, so the guard REFUSES A PERFECTLY GOOD
+    # BLOB the moment anyone passes an absolute path (e.g.
+    # `make data STRINGS_BIN=C:\...`). That fails SAFE (a stray backslash can only
+    # cause a mismatch, never a false match), but it breaks the build.
+    #
+    # Extract the 64 hex characters themselves rather than a whitespace field, so
+    # the leading `\`, the binary `*` marker and any separator all stop mattering.
     case "$SHA_FLAVOUR" in
-        coreutils) sha256sum "$1" | cut -d' ' -f1 ;;
-        perl)      shasum -a 256 "$1" | cut -d' ' -f1 ;;
+        coreutils) sha256sum "$1" | sed -n 's/^[^0-9a-fA-F]*\([0-9a-fA-F]\{64\}\).*/\1/p' ;;
+        perl)      shasum -a 256 "$1" | sed -n 's/^[^0-9a-fA-F]*\([0-9a-fA-F]\{64\}\).*/\1/p' ;;
         openssl)   openssl dgst -sha256 "$1" | sed 's/.*= *//' ;;
         python)
             "${PYTHON:-python3}" -c \

@@ -210,7 +210,7 @@ static void on_fatal_signal(int sig)
         if (pending(tg_arg)) prompts++;                                   \
         if (prompts < (n)) {                                              \
             failures++;                                                   \
-            fprintf(stderr, "FAIL (VACUOUS): ");                          \
+            fprintf(stderr, "FAIL: [VACUOUS]  ");                          \
             fprintf(stderr, __VA_ARGS__);                                 \
             fprintf(stderr, " - only %d prompt(s) were offered, need %d\n",\
                     prompts, (n));                                        \
@@ -2470,6 +2470,84 @@ static void test_n_tomari_empty_hand_no_draw(void)
 }
 
 /* ------------------------------------------------------------------ *
+ * REGRESSION, 2026-10-04 — the crash the whole-hand-discard answer path
+ * took, pinned at the unit level.
+ *
+ * `n_tomari_accept_6` and `n_tomari_empty_hand` above both died with
+ * SIGSEGV (child exit 139, `CRASH` verdict, `*** FATAL SIGNAL 11`) two
+ * prompts deep on the newly-routed `pay_cost_all:discard_all` answer.
+ * Root cause: `rb_handle_pay_cost_all_discard` (cost.c:2371-2374) forwards
+ * `rb_entry_cost(g)` into `rb_effect_pay_cost_all_discard`
+ * (src/ability/effects/misc.c), and on the 登場 path there is NO queue
+ * entry (engine.c:861-931 resolves 登場 inline and parks `ab.effect` in
+ * `queue.deferred`; the trace prints `cur=0 n=0`), so `rb_entry_cost`
+ * returns NULL. The handler's first statement was `if(e->target && ...)`
+ * with no `e` guard: a NULL dereference.
+ *
+ * The two end-to-end cases above only reach it through a card whose
+ * ability is printed with that cost. This pins the RULE the fix restores,
+ * with the Rust line it comes from, so it cannot regress silently even if
+ * the two corpus cards are re-censused away:
+ *
+ *   Rust  cost/handlers.rs:1683-1696, handle_pay_cost_all_discard
+ *     let cost = gs.ability_queue.current_entry()
+ *                    .and_then(|e| e.ability.cost.clone());
+ *     let target_str = cost.as_ref().and_then(|c| c.target.as_deref())
+ *                          .unwrap_or("self");
+ *     let source     = cost.as_ref().and_then(|c| c.source_str())
+ *                          .unwrap_or("hand");
+ *     let player = gs.resolve_target_player_mut(target_str);
+ *     let hand_ids: Vec<i16> = player.hand.cards.drain(..).collect();
+ *     player.waitroom.cards.extend(hand_ids.iter().copied());
+ *
+ * `unwrap_or("self")` — a MISSING cost means the ACTOR's own hand, and the
+ * whole hand is drained. That is exactly what the fixed C does with e == NULL,
+ * so this asserts it directly instead of inferring it from a card.
+ * ------------------------------------------------------------------ */
+static void test_n_tomari_null_cost_drains_actor_hand(void)
+{
+    TestGame *tg = &n_tg;
+    fresh(tg);
+    clear_p1(tg);
+    clear_p2(tg);
+    static const char *const EX[3] = { N11, N12, N13 };
+    int ids[3];
+    int n = 0;
+    for (int i = 0; i < 3; i++) {
+        int c = mid(tg, EX[i]);
+        pin_id(c, EX[i]);
+        if (c < 0) return;
+        ids[n++] = c;
+        test_add_to_hand(tg, c);
+    }
+    int hand_before = tg->state.p[0].hand.n;
+    int wait_before = tg->state.p[0].discard.n;
+    CHECK(hand_before >= 3, "null_cost: the three hand fixtures are in hand");
+    if (hand_before < 3) return;
+
+    /* The exact NULL the 登場 path hands this handler: no queue entry, so
+     * rb_entry_cost(g) is NULL. Calling the handler directly is the only way
+     * to name that state — from a card the engine would have to find first. */
+    int rc = rb_effect_pay_cost_all_discard(&tg->state, 0, NULL);
+
+    CHECK(rc == 1, "null_cost: a costless whole-hand discard reports it ran (handlers.rs:1670)");
+    CHECK_EQ(tg->state.p[0].hand.n, 0,
+             "null_cost: a costless whole-hand discard empties the ACTOR's hand "
+             "(target_str unwrap_or(\"self\"), handlers.rs:1687-1690)");
+    CHECK_EQ(tg->state.p[0].discard.n, wait_before + hand_before,
+             "null_cost: every drained card reached the actor's waitroom (handlers.rs:1696-1700)");
+    for (int i = 0; i < n; i++)
+        CHECK(wait_has(tg, ids[i]),
+              "null_cost: a hand card is in the waitroom, not in hand");
+    /* The `unwrap_or("self")` half is only meaningful if "self" is NOT the
+     * opponent: an empty hand on the far side would make the assertion
+     * vacuous, so pin it. */
+    CHECK_EQ(tg->state.p[1].hand.n, 0,
+             "null_cost CONTROL: the opponent's hand was already empty, so the "
+             "drain above is not the opponent's hand by accident");
+}
+
+/* ------------------------------------------------------------------ *
  * per_card / turn_limited_yell_second_activation_blocked_test.rs
  *      PL!SP-bp2-015-N (Sumire) 自動/ターン1回: a yell that revealed no card
  *      with a blade heart grants heart06 until the end of the live.
@@ -2821,6 +2899,7 @@ int main(void)
     run("n_tomari_accept_6",    test_n_tomari_accept_draws_six);
     run("n_tomari_skip",        test_n_tomari_skip_no_draw);
     run("n_tomari_empty_hand",  test_n_tomari_empty_hand_no_draw);
+    run("n_tomari_null_cost",  test_n_tomari_null_cost_drains_actor_hand);
 
     printf("--- O per_card/turn_limited_yell_second_activation_blocked_test ---\n");
     run("o_sumire_yell_heart06", test_o_sumire_real_yell_grants_heart06);

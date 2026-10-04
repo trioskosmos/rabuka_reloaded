@@ -81,7 +81,7 @@ static void baton_touch_moves_replaced_member_to_waitroom(void) {
         return;
     }
 
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
     int target = test_id(&game, "PL!SP-bp2-011-R");
     int arriver = test_id(&game, "PL!HS-sd1-008-SD");
@@ -121,7 +121,7 @@ static void baton_touch_does_not_lock_all_full_lanes(void) {
         return;
     }
 
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int left = test_id(&game, "PL!HS-sd1-001-SD");
@@ -175,7 +175,7 @@ static void baton_touch_hanaho_auto_ability_triggers(void) {
         return;
     }
 
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int hanaho = test_id(&game, "PL!HS-sd1-001-SD");
@@ -213,7 +213,7 @@ static void baton_touch_count_per_player(void) {
         return;
     }
 
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int hanaho = test_id(&game, "PL!HS-sd1-001-SD");
@@ -244,7 +244,7 @@ static void baton_touch_arriving_card_ids_tracked(void) {
         return;
     }
 
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int hanaho = test_id(&game, "PL!HS-sd1-001-SD");
@@ -278,7 +278,7 @@ static void opponent_baton_touch_discard_does_not_trigger(void) {
         return;
     }
 
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int hanaho = test_id(&game, "PL!HS-sd1-001-SD");
@@ -314,7 +314,7 @@ static void card_count_condition_baton_touch_filter(void) {
         return;
     }
 
-    TestGame game;
+static    TestGame game;
     test_game_new(&game);
 
     int member1 = test_id(&game, "PL!HS-sd1-006-SD");

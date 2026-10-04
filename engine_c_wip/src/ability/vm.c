@@ -602,13 +602,35 @@ static int effect_decode_placement_order(AbilityEffect *e, Rdr *r, uint8_t tag)
     return 1;
 }
 
-static int effect_decode_extra(AbilityEffect *e, const char *key, Rdr *r, uint8_t tag) {
-    char *value = decode_extra_value(r, tag);
-    if (!value) return 0;
-    int ok = effect_set_extra(e, key, value);
-    free(value);
-    return ok;
-}
+/* ── TOMBSTONE (2026-10-04). `effect_decode_extra` REMOVED.
+ *
+ * A census classified this DEAD-WRONG and drew a serious consequence: "a
+ * bytecode decoder arm with no caller: the `extra` tag it decodes has no C
+ * consumer, so any effect `extra` the generator emits through this arm is
+ * dropped rather than stored." That consequence is FALSE, and the danger of
+ * believing it was that it invites someone to "fix" a decoder that is already
+ * working.
+ *
+ * Extras are stored. Measured, not asserted: decoding all 2116 card-ability
+ * pairs and walking all 3223 effects stores 6902 extras across 2352 of those
+ * effects (max 12 on a single effect). A dropped-extras tree would report ~0.
+ *
+ * The live producer is the main decoder's generic scalar-extras arm at
+ * vm.c:1168-1190, which handles every tag this function's
+ * `decode_extra_value` handled and MORE:
+ *     TAG_STR  (vm.c:1169-1170) -> effect_set_extra(e, key, rb_get_string(idx))
+ *     TAG_I64  (vm.c:1171-1172) -> stringified into a 24-byte buffer
+ *     TAG_TRUE (vm.c:1173-1174) / TAG_FALSE (vm.c:1175-1176) -> "true"/"false"
+ *     TAG_ARRAY(vm.c:1177-1186) -> decode_extra_value + effect_set_extra,
+ *                                 PLUS the heart_colors -> heart_color mirror
+ *                                 at vm.c:1181-1183
+ *     anything else (vm.c:1187-1190) -> skip_value
+ * So the live arm is a strict SUPERSET of the deleted function: it had the same
+ * ARRAY body and one extra rule this function never had. `effect_decode_extra`
+ * was a dead duplicate of that arm, not a missing producer.
+ *
+ * Deadness proved by gcc -Wunused-function: "'effect_decode_extra' defined but
+ * not used"; its only occurrence in the file was its own definition. */
 
 /* decode a single effect from current cursor (assumes TAG_OBJVAR already read).
     Rust: TAG_OBJECT_VARIANT (0x09) + variant u8 + len + fields.
@@ -1049,12 +1071,73 @@ static AbilityEffect *decode_effect_body(Rdr *r) {
             uint32_t idx; if (rd_idx(r, &idx)) { const char *s = rb_get_string(idx); if (s) { strncpy(e->id_field, s, 31); e->id_field[31]=0; probe_keep(); } }
             continue;
         }
-        if (key && (!strcmp(key, "self_target") || !strcmp(key, "card_type")) && tag == RB_TAG_STR) {
-            uint32_t idx; if (rd_idx(r, &idx)) { const char *s = rb_get_string(idx); if (s) {
-                if (!strcmp(key,"self_target")) { strncpy(e->self_target_field, s, 7); e->self_target_field[7]=0; }
-                else { strncpy(e->card_type_field, s, 23); e->card_type_field[23]=0; }
+        /* `card_type` is a TYPED field, not a raw string, and this is the only
+         * writer of AbilityEffect::card_type_field in the tree.
+         *
+         * Rust: effect_decoder_gen.rs:81 `"card_type" => { ek.card_type =
+         * bc.read_card_type_value(); Some(true) }`, and read_card_type_value
+         * (vm.rs:479-489) is `CardType::from_card_str(get_string(idx)?)`.
+         * CardType::from_card_str (core/card.rs) has EXACTLY three arms and its
+         * miss arm is `_ => None`, so `AbilityEffect::card_type` is
+         * `Option<CardType>` -- the raw spelling cannot survive the decode in
+         * Rust, by construction.
+         *
+         * Measured over the corpus (985 abilities, 2230 decoded effects, via
+         * rb_decode_card_ability + the real decoder): 817 effects spell
+         * `card_type` inside the vocabulary (member_card 442, live_card 121,
+         * energy_card 86) and **168 spell it OUTSIDE it** -- `card` 167 and
+         * `member` 1 -- spread over **149 of the 985 abilities**
+         * (actions: move_cards 146, gain_resource 21, modify_cost 1).
+         * Storing the raw string made the C disagree with Rust at five
+         * independent consumers, because every one of them tests the field for
+         * mere NON-EMPTINESS rather than for a vocabulary:
+         *   core/card.c:959  card_filter_from_effect copies it into
+         *     RbCardFilter.card_type, which core/card.c:1107 counts in
+         *     `has_filter` -> an all-else-empty effect becomes "filtered",
+         *     and util.c:1547 then rejects EVERY card (`card_type == "card"`
+         *     matches none) -> empty candidate set, silent no-op.
+         *   ability/choice.c:251 puts it straight into RbChoice.card_type;
+         *     Rust can only ever place one of the three names there
+         *     (`card_type_any().map(CardType::as_card_str)`).
+         *   ability/compound.c:467-469 has a `!strcmp(ct,"member")` arm that
+         *     exists precisely because this field held the raw spelling; Rust
+         *     sees None there and keeps self_target inheritable.
+         *   ability/dynamic_count.c:654-655 passes it to dc_per_unit_units.
+         *   ability/describe.c:357-367 re-derives it correctly through
+         *     rb_effect_card_type_from_str, i.e. it was the only one of the
+         *     five that did NOT inherit the bug -- which is what made the
+         *     other four look covered.
+         *
+         * On a miss BOTH the struct field and the `card_type` extra stay unset.
+         * The extra matters: core/card.c:959 and dynamic_count.c:655 both read
+         * `card_type_field[0] ? field : fx_extra(e, "card_type")`, so leaving
+         * the raw spelling in the extras table would re-introduce exactly the
+         * divergence the empty field removes. (Measured: today the extras
+         * table never holds a `card_type` at all -- 0 of 2230 effects -- because
+         * this branch `continue`s before the scalar tail, so that fallback is
+         * already dead and stays dead.) Rust drops the string too, so nothing
+         * that Rust can observe is lost. */
+        if (key && !strcmp(key, "card_type") && tag == RB_TAG_STR) {
+            uint32_t idx;
+            if (!rd_idx(r, &idx)) goto fail;
+            const char *s = rb_get_string(idx);
+            if (s && (!strcmp(s, "member_card") || !strcmp(s, "live_card") ||
+                      !strcmp(s, "energy_card"))) {
+                strncpy(e->card_type_field, s, 23);
+                e->card_type_field[23] = 0;
                 probe_keep();
-            } }
+            } else {
+                e->card_type_field[0] = 0;   /* Rust's `_ => None` */
+                probe_drop(key, tag);
+            }
+            continue;
+        }
+        if (key && !strcmp(key, "self_target") && tag == RB_TAG_STR) {
+            uint32_t idx;
+            if (!rd_idx(r, &idx)) goto fail;
+            const char *s = rb_get_string(idx);
+            if (s) { strncpy(e->self_target_field, s, 7); e->self_target_field[7]=0; }
+            probe_keep();
             continue;
         }
         if (key && !strcmp(key, "self_target") &&
@@ -1342,6 +1425,21 @@ typedef struct {
     char **locations; int n_locations;
     int min_baton_touch_count; int has_min_baton_touch_count;
     char *movement;
+    /* T7 — the five keys Rust's ConditionCommon carries and this decoder did
+     * not, so each of them used to reach the catch-all and be DROPPED.
+     * Corpus counts over the 985 shipped abilities (make t7-wire):
+     *   any_location        18 nodes / 18 abilities
+     *   activated_this_turn  3 /  1
+     *   paid_cost_this_turn  1 /  1
+     *   text              680 / 504
+     *   trigger_event     131 / 112
+     * Rust: condition_decoder_gen.rs:137 / :25 / :84 / :234 / :25,:168 and
+     * core/card.rs:3198 / :3242 / :3248 / :3218 / :3223. */
+    int any_location; int has_any_location;
+    int activated_this_turn; int has_activated_this_turn;
+    int paid_cost_this_turn; int has_paid_cost_this_turn;
+    char *text;
+    Condition *trigger_event;
     int negation; int has_negation;
     int no_excess_heart; int has_no_excess_heart;
     char *cond_operator;
@@ -1536,6 +1634,14 @@ static void cond_copy_common(Condition *c, const ConditionLocals *l) {
     if (l->locations && l->n_locations > 0) cond_add_str_array(c, "locations", l->locations, l->n_locations);
     if (l->has_min_baton_touch_count) cond_add_i64(c, "min_baton_touch_count", l->min_baton_touch_count);
     if (l->movement) cond_add_str(c, "movement", l->movement);
+    /* T7 — keys Rust's ConditionCommon carries (card.rs:3198, :3242, :3248,
+     * :3218, :3223). Copied here so every build_* variant carries them; each
+     * was reaching the decode_condition_field catch-all and being dropped. */
+    if (l->has_any_location) cond_add_bool(c, "any_location", l->any_location);
+    if (l->has_activated_this_turn) cond_add_bool(c, "activated_this_turn", l->activated_this_turn);
+    if (l->has_paid_cost_this_turn) cond_add_bool(c, "paid_cost_this_turn", l->paid_cost_this_turn);
+    if (l->text) cond_add_str(c, "text", l->text);
+    if (l->trigger_event) cond_add_cond(c, "trigger_event", l->trigger_event);
     if (l->has_negation) cond_add_bool(c, "negation", l->negation);
     if (l->has_no_excess_heart) cond_add_bool(c, "no_excess_heart", l->no_excess_heart);
     if (l->cond_operator) cond_add_str(c, "operator", l->cond_operator);
@@ -2555,6 +2661,65 @@ static int decode_condition_field(Rdr *r, const char *key, ConditionLocals *l) {
         else if (tag == RB_TAG_FALSE) { l->yell_trigger = 0; l->has_yell_trigger = 1; }
         else if (tag == RB_TAG_NULL) { l->has_yell_trigger = 0; }
         else return 0;
+        return 1;
+    }
+    /* ── T7: the five keys Rust's ConditionCommon carries and this decoder did
+     * not name. Each of them previously fell through to the catch-all below,
+     * which calls rb_note_decode_fallback and DROPS the value — a silent
+     * wrong-value waiting for the moment somebody wires decode_condition_direct.
+     * Rust reads them at condition_decoder_gen.rs:137 (any_location), :25
+     * (activated_this_turn), :84 (paid_cost_this_turn), :234 (text) and
+     * :25/:168 (trigger_event); all under core/card.rs ConditionCommon.
+     *
+     * `text` and `trigger_event` are `#[cfg(feature = "debug_conditions")]` in
+     * Rust, and debug_conditions IS in engine/Cargo.toml's default features,
+     * so an ordinary build has them.
+     */
+    if (strcmp(key, "any_location") == 0) {
+        if (tag == RB_TAG_TRUE) { l->any_location = 1; l->has_any_location = 1; }
+        else if (tag == RB_TAG_FALSE) { l->any_location = 0; l->has_any_location = 1; }
+        else if (tag == RB_TAG_NULL) { l->has_any_location = 0; }
+        else return 0;
+        return 1;
+    }
+    if (strcmp(key, "activated_this_turn") == 0) {
+        if (tag == RB_TAG_TRUE) { l->activated_this_turn = 1; l->has_activated_this_turn = 1; }
+        else if (tag == RB_TAG_FALSE) { l->activated_this_turn = 0; l->has_activated_this_turn = 1; }
+        else if (tag == RB_TAG_NULL) { l->has_activated_this_turn = 0; }
+        else return 0;
+        return 1;
+    }
+    if (strcmp(key, "paid_cost_this_turn") == 0) {
+        if (tag == RB_TAG_TRUE) { l->paid_cost_this_turn = 1; l->has_paid_cost_this_turn = 1; }
+        else if (tag == RB_TAG_FALSE) { l->paid_cost_this_turn = 0; l->has_paid_cost_this_turn = 1; }
+        else if (tag == RB_TAG_NULL) { l->has_paid_cost_this_turn = 0; }
+        else return 0;
+        return 1;
+    }
+    if (strcmp(key, "text") == 0) {
+        /* Rust: `#[cfg(debug_conditions)] text: Option<String>` read with
+         * read_string_value — NULL and a non-string both yield None. */
+        if (tag == RB_TAG_STR) {
+            uint32_t idx; if (!rd_idx(r, &idx)) return 0;
+            l->text = rb_strdup(rb_get_string(idx));
+            return 1;
+        }
+        if (tag == RB_TAG_NULL) return 1;
+        skip_value(r, tag);
+        return 1;
+    }
+    if (strcmp(key, "trigger_event") == 0) {
+        /* Rust: `#[cfg(debug_conditions)] trigger_event: Option<Box<TriggerEvent>>`.
+         * The C has no TriggerEvent struct; a nested Condition under the same
+         * key is the carrier the live mirror (read_condition_fields, vm.c:404)
+         * already produces, so the typed path and the mirror agree on the
+         * value either way. Rust's TriggerEvent reader names 20 of the 24
+         * sub-keys the corpus carries and skip_values the rest, so keeping all
+         * of them here is a strict superset of what Rust retains. */
+        if (tag == RB_TAG_OBJVAR) { l->trigger_event = read_condition(r); return 1; }
+        if (tag == RB_TAG_OBJECT) { l->trigger_event = read_condition_fields(r, 0xFF); return 1; }
+        if (tag == RB_TAG_NULL) return 1;
+        skip_value(r, tag);
         return 1;
     }
     if (strcmp(key, "type") == 0) {

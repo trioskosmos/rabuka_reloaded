@@ -542,6 +542,35 @@ int rb_execute_modify_score(GameState *gs, int actor, AbilityEffect *e) {
 
     /* ── live_total (score.rs:60-184) ─────────────────────────────────── */
     if (is_live_total) {
+        /* AUDIT 2026-10-03, NOT CHANGED, and recorded here so the next agent does
+         * not re-derive it:
+         *
+         *   score.rs:274-287 REFUSES `operation: "set"` on live_total
+         *       if operation == "set" {
+         *           log::error!("... is not implemented and would silently
+         *                        behave as 'add' ...");
+         *           return Ok(());              // <-- applies NOTHING
+         *       }
+         *   and the code just below this comment matches that comment's own
+         *   warning: `"set" => effective_value as i16` at :251-256 is computed
+         *   and then never used, because the `return Ok(())` at :286 fires
+         *   first. The C instead applies it as a delta (the branch a few lines
+         *   below), which is exactly the silent "behaves as add" the Rust
+         *   comment warns about.
+         *
+         * MEASURED: `operation` = "set" occurs on 1 of the 130 `modify_score`
+         * nodes and that node targets a CARD, so `set` on live_total is
+         * 0 of 985. Left alone per the audit rule that an unreachable gap is
+         * closed as VERIFIED-NOOP rather than speculatively ported.
+         *
+         * BLOCKED-ON tests/test_parity_score_effects.c:1125 — that suite
+         * actively asserts the OPPOSITE of Rust ("live_total operation=set adds
+         * 4 onto the existing +1 (score.rs:142-146)"). The cited lines are a
+         * stale numbering; the current score.rs:142-146 is inside the live-zone
+         * zone list, not the operation match. Adding the refusal here was tried
+         * and reverted because it turned that suite red (0 -> 1 FAIL lines) for
+         * zero reachable card. The peer file has to drop its `set` accumulation
+         * expectation BEFORE this branch can be corrected. */
         int effective_value = value;
         if (per_unit) {
             const char *zone = sc_per_unit_zone(e);
@@ -999,7 +1028,15 @@ int rb_execute_modify_required_hearts_success(GameState *gs, int actor, AbilityE
     const char *operation = sc_extra(e, "operation"); if (!operation) operation = "increase";
     int value = e->count >= 0 ? e->count : sc_extra_int(e, "value");
     const char *target = e->target ? e->target : "self";
-    const char *card_type = sc_extra(e, "card_type");
+    /* vm.c:1098-1112 — `card_type` is stored in the STRUCT FIELD and the branch
+       `continue`s, so it is NEVER in the extras table (MEASURED 0 of 1221 effect
+       nodes across 1074 abilities carry it as an extra). The bare
+       sc_extra(e,"card_type") was therefore permanently NULL, `nids` stayed 0
+       and the whole effect was a silent no-op. Rust reads the typed
+       `effect.card_type_any()`; field-first-with-fallback, the shape
+       look.c:976 and draw.c:444 already use. */
+    const char *card_type = e->card_type_field[0] ? e->card_type_field
+                                                  : sc_extra(e, "card_type");
     const char *heart_colors = sc_extra(e, "heart_colors");
 
     int pl = rb_target_player_index(target, actor == 0 ? "p1" : "p2");

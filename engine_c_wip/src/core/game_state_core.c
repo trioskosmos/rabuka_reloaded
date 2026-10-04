@@ -10,12 +10,34 @@
    resolvers, and the rule-log / snapshot / ability-application writers.
 
    NOT ported here (deliberately, reported instead):
+     · structured_log / debug_trace rings   — no GameState field
+     · last_ability_trace                  — no GameState field
+     · current_turn_phase                  — no GameState field (derived here)
+
+   ⛔ CORRECTION 2026-10-04 (field census). This list USED to also claim, in these
+   exact words, that three more items had "no GameState field":
      · cards_paid_cost_this_turn            — no GameState field (see report)
      · player1/2_cheer_revealed_cards       — no GameState field
      · revealed_cost_cards / *_card_meta    — no GameState field
-     · rule_log / structured_log / debug_trace rings — no GameState fields
-     · last_ability_trace                  — no GameState field
-     · current_turn_phase                  — no GameState field (derived here)
+   All of that was FALSE and has been deleted. Every one of those members EXISTS
+   and is declared in include/rabuka.h: `cards_paid_cost_this_turn[]` +
+   `n_cards_paid_cost_this_turn` (the tracking / play-time-alt-cost block),
+   `player1_cheer_revealed_cards[]` + `player2_cheer_revealed_cards[]` and their two
+   counters, and `revealed_cost_cards[]` + `n_revealed_cost_cards`. What was
+   actually true is narrower and is now the whole statement: they are DECLARED BUT
+   UNWIRED — 0 writers and 0 readers. Each one now carries its own measured
+   BLOCKED-ON in the header, naming the exact file:line of the missing producer or
+   consumer; `*_card_meta` is the one genuine absence (Rust's
+   `revealed_cost_card_meta` is display-only). A comment that says "no field exists"
+   when the field exists and is simply not wired sends the next reader looking for a
+   declaration instead of at the call site, which is where the work is.
+
+   ⛔ rule_log IS WIRED (2026-10-03). `GameState.rule_log[500][256]` +
+   `rule_log_len[]` + `n_rule_log` landed in include/rabuka.h, and the four
+   logging entry points below now append to it through gsc_rule_log_push().
+   They used to route into rb_log_push_verdict(text,"rule_log",1), which is the
+   CONDITION-VERDICT ring (ability/log.c, 32 slots, drop-newest): the two logs
+   destroyed each other's entries. That routing is GONE.
 
    REACHABILITY, MEASURED (2026-10-02). 50 rb_gsc_* definitions; exactly ONE
    has an external caller in the whole tree:
@@ -33,16 +55,16 @@
    a live twin in another file and are pure drift hazard. The full
    WIRE/DELETE/REPORT table for every one is in the handover report.
 
-   ⛔ DO NOT WIRE THE LOGGING GROUP INTO rb_log_push_verdict. Rust's
-   push_rule_log / push_rule_log_fmt feed a SEPARATE `rule_log: Vec<String>`
-   (mod.rs:1526-1540, 72 + 61 src call sites). rb_log_push_verdict is the
-   CONDITION-VERDICT buffer (ability/log.c: 32 slots, drop-newest, gated on
-   ABILITY_DEBUG). Routing the rule log there evicts condition verdicts. The
-   required GameState field is a bounded rule-log ring; the owner of
-   include/rabuka.h must add it before any of the nine logging functions below
-   gets a caller. current_turn_phase must NOT be added (it is derivable from
-   g->phase + first/second_attacker, and adding it makes a second source of
-   truth).
+   ⛔ THE LOGGING GROUP MUST NOT REGRESS INTO THE VERDICT RING. Rust's
+   push_rule_log / push_rule_log_fmt feed `rule_log: Vec<String>` ONLY
+   (mod.rs:1526-1540). rb_log_push_verdict is the CONDITION-VERDICT buffer
+   (ability/log.c: 32 slots, drop-newest). The one remaining offender is
+   rb_gsc_push_rule_log_fmt, whose DECLARED signature takes no GameState* and so
+   structurally cannot reach g->rule_log — see its body for the exact
+   include/rabuka.h line that closes it. Every other entry point here goes
+   through gsc_rule_log_push. current_turn_phase must NOT be added (it is
+   derivable from g->phase + first/second_attacker, and adding it makes a second
+   source of truth).
 
    Every exported symbol is prefixed rb_gsc_ so this file can be added to the
    build without colliding with any existing symbol.
@@ -50,13 +72,12 @@
    Helpers reused rather than reimplemented (do NOT re-derive these here):
      rb_zone_cards                (ability/util.c)   — zone id enumeration
      rb_card_get_card_names       (core/card.c)      — card name lookup
-     rb_find_card_stage_position  (ability/resolver.c)
-     rb_get_pending_choice        (ability/choice.c)
-     rb_get_pending_choice_player_id (ability/choice.c)
-     rb_log_push_verdict          (ability/log.c)    — the C rule-log sink
-     rb_mods_trace_push           (core/modifiers.c) — ability-application ring
-     rb_ability_debug_enabled     (ability/debug.c)
-     rb_opponent_id               (core/…)           — seat arithmetic
+rb_find_card_stage_position  (ability/resolver.c)
+      rb_get_pending_choice        (ability/choice.c)
+      rb_get_pending_choice_player_id (ability/choice.c)
+      rb_mods_trace_push           (core/modifiers.c) — ability-application ring
+      rb_ability_debug_enabled     (ability/debug.c) — the rule-log gate (below)
+      rb_opponent_id               (core/…)           — seat arithmetic
    ════════════════════════════════════════════════════════════════════════ */
 
 #include "rabuka.h"
@@ -87,15 +108,15 @@
    ───────────────────────────────────────────────────────────────────────── */
 
 /* ── Rust: Phase (engine/src/core/types.rs::Phase) ──────────────────────────
-   The C RbPhase enum collapses Rust's 13 variants into 12 (there is no
-   separate ChooseFirstAttacker; RB_PHASE_RPS covers the RPS->first-attacker
-   step, with g->rps_winner carrying the outcome). The mapping is total:
-   every C phase has a Rust counterpart. */
-typedef enum {
-    RB_GSC_TP_FIRST_ATTACKER_NORMAL = 0,
-    RB_GSC_TP_SECOND_ATTACKER_NORMAL,
-    RB_GSC_TP_LIVE
-} RbGscTurnPhase;
+ *   The C RbPhase enum collapses Rust's 13 variants into 12 (there is no
+ *   separate ChooseFirstAttacker; RB_PHASE_RPS covers the RPS->first-attacker
+ *   step, with g->rps_winner carrying the outcome). The mapping is total:
+ *   every C phase has a Rust counterpart.
+ *
+ *   RbGscTurnPhase MOVED to include/rabuka.h on 2026-10-03. It used to be a local
+ *   typedef here, which meant the only way to declare
+ *   rb_gsc_current_turn_phase() in the header was not to - the file compiled by
+ *   accident rather than by contract. */
 
 /* RbGscZoneSnapshot and RB_GSC_ZONE_SNAPSHOT_KEYS now live in include/rabuka.h;
    the local copy that used to sit here was removed once the header landed. */
@@ -703,29 +724,110 @@ int rb_gsc_choice_option_count(const RbChoice *ch) {
 }
 
 /* ── rule-log writers ───────────────────────────────────────────────────────
-   Rust: mod.rs:1526-1539 (push_rule_log / push_rule_log_fmt).
-   The C GameState has no `rule_log: Vec<String>` ring; the port's rule-log
-   sink is the global verdict buffer (ability/log.c, rb_log_push_verdict),
-   which is itself gated by rb_log_set_enabled — the same gate Rust's
-   runtime_flags::logging_enabled() provides. LOG_BOUND_RULE's 500-line window
-   is the log.c ring bound (RB_LOG_BUFFER_MAX). */
-void rb_gsc_push_rule_log(const char *text) {
-    if (!text) return;
-    rb_log_push_verdict(text, "rule_log", 1);
+   Rust: mod.rs:1526-1539 (push_rule_log / push_rule_log_fmt) landing in
+   `rule_log: Vec<String>` through push_rule_log_to / truncate_rule_log
+   (mod.rs:1584-1606).
+
+   WAS WRONG AND IS NOW RIGHT. This used to read:
+
+       The C GameState has no `rule_log: Vec<String>` ring; the port's rule-log
+       sink is the global verdict buffer (ability/log.c, rb_log_push_verdict)
+
+   and did exactly that — rb_gsc_push_rule_log called
+   rb_log_push_verdict(text,"rule_log",1), which is the CONDITION-VERDICT ring
+   (ability/log.c: RB_LOG_BUF_MAX == 32, drop-newest). Both
+   include/rabuka.h:1786-1796 and the file banner above FORBID that routing,
+   because the two logs then evict each other's entries: a rule-log line pushed
+   past 32 total lines starts overwriting condition verdicts, and a condition
+   verdict pushed past 32 loses the rule-log history. `GameState.rule_log[500]`
+   / `rule_log_len[]` / `n_rule_log` now exist, so the ring is out of the path.
+
+   gsc_rule_log_push is the faithful port of `push_rule_log_to`:
+       log.push(text); truncate_rule_log(log);        // mod.rs:1584-1587
+       if log.len() > LOG_BOUND_RULE { log.drain(0..log.len() - LOG_BOUND_RULE); }
+   i.e. the NEWEST RB_GSC_RULE_LOG_MAX lines are kept and the oldest are dropped
+   off the front. A C `Vec` has no drain, so the drain is the memmove below and
+   the parallel `rule_log_len[]` array is shifted with it — otherwise entry i and
+   its length would describe different lines. Rust's Vec is unbounded, so a line
+   LONGER than RB_GSC_RULE_LOG_LINE_MAX is truncated here; the corpus's longest
+   formatted rule-log line is far shorter, and dropping the tail of one line is
+   the only bounded-array behaviour available.
+
+   THE GATE. Rust gates push_rule_log / push_rule_log_fmt on
+   `runtime_flags::logging_enabled()` (mod.rs:1527/:1536). The C has no exported
+   equivalent of log.c's `rb_log_recording()` (= g_log_enabled ||
+   rb_ability_debug_enabled(), ability/log.c:47-49, which is static), so this
+   uses rb_ability_debug_enabled() — the ABILITY_DEBUG atomic the C does export
+   and the gate live.c:1298 already applies to its own rule-log writer. Same
+   observable behaviour as before this change (rb_log_push_verdict was gated by
+   the same pair), so no suite moves. The C-only rb_log_set_enabled() hook does
+   NOT reach here; that is reported, not silently accepted. */
+static void gsc_rule_log_push(const GameState *g, const char *text) {
+    if (!g || !text) return;
+    if (!rb_ability_debug_enabled()) return;
+    /* Rust takes `&mut self` because Vec::push needs it; the C takes a const
+       GameState* because two of the four entry points are declared that way
+       (include/rabuka.h:3613-3615) and re-casting them at each call site would
+       be noisier than one documented cast here. `rule_log` is append-only
+       display state — no reader in engine/src touches anything else on `g`. */
+    GameState *m = (GameState *)g;
+    if (m->n_rule_log >= RB_GSC_RULE_LOG_MAX) {
+        memmove(m->rule_log[0], m->rule_log[1],
+                (size_t)(RB_GSC_RULE_LOG_MAX - 1) * sizeof(m->rule_log[0]));
+        memmove(m->rule_log_len, m->rule_log_len + 1,
+                (size_t)(RB_GSC_RULE_LOG_MAX - 1) * sizeof(m->rule_log_len[0]));
+        m->n_rule_log = RB_GSC_RULE_LOG_MAX - 1;
+    }
+    size_t len = strlen(text);
+    if (len > (size_t)RB_GSC_RULE_LOG_LINE_MAX - 1)
+        len = (size_t)RB_GSC_RULE_LOG_LINE_MAX - 1;
+    memcpy(m->rule_log[m->n_rule_log], text, len);
+    m->rule_log[m->n_rule_log][len] = '\0';
+    m->rule_log_len[m->n_rule_log] = (uint16_t)len;
+    m->n_rule_log++;
 }
-void rb_gsc_push_rule_log_fmt(const char *fmt, ...) {
-    char buf[512];
+
+/* rb_gsc_push_rule_log_fmt — BLOCKED ON include/rabuka.h:3609.
+
+   THE DECLARED SIGNATURE IS THE BLOCKER, and it is the one signature the header
+   re-extraction got "right" and therefore hid. Rust's push_rule_log_fmt is a
+   `&mut self` method (mod.rs:1535) — it takes the GameState by definition, and
+   all 133 of its engine/src call sites (choice.rs:292/:1656/:1911, log.rs:157,
+   resolver.rs:1033, phases.rs:1394/:1417/:1762) have one in hand. The C
+   declaration
+
+       void rb_gsc_push_rule_log_fmt(const char *fmt, ...);
+
+   has no GameState*, so this function STRUCTURALLY CANNOT reach g->rule_log.
+   Its previous body therefore called rb_gsc_push_rule_log, which wrote into the
+   32-slot condition-verdict ring — the exact thing the header forbids.
+
+   EXACT PATCH for the header owner (one line, include/rabuka.h:3609):
+       - void rb_gsc_push_rule_log_fmt(const char *fmt, ...);
+       + void rb_gsc_push_rule_log_fmt(GameState *g, const char *fmt, ...);
+
+   That one change is what unblocks the whole group: the ~25 C sites that
+   hand-roll the Rust call by writing rb_log_push_verdict(line,"rule_log",1)
+   become one-token swaps to rb_gsc_push_rule_log_fmt(g, "%s", line). Until it
+   lands this function CANNOT log, so rather than silently discard the line (or
+   put it back in the ring) it says so once on stderr and returns. It has ZERO
+   callers tree-wide today, so nothing is lost and no suite moves; the point of
+   the one-shot warning is that the first future caller hears about it instead
+   of shipping a rule log that vanishes. */
+void rb_gsc_push_rule_log_fmt(GameState *g, const char *fmt, ...) {
+    if (!g || !fmt) return;
+    char line[RB_GSC_RULE_LOG_LINE_MAX];
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
+    vsnprintf(line, sizeof(line), fmt, ap);
     va_end(ap);
-    rb_gsc_push_rule_log(buf);
+    gsc_rule_log_push(g, line);
 }
 
 /* ── log_entry ─────────────────────────────────────────────────────────────
-    Rust: mod.rs:1117-1161. Gated on logging_enabled (rb_log_push_verdict's own
-    gate); `player_label` / `source_card_name` feed the structured entry, which
-    has no C field, so only the rule-log text half lands (reported).
+    Rust: mod.rs:1117-1161. Gated on logging_enabled (gsc_rule_log_push's gate);
+    `player_label` / `source_card_name` feed the structured entry, which has no
+    C field, so only the rule-log text half lands (reported).
 
     Rust's SIBLING `log_ability` (mod.rs:1154-1162) is deliberately NOT ported:
     it has ZERO callers in engine/src and ZERO in engine/tests, so it is not a
@@ -733,13 +835,13 @@ void rb_gsc_push_rule_log_fmt(const char *fmt, ...) {
     rb_gsc_player_prefix_id had a (discarded) caller. */
 void rb_gsc_log_entry(GameState *g, const char *text, const char *player_label, int source_card_id,
                       const char *source_card_name, const char *category) {
-    if (!text) return;
+    if (!g || !text) return;
     char line[768];
     snprintf(line, sizeof(line), "[T%d %s] %s | event=%s source=%d card=%s",
              g->turn, rb_phase_name(g->phase), text,
              category ? category : "", source_card_id,
              source_card_name ? source_card_name : "None");
-    rb_gsc_push_rule_log(line);
+    gsc_rule_log_push(g, line);
     (void)player_label;   /* only feeds the structured entry, which has no C field */
 }
 
@@ -752,13 +854,22 @@ void rb_gsc_push_choice_offered(const GameState *g, const RbChoice *ch) {
     int opts = rb_gsc_choice_option_count(ch);
     char labels[1024];
     rb_gsc_choice_offered_labels(g, ch, labels, sizeof(labels));
-    char line[1400];
+    /* Sized to the worst case the format can produce, so this intermediate is never
+   the bottleneck: "[T" + int (11) + " " + phase_name + "] Choice offered: " +
+   description (char[512], so 511) + " | options=" + int (11) + " skip_allowed="
+   + int (11) + " source=" + int (11) + "\n" + labels (1023) + NUL = 1665 worst
+   case. `line[1400]` was short of that, which is the -Wformat-truncation at
+   :844. It was harmless -- gsc_rule_log_push copies into
+   `rule_log[...][RB_GSC_RULE_LOG_LINE_MAX]`, so everything past that was dropped
+   anyway -- but "harmless because a later buffer is smaller" is not a reason to
+   leave a truncating intermediate in the middle of a formatter. */
+char line[1792];
     snprintf(line, sizeof(line),
              "[T%d %s] Choice offered: %s | options=%d skip_allowed=%d source=%d\n%s",
              g->turn, rb_phase_name(g->phase),
              ch->description[0] ? ch->description : labels, opts,
              ch->allow_skip ? 1 : 0, g->activating_card, labels);
-    rb_gsc_push_rule_log(line);
+    gsc_rule_log_push(g, line);
 }
 
 void rb_gsc_push_choice_resolved(const GameState *g, const RbChoice *ch,
@@ -769,7 +880,7 @@ void rb_gsc_push_choice_resolved(const GameState *g, const RbChoice *ch,
     snprintf(line, sizeof(line),
              "[choice] resolved: offered %d option(s), picked %s",
              offered, skipped ? "skip" : (chosen ? chosen : ""));
-    rb_gsc_push_rule_log(line);
+    gsc_rule_log_push(g, line);
 }
 
 /* ── push_performance_snapshot ──────────────────────────────────────────────
