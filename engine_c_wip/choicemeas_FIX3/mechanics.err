@@ -1,0 +1,111 @@
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=7
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,5,0,12,0,0,3,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[6,2,0,5,0,0,2,0] filled=[0,2,0,11,0,0,2,0]
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=110 ab=1 occurrence=0 use_limit=-1 effect=modify_score options=0
+[LIVE_SUCCESS_QUEUE] cid=110 ab=1 occurrence=0 limit=99 reached=0 completed=0
+[QUEUE_EXEC] idx=0 n=1 cid=110 ab=1 actor=0 action=modify_score
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,5,0,12,0,0,3,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[6,2,0,5,0,0,2,0] filled=[0,2,0,11,0,0,2,0]
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=0 revealed=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[4,0,0,0,0,0,0,0] filled=[0,0,0,0,0,0,0,0]
+[EARLY_SEAT] pl=0 won=0 no_excess=0 surplus=-1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[4,0,0,0,0,0,0,0] filled=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[CAN_PLACE_DECODE] cid=1493 ability=0 constant=1 trigger=- action=- dest=-
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=1493 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_WAITROOM_BATCH] n=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[EARLY_SEAT] pl=0 won=0 no_excess=0 surplus=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_QUEUE] cid=1965 ability=0 passes=1 occurred=1 revealed=6
+[YELL_PERFORM] queued=1 entries=1 state=0 occurred=1 revealed=6
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[QUEUE_EXEC] idx=0 n=1 cid=1965 ab=0 actor=0 action=gain_resource
+[YELL_DRAIN] cid=1965 action=gain_resource has_cond=1 cond=0xa00197320 pending=0
+[YELL_EXEC_ENTER] host=1965 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=6
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_EXEC_COND] host=1965 occurred=1 revealed=6 result=1
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[4,0,0,0,0,0,0,0] filled=[0,0,0,4,0,0,0,0]
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_QUEUE] cid=1965 ability=0 passes=1 occurred=1 revealed=6
+[YELL_PERFORM] queued=0 entries=1 state=0 occurred=1 revealed=6
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[4,0,0,0,0,0,0,0] filled=[0,0,0,4,0,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=9
+[EARLY_SEAT] pl=1 won=1 no_excess=0 surplus=9
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=1->1 processed=1 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[4,0,0,0,0,0,0,0] filled=[0,0,0,4,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[4,0,0,0,0,0,0,0] filled=[0,0,0,4,0,0,0,0]
+[LIVE_SCORE] p1=1 p2=1
+[CAN_PLACE_DECODE] cid=1493 ability=0 constant=1 trigger=- action=- dest=-
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=1493 can_place=1 live=1
+[CAN_PLACE_DECODE] cid=1493 ability=0 constant=1 trigger=- action=- dest=-
+[LIVE_SUCCESS_RESULT] pl=1 won=1 must_skip=0 card=1493 can_place=1 live=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=1 p2_added=1
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=1 p1_succ=1(+1) p2_succ=1(+1)
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=9
+[EARLY_SEAT] pl=1 won=1 no_excess=0 surplus=9
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=1 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=1 p1_succ=1(+0) p2_succ=1(+0)
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_QUEUE] cid=1965 ability=0 passes=1 occurred=1 revealed=6
+[YELL_PERFORM] queued=1 entries=1 state=0 occurred=1 revealed=6
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[QUEUE_EXEC] idx=0 n=1 cid=1965 ab=0 actor=0 action=gain_resource
+[YELL_DRAIN] cid=1965 action=gain_resource has_cond=1 cond=0xa00197320 pending=0
+[YELL_EXEC_ENTER] host=1965 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=6
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_EXEC_COND] host=1965 occurred=1 revealed=6 result=1
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[4,0,0,0,0,0,0,0] filled=[0,0,0,4,0,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=9
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=1->1 processed=1 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[4,0,0,0,0,0,0,0] filled=[0,0,0,4,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=1 p2=0
+[CAN_PLACE_DECODE] cid=1493 ability=0 constant=1 trigger=- action=- dest=-
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=1493 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=9
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+0) p2_succ=0(+0)

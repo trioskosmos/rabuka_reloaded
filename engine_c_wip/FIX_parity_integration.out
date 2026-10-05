@@ -1,0 +1,164 @@
+make t-nogate: running T=parity_integration WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_integration src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_integration.c
+./rb_verdict ./rb_engine_t_parity_integration parity_integration
+ok: walk: a fresh TestGame starts in Main
+ok: walk: the first attacker acts first
+ok: walk: Main pass hands over to the second attacker
+ok: walk: the second attacker is now active
+ok: walk: Active -> Energy
+ok: walk: Energy -> Draw
+ok: walk: Draw -> Main (second attacker)
+ok: walk: second attacker's Main -> LiveCardSet
+ok: walk: LiveCardSet opens with the first attacker
+ok: walk: LiveCardSet second window is the second attacker
+ok: walk: after the second LiveCardSet the performance window opens (ライブ開始時 fires here)
+ok: walk: the live round rolls over into Active of the next turn
+ok: walk: the turn counter advanced past the first round
+GAP: GAP-00 RPS + mulligan action chain is not ported to C (engine/src/turn/phases.rs vs engine_c_wip/src/engine.c:1361)
+ok: two-card live: reached LiveCardSet
+ok: two-card live: P1 holds two live cards
+ok: two-card live: P2 holds two live cards
+ok: two-card live: the flow crossed victory determination
+ok: two-card live: P1's tied live card reached the success zone
+ok: two-card live: P2's tied live card reached the success zone
+ok: two successes: P1's live zone is empty again
+ok: two successes: P2's live zone is empty again
+ok: two successes: P1 stays on two successes (no third placement)
+ok: two successes: P2 stays on two successes (no third placement)
+ok: two successes on both sides is not a finished game
+ok: rule 8.4.6.1: no live cards set -> no winner -> no success-zone placement (P1)
+ok: rule 8.4.6.1: no live cards set -> no winner -> no success-zone placement (P2)
+ok: rule 8.4.6.1: the round really rolled over -- the turn counter left its initial value of 1 (measured turn 2); Rust live_score_tie_live_zone_placement_across_rounds_test.rs:258
+ok: rule 8.4.6.1: the new round opens with the first attacker, so the loop above exited on a real rollover and not on the guard; Rust live_score_tie_live_zone_placement_across_rounds_test.rs:258
+ok: himeko: 可可 starts parked at P2-right
+ok: himeko: 姫芽's debut must displace 可可 off P2-right
+ok(gap-closed): himeko: 可可 must land on P2-center (姫芽's front area)
+GAP: himeko: 可可's opponent-caused area-move watcher grants heart06
+ok: himeko gate: a non-MiraKura stage member blocks the reposition, 可可 stays at P2-right
+ok: himeko gate: no movement happened, so 可可's watcher is silent
+ok: round5: P2's copy scores +1 because opponent(P1)=3 > self(P2)=1
+ok: round5: P2's copy scores +0 when P1 is NOT strictly ahead
+ok: round5 mirror: P1's copy sees opp(P2)=3 > self(P1)=2 -> +1
+ok: round5 mirror: P2's copy sees opp(P1)=2 is NOT > self(P2)=3 -> +0
+ok: rule 4.7.4: P2's WAITED energy is still エネルギー, so opp total 3 > self 2 -> +1
+ok: mei: a single eligible target auto-resolves, leaving no stuck prompt
+ok: mei: an already-waited cost-2 member stays a legal target and remains Wait
+ok: mei: the cost gate protects the cost-4 member
+ok: rina mill: P1's deck loses exactly its top 7 even though RINA belongs to P2
+ok: rina mill: P1's mill lands in P1's OWN waitroom
+ok: rina mill: 「自分と相手」 follows the firing seat, so P2 mills her own deck too
+ok: rina mill: P2's mill lands in P2's own waitroom
+ok: rina mill identity: P1's milled cards are in P1's waitroom only
+ok: rina mill identity: P2's milled cards are in P2's waitroom only
+ok: rina mill identity: P1's waitroom holds exactly 7
+ok: rina mill identity: P2's waitroom holds exactly 7
+ok: natsumi fixtures resolve
+FAIL:  test_natsumi_blades
+ok: natsumi 6c: energy 6 < 7 -> no blade for self
+ok: natsumi 6c: energy 6 < 7 -> no blade for the other member
+ok: natsumi 6d: a duration=live_end blade expires after victory determination
+ok: natsumi 6d: the other member's live_end blade expires too
+ok: hajimari fixtures resolve
+ok: hajimari 7a: with 2 cards in the success zone -> +5 score
+FAIL:  test_hajimari_set_required_hearts
+ok: hajimari 7a: heart03 is SET to 3
+ok: hajimari 7a: heart00 is SET to 3, replacing the printed 2 entirely
+ok: hajimari 7b: an empty success zone fails the gate -> no score
+ok: dream with you fixture resolves
+ok: dream with you: an empty stage has no blade -> the >=10 gate fails
+ok(gap-closed): dream with you: 4+3+3 = 10 blade on stage satisfies >= 10 -> +1 score
+ok: hanamaru fixtures resolve
+ok: hanamaru 16a: cost 9 > opponent max 4 -> +2 blade until live end
+ok: hanamaru 16b: cost 9 < opponent max 15 -> no blade
+ok: suzu 17a: paying the optional discard grants +6 cost (10 -> 16)
+FAIL:  test_suzu_cost_bonus
+ok: suzu 17a: the same gate grants 1 blade
+ok: suzu 17b: the cost is still paid, so +6 cost stands
+ok: suzu 17b: 16 < opponent 19 -> no heart05
+ok: suzu 17b: 16 < opponent 19 -> no blade
+ok: izumi fixture resolves
+FAIL:  test_izumi_debut_draw2_discard1
+ok: izumi 9a: 桂城泉 is on stage at center
+ok: 澁谷かのん fixtures resolve
+ok: kanon 1a: the other Liella! member's LiveStart is invalidated
+ok: kanon 1a: a Liella! card is recovered from the waitroom to hand
+ok: kanon 1a: the recovered card left the waitroom
+FAIL:  test_kanon_invalidate_and_recover
+ok: cl1-006-CL fixtures resolve
+ok: live_end rollover: the +3 blade grant is registered inside the live
+ok: live_end rollover: the REAL victory-determination rollover expires the grant
+ok: live_end rollover: no temporary effect is left behind
+ok: 百生吟子 fixtures resolve
+ok: ginko debut: a single eligible candidate auto-resolves with no dangling prompt
+ok: ginko debut: the cost-9-or-less member is rested
+ok: ginko debut: the cost gate protects the cost-15 member
+ok: 松浦果南 fixtures resolve
+FAIL:  test_kanan_discard_gain_live
+ok: kanan 2a: the recovered live is one of the waitroom's, not a fresh card
+ok: kanan 2b: no payable cost -> cost skipped -> no live card recovered
+ok: 上原歩夢 fixtures resolve
+ok: ayumu 3a: 「デッキの上からカードを5枚見る」 takes exactly 5
+ok: ayumu 3a: the single live card among the five is the only legal pick
+ok: ayumu 3a: the 4 non-picked cards go to the waitroom
+ok: ayumu 3b: a live card in hand fails the compound AND -> deck unchanged
+ok: 平安名すみれ fixture resolves
+ok: sumire: a CENTER debut gains the printed 2 blades
+ok: sumire: a LEFT debut does NOT gain blades (activation_position is checked)
+ok: sumire: a RIGHT debut does NOT gain blades
+ok: 高坂穂乃果 fixture resolves
+ok: honoka 8a: live total 1 + 2 = 3 looked at, 1 to hand (cost fodder discarded)
+ok: honoka 8b: 2 unlooked remainder + 1 cost fodder = 3 in the waitroom
+ok: honoka 8d: 穂乃果 stays on stage
+ok: honoka 8f: live total 2 + 2 = 4 looked at, 3 remainder + 1 cost = 4
+ok: honoka 8j: live total (1+2) + 2 = 5 looked at, 4 remainder + 1 cost = 5
+ok: karin ab#1: 0 waited opponent members -> select 0 -> waitroom unchanged
+ok: karin ab#1: the deck still shrank from the LiveStart draws
+FAIL:  test_karin_ab1_select_from_discard
+ok: karin ab#1: a non-虹ヶ咲 waitroom card is not selectable
+ok: karin ab#1: target=self — P2's waitroom is never the source
+ok(gap-closed): karin ab#1: hand = 2 seeded + 1 LiveStart draw - 1 live set = ... (Rust asserts exactly 3)
+ok: サイコーハート fixture resolves
+ok: saikou: an empty success zone grants no score
+ok: saikou: a score-1 card in the success zone grants +1
+ok: saikou: a score-5 card in the success zone grants +1
+ok: saikou: score-1 AND score-5 both present grants +2
+FAIL:  test_saikou_success_zone_scores
+ok: 桜小路きな子 fixtures resolve
+ok: kinako: while a Liella! member moved areas this turn, this hand card costs -2
+ok: kinako: no movement this turn -> normal cost
+ok: kinako: a NON-Liella! member moved -> no discount (group filter is live)
+FAIL:  test_kokoro_cost_copy
+ok: kokoro below threshold: 9 < 10 -> no heart05
+ok: kokoro: the optional discard gate is offered
+ok: kokoro decline: the holder's printed cost is unchanged
+ok: kokoro decline: no heart is granted
+ok: kokoro: no payable DOLLCHESTRA cost target -> no gate at all
+ok: kokoro: without a gate the cost is untouched
+ok: 果南 fixtures resolve
+ok: kanan: the holder stays on stage — exclude_self prevents self-milling
+ok: kanan: without a sacrifice there is no rebirth either
+ok: 朝香果林 bp5-004-R fixtures resolve
+FAIL:  test_karin_livestart_blade4_window
+ok: karin dual window: 「ちょうど4つ」 is an EXACT match, so a blade-1 member is immune
+GAP: yell: with three blade-heart-free reveals, 皐月 gains heart06
+GAP: yell: with three blade-heart-free reveals, Wien gains heart03
+ok: yell: a blade heart in the reveal blocks 皐月's gain
+ok: yell: a blade heart in the reveal blocks Wien's gain
+ok: yell: an ALL blade reveal also blocks 皐月 (Q112)
+ok: yell: an ALL blade reveal also blocks Wien (Q112)
+ok: Solitude Rain fixtures resolve
+ok: solitude rain fixture is discriminating: the mu's fillers add colours Solitude Rain must NOT score
+ok: solitude rain: +1 per heart01..heart06 colour held by 虹ヶ咲 members on stage
+ok: ファンファーレ fixtures resolve
+GAP: fanfare 11a: 15+ みらくらぱーく！ cards moved -> 3 blade on 姫芽
+ok: fanfare 11b: fewer than 15 みらくらぱーく！ cards -> 0 blade
+ok: PL!N-bp3-015-N fixture resolves
+ok: routing: the ライブ開始時 window is reached by name
+FAIL:  test_live_start_choice_routing_both_seats
+
+171 assertions, 28 failures, 5 known gaps
+FAILED: parity_integration  [exit=1, 39 result line(s): assert=39 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=11]

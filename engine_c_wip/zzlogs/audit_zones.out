@@ -1,0 +1,274 @@
+make t-nogate: running T=audit_zones WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_audit_zones src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_audit_zones.c
+./rb_verdict ./rb_engine_t_audit_zones audit_zones
+FAIL: RED-PINNED: RB_MAX_HAND (40) cards in hand is not the end of the road -- Rust Hand is a SmallVec with no bound (zones.rs:890-892, add_card :908-910) and a 60-card deck can legitimately be held; the C bound silently refuses the (RB_MAX_HAND+1)th card
+FAIL: RED-PINNED: 33 distinct appearances in one turn are ALL recorded (stored 32, table capacity 32); the C stops at 32, so the last appearance has no source zone and any source-gated appeared-this-turn condition cannot match it
+FAIL: RED-PINNED: the appearance past the cap is still readable (card 162, zone 0)
+ok: hand: fixture PL!-bp4-003-P resolves to a real card
+ok: hand: the C reader sees a card parked in it via rb_zone_cards [effect.source=hand x88, e.g. PL!HS-bp1-010-N]
+ok: discard: fixture PL!-bp4-003-P resolves to a real card
+ok: discard: the C reader sees a card parked in it via rb_zone_cards [effect.source=discard x171, e.g. PL!-bp4-003-P]
+ok: deck: fixture PL!-bp4-003-P resolves to a real card
+ok: deck: the C reader sees a card parked in it via rb_zone_cards [effect.source=deck x142, e.g. PL!HS-bp1-010-N]
+ok: deck_top: fixture PL!-bp4-003-P resolves to a real card
+ok: deck_top: the C reader sees a card parked in it via rb_zone_cards [effect.source=deck_top x116, e.g. PL!-sd1-011-PR]
+ok: deck_bottom: fixture PL!-bp4-003-P resolves to a real card
+ok: deck_bottom: the C reader sees a card parked in it via rb_zone_cards [effect.source=deck_bottom x9, e.g. PL!S-bp7-004-P]
+ok: stage: fixture PL!-bp4-003-P resolves to a real card
+ok: stage: the C reader sees a card parked in it via rb_get_zone_card_count [effect.source=stage x110, e.g. PL!-PR-007-PR]
+ok: energy_zone: fixture IKZL-PR-001-PR resolves to a real card
+ok: energy_zone: the C reader sees a card parked in it via rb_zone_cards [effect.source=energy_zone x12, e.g. PL!N-bp3-001-P]
+ok: energy_deck: fixture IKZL-PR-001-PR resolves to a real card
+ok: energy_deck reads as EMPTY through both C readers, exactly as Rust does (util.rs:2125 `_ => &[]`); it is writable but not readable, which is why placement has its own arm
+ok: live_card_zone: fixture LL-PR-004-PR resolves to a real card
+ok: live_card_zone: the C reader sees a card parked in it via rb_zone_cards [effect.source=live_card_zone x7, e.g. PL!N-bp4-010-P]
+ok: success_live_zone: fixture LL-PR-004-PR resolves to a real card
+ok: success_live_zone: the C reader sees a card parked in it via rb_zone_cards [effect.destination=success_live_zone x6, e.g. PL!N-bp4-010-P]
+ok: under_member: fixture PL!-bp4-003-P resolves to a real card
+ok: under_member: the C reader sees a card parked in it via rb_get_zone_card_count [effect.destination=under_member x21, e.g. PL!-bp6-003-P]
+ok: waitroom: fixture PL!-bp4-003-P resolves to a real card
+ok: waitroom: the C reader sees a card parked in it via rb_zone_cards [Zone::Waitroom, the discard alias (Rust enums.rs:97)]
+ok: under: fixture PL!-bp4-003-P resolves to a real card
+ok: under: the C reader sees a card parked in it via rb_get_zone_card_count [Zone::UnderMember alias (Rust enums.rs:108)]
+ok: success_live_card_zone: fixture LL-PR-004-PR resolves to a real card
+ok: success_live_card_zone: the C reader sees a card parked in it via rb_zone_cards [SuccessLiveZone alias (Rust enums.rs:104)]
+ok: zone_vocabulary_readable
+ok: rb_zone_id_from_str(the Japanese spelling of "stage") == RB_ZONEID_STAGE (Rust types.rs:757 accepts the same spelling)
+ok: zone_japanese_stage_spelling
+ok: rb_zone_id_from_str("stage") resolves
+ok: rb_zone_id_as_str("stage") returns a string
+ok: rb_zone_id_from_str("hand") resolves
+ok: rb_zone_id_as_str("hand") returns a string
+ok: rb_zone_id_from_str("deck") resolves
+ok: rb_zone_id_as_str("deck") returns a string
+ok: rb_zone_id_from_str("deck_top") resolves
+ok: rb_zone_id_as_str("deck_top") returns a string
+ok: rb_zone_id_from_str("deck_bottom") resolves
+ok: rb_zone_id_as_str("deck_bottom") returns a string
+ok: rb_zone_id_from_str("deck_top_or_bottom") resolves
+ok: rb_zone_id_as_str("deck_top_or_bottom") returns a string
+ok: rb_zone_id_from_str("discard") resolves
+ok: rb_zone_id_as_str("discard") returns a string
+ok: rb_zone_id_from_str("waitroom") resolves
+ok: rb_zone_id_as_str("waitroom") returns a string
+ok: rb_zone_id_from_str("energy") resolves
+ok: rb_zone_id_as_str("energy") returns a string
+ok: rb_zone_id_from_str("energy_deck") resolves
+ok: rb_zone_id_as_str("energy_deck") returns a string
+ok: rb_zone_id_from_str("success_zone") resolves
+ok: rb_zone_id_as_str("success_zone") returns a string
+ok: rb_zone_id_from_str("live_card_zone") resolves
+ok: rb_zone_id_as_str("live_card_zone") returns a string
+ok: rb_zone_id_from_str("success_live_zone") resolves
+ok: rb_zone_id_as_str("success_live_zone") returns a string
+ok: rb_zone_id_from_str("empty_area") resolves
+ok: rb_zone_id_as_str("empty_area") returns a string
+ok: rb_zone_id_from_str("same_area") resolves
+ok: rb_zone_id_as_str("same_area") returns a string
+ok: rb_zone_id_from_str("under_member") resolves
+ok: rb_zone_id_as_str("under_member") returns a string
+ok: rb_zone_id_from_str("under") resolves
+ok: rb_zone_id_as_str("under") returns a string
+ok: rb_zone_id_from_str("looked_at") resolves
+ok: rb_zone_id_as_str("looked_at") returns a string
+ok: rb_zone_id_from_str("looked_at_remaining") resolves
+ok: rb_zone_id_as_str("looked_at_remaining") returns a string
+ok: rb_zone_id_from_str("revealed_cards") resolves
+ok: rb_zone_id_as_str("revealed_cards") returns a string
+ok: rb_zone_id_from_str("selected_cards") resolves
+ok: rb_zone_id_as_str("selected_cards") returns a string
+ok: rb_zone_id_from_str("those_cards") resolves
+ok: rb_zone_id_as_str("those_cards") returns a string
+ok: rb_zone_id_from_str("preceding_moved") resolves
+ok: rb_zone_id_as_str("preceding_moved") returns a string
+ok: rb_zone_id_from_str("recently_moved") resolves
+ok: rb_zone_id_as_str("recently_moved") returns a string
+ok: rb_zone_id_from_str("front") resolves
+ok: rb_zone_id_as_str("front") returns a string
+ok: rb_zone_id_from_str("live_total") resolves
+ok: rb_zone_id_as_str("live_total") returns a string
+ok: rb_zone_id_from_str("resolution") resolves
+ok: rb_zone_id_as_str("resolution") returns a string
+ok: rb_zone_id_from_str("resolution_zone") resolves
+ok: rb_zone_id_as_str("resolution_zone") returns a string
+ok: rb_zone_id_from_str("exclusion_zone") resolves
+ok: rb_zone_id_as_str("exclusion_zone") returns a string
+ok: "energy_zone" maps to the single Rust ZoneId::Energy (types.rs:765)
+ok: KNOWN ASYMMETRY (pinned, not a bug): RB_ZONEID_ENERGY_ZONE is unreachable from any string because Rust has ONE Energy variant
+ok: rb_zone_equivalent: discard == waitroom
+ok: KNOWN ASYMMETRY (pinned): rb_zone_equivalent says success_zone != success_live_zone while rb_zone_id_to_ability_zone maps the former onto the latter (data.c:810) -- Rust keeps them distinct (enums.rs:55 vs :57)
+ok: zone_name_roundtrip
+ok: destination "discard" from "hand" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [effect.destination=discard x136, e.g. PL!HS-bp1-010-N]
+ok: place_discard
+ok: destination "hand" from "discard" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [effect.destination=hand x345, e.g. PL!-bp4-003-P]
+ok: place_hand
+ok: destination "deck_top" from "hand" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [effect.destination=deck_top x33, e.g. PL!-bp3-014-N]
+ok: place_deck_top
+ok: destination "deck_bottom" from "hand" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [effect.destination=deck_bottom x26, e.g. PL!S-bp2-008-P]
+ok: place_deck_bottom
+ok: destination "energy_deck" from "hand" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [cost.destination=energy_deck x6, e.g. PL!SP-bp7-006-P]
+ok: place_energy_deck
+ok: destination "energy_zone" from "hand" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [effect.destination=energy_zone x34, e.g. PL!SP-PR-004-PR]
+ok: place_energy_zone
+ok: destination "live_card_zone" from "hand" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [effect.destination=live_card_zone x2, e.g. PL!HS-bp2-018-N]
+ok: place_live_card_zone
+ok: destination "success_live_zone" from "hand" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [effect.destination=success_live_zone x6, e.g. PL!N-bp4-010-P]
+ok: place_success_live_zone
+ok: destination "same_area" from "discard" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [RED-PINNED: Rust util.rs:2396-2422 SameArea arm; corpus effect.destination=same_area x9, e.g. PL!S-bp3-006-P]
+ok: place_same_area
+ok: destination "deck_top_or_bottom" from "hand" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [RED-PINNED: Rust catch-all util.rs:2442-2449 returns true; corpus x3, e.g. PL!S-bp6-002-P]
+ok: place_deck_top_or_bottom
+ok: destination "front" from "hand" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [RED-PINNED: Rust catch-all util.rs:2442-2449; corpus x1, PL!HS-pb1-014-P+]
+ok: place_front
+ok: destination "under_member" from "hand" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [RED-PINNED: Rust util.rs:2423-2441 UnderMember arm; corpus destination=under_member x21 + cost x5]
+ok: place_under_member
+ok: destination "" from "hand" preserves the census (removed=1 placed=1, census 1 -> 1; Rust util.rs:2337-2450 has no failure arm, so no destination can delete) [RED-PINNED: Rust catch-all util.rs:2443-2445 sends "" to the waitroom and returns true]
+ok: place_empty_destination
+ok: rb_live_can_place_card is true with an empty zone (Rust zones.rs:518)
+ok: rb_live_add_card #1 succeeds inside MAX_LIVE_CARDS
+ok: rb_live_add_card #2 succeeds inside MAX_LIVE_CARDS
+ok: rb_live_add_card #3 succeeds inside MAX_LIVE_CARDS
+ok: live zone holds 3 cards after 3 adds
+ok: rb_live_can_place_card is STILL true at capacity -- Rust applies no capacity rule inside can_place_card (zones.rs:518-521)
+ok: a 4th card enters the live zone (Rust LiveCardZone::add_card pushes unconditionally, zones.rs:533); returning -1 here was a deletion
+ok: the 4th live card is on the board (census 3 -> 4)
+ok: live_zone_has_no_c_invented_capacity
+ok: success zone holds the 3 winning live cards (3)
+ok: a 4th success-zone card is RETAINED, not silently dropped (Rust zones.rs:1002-1004 pushes unconditionally; the old C cap of RB_MAX_LIVE_CARDS deleted it while live.c's own guard allowed it)
+ok: the 4th success card is on the board (census 3 -> 4)
+ok: success_zone_fourth_card_survives
+ok: arm 1 precondition: the main deck is EMPTY
+ok: arm 1: refresh returns 1 with an empty deck and a non-empty waitroom
+ok: arm 1: an ordinary refresh empties the waitroom (0 left)
+ok: arm 1: deck_refreshed_this_turn is set (player.rs:644)
+ok: arm 1: refresh conserves the census (20 -> 20); the old body cleared discard.n unconditionally after copying only what fitted
+ok: arm 2: refresh is a NO-OP while the main deck is non-empty (Rust player.rs:636 requires main_deck.is_empty())
+ok: arm 2: neither zone changed (deck 20->20, waitroom 20->20); the old body spliced 20 waitroom cards under 20 live cards
+ok: arm 2: the census is unchanged (40 -> 40)
+ok: arm 3: refresh is a NO-OP when the waitroom is empty
+ok: refresh_conserves_cards
+ok: exclusion fixture IKZL-PR-001-PR resolves
+ok: exclusion_zone holds BOTH pushes (2) -- Rust zones.rs:1040 pushes unconditionally; the old C dedup scan returned early and held 1
+ok: exclusion_zone_twice_is_two_cards
+ok: an All-bucket (index 7) requirement of 2 with nothing supplied is NOT satisfied (card.rs:4377-4384 iterates All; the old private copy skipped index 7 entirely and answered yes)
+ok: 2 heartless is satisfied by 2 unclaimed blue hearts (card.rs:4392-4401 leftover_sum); the old private copy never tracked `remaining`
+ok: rb_check_heart_requirement refuses a NULL `provided`; that guard is Rust zones.rs:592-594 (`else { false }`), NOT card.rs:4361-4363 -- the empty-need short-circuit has to be the CALLER's, so the exported gate is what has to be right
+ok: an EMPTY requirement is satisfied by an empty stage (card.rs:4361-4363: need.hearts.is_empty() -> true)
+ok: fixture LL-PR-004-PR decodes a non-empty need_heart, so the empty-stage path below is a real branch
+ok: a live card WITH a need_heart scores 0 when the stage provides nothing (Rust zones.rs:592-594 else-false); got 0
+ok: the same card scores once the stage provides exactly its printed need; got 3
+ok: one heart short of the printed need the card scores 0; got 0
+ok: corpus fact: 331 live cards carry a need_heart and 0 carry none, so the empty-need short-circuit is reachable only through a modifier (either way the gate delegates to the one port)
+ok: live_score_heart_gate_matches_rust
+ok: corpus zone string "hand" (x759) -> hand, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "discard" (x502) -> discard, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "stage" (x455) -> stage, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "energy_zone" (x185) -> energy, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "deck_top" (x157) -> deck_top, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "deck" (x144) -> deck, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "revealed_cards" (x92) -> revealed_cards, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "success_live_card_zone" (x81) -> success_live_zone, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "energy_deck" (x52) -> energy_deck, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "preceding_moved" (x44) -> preceding_moved, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "under_member" (x42) -> under_member, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "deck_bottom" (x38) -> deck_bottom, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "live_card_zone" (x37) -> live_card_zone, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "success_live_zone" (x28) -> success_live_zone, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "selected_cards" (x14) -> selected_cards, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "looked_at" (x10) -> looked_at, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "empty_area" (x9) -> empty_area, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "same_area" (x9) -> same_area, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "those_cards" (x7) -> those_cards, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "deck_top_or_bottom" (x3) -> deck_top_or_bottom, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "looked_at_remaining" (x2) -> looked_at_remaining, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "front" (x1) -> front, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: corpus zone string "recently_moved" (x1) -> recently_moved, matching Rust (ability/enums.rs:89-122 / types.rs:765-796)
+ok: the one Japanese corpus zone string -> Stage (types.rs:767)
+ok: the tally adds up: 2674 zone-valued occurrences minus the single non-zone value "activating_card" (got 2673)
+ok: "activating_card" (1 occurrence, a `location` field that names a card role, not a zone) resolves to Unknown -- Rust's `_` arm
+ok: "under" -> UnderMember (types.rs:782 alias arm)
+ok: "resolution_zone" -> Resolution (types.rs:792 alias arm)
+ok: "waitroom" -> Waitroom (its own variant, not folded onto Discard)
+ok: corpus_zone_string_coverage
+ok: rb_zone_of_str("deck_top") -> RB_ZONE_DECK: the caller's top insert IS DeckTop's rule (util.rs:2457-2463)
+ok: rb_zone_of_str("deck_bottom") -> 0 (38 corpus occurrences): refusing is correct, RB_ZONE_DECK would claim "top" for a bottom insert
+ok: rb_zone_of_str("energy_deck") -> 0 (52 corpus occurrences): refusing is correct, RB_ZONE_ENERGY is a different bag
+ok: control: rb_zone_of_str resolves a spellable zone
+ok: rb_zone_of_str refuses an unmapped spelling -> the caller's hand fallback, which is Rust's `place_card_in_zone` catch-all (util.rs:2530)
+ok: zone_of_str_deck_bottom_and_energy_deck
+ok: a clean board satisfies rb_zone_invariant
+ok: an under-card WITH a host satisfies rb_zone_invariant
+ok: an under-card with NO host VIOLATES rb_zone_invariant -- the old body returned 1 here and the orphan is invisible to every reader
+ok: zone_invariant_sees_orphan_under_cards
+ok: a draw into a FULL hand does not delete a card (census 41 -> 41): the old body called rb_zone_draw FIRST and then let rb_hand_add discard the card on the `hand.n < RB_MAX_HAND` test
+ok: the undrawn card stays in the deck when the hand cannot take it (deck 1 -> 1)
+ok: full_hand_draw_does_not_delete
+FAIL:  hand_zone_is_unbounded_like_rust
+== hand_zone_is_unbounded_like_rust: RED as pinned -> CAPACITY GAP (rabuka.h RB_MAX_HAND, not owned by this audit): Rust's hand is an unbounded SmallVec (1 failing assertion(s))
+ok: an empty stage answers CENTRE (util.rs:2542 `stage[1] == -1 -> Some(1)`), not LEFT: the C scanned 0,1,2
+ok: left occupied + centre empty answers CENTRE (util.rs:2542 still first)
+ok: centre occupied + left empty answers LEFT (util.rs:2543), skipping the empty right: the probe is ORDERED, not a search for any vacancy
+ok: left AND centre occupied answers RIGHT (util.rs:2544), the last arm
+ok: a full stage answers -1, which is Rust's `None` (util.rs:2549)
+ok: a null stage array is refused rather than dereferenced
+ok: stage_first_empty_is_centre_first
+ok: stage: fixture PL!-bp4-003-P resolves
+ok: stage: placement returns true (util.rs:2455)
+ok: stage with no vacated area lands in the CENTRE (util.rs:2447 + :2542); left is still empty (left=-1)
+ok: stage: no other stage slot is touched
+ok: stage: the card is on the board, not destroyed (census 0 -> 1)
+ok: empty_area: fixture PL!-bp4-003-P resolves
+ok: empty_area: placement returns true (util.rs:2455)
+ok: empty_area with no vacated area lands in the CENTRE (util.rs:2447 + :2542); left is still empty (left=-1)
+ok: empty_area: no other stage slot is touched
+ok: empty_area: the card is on the board, not destroyed (census 0 -> 1)
+ok: an explicitly vacated LEFT area is still honoured (util.rs:2492-2495 same_area arm), so the centre-first probe does not override a named area
+ok: place_stage_lands_in_the_centre
+ok: fixture PL!-bp4-003-P resolves
+ok: rb_decode_card_by_index succeeds for PL!-bp4-003-P
+ok: Card.name is populated and non-empty ("南 ことり")
+ok: Card.card_no_idx is a live index (403)
+ok: Card.name_idx is a live index (202)
+ok: Card.type_flags low 2 bits are a valid card type (8 & 3 = 0; 0=member 1=live 2=energy, and Rust maps the out-of-range 3 onto member too, card_binary.rs:142-147)
+ok: the decoded type agrees with the accessors: PL!-bp4-003-P is a member
+ok: Card.n_hearts (2) covers the base-heart section (num_base 1)
+ok: Card.n_hearts (2) never exceeds RB_MAX_HEARTS (64) even when the record is truncated
+ok: Card.ability is NULL after rb_decode_card_by_index -- DOCUMENTED SHAPE, not a gap: Rust's Card::from_dbf_record does not attach abilities either (card_loader.rs attach_abilities is a second pass, mirrored by rb_decode_card_ability)
+ok: the card really does carry 1 ability record(s), so the NULL above is the deferred-attach contract and not a missing record
+ok: Card.ability_idx / rb_card_ability_idx IS populated on the decode path, so the record is not missing the ability, only the parsed form
+ok: Card.has_special is false unless a non-zero special_count was read (has_special=0 special_count=0)
+ok: card_record_field_population
+ok: the card database is loaded (2639 records)
+ok: rb_card_stridx(0) is a live index (2)
+ok: rb_card_stridx(2640) == 0xFFFF, the absent marker compile_cards.py already writes for a missing field (cards/compile_cards.py:85, :89); the old body returned 0
+ok: rb_card_string(rb_card_stridx(out-of-range)) is EMPTY, not string 0 -- index 0 is a real interned string, so the old value produced a silently wrong card name (got "")
+ok: rb_card_ability_idx(out-of-range) == 0xFFFF, consistent with rb_card_stridx
+ok: card_stridx_absent_marker
+ok: the corpus has cards WITH a unit (2198)
+ok: the corpus has cards WITHOUT a unit (441)
+ok: rb_card_unit_name is "" for EVERY absent-unit card (441/441)
+ok: rb_card_unit_name returns the real unit for EVERY card that has one (2198/2198)
+ok: card_unit_accessor
+ok: cards.json has NO `group` key, so every group is derived (0 stored)
+ok: rb_card_group_name equals the stored string or the series-derived constant for EVERY record: 2639 agree, 0 disagree; 90 records have a series that maps to no group and correctly yield ""
+ok: derived_group_agrees_with_series
+ok: the derived Nijigasaki group uses the SMALL ke U+30F6 (E3 83 B6)
+ok: a literal typed with the FULL ke U+8671 (E8 99 B1) does NOT compare equal -- writing one anywhere makes that filter a silent no-op
+ok: cards.bin carries BOTH spellings of the same unit (51 with U+FF01, 45 with ASCII '!'), so a filter written in one form must match cards stored in the other
+ok: group_literal_bytes
+ok: control: the move itself conserves the census (1 -> 1)
+ok: RED-PINNED: after a hand -> discard move, GameState.recently_moved_from_zone names the SOURCE zone (rabuka.h:1555 says it feeds TriggerEvent.moved_from_zone); nothing in src/ writes the field, so every source-gated idoutsuuji condition is unreachable
+ok: recently_moved_from_zone_is_written
+FAIL:  appearance_source_recording_is_bounded
+== appearance_source_recording_is_bounded: RED as pinned -> ENGINE BUG (rabuka.h, not owned by this audit): the appearance-source table stops at 32 entries (2 failing assertion(s))
+
+35 cases, 223 assertions, 3 failures
+ZONE/CARD-RECORD AUDIT: RED -- open gaps listed above
+FAILED: audit_zones  [exit=1, 5 result line(s): assert=5 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=2]
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

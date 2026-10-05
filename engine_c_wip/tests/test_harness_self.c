@@ -130,7 +130,7 @@ static int failures;
  * that has grown four times: it buys the next append time without pretending
  * the append is free.
  */
-#define RB_GAMESTATE_BYTES_PINNED1090528u
+#define RB_GAMESTATE_BYTES_PINNED 1090528u
 #define RB_MIN_SAFE_LOCALS         14
 
 /* Parse the FIRST `-Wl,--stack,N` out of the Makefile. Returns 0 if the file

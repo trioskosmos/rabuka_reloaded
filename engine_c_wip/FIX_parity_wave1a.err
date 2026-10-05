@@ -1,0 +1,325 @@
+tests/test_parity_wave1a.c:857:16: warning: '/*' within comment [-Wcomment]
+  857 |  * "cards/build/*.bin").  The string table is an UNSEPARATED interned pool --
+--- pipeline input: ../cards/build/abilities_strings.bin       726742 bytes
+--- pipeline input: ../cards/build/abilities.bin               98809 bytes
+--- pipeline input: src/core/generated/bytecode_blob.c         267001 bytes
+--- pipeline skew: manifest output.bytes=0  abilities.bin=98809  -> UNVERIFIABLE HERE (the isolated build root carries only cards.bin and abilities_strings.bin, not the manifest / abilities.bin).  The skew itself is real and was measured in the repo: manifest output.bytes=98509 at HEAD / 98542 in the working tree while cards/build/abilities.bin is 98537 bytes and bytecode_blob.c is a COMMITTED file matching HEAD.  See the BUILD-PIPELINE SKEW REPORT in the file header.
+--- heart index map (rb_heart_color_as_str) ---
+    index 0 -> "heart00" -> enum 0
+    index 1 -> "heart01" -> enum 1
+    index 2 -> "heart02" -> enum 2
+    index 3 -> "heart03" -> enum 3
+    index 4 -> "heart04" -> enum 4
+    index 5 -> "heart05" -> enum 5
+    index 6 -> "heart06" -> enum 6
+--- group / unit names (rb_card_group_name is SERIES level; group_idx is empty for ALL 2,639 cards) ---
+    PL!-pb2-021-N          id=449    group="μ's" unit="Printemps" cost=4 score=0
+    PL!-sd1-010-SD         id=498    group="μ's" unit="Printemps" cost=4 score=0
+    PL!-pb2-041-L          id=469    group="μ's" unit="lily white" cost=0 score=7
+    PL!-pb1-029-SRL        id=355    group="μ's" unit="lily white" cost=0 score=1
+    PL!-pb2-003-PP         id=415    group="μ's" unit="Printemps" cost=9 score=0
+    PL!-bp6-001-P          id=253    group="μ's" unit="Printemps" cost=2 score=0
+    PL!-bp6-017-N          id=286    group="μ's" unit="Printemps" cost=2 score=0
+    PL!-pb2-005-PP         id=419    group="μ's" unit="lily white" cost=5 score=0
+    PL!-bp6-017-N          id=286    group="μ's" unit="Printemps" cost=2 score=0
+    PL!S-bp5-012-N         id=1736   group="Aqours" unit="AZALEA" cost=2 score=0
+    PL!-bp4-026-L          id=170    group="μ's" unit="BiBi" cost=0 score=1
+    PL!-bp4-024-L          id=166    group="μ's" unit="Printemps" cost=0 score=2
+    PL!HS-bp1-019-L        id=608    group="蓮ノ空" unit="" cost=0 score=1
+    PL!SP-bp4-023-L        id=2205   group="Liella!" unit="" cost=0 score=8
+    PL!HS-pb1-023-N        id=856    group="蓮ノ空" unit="EdelNote" cost=15 score=0
+    PL!-sd1-006-SD         id=494    group="μ's" unit="BiBi" cost=9 score=0
+    PL!SP-pb1-001-R        id=2371   group="Liella!" unit="CatChu!" cost=11 score=0
+    PL!SP-sd1-002-SD       id=2555   group="Liella!" unit="KALEIDOSCORE" cost=11 score=0
+    PL!N-bp1-021-N         id=1017   group="虹ヶ咲" unit="QU4RTZ" cost=4 score=0
+    PL!-sd1-020-SD         id=511    group="μ's" unit="" cost=0 score=2
+    PL!-sd1-019-SD         id=509    group="μ's" unit="" cost=0 score=1
+    PL!N-bp1-027-L         id=1026   group="虹ヶ咲" unit="" cost=0 score=0
+    PL!N-bp7-030-L         id=1310   group="虹ヶ咲" unit="" cost=0 score=0
+        [census] whole-board card count after setup = 13
+        [info] A1 after the wait-branch fire: orientation="wait" blade=0 pending=0
+        [census] whole-board card count still 13 (the 自動 fire)
+FAIL: A1: the wait branch of the `or` grants exactly one blade (got 0 expected 1)
+FAIL: A1: the wait branch of the `or` also makes her active (orientation is "wait")
+        [census] whole-board card count after setup = 12
+        [census] whole-board card count still 12 (a bare recalculation)
+        [census] whole-board card count after setup = 13
+        [census] whole-board card count still 13 (the twin-identity setup)
+        [info] A3 control: after firing for the STAGED twin, eri blade=0, other blade=0
+FAIL: A3 CONTROL: on this very board the STAGED instance DOES gain a blade, so the un-staged twin's zero is a real scoping result and not a dead engine
+A4 wait-branch  condition(variant=7) {
+A4 wait-branch   cond.variant=7 field[0] state = "wait"
+A4 wait-branch   cond.variant=7 field[1] from_state = "active"
+A4 wait-branch   cond.variant=7 field[2] to_state = "wait"
+A4 wait-branch   cond.variant=7 field[3] temporal = "this_turn"
+A4 wait-branch   cond.variant=7 field[4] temporal_scope = "this_turn"
+A4 wait-branch   cond.variant=7 field[5] card_type = "member_card"
+A4 wait-branch   cond.variant=7 field[6] self_target = (tag 2)
+A4 wait-branch   cond.variant=7 field[7] target = "self"
+A4 wait-branch   cond.variant=7 field[8] text = "自分のカードの効果によってウェイト状態になったとき"
+A4 wait-branch  }
+        [info] A4 wait-branch self_target decoded as 1
+A5 cost-branch  condition(variant=2) {
+A5 cost-branch   cond.variant=2 field[0] paid_cost_this_turn = (tag 2)
+A5 cost-branch   cond.variant=2 field[1] self_target = (tag 2)
+A5 cost-branch   cond.variant=2 field[2] card_type = "member_card"
+A5 cost-branch   cond.variant=2 field[3] target = "self"
+A5 cost-branch   cond.variant=2 field[4] text = "このメンバーが、自分のカードの能力のコストを支払うため"
+A5 cost-branch  }
+        [info] A5 cost-branch variant=2
+        [info] B1 PL!-pb2-041-L group="μ's" unit="lily white"
+B1 effect action="count_as_multiple" count=2 src=success_live_zone dst=- target=self card_type=live_card is_optional=0 n_child=0 n_options=0 has_cond=1
+B1   extra[0] duration = as_long_as
+B1   extra[1] conditional = true
+B1   extra[2] self_target = true
+B1   extra[3] count_as = 2
+B1   extra[4] counted_by = lily white
+B1  condition(variant=1) {
+B1   cond.variant=1 field[0] text = "このカードが自分の成功ライブカード置き場にあるかぎり"
+B1   cond.variant=1 field[1] target = "self"
+B1   cond.variant=1 field[2] location = "success_live_card_zone"
+B1   cond.variant=1 field[3] card_type = "live_card"
+B1   cond.variant=1 field[4] check_self = (tag 2)
+B1   cond.variant=1 field[5] self_target = (tag 2)
+B1  }
+        [info] B1 extras: count_as=2 counted_by=lily white group_names=(absent)
+        [zone] success (seeded)       n=1 : PL!-pb2-041-L
+        [zone] live                   n=1 : PL!-pb2-041-L
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=modify_score
+        [zone] success (at assertion) n=1 : PL!-pb2-041-L
+        [census] whole-board card count after setup = 28
+        [info] B2 score modifier on PL!-pb2-041-L = 0
+FAIL: B2: alone in the success live card zone this card is ONE lily white card against a 2-above threshold, so the 常時 weight is the only thing that can satisfy it, and the +1 must follow (got 0 expected 1)
+        [census] whole-board card count still 28 (the phase flow to performance)
+        [zone] live                   n=1 : PL!-pb2-041-L
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=modify_score
+        [zone] success (at assertion) n=0 :
+        [info] B2 CONTROL (empty success zone) score modifier = 0, zone n=0
+        [zone] success (seeded)       n=2 : PL!-pb1-029-SRL PL!-pb2-041-L
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=modify_score
+        [zone] success (at assertion) n=2 : PL!-pb1-029-SRL PL!-pb2-041-L
+        [census] whole-board card count after setup = 29
+        [info] B3 score modifier on PL!-pb2-041-L = 1, lw1 score modifier = 0
+        [census] whole-board card count still 29 (the two-card success zone flow)
+        [info] C1 PL!-bp6-001-P has ライブ成功時: 1 | PL!-bp6-017-N has ライブ成功時: 0
+[DBG_INVAL] actor=0 act=2641 tt=ライブ成功時 dur=live_end tgt=opponent ct=member_card gn=- self=
+        [info] C fire: ab#0 use_limit=-1 uses_used=0 queue_n=0 prompts since control point=0
+        [census] whole-board card count after setup = 46
+        [info] C2 heart03=1 invalidations=1 invalidate(opp,ライブ成功時)=0
+FAIL: C2: a target prompt was open at the assertion site
+FAIL: [VACUOUS]  C2: the target selection really was prompted -- without a prompt the heart could not be attributable to this ability - 0 prompt(s) were produced after the                            control point, need at least 1
+        [info] C2: invalidations=1, target prompt=0, prompts produced by the fire=0
+        [census] whole-board card count still 46 (the invalidating fire)
+[DBG_INVAL] actor=0 act=2641 tt=ライブ成功時 dur=live_end tgt=opponent ct=member_card gn=- self=
+        [info] C fire: ab#0 use_limit=-1 uses_used=0 queue_n=0 prompts since control point=0
+        [census] whole-board card count after setup = 46
+        [info] C3 heart03=1 invalidations=0 prompted=0
+FAIL: C3: a target prompt WAS offered -- the card text names no group filter, so C2 and C3 reach the engine identically up to the answer
+FAIL: C3: 「これにより無効にした場合」 -- a target with no ライブ成功時 ability gains nothing (got 1 expected 0)
+        [census] whole-board card count still 46 (the non-invalidating fire)
+[DBG_INVAL] actor=0 act=2641 tt=ライブ成功時 dur=live_end tgt=opponent ct=member_card gn=- self=
+        [info] C fire: ab#0 use_limit=-1 uses_used=0 queue_n=0 prompts since control point=0
+        [census] whole-board card count after setup = 46
+        [info] C4 heart03=1 invalidations=0 prompted=0 p1 stage_len=1 p2 stage_len=0
+FAIL: C4: with no opponent member there is nothing to invalidate, so the conditional heart is not granted (got 1 expected 0)
+        [census] whole-board card count still 46 (the own-stage setup)
+        [zone] success (seeded)       n=1 : PL!-bp4-026-L
+[DBG_GAIN] actor=0 host=2643 act=gain_ability ag=【常時】自分のステージにいる『μ's』のメンバーは、【ブレード】を得る。 gat=常時 ge=yes ge_act=gain_resource ge_tgt=self ge_cnt=-1 src=stage ct=member_card gn=μ's self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=self action=gain_resource value=- nex=4
+[DBG_GAIN_INNER_KV] group_names = μ's
+[DBG_GAIN_INNER_KV] resource = blade
+[DBG_GAIN_INNER_KV] all = true
+[DBG_GAIN_INNER_KV] duration = live_end
+[RESUME_ANY] kind=1 zone=stage target=gain_ability_targets route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00196240 target=0x0 eff=0xa00196240 cur=0 n=0 state=0 pending=1
+[STAGE_TARGET_RESULT] pick=1 slot=2 cid=2640 target=gain_ability_targets
+[RESUME_EXEC] def=0xa00196240 action=gain_ability is_cost=0 host=2643
+[DBG_GAIN] actor=0 host=2643 act=gain_ability ag=【常時】自分のステージにいる『μ's』のメンバーは、【ブレード】を得る。 gat=常時 ge=yes ge_act=gain_resource ge_tgt=self ge_cnt=-1 src=stage ct=member_card gn=μ's self_tgt= nsel=1 cond=1
+[DBG_GAIN_INNER] count=-1 target=self action=gain_resource value=- nex=4
+[DBG_GAIN_INNER_KV] group_names = μ's
+[DBG_GAIN_INNER_KV] resource = blade
+[DBG_GAIN_INNER_KV] all = true
+[DBG_GAIN_INNER_KV] duration = live_end
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+        [info] D after debut: rin blade=0 ally blade=1 non_mus blade=0 (rin at stage[1]=yes) uses(rin,0)=0
+        [census] whole-board card count after setup = 38
+        [zone] success (at assertion) n=1 : PL!-bp4-026-L
+FAIL: D1: she is a mu's member too, so the gained constant applies to her (got 0 expected 1)
+        [census] whole-board card count still 38 (the debut + recalculation)
+        [zone] success (seeded)       n=1 : PL!-bp4-024-L
+        [info] D after debut: rin blade=0 ally blade=0 non_mus blade=0 (rin at stage[1]=yes) uses(rin,0)=0
+        [census] whole-board card count after setup = 38
+        [zone] success (at assertion) n=1 : PL!-bp4-024-L
+        [census] whole-board card count still 38 (the no-icon debut)
+        [zone] success (seeded)       n=1 : PL!HS-bp1-019-L
+[DBG_GAIN] actor=0 host=2643 act=gain_ability ag=【常時】自分のステージにいる『μ's』のメンバーは、【ブレード】を得る。 gat=常時 ge=yes ge_act=gain_resource ge_tgt=self ge_cnt=-1 src=stage ct=member_card gn=μ's self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=self action=gain_resource value=- nex=4
+[DBG_GAIN_INNER_KV] group_names = μ's
+[DBG_GAIN_INNER_KV] resource = blade
+[DBG_GAIN_INNER_KV] all = true
+[DBG_GAIN_INNER_KV] duration = live_end
+[RESUME_ANY] kind=1 zone=stage target=gain_ability_targets route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00196240 target=0x0 eff=0xa00196240 cur=0 n=0 state=0 pending=1
+[STAGE_TARGET_RESULT] pick=1 slot=2 cid=2640 target=gain_ability_targets
+[RESUME_EXEC] def=0xa00196240 action=gain_ability is_cost=0 host=2643
+[DBG_GAIN] actor=0 host=2643 act=gain_ability ag=【常時】自分のステージにいる『μ's』のメンバーは、【ブレード】を得る。 gat=常時 ge=yes ge_act=gain_resource ge_tgt=self ge_cnt=-1 src=stage ct=member_card gn=μ's self_tgt= nsel=1 cond=1
+[DBG_GAIN_INNER] count=-1 target=self action=gain_resource value=- nex=4
+[DBG_GAIN_INNER_KV] group_names = μ's
+[DBG_GAIN_INNER_KV] resource = blade
+[DBG_GAIN_INNER_KV] all = true
+[DBG_GAIN_INNER_KV] duration = live_end
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+        [info] D after debut: rin blade=0 ally blade=1 non_mus blade=0 (rin at stage[1]=yes) uses(rin,0)=0
+        [census] whole-board card count after setup = 38
+        [zone] success (at assertion) n=1 : PL!HS-bp1-019-L
+FAIL: D3: a DOLLCHESTRA live carrying the score icon fails the group filter (got 1 expected 0)
+        [census] whole-board card count still 38 (the wrong-group debut)
+        [zone] success (seeded)       n=0 :
+[DBG_GAIN] actor=0 host=2642 act=gain_ability ag=【常時】自分のステージにいる『μ's』のメンバーは、【ブレード】を得る。 gat=常時 ge=yes ge_act=gain_resource ge_tgt=self ge_cnt=-1 src=stage ct=member_card gn=μ's self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=self action=gain_resource value=- nex=4
+[DBG_GAIN_INNER_KV] group_names = μ's
+[DBG_GAIN_INNER_KV] resource = blade
+[DBG_GAIN_INNER_KV] all = true
+[DBG_GAIN_INNER_KV] duration = live_end
+[RESUME_ANY] kind=1 zone=stage target=gain_ability_targets route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00196240 target=0x0 eff=0xa00196240 cur=0 n=0 state=0 pending=1
+[STAGE_TARGET_RESULT] pick=1 slot=2 cid=2640 target=gain_ability_targets
+[RESUME_EXEC] def=0xa00196240 action=gain_ability is_cost=0 host=2642
+[DBG_GAIN] actor=0 host=2642 act=gain_ability ag=【常時】自分のステージにいる『μ's』のメンバーは、【ブレード】を得る。 gat=常時 ge=yes ge_act=gain_resource ge_tgt=self ge_cnt=-1 src=stage ct=member_card gn=μ's self_tgt= nsel=1 cond=1
+[DBG_GAIN_INNER] count=-1 target=self action=gain_resource value=- nex=4
+[DBG_GAIN_INNER_KV] group_names = μ's
+[DBG_GAIN_INNER_KV] resource = blade
+[DBG_GAIN_INNER_KV] all = true
+[DBG_GAIN_INNER_KV] duration = live_end
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+        [info] D after debut: rin blade=0 ally blade=1 non_mus blade=0 (rin at stage[1]=yes) uses(rin,0)=0
+        [census] whole-board card count after setup = 37
+        [zone] success (at assertion) n=0 :
+FAIL: D4: no cards in the success zone, so the ability is not gained (got 1 expected 0)
+        [census] whole-board card count still 37 (the empty-zone debut)
+        [zone] success (seeded)       n=0 :
+[DBG_GAIN] actor=0 host=2642 act=gain_ability ag=【常時】自分のステージにいる『μ's』のメンバーは、【ブレード】を得る。 gat=常時 ge=yes ge_act=gain_resource ge_tgt=self ge_cnt=-1 src=stage ct=member_card gn=μ's self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=self action=gain_resource value=- nex=4
+[DBG_GAIN_INNER_KV] group_names = μ's
+[DBG_GAIN_INNER_KV] resource = blade
+[DBG_GAIN_INNER_KV] all = true
+[DBG_GAIN_INNER_KV] duration = live_end
+[RESUME_ANY] kind=1 zone=stage target=gain_ability_targets route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00196240 target=0x0 eff=0xa00196240 cur=0 n=0 state=0 pending=1
+[STAGE_TARGET_RESULT] pick=1 slot=2 cid=2640 target=gain_ability_targets
+[RESUME_EXEC] def=0xa00196240 action=gain_ability is_cost=0 host=2642
+[DBG_GAIN] actor=0 host=2642 act=gain_ability ag=【常時】自分のステージにいる『μ's』のメンバーは、【ブレード】を得る。 gat=常時 ge=yes ge_act=gain_resource ge_tgt=self ge_cnt=-1 src=stage ct=member_card gn=μ's self_tgt= nsel=1 cond=1
+[DBG_GAIN_INNER] count=-1 target=self action=gain_resource value=- nex=4
+[DBG_GAIN_INNER_KV] group_names = μ's
+[DBG_GAIN_INNER_KV] resource = blade
+[DBG_GAIN_INNER_KV] all = true
+[DBG_GAIN_INNER_KV] duration = live_end
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+        [info] D after debut: rin blade=0 ally blade=1 non_mus blade=0 (rin at stage[1]=yes) uses(rin,0)=0
+        [census] whole-board card count after setup = 37
+FAIL: D5 step 1: precondition -- debuted with an empty success zone (got 1 expected 0)
+        [zone] success (after late add) n=1 : PL!-bp4-026-L
+        [info] D5 zone went 0 -> 1, ally blade=1
+        [census] whole-board card count 37 -> 38 (delta 1, as expected: one card entering the success live card zone)
+FAIL: D5: the 登場 evaluated the condition once at debut; a card arriving afterwards does not retroactively grant the ability (got 1 expected 0)
+        [zone] success (seeded)       n=2 : PL!-bp4-026-L PL!-pb1-029-SRL
+[DBG_GAIN] actor=0 host=2644 act=gain_ability ag=【常時】自分のステージにいる『μ's』のメンバーは、【ブレード】を得る。 gat=常時 ge=yes ge_act=gain_resource ge_tgt=self ge_cnt=-1 src=stage ct=member_card gn=μ's self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=self action=gain_resource value=- nex=4
+[DBG_GAIN_INNER_KV] group_names = μ's
+[DBG_GAIN_INNER_KV] resource = blade
+[DBG_GAIN_INNER_KV] all = true
+[DBG_GAIN_INNER_KV] duration = live_end
+[RESUME_ANY] kind=1 zone=stage target=gain_ability_targets route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00196240 target=0x0 eff=0xa00196240 cur=0 n=0 state=0 pending=1
+[STAGE_TARGET_RESULT] pick=1 slot=2 cid=2640 target=gain_ability_targets
+[RESUME_EXEC] def=0xa00196240 action=gain_ability is_cost=0 host=2644
+[DBG_GAIN] actor=0 host=2644 act=gain_ability ag=【常時】自分のステージにいる『μ's』のメンバーは、【ブレード】を得る。 gat=常時 ge=yes ge_act=gain_resource ge_tgt=self ge_cnt=-1 src=stage ct=member_card gn=μ's self_tgt= nsel=1 cond=1
+[DBG_GAIN_INNER] count=-1 target=self action=gain_resource value=- nex=4
+[DBG_GAIN_INNER_KV] group_names = μ's
+[DBG_GAIN_INNER_KV] resource = blade
+[DBG_GAIN_INNER_KV] all = true
+[DBG_GAIN_INNER_KV] duration = live_end
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+        [info] D after debut: rin blade=0 ally blade=1 non_mus blade=0 (rin at stage[1]=yes) uses(rin,0)=0
+        [census] whole-board card count after setup = 39
+        [zone] success (at assertion) n=2 : PL!-bp4-026-L PL!-pb1-029-SRL
+        [census] whole-board card count still 39 (the two-card debut)
+        [info] E after 5 passes: phase=LiveCardSet
+        [zone] live                   n=1 : PL!SP-bp4-023-L
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2648 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2648 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2648 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=hand target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001985d0 cur=1 n=2 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=1 n=2 cid=2648 ab=1 actor=0 action=set_blade_type
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=8
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,1,0,9,4,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[8,0,0,0,0,0,11,0] filled=[0,3,0,1,0,9,4,0]
+        [info] E after the yell: phase=PerformanceSecond n_snapshots=1 pending=0 blades(host)=0 blades(extra)=0
+        [census] whole-board card count after setup = 52
+        [snap] n_yell_cards=8 note_icons=1 yell_blade_hearts=[0,0,0,0,0,7,0,0]
+        [snap] reveals: PL!-sd1-013-SD PL!S-PR-017-PR PL!-sd1-010-SD PL!S-PR-015-PR PL!S-bp2-015-PR PL!N-bp1-021-N PL!-sd1-020-SD PL!-sd1-019-SD
+FAIL: E1: every listed blade heart was recoloured TO purple, so nothing is left at indices 1..5 (got 7 expected 0)
+FAIL: E1: exactly the revealed listed cards carry a purple blade heart at index 6 (got 0 expected 7)
+        [census] whole-board card count still 52 (the Dazzling yell)
+        [info] E after 5 passes: phase=LiveCardSet
+        [zone] live                   n=1 : PL!SP-bp4-023-L
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2643 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2643 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2643 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=hand target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001985d0 cur=1 n=2 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=1 n=2 cid=2643 ab=1 actor=0 action=set_blade_type
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=8
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[2,3,0,1,0,9,4,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[8,0,0,0,0,0,11,0] filled=[2,3,0,1,0,9,4,0]
+        [info] E after the yell: phase=PerformanceSecond n_snapshots=1 pending=0 blades(host)=0 blades(extra)=0
+        [census] whole-board card count after setup = 52
+        [snap] n_yell_cards=8 note_icons=0 yell_blade_hearts=[2,0,0,0,0,7,0,0]
+FAIL: E2: the draw-icon card's blade heart left index 5 (got 7 expected 0)
+FAIL: E2: only the draw-icon card carries a recoloured purple blade heart; the colorless card gains none (got 0 expected 1)
+        [census] whole-board card count still 52 (the Dazzling yell (draw/colorless board))
+        [info] E3 kanon group="Liella!" unit="CatChu!" | liella group="Liella!" unit="KALEIDOSCORE" | third group="μ's"
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2641 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=3 cid=2640 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=hand target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001985d0 cur=1 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=1 n=3 cid=2640 ab=1 actor=0 action=set_blade_type
+[QUEUE_EXEC] idx=2 n=3 cid=2641 ab=0 actor=0 action=conditional_on_optional
+        [census] whole-board card count after setup = 84
+FAIL: E3: the first member selection must be prompted
+FAIL: E3: expected a SelectCard stage prompt (got "")
+FAIL: E3: the exclude_selected second selection must be prompted
+FAIL: E3: expected a SelectCard stage prompt on the second selection (got "")
+FAIL: [VACUOUS]  E3: a SECOND real prompt was offered (a single-prompt board would make the first CHECK vacuous) - 1 prompt(s) were produced after the                            control point, need at least 2
+        [info] E3 blades: kanon=0 liella=0 third=0
+FAIL: E3: Kanon gains a blade from Dazzling Game
+FAIL: E3: the other Liella! member gains a blade from Dazzling Game
+        [census] whole-board card count still 84 (the two sequential selections)
+25 failure(s) across 0 crashed case(s)
+make[2]: *** [Makefile:515: t-run] エラー 1
+make[1]: *** [Makefile:354: t] エラー 2
+make: *** [Makefile:536: t-nogate] エラー 2

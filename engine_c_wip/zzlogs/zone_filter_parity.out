@@ -1,0 +1,54 @@
+make t-nogate: running T=zone_filter_parity WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_zone_filter_parity src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_zone_filter_parity.c
+./rb_verdict ./rb_engine_t_zone_filter_parity zone_filter_parity
+ok: known ability zone maps to a zone id
+ok: zone id maps back to ability zone
+ok: ability zone round trip preserves zone
+ok: known ability zone maps to a zone id
+ok: zone id maps back to ability zone
+ok: ability zone round trip preserves zone
+ok: known ability zone maps to a zone id
+ok: zone id maps back to ability zone
+ok: ability zone round trip preserves zone
+ok: known ability zone maps to a zone id
+ok: zone id maps back to ability zone
+ok: ability zone round trip preserves zone
+ok: known ability zone maps to a zone id
+ok: zone id maps back to ability zone
+ok: ability zone round trip preserves zone
+ok: known ability zone maps to a zone id
+ok: zone id maps back to ability zone
+ok: ability zone round trip preserves zone
+ok: known ability zone maps to a zone id
+ok: zone id maps back to ability zone
+ok: ability zone round trip preserves zone
+ok: energy alias resolves
+ok: energy_zone alias resolves
+ok: discard resolves
+ok: waitroom resolves
+ok: discard and waitroom are equivalent
+ok: energy and energy_zone are equivalent
+ok: unknown combined zone resolves to unknown
+ok: empty zone resolves to unknown
+ok: targeting fixture cards resolve
+ok: self-excluding group filter returns two members
+ok: self-excluding group filter returns the two outer members
+ok: turn one live phase satisfies both temporal gates
+ok: turn two fails the turn-number gate
+ok: turn one main phase fails the phase gate
+ok: missing phase constraint remains backward compatible
+ok: deck content parser accepts supported formats
+ok: deck parser expands quantities
+ok: prefix quantity card is first
+ok: suffix quantity card follows
+ok: bare card has quantity one
+ok: card number normalization accepts surrounding whitespace
+ok: card number normalization strips rarity suffix
+ok: card number normalization accepts exclamation suffix
+ok: card number normalization strips fullwidth exclamation suffix
+ALL ZONE AND FILTER CHECKS PASSED
+PASSED: zone_filter_parity  [exit=0, 0 result line(s), renormalised=0]

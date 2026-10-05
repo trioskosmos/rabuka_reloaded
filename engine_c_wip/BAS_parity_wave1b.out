@@ -1,0 +1,82 @@
+make t-nogate: running T=parity_wave1b WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_wave1b src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_wave1b.c
+./rb_verdict ./rb_engine_t_parity_wave1b parity_wave1b
+--- A1 hs_pb1_001_jidou_activated_energy_funds_live_start_payment ---
+        a1_jidou_energy_is_exactly_what_live_start_pays: 5 failure(s), 0 setup bug(s)
+FAIL:   a1_jidou_energy_is_exactly_what_live_start_pays
+        a2_declining_jidou_leaves_live_start_unable_to_pay: 1 failure(s), 0 setup bug(s)
+FAIL:   a2_declining_jidou_leaves_live_start_unable_to_pay
+--- A3 hs_pb1_003_turn2_second_discard_event_grants_again ---
+        a3_two_separate_discard_events_in_one_turn_grant_twice: 0 failure(s), 0 setup bug(s)
+ok       a3_two_separate_discard_events_in_one_turn_grant_twice
+        a4_batch_of_three_is_one_event_and_keeps_the_second_allowance: 0 failure(s), 0 setup bug(s)
+ok       a4_batch_of_three_is_one_event_and_keeps_the_second_allowance
+        a5_turn2_refuses_a_third_event_in_one_turn: 0 failure(s), 0 setup bug(s)
+ok       a5_turn2_refuses_a_third_event_in_one_turn
+--- A6 hs_pb1_009_jidou_blades_charge_live_start_threshold ---
+        a6_one_appearance_grants_blade_to_host_below_threshold: 1 failure(s), 0 setup bug(s)
+FAIL:   a6_one_appearance_grants_blade_to_host_below_threshold
+        a7_printed_blade_alone_does_not_fire_live_start: 0 failure(s), 0 setup bug(s)
+ok       a7_printed_blade_alone_does_not_fire_live_start
+        a8_two_appearances_reach_the_live_start_blade_threshold: 0 failure(s), 0 setup bug(s)
+ok       a8_two_appearances_reach_the_live_start_blade_threshold
+        a9_blades_land_on_the_host_so_the_condition_reads_them: 1 failure(s), 0 setup bug(s)
+FAIL:   a9_blades_land_on_the_host_so_the_condition_reads_them
+        a10_turn_two_reopens_the_allowance_so_two_more_grant_plus_four: 0 failure(s), 0 setup bug(s)
+ok       a10_turn_two_reopens_the_allowance_so_two_more_grant_plus_four
+--- A11 rurino_stage_to_waitroom_watcher_baseline ---
+        a11_rurino_stage_to_waitroom_draws_exactly_two: 2 failure(s), 0 setup bug(s)
+FAIL:   a11_rurino_stage_to_waitroom_draws_exactly_two
+--- A12 sp_bp5_005_mill_arms_jidou_recover ---
+        a12_mill_arms_jidou_recover_and_its_blade_counts_the_same_batch: 4 failure(s), 0 setup bug(s)
+FAIL:   a12_mill_arms_jidou_recover_and_its_blade_counts_the_same_batch
+        a13_declining_jidou_recover_keeps_the_mills_blade_but_recovers_nothing: 2 failure(s), 0 setup bug(s)
+FAIL:   a13_declining_jidou_recover_keeps_the_mills_blade_but_recovers_nothing
+--- A14 yell_real_yell_no_blade_heart_grants_heart ---
+        a14_wien_real_yell_with_no_blade_heart_grants_heart03: 1 failure(s), 0 setup bug(s)
+FAIL:   a14_wien_real_yell_with_no_blade_heart_grants_heart03
+        a15_sumire_real_yell_with_no_blade_heart_grants_heart06: 1 failure(s), 0 setup bug(s)
+FAIL:   a15_sumire_real_yell_with_no_blade_heart_grants_heart06
+        a16_no_yell_no_heart_for_both_watchers: 0 failure(s), 0 setup bug(s)
+ok       a16_no_yell_no_heart_for_both_watchers
+--- B effects/modify_need_heart PL!-pb2-040-L ---
+        b1_no_activated_member_reduces_nothing: 0 failure(s), 0 setup bug(s)
+ok       b1_no_activated_member_reduces_nothing
+        b2_one_activated_member_reduces_need_by_three: 0 failure(s), 0 setup bug(s)
+ok       b2_one_activated_member_reduces_need_by_three
+        b3_two_activated_members_reduce_need_by_five: 0 failure(s), 0 setup bug(s)
+ok       b3_two_activated_members_reduce_need_by_five
+        b4_three_activated_members_reduce_need_by_six: 0 failure(s), 0 setup bug(s)
+ok       b4_three_activated_members_reduce_need_by_six
+        b5_staged_member_that_was_never_activated_reduces_nothing: 1 failure(s), 0 setup bug(s)
+FAIL:   b5_staged_member_that_was_never_activated_reduces_nothing
+        b6_staged_member_that_was_activated_and_stayed_counts_once: 0 failure(s), 0 setup bug(s)
+ok       b6_staged_member_that_was_activated_and_stayed_counts_once
+        b7_waited_again_after_being_activated_still_counts: 0 failure(s), 0 setup bug(s)
+ok       b7_waited_again_after_being_activated_still_counts
+        b8_the_clause_parses_as_a_history_not_a_state: 0 failure(s), 0 setup bug(s)
+ok       b8_the_clause_parses_as_a_history_not_a_state
+--- C effects/cost/play_cost PL!-pb2-012-P+ ---
+        c1_printed_cost_is_thirteen: 0 failure(s), 0 setup bug(s)
+ok       c1_printed_cost_is_thirteen
+        c2_no_staged_members_means_no_reduction: 0 failure(s), 0 setup bug(s)
+ok       c2_no_staged_members_means_no_reduction
+        c3_one_printemps_member_alone_is_not_enough: 0 failure(s), 0 setup bug(s)
+ok       c3_one_printemps_member_alone_is_not_enough
+        c4_two_distinctly_named_printemps_members_grant_minus_two: 0 failure(s), 0 setup bug(s)
+ok       c4_two_distinctly_named_printemps_members_grant_minus_two
+        c5_two_prints_of_the_same_character_are_not_distinct: 0 failure(s), 0 setup bug(s)
+ok       c5_two_prints_of_the_same_character_are_not_distinct
+        c6_a_non_printemps_ally_does_not_count: 0 failure(s), 0 setup bug(s)
+ok       c6_a_non_printemps_ally_does_not_count
+        c7_three_printemps_members_still_grant_only_minus_two: 0 failure(s), 0 setup bug(s)
+ok       c7_three_printemps_members_still_grant_only_minus_two
+
+==== parity_wave1b: 31 test case(s) run ====
+     21 ok, 10 FAILED, 0 CRASHED, 0 SETUPBUG
+     329 assertion(s), 19 failure(s), 0 setup bug(s), 3 prompt(s)
+FAILED: parity_wave1b  [exit=1, 29 result line(s): assert=29 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=10]

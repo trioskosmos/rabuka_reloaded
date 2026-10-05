@@ -1,0 +1,2 @@
+tests/test_parity_wave1a.c:857:16: warning: '/*' within comment [-Wcomment]
+  857 |  * "cards/build/*.bin").  The string table is an UNSEPARATED interned pool --

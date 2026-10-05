@@ -1,0 +1,59 @@
+make t-nogate: running T=parity_wave1a WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_wave1a src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_wave1a.c
+./rb_verdict ./rb_engine_t_parity_wave1a parity_wave1a
+--- A effects/auto: pb2_self_wait_or_cost_paid... PL!-pb2-021-N (5) ---
+        a1_becoming_wait_activates_and_grants_a_blade: 6 assertion(s), 2 failure(s), 0 setup bug(s), 0 prompt(s)
+FAIL: a1_becoming_wait_activates_and_grants_a_blade
+        a2_empty_setup_grants_nothing: 4 assertion(s), 0 failure(s), 0 setup bug(s), 0 prompt(s)
+ok     a2_empty_setup_grants_nothing
+        a3_does_not_fire_for_another_cards_ability: 7 assertion(s), 1 failure(s), 0 setup bug(s), 0 prompt(s)
+FAIL: a3_does_not_fire_for_another_cards_ability
+        a4_wait_branch_parses_as_self_scoped_state_condition: 12 assertion(s), 0 failure(s), 0 setup bug(s), 0 prompt(s)
+ok     a4_wait_branch_parses_as_self_scoped_state_condition
+        a5_cost_paid_branch_is_still_a_vacuous_comparison: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 prompt(s)
+ok     a5_cost_paid_branch_is_still_a_vacuous_comparison
+--- B effects/count: count_as_two_lily_white PL!-pb2-041-L (3) ---
+        b1_constant_parses_as_a_counting_weight_of_two: 7 assertion(s), 0 failure(s), 0 setup bug(s), 0 prompt(s)
+ok     b1_constant_parses_as_a_counting_weight_of_two
+        b2_alone_counts_as_two_and_earns_the_score_bonus: 10 assertion(s), 1 failure(s), 0 setup bug(s), 0 prompt(s)
+FAIL: b2_alone_counts_as_two_and_earns_the_score_bonus
+        b3_self_score_is_not_applied_once_per_zone_occurrence: 4 assertion(s), 0 failure(s), 0 setup bug(s), 0 prompt(s)
+ok     b3_self_score_is_not_applied_once_per_zone_occurrence
+--- C effects/invalidate/live_success: PL!-pb2-003-PP (4) ---
+        c1_fixture_live_success_abilities_differ: 6 assertion(s), 0 failure(s), 0 setup bug(s), 0 prompt(s)
+ok     c1_fixture_live_success_abilities_differ
+        c2_invalidating_a_live_success_ability_gains_heart03: 8 assertion(s), 2 failure(s), 0 setup bug(s), 0 prompt(s)
+FAIL: c2_invalidating_a_live_success_ability_gains_heart03
+        c3_target_with_no_live_success_ability_gains_nothing: 9 assertion(s), 2 failure(s), 0 setup bug(s), 0 prompt(s)
+FAIL: c3_target_with_no_live_success_ability_gains_nothing
+        c4_our_own_live_success_abilities_are_not_invalidated: 8 assertion(s), 1 failure(s), 0 setup bug(s), 0 prompt(s)
+FAIL: c4_our_own_live_success_abilities_are_not_invalidated
+--- D effects/gain/abilities: debut_gain_mus_constant PL!-pb2-005-PP (6) ---
+        d1_mus_score_card_grants_the_constant_to_every_mus_member: 9 assertion(s), 1 failure(s), 0 setup bug(s), 1 prompt(s)
+FAIL: d1_mus_score_card_grants_the_constant_to_every_mus_member
+        d2_mus_card_without_score_icon_grants_nothing: 6 assertion(s), 0 failure(s), 0 setup bug(s), 0 prompt(s)
+ok     d2_mus_card_without_score_icon_grants_nothing
+        d3_non_mus_score_card_grants_nothing: 6 assertion(s), 1 failure(s), 0 setup bug(s), 1 prompt(s)
+FAIL: d3_non_mus_score_card_grants_nothing
+        d4_empty_success_zone_grants_nothing: 6 assertion(s), 1 failure(s), 0 setup bug(s), 1 prompt(s)
+FAIL: d4_empty_success_zone_grants_nothing
+        d5_score_card_arriving_after_debut_does_not_backfill: 7 assertion(s), 2 failure(s), 0 setup bug(s), 1 prompt(s)
+FAIL: d5_score_card_arriving_after_debut_does_not_backfill
+        d6_two_mus_score_cards_do_not_double_the_constant: 6 assertion(s), 0 failure(s), 0 setup bug(s), 1 prompt(s)
+ok     d6_two_mus_score_cards_do_not_double_the_constant
+--- E effects/live_start: dazzling_game PL!SP-bp4-023-L (3) ---
+        e1_recolors_listed_blade_hearts_to_purple: 17 assertion(s), 2 failure(s), 0 setup bug(s), 1 prompt(s)
+FAIL: e1_recolors_listed_blade_hearts_to_purple
+        e2_leaves_draw_and_colorless_icons_unchanged: 11 assertion(s), 2 failure(s), 0 setup bug(s), 1 prompt(s)
+FAIL: e2_leaves_draw_and_colorless_icons_unchanged
+        e3_q187_exclude_selected_liella_other_pickable: 15 assertion(s), 7 failure(s), 0 setup bug(s), 1 prompt(s)
+FAIL: e3_q187_exclude_selected_liella_other_pickable
+
+=== test_parity_wave1a summary ===
+  cases: 8 ok, 13 failed, 0 crashed
+  assertions: 167, failures: 25, setup bugs: 0, prompts seen: 8
+FAILED: parity_wave1a  [exit=1, 38 result line(s): assert=38 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=13]

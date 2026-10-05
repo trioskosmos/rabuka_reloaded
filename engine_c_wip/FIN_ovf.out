@@ -1,0 +1,39 @@
+make t-nogate: running T=parity_selected_cards_overflow WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -c -o src/ability/effects/misc.o src/ability/effects/misc.c
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_selected_cards_overflow src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_selected_cards_overflow.c
+./rb_verdict ./rb_engine_t_parity_selected_cards_overflow parity_selected_cards_overflow
+ok: A1: selected_cards[] has exactly RB_MAX_RECENTLY_MOVED (8) slots
+ok: A2: RB_MAX_RECENTLY_MOVED is still 8, so a 9-card reveal is over capacity
+ok: A3: the array is smaller than RB_MAX_ZONE, which is why a RB_MAX_ZONE clamp is an overflow
+ok: A4: the cid-437 fixture really does read selected_cards, so the guarded branch is reachable
+ok: B1: a mandatory 9-card reveal cost is paid (not refused)
+ok: B2: the 9th card did NOT overwrite anything past selected_cards[7]
+ok: B3: n_selected_cards is clamped to the array's real capacity after a 9-card reveal
+ok: B4: the selected_cards relay is still populated after the clamp
+ok: B5: selected_cards[0] is the first eligible card
+ok: C1: a mandatory full-hand reveal cost is paid
+ok: C2: a 40-card reveal left every member after selected_cards[] intact
+ok: C3: n_selected_cards is clamped at RB_MAX_HAND-wide reveal
+ok: C4: the clamp saturates at the capacity, it is not merely 'smaller'
+ok: C5: every populated selected_cards slot holds an eligible hand id
+ok: D1: pass 1 pays a full-hand reveal
+ok: D1: pass 1 leaves members after selected_cards[] intact
+ok: D2: pass 2 pays a full-hand reveal
+ok: D2: pass 2 leaves members after selected_cards[] intact
+ok: D3: n_selected_cards does not grow across repeated wide reveals
+ok: E1: a mandatory 3-card reveal cost is paid
+ok: E2: an under-capacity reveal records ALL 3 cards (no truncation)
+ok: E3: slot 0 is the first card
+ok: E4: slot 1 is the second card
+ok: E5: slot 2 is the third card
+ok: E6: all 3 cards reached revealed_cards[] (that array is correctly sized)
+
+==== parity_selected_cards_overflow ====
+tests run: 5
+checks, 0 failures
+PASSED: parity_selected_cards_overflow
+PASSED: parity_selected_cards_overflow  [exit=0, 0 result line(s), renormalised=0]

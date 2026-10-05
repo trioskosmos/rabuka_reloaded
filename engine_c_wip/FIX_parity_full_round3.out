@@ -1,0 +1,413 @@
+make t-nogate: running T=parity_full_round3 WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_full_round3 src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_full_round3.c
+./rb_verdict ./rb_engine_t_parity_full_round3 parity_full_round3
+card database loaded: 2639 cards
+heart slot map (rb_parse_heart_color -> rb_heart_color_index): heart02=2 heart03=3 heart04=4 heart05=5 heart06=6 (engine map: 0=heart00 1=heart01 2=heart02 3=heart03 4=heart04 5=heart05 6=heart06 7=all)
+decode-fallback abilities in this build: 0 (rb_verify_generated_tables self-check is run by the generators; a mojibake string key below means regen, not an engine bug)
+--- §A ayumu LL-bp1-001-R+ multi-name debut / live start ---
+  ok: A1 ayumu: the fixture is really LL-bp1-001-R＋
+  ok: A1 ayumu: PRINTED cost is 20
+  ok: A1 member: the fixture is really PL!-sd1-010-SD
+  ok: A1 member: PRINTED cost is 4
+  ok: A1 filler: the fixture is really PL!-sd1-013-SD
+  ok: A1 filler: PRINTED cost is 4
+  ok: A1: CENSUS is 23 before the play (3 fixture cards + 20 energy)
+  ok: A1: two cards in hand before the play
+  ok: A1: one card in the waitroom before the play
+  ok: A1: Ayumu is played to the centre area
+  ok: A1: a single discard candidate auto-resolves and raises NO prompt
+    <A1 after the play> NO PENDING CHOICE
+  ok: A1: the waitroom member really was recovered INTO HAND
+  ok: A1: the waitroom member is no longer in the waitroom
+  ok: A1: Ayumu is on the stage (the play itself landed)
+  ok: A1: once the standing prompt IS answered the member really reaches hand
+  ok: A1: once the standing prompt IS answered the member really leaves the waitroom
+  ok: A1: CENSUS unchanged -- one card moved from discard to hand, none destroyed
+        A1_debut_recover_from_discard: 17 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       A1_debut_recover_from_discard
+  ok: A1b ayumu: the fixture is really LL-bp1-001-R＋
+  ok: A1b ayumu: PRINTED cost is 20
+  ok: A1b m1: the fixture is really PL!-sd1-010-SD
+  ok: A1b m1: PRINTED cost is 4
+  ok: A1b m2: the fixture is really PL!-sd1-013-SD
+  ok: A1b m2: PRINTED cost is 4
+  ok: A1b: CENSUS is 23 before the play (2 members + ayumu + 20 energy)
+  ok: A1b: control -- no prompt is standing before the play
+  ok: A1b: Ayumu is played to the centre area
+  ok: A1b: THE ONE ADDED WAITROOM MEMBER MAKES THE ABILITY ASK -- the waitroom is really read, so A1's no-prompt result is the rule and not an inert engine
+    <A1b prompt> kind=SelectCard zone='discard' card_type='member_card' count=1 allow_skip=0 target='self' actor=0 tpid='self' cost_limit=0 op='' n_filtered=2 filter_group='' desc='Select 1 card(s) from the waiting room' desc_ja=''
+  ok: A1b: the prompt is not stamped to the opponent seat
+  ok: A1b: at least one waitroom member reached hand
+  ok: A1b: exactly ONE of the two candidates left the waitroom
+  ok: A1b: the recovered card is one of the two seeded instances
+  ok: A1b: CENSUS unchanged -- one card moved, none destroyed
+        A1b_two_candidates_prompt: 15 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       A1b_two_candidates_prompt
+  ok: A2 ayumu: the fixture is really LL-bp1-001-R＋
+  ok: A2 ayumu: PRINTED cost is 20
+  ok: A2: the board is empty -- this Rust test reads the database only
+  ok: A2: Q62 -- the printed name contains the '&' separator
+  ok: A2: Q62 -- the name splits into exactly 3 individual names
+  ok: A2: name part 1 is the 4 characters of the first individual name
+  ok: A2: name part 2 is the 5 characters of the second individual name
+  ok: A2: name part 3 is the 5 characters of the third individual name
+  ok: A2: the card carries a 登場 ability (decoded from bytecode)
+  ok: A2: the card carries a ライブ開始時 ability (decoded from bytecode)
+  ok: A2: the ライブ開始時 ability text names ALL THREE individual characters
+    <A2> ライブ開始時 full_text = {{live_start.png|ライブ開始時}}手札の「上原歩夢」と「澁谷かのん」と「日野下花帆」を、好きな組み合わせで合計3枚、控え室に置いてもよい：ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋３する。」を得る。
+（手札のこのカードもこの効果で控え室に置ける。）
+  ok: A2: CENSUS still 0 -- reading the database places nothing
+        A2_q62_individual_names: 12 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       A2_q62_individual_names
+  ok: A3 ayumu: the fixture is really LL-bp1-001-R＋
+  ok: A3 ayumu: PRINTED cost is 20
+  ok: A3 filler_l: the fixture is really PL!-sd1-019-SD
+  ok: A3 fill: the fixture is really PL!-sd1-010-SD
+  ok: A3 fill: PRINTED cost is 4
+  ok: A3 ayumu_cp: the fixture is really LL-bp1-001-R＋
+  ok: A3 ayumu_cp: PRINTED cost is 20
+  ok: A3: exactly one member is on P1's stage before the trigger
+  ok: A3: the hand holds exactly ONE copy of the three-name card
+  ok: A3: the hand copy is a DISTINCT instance from the stage card (Rust used game.new_id for exactly this reason)
+  ok: A3: control -- no prompt is standing before the live start
+  ok: A3: the ライブ開始時 scan ran for P1
+  ok: A3: the optional cost (named characters from hand) PROMPTS at live start
+    <A3 live start prompt> kind=SelectCard zone='hand' card_type='' count=0 allow_skip=1 target='' actor=0 tpid='p1' cost_limit=0 op='' n_filtered=0 filter_group='' desc='Select any number of card (上原歩夢 / 澁谷かのん / 日野下花帆) from hand (0-1) to waitroom (or skip)' desc_ja='手札から任意枚控え室に置く（上原歩夢 / 澁谷かのん / 日野下花帆）（スキップ可）'
+  ok: A3: the activating member really gained an ability
+    <A3> gained[0] = 【常時】ライブの合計スコアを+3する。
+  ok: A3: the gained ability is the score +3 constant (printed above)
+  ok: A3: CENSUS unchanged across the whole live-start sequence
+        A3_live_start_triggers: 16 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       A3_live_start_triggers
+--- §B bella PL!N-bp3-027-L surplus heart04 + Nijigasaki ---
+  ok: B1 bella: the fixture is really PL!N-bp3-027-L
+  ok: B fill: the fixture is really PL!-sd1-010-SD
+  ok: B fill: PRINTED cost is 4
+  ok: B ener: the fixture is really LL-E-001-SD
+  ok: B yell: the fixture is really PL!N-bp3-030-L
+  ok: B: the energy deck really was seeded with the requested number of cards
+  ok: B: the live card enters P1's live set
+    <B1 test arm (Bella, empty stage)> WAIT-energy 0->0 (delta 0) | energy 0->1 | energy_deck 2->1 | success=0 | census 23->23
+  ok: B fill: the fixture is really PL!-sd1-010-SD
+  ok: B fill: PRINTED cost is 4
+  ok: B ener: the fixture is really LL-E-001-SD
+  ok: B yell: the fixture is really PL!N-bp3-030-L
+  ok: B: the energy deck really was seeded with the requested number of cards
+  ok: B: the live card enters P1's live set
+    <B1 reference arm (Bella, Emma heart04=4)> WAIT-energy 0->0 (delta 0) | energy 0->2 | energy_deck 2->0 | success=1 | census 24->24
+  ok: B1: the energy deck really holds 2 cards, so the negative is not vacuous
+  ok: B1: the reference arm's live really succeeded, so the ability fired there
+  ok: B1: Q174 -- with NO 虹ヶ咲 member on stage Bella placed NO energy: one FEWER card left the energy deck than on the reference arm where the condition holds
+  ok: B1: no prompt is left standing after the walk
+    <B1> test arm success zone = 0 (diagnostic: on an empty stage with no yell the live cannot be made to succeed, so B1's negative is doubly weak in C as well as in Rust)
+  ok: B1: CENSUS unchanged -- nothing was placed and nothing destroyed
+  ok: B1: reference arm CENSUS unchanged too -- the extra energy really MOVED
+        B1_q174_no_member_no_fire: 19 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       B1_q174_no_member_no_fire
+  ok: B2 bella: the fixture is really PL!N-bp3-027-L
+  ok: B2 niji: the fixture is really PL!N-bp1-018-N
+  ok: B2 niji: PRINTED cost is 9
+  ok: B2: fixture check -- the stage member has NO heart04 at all
+  ok: B2: fixture check -- the stage member has heart03=1
+  ok: B2: fixture check -- the stage member has heart05=1
+  ok: B2: fixture check -- the stage member has heart06=2
+  ok: B fill: the fixture is really PL!-sd1-010-SD
+  ok: B fill: PRINTED cost is 4
+  ok: B ener: the fixture is really LL-E-001-SD
+  ok: B yell: the fixture is really PL!N-bp3-030-L
+  ok: B: the energy deck really was seeded with the requested number of cards
+  ok: B: the live card enters P1's live set
+    <B2 test arm (Bella, Nearukawa, 3 yell)> WAIT-energy 0->0 (delta 0) | energy 0->1 | energy_deck 2->1 | success=1 | census 27->27
+  ok: B fill: the fixture is really PL!-sd1-010-SD
+  ok: B fill: PRINTED cost is 4
+  ok: B ener: the fixture is really LL-E-001-SD
+  ok: B yell: the fixture is really PL!N-bp3-030-L
+  ok: B: the energy deck really was seeded with the requested number of cards
+  ok: B: the live card enters P1's live set
+    <B2 reference arm (Bella, Emma heart04=4)> WAIT-energy 0->0 (delta 0) | energy 0->2 | energy_deck 2->0 | success=1 | census 27->27
+  ok: B2: the energy deck really holds 2 cards, so the negative is not vacuous
+  ok: B2: Q174 -- surplus heart04 = 0 (the stage member has NO heart04), so Bella placed NO energy: one FEWER card left the energy deck than on the reference arm
+  ok: B2: La Bella Patria really did succeed -- the ライブ成功時 window WAS open, which is what makes the negative above meaningful
+  ok: B2: the reference arm's live really succeeded too, so the two deltas are directly comparable
+  ok: B2: CENSUS unchanged -- nothing was placed and nothing destroyed
+  ok: B2: reference arm CENSUS unchanged too -- the extra energy really MOVED
+        B2_q174_no_heart04_no_fire: 25 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       B2_q174_no_heart04_no_fire
+  ok: B3 bella: the fixture is really PL!N-bp3-027-L
+  ok: B3 emma: the fixture is really PL!N-pb1-008-R
+  ok: B3 emma: PRINTED cost is 17
+  ok: B3: fixture check -- the stage member really has heart04=4
+  ok: B3: fixture check -- and heart02=1, so the fixture is not swapped
+  ok: B fill: the fixture is really PL!-sd1-010-SD
+  ok: B fill: PRINTED cost is 4
+  ok: B ener: the fixture is really LL-E-001-SD
+  ok: B yell: the fixture is really PL!N-bp3-030-L
+  ok: B: the energy deck really was seeded with the requested number of cards
+  ok: B: the live card enters P1's live set
+    <B3 test arm (Bella, Emma heart04=4)> WAIT-energy 0->0 (delta 0) | energy 0->2 | energy_deck 2->0 | success=1 | census 24->24
+  ok: B fill: the fixture is really PL!-sd1-010-SD
+  ok: B fill: PRINTED cost is 4
+  ok: B ener: the fixture is really LL-E-001-SD
+  ok: B yell: the fixture is really PL!N-bp3-030-L
+  ok: B: the energy deck really was seeded with the requested number of cards
+  ok: B: the live card enters P1's live set
+    <B3 reference arm (Bella, Emma heart04=4, second board)> WAIT-energy 0->0 (delta 0) | energy 0->2 | energy_deck 2->0 | success=1 | census 24->24
+  ok: B3: two identical positive boards shrink the energy deck identically -- the comparison B1 and B2 rely on is repeatable
+  ok: B3: La Bella Patria really did succeed
+  ok: B3: Rust's assertion -- the energy deck ends up shorter than it started
+  ok: B3: CENSUS unchanged -- the energy card MOVED deck -> zone, none destroyed
+        B3_positive_heart04_fires: 21 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       B3_positive_heart04_fires
+--- §K kosuzu PL!HS-pb1-005-R choose-number truth table ---
+  ok: K1 top: the fixture is really PL!HS-sd1-013-SD
+  ok: K1 top: PRINTED cost is 2
+  ok: K1 control member: the fixture is really PL!-sd1-013-SD
+  ok: K1 control member: PRINTED cost is 4
+  ok: K kosuzu: the fixture is really PL!HS-pb1-005-R
+  ok: K kosuzu: PRINTED cost is 11
+  ok: K fill: the fixture is really PL!-sd1-010-SD
+  ok: K fill: PRINTED cost is 4
+  ok: K: Kosuzu is played to the centre area
+  ok: K: Kosuzu really is on the stage
+  ok: K1: the seeded top-of-deck card is really on top
+  ok: K1: the CONTROL member (no ライブ開始時 ability) really is on the stage too
+  ok: K1: control -- no prompt is standing before the live start
+  ok: K1: the number-choice prompt really appears at live start
+    <K1 number prompt> kind=SelectNumber zone='' card_type='' count=22 allow_skip=0 target='choice_number' actor=0 tpid='' cost_limit=0 op='' n_filtered=0 filter_group='' desc='Choose a number: 1..22, 67' desc_ja=''
+  ok: K1: the whole sequence resolved after one answer
+  ok: K1: the revealed top card really is in hand (exactly one instance)
+    <K1> kosuzu id=827 printed_blade=4 mods[set=0 add=0 total=0] | control id=502 printed_blade=1 mods[set=0 add=0 total=0]
+  ok: K1: control -- the abilityless member on the same board gained NO blade
+  ok: K1: NO blade was gained on Kosuzu -- the chosen number is below the card's cost
+  ok: K1: CENSUS unchanged -- one card moved deck -> hand, none destroyed
+        K1_choose_number_to_hand: 19 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       K1_choose_number_to_hand
+  ok: K2 top: the fixture is really PL!HS-sd1-013-SD
+  ok: K2 top: PRINTED cost is 2
+  ok: K kosuzu: the fixture is really PL!HS-pb1-005-R
+  ok: K kosuzu: PRINTED cost is 11
+  ok: K fill: the fixture is really PL!-sd1-010-SD
+  ok: K fill: PRINTED cost is 4
+  ok: K: Kosuzu is played to the centre area
+  ok: K: Kosuzu really is on the stage
+  ok: K2: control -- no prompt is standing before the live start
+  ok: K2: the number-choice prompt really appears at live start
+    <K2 number prompt> kind=SelectNumber zone='' card_type='' count=22 allow_skip=0 target='choice_number' actor=0 tpid='' cost_limit=0 op='' n_filtered=0 filter_group='' desc='Choose a number: 1..22, 67' desc_ja=''
+  ok: K2: the whole sequence resolved after one answer
+  ok: K2: CENSUS unchanged -- the card was relocated, none destroyed
+        K2_choose_number_gains_blade: 15 assertion(s), 3 failure(s), 0 setup bug(s)
+FAIL:   K2_choose_number_gains_blade
+  ok: K3 top: the fixture is really PL!-sd1-010-SD
+  ok: K3 top: PRINTED cost is 4
+  ok: K kosuzu: the fixture is really PL!HS-pb1-005-R
+  ok: K kosuzu: PRINTED cost is 11
+  ok: K fill: the fixture is really PL!-sd1-010-SD
+  ok: K fill: PRINTED cost is 4
+  ok: K: Kosuzu is played to the centre area
+  ok: K: Kosuzu really is on the stage
+  ok: K3: the seeded top-of-deck card is really on top
+  ok: K3: control -- no prompt is standing before the live start
+  ok: K3: the number-choice prompt really appears at live start
+    <K3 number prompt> kind=SelectNumber zone='' card_type='' count=22 allow_skip=0 target='choice_number' actor=0 tpid='' cost_limit=0 op='' n_filtered=0 filter_group='' desc='Choose a number: 1..22, 67' desc_ja=''
+  ok: K3: the whole sequence resolved after one answer
+  ok: K3: the EQUAL case also puts the revealed card into hand
+  ok: K3: CENSUS unchanged -- one card moved deck -> hand, none destroyed
+        K3_equal_choice_both: 15 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   K3_equal_choice_both
+--- §L lovepeace PL!-bp3-026-L live-success +1 / q149 / q172 ---
+  ok: L1 love_p1: the fixture is really PL!-bp3-026-L
+  ok: L1 strong1: the fixture is really PL!-pb1-014-R
+  ok: L1 strong1: PRINTED cost is 15
+  ok: L1 strong2: the fixture is really PL!-PR-003-PR
+  ok: L1 strong2: PRINTED cost is 15
+  ok: L1 weak: the fixture is really PL!-sd1-010-SD
+  ok: L1 weak: PRINTED cost is 4
+  ok: L1 fill: the fixture is really PL!-sd1-010-SD
+  ok: L1 fill: PRINTED cost is 4
+  ok: L1: P1 has the two strong members
+  ok: L1: P2 has the one weak member
+  ok: L1: P1's live zone holds one card
+  ok: L1: P2's live zone holds one card
+    <L1> P1 hearts total=20 (heart03 5 -> 12)  P2 hearts total=2
+  ok: L1: precondition -- P1's heart total really EXCEEDS P2's
+  ok: L1: control -- P1 has a live card for the window
+  ok: L1: precondition -- the ライブ成功時 window is OPEN
+  ok: L1: Q150 -- P1's own live card gains +1 score when P1's hearts exceed P2's
+  ok: L1: the OPPONENT's copy of the same print gains nothing
+  ok: L1: CENSUS unchanged -- a score modifier creates and destroys no card
+        L1_q150_hearts_gt_plus1: 19 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       L1_q150_hearts_gt_plus1
+  ok: L2: the board is empty -- this Rust test reads the database only
+  ok: L2 fixture: the fixture is really PL!-sd1-014-SD
+  ok: L2: Q149 -- total_hearts is the sum of all base heart values for PL!-sd1-014-SD
+  ok: L2 fixture: the fixture is really PL!SP-PR-005-PR
+  ok: L2: Q149 -- total_hearts is the sum of all base heart values for PL!SP-PR-005-PR
+  ok: L2 fixture: the fixture is really PL!-PR-003-PR
+  ok: L2: Q149 -- total_hearts is the sum of all base heart values for PL!-PR-003-PR
+  ok: L2: CENSUS still 0 -- reading the DB places nothing
+        L2_q149_total_hearts: 8 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       L2_q149_total_hearts
+  ok: L3 live: the fixture is really PL!-sd1-020-SD
+  ok: L3 member: the fixture is really PL!-sd1-014-SD
+  ok: L3 member: PRINTED cost is 9
+  ok: L3 cheer: the fixture is really PL!-sd1-010-SD
+  ok: L3 cheer: PRINTED cost is 4
+  ok: L3 fill: the fixture is really PL!-sd1-010-SD
+  ok: L3 fill: PRINTED cost is 4
+  ok: L3: fixture check -- the stage member's total_hearts is 4
+  ok: L3: exactly one member is on P1's stage
+  ok: L3: CENSUS baselined before the live set
+  ok: L3: the live card enters P1's live set
+  ok: L3: Q172 -- the live succeeded and was placed in the success zone
+  ok: L3: the success zone holds the very live card that was set
+  ok: L3: CENSUS unchanged -- blade hearts never became base hearts
+        L3_q172_gained_hearts: 14 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       L3_q172_gained_hearts
+--- §H hareruya PL!SP-bp1-026-L distinct Liella! names ---
+  ok: H hareruya: the fixture is really PL!SP-bp1-026-L
+  ok: H fill: the fixture is really PL!-sd1-010-SD
+  ok: H fill: PRINTED cost is 4
+  ok: H liella member: the fixture is really PL!SP-bp1-014-N
+  ok: H liella member: PRINTED cost is 4
+  ok: H liella member: the fixture is really PL!SP-bp1-015-N
+  ok: H liella member: PRINTED cost is 4
+  ok: H liella member: the fixture is really PL!SP-bp1-016-N
+  ok: H liella member: PRINTED cost is 4
+  ok: H liella member: the fixture is really PL!SP-bp1-019-N
+  ok: H liella member: PRINTED cost is 11
+  ok: H liella member: the fixture is really PL!SP-bp1-020-N
+  ok: H liella member: PRINTED cost is 4
+  ok: H1: five members really are in the waitroom
+  ok: H1: NONE of them is on the stage (waitroom-only)
+  ok: H1: control -- the five waitroom members have five DISTINCT names
+  ok: H1: control -- every seeded member resolves a Liella! unit name
+  ok: H1: control -- no two seeded cards print the same name
+    <H1> waitroom names: [嵐 千砂都] [平安名すみれ] [葉月 恋] [若菜四季] [鬼塚夏美]
+  ok: H1: the live card enters P1's live set
+  ok: H1: control -- the live card is really in the zone
+  ok: H1: Q64 -- heart02 required hearts are set to exactly 2
+  ok: H1: Q64 -- heart03 required hearts are set to exactly 2
+  ok: H1: Q64 -- heart06 required hearts are set to exactly 2
+  ok: H1: CENSUS unchanged -- a required-heart modifier moves no card
+        H1_q64_five_distinct: 24 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       H1_q64_five_distinct
+  ok: H hareruya: the fixture is really PL!SP-bp1-026-L
+  ok: H fill: the fixture is really PL!-sd1-010-SD
+  ok: H fill: PRINTED cost is 4
+  ok: H liella member: the fixture is really PL!SP-bp1-014-N
+  ok: H liella member: PRINTED cost is 4
+  ok: H liella member: the fixture is really PL!SP-bp1-015-N
+  ok: H liella member: PRINTED cost is 4
+  ok: H liella member: the fixture is really PL!SP-bp1-016-N
+  ok: H liella member: PRINTED cost is 4
+  ok: H liella member: the fixture is really PL!SP-bp1-019-N
+  ok: H liella member: PRINTED cost is 11
+  ok: H1b: four members really are in the waitroom
+  ok: H1b: control -- FOUR distinct names, one below the printed threshold of 5
+  ok: H1b: the live card enters P1's live set
+  ok: H1b: with only FOUR distinct Liella! names the heart02 cost reduction is NOT applied
+  ok: H1b: with only FOUR distinct Liella! names the heart03 cost reduction is NOT applied
+  ok: H1b: with only FOUR distinct Liella! names the heart06 cost reduction is NOT applied
+  ok: H1b: CENSUS unchanged
+        H1b_four_distinct_not_met: 18 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       H1b_four_distinct_not_met
+  ok: H2 hareruya: the fixture is really PL!SP-bp1-026-L
+  ok: H2 fill: the fixture is really PL!-sd1-010-SD
+  ok: H2 fill: PRINTED cost is 4
+  ok: H2: control -- the five cards really print five distinct names
+    <H2> the shared-surname pair is [鬼塚夏美] and [鬼塚冬毬]
+  ok: H2: the two cards that share a surname still print DIFFERENT full names
+  ok: H2: the live card enters P1's live set
+  ok: H2: Q74 -- the required-heart modifier is set with five distinct Liella! names
+  ok: H2: CENSUS unchanged
+        H2_q74_multiname_counting: 8 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       H2_q74_multiname_counting
+--- §Y you LL-bp2-001-R+ q129 / live-start optional cost ---
+  ok: Y1: the board is empty -- this Rust test reads the database only
+  ok: Y1 keke: the fixture is really LL-bp2-001-R＋
+  ok: Y1 keke: PRINTED cost is 20
+    <Y1> cost-reduction 常時 = {{jyouji.png|常時}}手札にあるこのメンバーカードのコストは、このカード以外の自分の手札1枚につき、1少なくなる。
+    <Y1> baton-block   常時 = {{jyouji.png|常時}}このメンバーはバトンタッチで控え室に置けない。
+  ok: Y1: Q129 -- the card carries a 常時 ability for the SELF cost reduction
+  ok: Y1: Q129 -- the card carries a 常時 ability preventing baton touch
+  ok: Y1: CENSUS still 0 -- reading the DB places nothing
+        Y1_q129_self_only: 6 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       Y1_q129_self_only
+  ok: Y2 keke: the fixture is really LL-bp2-001-R＋
+  ok: Y2 keke: PRINTED cost is 20
+  ok: Y2 filler_l: the fixture is really PL!-sd1-019-SD
+  ok: Y2 fill: the fixture is really PL!-sd1-010-SD
+  ok: Y2 fill: PRINTED cost is 4
+  ok: Y2 named_cp: the fixture is really LL-bp2-001-R＋
+  ok: Y2 named_cp: PRINTED cost is 20
+  ok: Y2: the hand copy is a DISTINCT instance from the stage card
+  ok: Y2: exactly one named-character copy is in hand
+  ok: Y2: control -- no prompt is standing before the live start
+  ok: Y2: the ライブ開始時 optional cost PROMPTS when an eligible named character is in hand
+    <Y2 optional cost> kind=SelectCard zone='hand' card_type='' count=0 allow_skip=1 target='' actor=0 tpid='p1' cost_limit=0 op='' n_filtered=0 filter_group='' desc='Select any number of card (渡辺曜 / 鬼塚夏美 / 大沢瑠璃乃) from hand (0-1) to waitroom (or skip)' desc_ja='手札から任意枚控え室に置く（渡辺曜 / 鬼塚夏美 / 大沢瑠璃乃）（スキップ可）'
+  ok: Y2: blade is gained on the ACTIVATING card after the named copy is discarded
+  ok: Y2: CENSUS unchanged -- the named card moved hand -> discard, none destroyed
+        Y2_live_start_optional_cost: 13 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       Y2_live_start_optional_cost
+  ok: Y3 keke: the fixture is really LL-bp2-001-R＋
+  ok: Y3 keke: PRINTED cost is 20
+  ok: Y3 filler_l: the fixture is really PL!-sd1-019-SD
+  ok: Y3 fill: the fixture is really PL!-sd1-010-SD
+  ok: Y3 fill: PRINTED cost is 4
+  ok: Y3 named_cp: the fixture is really LL-bp2-001-R＋
+  ok: Y3 named_cp: PRINTED cost is 20
+  ok: Y3: the non-candidate filler really is in hand exactly once
+  ok: Y3: control -- no prompt is standing before the live start
+  ok: Y3: the ライブ開始時 optional cost PROMPTS
+    <Y3 optional cost> kind=SelectCard zone='hand' card_type='' count=0 allow_skip=1 target='' actor=0 tpid='p1' cost_limit=0 op='' n_filtered=0 filter_group='' desc='Select any number of card (渡辺曜 / 鬼塚夏美 / 大沢瑠璃乃) from hand (0-1) to waitroom (or skip)' desc_ja='手札から任意枚控え室に置く（渡辺曜 / 鬼塚夏美 / 大沢瑠璃乃）（スキップ可）'
+    <Y3 re-ask> NO PENDING CHOICE
+  ok: Y3: the abilityless filler is STILL IN HAND -- it was not selectable
+  ok: Y3: the paired POSITIVE -- blade WAS gained from the named copy, so the optional cost really resolved and the filler really was skipped
+  ok: Y3: CENSUS unchanged -- the named card moved hand -> discard, none destroyed
+        Y3_abilityless_not_in_choice: 14 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   Y3_abilityless_not_in_choice
+--- §C kanon PL!SP-bp5-001-R+ choice_condition activation cost ---
+  ok: C kanon: the fixture is really PL!SP-bp5-001-R＋
+  ok: C kanon: PRINTED cost is 10
+  ok: C1 filler: the fixture is really PL!-sd1-010-SD
+  ok: C1 filler: PRINTED cost is 4
+  ok: C1 cheap: the fixture is really PL!-sd1-019-SD
+  ok: C1: fixture check -- 10 of the 15 energy cards are active
+  ok: C1: fixture check -- 15 energy cards exist
+  ok: C1: Kanon really is on the stage
+  ok: C1: Kanon is NOT in hand (placed by hand)
+  ok: C1: control -- no prompt is standing before the activation
+  ok: C1: the 起動 ability is activated
+    <C1 option prompt> NO PENDING CHOICE
+    <C1 SelectCard> NO PENDING CHOICE
+  ok: C1: the effect resolves after the discard
+  ok: C1: exactly ONE wait energy was activated (10 -> 11)
+  ok: C1: CENSUS unchanged -- one card moved hand -> waitroom, none destroyed
+        C1_choice_discard_flow: 19 assertion(s), 5 failure(s), 0 setup bug(s)
+FAIL:   C1_choice_discard_flow
+  ok: C kanon: the fixture is really PL!SP-bp5-001-R＋
+  ok: C kanon: PRINTED cost is 10
+  ok: C2: fixture check -- 10 of the 15 energy cards are active
+  ok: C2: CENSUS baselined immediately before the activation
+  ok: C2: control -- no prompt is standing before the activation
+  ok: C2: the 起動 ability is activated
+    <C2 option prompt> NO PENDING CHOICE
+  ok: C2: the effect resolves after paying the wait cost
+  ok: C2: exactly ONE wait energy was activated (10 -> 11)
+  ok: C2: CENSUS unchanged -- a wait state change moves and destroys no card
+        C2_choice_wait_option: 11 assertion(s), 2 failure(s), 0 setup bug(s)
+FAIL:   C2_choice_wait_option
+
+=== parity_full_round3 ===
+tests passed          : 16
+tests failed (parity) : 5
+tests crashed (engine): 0
+assertions (shared)   : 328
+failures  (shared)    : 12
+fixture setup bugs    : 0
+PARITY DIVERGENCE: the run stayed red by design.
+FAILED: parity_full_round3  [exit=1, 17 result line(s): assert=17 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=17]

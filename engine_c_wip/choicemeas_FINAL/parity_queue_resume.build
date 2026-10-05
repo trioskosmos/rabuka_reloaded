@@ -1,0 +1,7 @@
+tests/test_parity_queue_resume.c:71:9: warning: 'FLAT_VERDICT' redefined
+   71 | #define FLAT_VERDICT() flat_verdict_failed(__func__)
+      |         ^~~~~~~~~~~~
+In file included from tests/test_parity_queue_resume.c:23:
+include/test_game.h:378:9: note: this is the location of the previous definition
+  378 | #define FLAT_VERDICT() test_flat_verdict_failed(__func__)
+      |         ^~~~~~~~~~~~

@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-05T09:13:10.359409+00:00",
+  "generated_at": "2026-10-05T10:19:20.514313+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
@@ -444,7 +444,7 @@
         {
           "file": "engine/tests/test_modules/characterization/seed_reproduces_game_test.rs",
           "test": "each_replayed_game_reaches_a_terminal_result",
-          "line": 363,
+          "line": 394,
           "detail": ""
         },
         {
@@ -1030,7 +1030,7 @@
         {
           "file": "engine/tests/test_modules/characterization/seed_reproduces_game_test.rs",
           "test": "each_replayed_game_reaches_a_terminal_result",
-          "line": 363,
+          "line": 394,
           "detail": "2 inequality assertion(s) on a count, vs baseline+threshold"
         }
       ]

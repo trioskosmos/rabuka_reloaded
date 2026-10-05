@@ -1,0 +1,32 @@
+make t-nogate: running T=artifacts_consistent WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_artifacts_consistent src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_artifacts_consistent.c
+./rb_verdict ./rb_engine_t_artifacts_consistent artifacts_consistent
+=== generated-artifact consistency gate ===
+abilities=985 interned_strings=6032 table_bytes=726671
+gen_data self-check OK: 985 abilities, 6032 interned strings, table 726671 bytes, offsets and digests consistent.
+canonical blob: 726742 bytes, FNV-1a 32 = 1858760114
+committed C   : 726671 bytes, FNV-1a 32 = 3985478542
+FAIL: RBKA_STRINGS_TABLE_LEN == the canonical blob's length (the committed offsets DO index the canonical blob)
+FAIL: RBKA_STRINGS_TABLE_FNV == the canonical blob's whole-file digest
+FAIL: c_artifacts.strings_table_len 726671 == the canonical blob's length 726742 -- the C tables and cards/build are from ONE regen_all.sh run
+
+=== 23 checks, 3 failed ===
+RESULT: THE GENERATED ARTIFACTS ARE INCONSISTENT.
+A skewed engine links silently -- the interned pool is
+unseparated, so drift returns byte splices, not errors.
+If only the CROSS-GENERATION checks above failed, the C tables
+and the blob they index are each internally fine but come from
+different generator runs -- the 2026-10-04 state exactly.
+FIX: bash tools/regen_all.sh
+     then commit cards/build/abilities_strings.bin,
+     src/core/generated/gen_data.c and bytecode_blob.c
+     TOGETHER, in one commit, and update the c_artifacts
+     block in cards/build/generation_manifest.json to match.
+FAILED: artifacts_consistent  [exit=1, 3 result line(s): assert=3 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=0]
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

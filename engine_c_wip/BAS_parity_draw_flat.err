@@ -1,0 +1,416 @@
+tests/test_parity_draw_flat.c: In function 'df_card_has_ability_text':
+tests/test_parity_draw_flat.c:1693:66: warning: comparison between pointer and integer
+ 1693 |         int hit = (ab.full_text && strstr(ab.full_text, needle)) != NULL;
+      |                                                                  ^~
+tests/test_parity_draw_flat.c: In function 'dc_expect_select_card':
+tests/test_parity_draw_flat.c:1910:17: warning: the comparison will always evaluate as 'true' for the address of 'zone' will never be NULL [-Waddress]
+ 1910 |              ch && ch->zone ? ch->zone : "(null)");
+      |                 ^~
+In file included from tests/test_parity_draw_flat.c:99:
+include/rabuka.h:972:10: note: 'zone' declared here
+  972 |     char zone[32];
+      |          ^~~~
+tests/test_parity_draw_flat.c: In function 'test_chain_optional_wait_gates_draw_discard':
+tests/test_parity_draw_flat.c:2528:57: warning: the comparison will always evaluate as 'true' for the address of 'zone' will never be NULL [-Waddress]
+ 2528 |             if (ch && ch->kind == RB_CHOICE_SELECT_CARD && ch->zone &&
+      |                                                         ^~
+include/rabuka.h:972:10: note: 'zone' declared here
+  972 |     char zone[32];
+      |          ^~~~
+tests/test_parity_draw_flat.c: In function 'test_optional_energy_live_success_draw':
+tests/test_parity_draw_flat.c:818:85: warning: '%s' directive output may be truncated writing up to 511 bytes into a region of size 196 [-Wformat-truncation=]
+  818 |                      "%s: the pay/skip prompt must name what it is paying for (got '%s')",
+      |                                                                                     ^~
+tests/test_parity_draw_flat.c:817:13: note: 'snprintf' output 63 or more bytes (assuming 574) into a destination of size 256
+  817 |             snprintf(msg, sizeof(msg),
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~
+  818 |                      "%s: the pay/skip prompt must name what it is paying for (got '%s')",
+      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  819 |                      CASES[i].live_no, ch ? ch->description : "(null)");
+      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+FAIL: current > original -> draw 1 (got 0 expected 1)
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: no Mei on stage -> single draw (got 2 expected 1)
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=319 deferred=0xa001a5400 eff=0xa001a5400 cur=0 n=0 state=3
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001a5400 target=0x0 eff=0xa001a5400 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=319 deferred=0xa001a6590 eff=0xa001a6590 cur=0 n=0 state=3
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0xa001a6590 target=0x0 eff=0xa001a6590 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: Hanayo herself is a valid cost target and must be waited
+FAIL: own stage member must be waited
+FAIL: waited 2 members -> drew 2 (got 0 expected 2)
+FAIL: exactly 2 cards left the deck (got 0 expected 2)
+[DEBUT_COST_PENDING] card=319 deferred=0xa001a7720 eff=0xa001a7720 cur=0 n=0 state=3
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0xa001a7720 target=0x0 eff=0xa001a7720 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: Hanayo gets waited by the cost
+FAIL: 1 newly-waited member -> drew exactly 1 (-1 played +1) (got 0 expected 1)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the per-turn use is recorded
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the first firing consumes the per-turn budget
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_PID_NORMALIZE] entry=0 card=1333 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1333 ab=0 actor=0 action=draw_card
+[TEST_BATON_TOUCH] test_play_to_stage(2108, area 0): area 0 already holds card 1333, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[DEBUT_COST_PENDING] card=2029 deferred=0xa001aa8d0 eff=0xa001aa8d0 cur=0 n=0 state=3
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0xa001aa8d0 target=0x0 eff=0xa001aa8d0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: Coco on Left: should draw (play -1, draw +2 => +1 net of -1) (got 1 expected 0)
+[DEBUT_COST_PENDING] card=2029 deferred=0xa001adbc0 eff=0xa001adbc0 cur=0 n=0 state=3
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0xa001adbc0 target=0x0 eff=0xa001adbc0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=2029 deferred=0xa001b0eb0 eff=0xa001b0eb0 cur=0 n=0 state=3
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0xa001b0eb0 target=0x0 eff=0xa001b0eb0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: Chisato on Left: draw 2 + discard 2 should net hand_before - 1 (got 0 expected 2)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: Chisato on Right: draw 2 + discard 2 should net hand_before - 1 (got 0 expected 2)
+FAIL: Chisato on Center should NOT have fired, but got SelectCard zone=hand count=2
+FAIL: Chisato on Center: should NOT activate (got 3 expected 1)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the stocked deck card was drawn
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019fb30 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: center should not draw (got 2 expected 0)
+FAIL: center must not even prompt for a discard
+FAIL: the deck is untouched by a no-draw debut (got 28 expected 30)
+FAIL: PL!S-pb1-024-L keep fixtures resolve
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001c4340 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[OPP_LIVE_SUCCESS_EVAL] host=1519 owner=0 actor=0 opponent=1 won=0 no_excess_requested=0 result=0
+FAIL: hand discard prompt expected
+FAIL: expected SelectCard for the discard
+FAIL: opponent succeeded too -> base draw + extra draw (got 1 expected 2)
+[OPP_LIVE_SUCCESS_EVAL] host=1519 owner=0 actor=0 opponent=1 won=0 no_excess_requested=0 result=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001c6e60 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[TEST_BATON_TOUCH] test_play_to_stage(2730, area 0): area 0 already holds card 940, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[TEST_BATON_TOUCH] test_play_to_stage(2733, area 0): area 0 already holds card 1016, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[TEST_BATON_TOUCH] test_play_to_stage(2736, area 0): area 0 already holds card 498, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[TEST_BATON_TOUCH] test_play_to_stage(2737, area 0): area 0 already holds card 495, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001cd4a0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[TEST_BATON_TOUCH] test_play_to_stage(2740, area 0): area 0 already holds card 488, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+FAIL: cost != 7 baton should NOT trigger draw, but got pending choice
+FAIL: replaced a cost-4 member -> deck should NOT shrink (got 0 expected 2)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001cd4a0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001cd4a0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=0 slot=0 cid=953 target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=1155 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001e7340 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: accepting waited the Niji member
+FAIL: the discard step put the chosen card in the waitroom
+FAIL: the untouched hand card is kept
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=1301 target=self count=-1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=0 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=1301 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=1301 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=1301 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=1301 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001e7340 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: turn-limited use recorded
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=1301 target=self count=-1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=0 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=1301 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=1301 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=1301 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=1301 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=1301 target=self count=-1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=0 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=1301 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=1301 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=1301 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=1301 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001ee000 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=58 target=self count=-1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=0 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=58 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=58 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=58 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=58 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001ee000 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+FAIL: accepted cost waits her
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001ee000 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001f0790 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001f0790 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target=self route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001f0790 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001f0790 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001f0790 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001f0790 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001f0790 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001f0790 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=4
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00226bc0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00226bc0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00226bc0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=2
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00226bc0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00226bc0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0022fc20 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0022fc20 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=585 deferred=0xa00232010 eff=0xa00232010 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00232010 target=0x0 eff=0xa00232010 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa00232010 action=draw_card is_cost=0 host=585
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: discard prompt 2 expected
+FAIL: re-prompt 3 expected (up-to-3 lets us stop)
+FAIL: 2 cards reached the waitroom (got 1 expected 2)
+[DEBUT_COST_PENDING] card=585 deferred=0xa00232ef0 eff=0xa00232ef0 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0xa00232ef0 target=0x0 eff=0xa00232ef0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: skipped cost -> 0 discarded -> draw 0 (got 3 expected 4)
+[DEBUT_COST_PENDING] card=585 deferred=0xa00234010 eff=0xa00234010 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00234010 target=0x0 eff=0xa00234010 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa00234010 action=draw_card is_cost=0 host=585
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: discard prompt 2 expected
+FAIL: discard prompt 3 expected
+FAIL: 3 cards reached the waitroom (got 1 expected 3)
+FAIL: drew 3 for 3 discarded (got 8 expected 7)
+[DEBUT_COST_PENDING] card=585 deferred=0xa00235130 eff=0xa00235130 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00235130 target=0x0 eff=0xa00235130 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa00235130 action=draw_card is_cost=0 host=585
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: discard prompt 2 expected
+FAIL: discard prompt 3 expected
+FAIL: 3 discarded (got 1 expected 3)
+FAIL: 3 drawn (got 18 expected 17)
+FAIL: hand_before - 1 (Rurino) - 3 discarded + 3 drawn (got 8 expected 7)
+[QUEUE_PID_NORMALIZE] entry=0 card=3033 ab=1 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=1 card=3034 ab=1 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=2 cid=3033 ab=1 actor=0 action=sequential
+[QUEUE_EXEC] idx=1 n=2 cid=3034 ab=1 actor=0 action=sequential
+FAIL: optional discard cost should be offered
+FAIL: decline path answers a SelectCard prompt
+[QUEUE_PID_NORMALIZE] entry=0 card=3035 ab=1 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=2 cid=3035 ab=1 actor=0 action=sequential
+[QUEUE_EXEC] idx=1 n=2 cid=3036 ab=1 actor=0 action=sequential
+FAIL: optional discard cost must be prompted
+FAIL: expected SelectCard for the any-number discard cost
+FAIL: up-to-N re-ask expected after the discard
+FAIL: expected SelectCard re-ask prompt
+FAIL: should draw 2 cards after discarding 1 (got 3 expected 2)
+FAIL: deck should have 18 remaining cards after drawing 2 (got 17 expected 18)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1163 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1163 ab=0 actor=0 action=sequential
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1163 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1163 ab=0 actor=0 action=sequential
+51 of 607 check(s) failed
+make[2]: *** [Makefile:515: t-run] エラー 1
+make[1]: *** [Makefile:354: t] エラー 2
+make: *** [Makefile:536: t-nogate] エラー 2

@@ -105,6 +105,8 @@ void rb_queue_init(RbAbilityQueue *q) {
     memset(q, 0, sizeof(*q));
     q->state = RB_QUEUE_IDLE;
     q->selected_heart_color = -1;
+    /* Option<i16> = None; 0 is a legal card index. */
+    q->pending_success_replacement_card_id = -1;
 }
 
 static void entry_clear_pending_actions(RbQueueEntry *e) {
@@ -142,6 +144,9 @@ void rb_queue_clear(RbAbilityQueue *q) {
     memset(q, 0, sizeof(*q));
     q->state = RB_QUEUE_IDLE;
     q->selected_heart_color = -1;
+    /* core/game_state/mod.rs:433-434 -- concede also clears
+     * `pending_success_replacement_card_id`, and this memset is that clear. */
+    q->pending_success_replacement_card_id = -1;
 }
 
 /* ==========================================================================

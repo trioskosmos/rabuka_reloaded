@@ -1,0 +1,72 @@
+make t-nogate: running T=deck_parser WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_deck_parser src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_deck_parser.c
+./rb_verdict ./rb_engine_t_deck_parser deck_parser
+ok: card-first quantity parses
+ok: card-first quantity is preserved
+ok: card-first identifier is normalized
+ok: unicode multiplication separator parses
+ok: unicode quantity is preserved
+ok: separator without spaces parses
+ok: separator quantity is preserved
+ok: inline hash comment is ignored
+ok: inline slash comment is ignored
+ok: zero quantity is rejected
+ok: invalid quantity is rejected
+ok: HTML deck content parses
+ok: HTML quantities expand in source order
+ok: first expanded card is source first
+ok: first quantity expands in place
+ok: bare card follows quantity
+ok: unicode quantity card follows
+ok: unicode quantity expands in place
+ok: null content fails
+ok: failed content parse initializes empty output
+ok: temporary deck fixture opens
+ok: deck file parses with status
+ok: deck file name uses the filename stem
+ok: deck file preserves entry lines
+ok: deck list expands to card numbers
+ok: deck list expansion preserves quantities
+ok: missing deck file returns I/O status
+ok: deck file error text is populated
+ok: deck status string is stable
+ok: plain card number normalises
+ok: plain card number is unchanged
+ok: trailing ASCII plus normalises
+ok: trailing ASCII plus is stripped
+ok: trailing ASCII bang normalises
+ok: trailing ASCII bang is stripped
+ok: trailing fullwidth plus (U+FF0B) normalises
+ok: trailing fullwidth plus is stripped
+ok: trailing fullwidth bang (U+FF01) normalises
+ok: trailing fullwidth bang is stripped
+ok: interior ASCII plus still normalises to a non-empty string
+ok: interior ASCII plus is left verbatim (Rust would widen it to U+FF0B)
+ok: surrounding whitespace is trimmed
+ok: trimming leaves the card number
+ok: NULL input is rejected
+ok: blank input is rejected
+ok: a token that is only a plus normalises to empty and is rejected
+ok: a buffer too small for the token is rejected, not truncated
+ok: U+00D7 multiplier is accepted (Rust's parse_line would return None)
+ok: U+00D7 multiplier quantity is 3
+ok: U+00D7 multiplier yields the card number
+ok: 'X' with no surrounding spaces is accepted (Rust would return None)
+ok: 'X' no-space quantity is 2
+ok: 'X' no-space splits card from quantity
+ok: an inline '#' comment is stripped (Rust keeps it and rejects the line)
+ok: inline '#' comment leaves quantity 1
+ok: inline '#' comment leaves the card number
+ok: quantity 0 is rejected (Rust returns Some((card_no, 0)) instead)
+ok: quantity 256 is rejected by both sides
+ok: a bare card number parses with quantity 1
+ok: bare card number quantity is 1
+ok: a token without '-' is not a card number
+ok: an empty line is skipped
+ok: a '//' comment line is skipped
+ALL DECK PARSER CHECKS PASSED
+PASSED: deck_parser  [exit=0, 0 result line(s), renormalised=0]

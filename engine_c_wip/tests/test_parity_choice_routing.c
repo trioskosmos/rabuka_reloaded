@@ -512,6 +512,142 @@ static void seed_entry_active(TestGame *tg, const char *owner, int active)
     tg->state.active = active;
 }
 
+/* ===========================================================================
+ * SECTION 8 -- the `select` SOURCE CARRIER (landed 2026-10-05)
+ *
+ * WHAT RUST REQUIRES
+ *   engine/src/ability/effects/selection.rs:45-52  `execute_select_effect`:
+ *       if effect.source_any().is_none()
+ *          && effect.heart_colors_any().is_empty()
+ *          && effect.or_card_types_any().is_none()
+ *          && effect.characters_any().is_none_or(|v| v.is_empty())
+ *          && effect.group_names_any().is_none()
+ *       { return self.execute_area_select(gs, effect); }
+ *   `source_any()` reads the DECODED `source` FIELD of AbilityEffect -- it is
+ *   not an extras-table lookup.
+ *
+ * WHAT THE C DID
+ *   src/ability/effects/draw.c:653 `rb_effect_select_effect` read the carrier
+ *   with `draw_extra(e, "source")`, i.e. an extras-table row. The only writer
+ *   of a `source` key is src/ability/vm.c:735, and it assigns the STRUCT FIELD
+ *   `e->source` -- it never calls effect_set_extra for that key. So
+ *   `draw_extra(e, "source")` was NULL for EVERY decoded select node, and the
+ *   area_select arm at draw.c:664 was taken for all of them.
+ *   MEASURED over the whole card corpus (tools/select_route_census.c):
+ *       select nodes                         73
+ *       e->source set (struct field)          39
+ *       extra("source") set                   0   <-- always NULL
+ *       routing BEFORE (draw_extra) area_select=14 heart_color=24 generic=35
+ *       routing AFTER  (Rust's source_any) area_select=4 heart_color=24 generic=45
+ *   i.e. 10 select nodes were offered an AREA prompt where Rust opens a card
+ *   SelectCard.
+ *
+ * THE OBSERVABLE TWIN
+ *   engine/tests/test_modules/effects/compound/cost_and_effect/
+ *   discard_score_energy_live_recovery_edges_test.rs:15-42
+ *   `discard_score_energy_live_recovery_no_live_in_discard_no_selection`:
+ *   after paying the hand-discard cost, with an EMPTY waitroom, Rust
+ *   auto-completes -- `assert!(!game.has_pending_choice())` at :37-40. The C
+ *   instead opened the area prompt (observed shape:
+ *   `kind=2 target="area_select" count=2 desc="Choose an area: left,right"`).
+ *
+ * THE ONE LEVEL DEEPER DEFECT THIS UNCOVERED (and fixed with it)
+ *   Correctly routing selection.rs:87 `execute_select` reaches a branch that
+ *   had never been reachable, and it carried a stale-pointer bug:
+ *   draw.c (phase 0) parked `g->queue.resume_eff = e`, and choice.c:5393
+ *   (the mode==5 C6 re-entry) forwarded that pointer back into
+ *   rb_effect_both_hand_shuffle_under. For a TRIGGER-driven activation the
+ *   ability tree is decoded onto the trigger handler's STACK, so by the time
+ *   the prompt is answered that node is dead -- measured
+ *   `RESUME_CAPTURE ... eff=0x7ffff9d20`, and dereferencing it took
+ *   parity_sequential `j_keep_three_draw_three` to SIGSEGV (exit 139). The
+ *   keep-N count is the only thing phases 1/2 read off the node, so it now
+ *   travels in `g->keep_shuffle_under_count` and the dead pointer is not
+ *   parked at all. This is the SAME alias class as the load-bearing deferred
+ *   frees: an owning node aliased past its frame.
+ * =========================================================================== */
+
+static void t_select_source_carrier_is_the_decoded_field(void)
+{
+    static TestGame tg;
+    int shizuku;
+    test_game_new(&tg);
+    shizuku = test_id(&tg, "PL!N-bp5-003-R");
+    if (shizuku < 0) { CHECK(0, "Q214 PL!N-bp5-003-R is in the database"); return; }
+
+    /* Decode the ability and find the `select` node Rust reads at
+     * selection.rs:45. Its source must live in the STRUCT FIELD. */
+    int n = rb_card_num_abilities((uint32_t)shizuku);
+    int found = 0, struct_field = 0, extra_row = 0;
+    for (int ai = 0; ai < n; ai++) {
+        Ability ab; memset(&ab, 0, sizeof(ab));
+        if (!rb_decode_card_ability((uint32_t)shizuku, ai, &ab)) continue;
+        for (int ci = 0; ab.effect && ci < ab.effect->n_child; ci++) {
+            const AbilityEffect *c = ab.effect->child[ci];
+            if (!c->action || strcmp(c->action, "select") != 0) continue;
+            found++;
+            if (c->source && *c->source) struct_field++;
+            for (int xi = 0; xi < c->n_extra; xi++)
+                if (c->extra_k[xi] && !strcmp(c->extra_k[xi], "source")) extra_row++;
+        }
+        rb_free_ability(&ab);
+    }
+    char msg[256];
+    snprintf(msg, sizeof(msg),
+             "selection.rs:45 -- Q214 decodes a `select` node whose source is "
+             "the case's whole subject (found=%d)", found);
+    CHECK(found > 0, msg);
+    CHECK(struct_field == found,
+             "selection.rs:45 `source_any()` -- EVERY `select` node carries its "
+             "source in the DECODED FIELD, which is the only carrier "
+             "draw.c:653 is allowed to read");
+    /* The regression this pins: draw.c read the extras table, and vm.c:735
+     * never writes that row, so the count was 0 and every node took the
+     * area_select arm. */
+    CHECK(extra_row == 0,
+             "vm.c:735 -- `source` is NEVER an extras-table row, so reading it "
+             "as one (the pre-fix draw.c:658) is what routed 10 nodes to "
+             "area_select");
+}
+
+static void t_q214_empty_waitroom_opens_no_prompt(void)
+{
+    static TestGame tg;
+    int shizuku, filler;
+    test_game_new(&tg);
+    shizuku = test_id(&tg, "PL!N-bp5-003-R");
+    filler  = test_id(&tg, "PL!-sd1-010-SD");
+    if (shizuku < 0 || filler < 0) {
+        CHECK(0, "Q214 + its PL!-sd1-010-SD filler are in the database");
+        return;
+    }
+    tg.state.p[0].stage[0] = filler;
+    tg.state.p[0].stage[1] = shizuku;
+    tg.state.p[0].stage[2] = filler;
+    tg.state.p[0].hand.n = 0;
+    tg.state.p[0].hand.cards[tg.state.p[0].hand.n++] = filler;
+    tg.state.p[0].discard.n = 0;              /* Rust :24 "waitroom empty" */
+    test_give_energy(&tg, 5);
+
+    /* Rust :26-34 UseAbility on shizuku, then :35 pay the hand cost. */
+    int fired = test_activate_ability(&tg, shizuku);
+    CHECK(fired, "Q214: the 起動 ability was queued (ActionType::UseAbility)");
+    int one[] = { 0 };
+    if (test_has_pending_choice(&tg)) test_select_indices(&tg, one, 1);
+
+    /* Rust :37-40 -- `assert!(!game.has_pending_choice(), "no live in discard
+     * should not prompt selection")`. This is the assertion the pre-fix C
+     * failed: it opened `target="area_select"` because selection.rs:45 was
+     * read off the wrong carrier. */
+    CHECK(!test_has_pending_choice(&tg),
+          "discard_score_energy_live_recovery_edges_test.rs:37-40 -- with an "
+          "EMPTY waitroom the recovery leg has no candidate, so Rust "
+          "auto-completes with NO prompt (pre-fix C opened area_select)");
+    CHECK(tg.state.p[0].hand.n == 0,
+             "discard_score_energy_live_recovery_edges_test.rs:41 -- the hand "
+             "cost was still paid and discarded");
+}
+
 static void t_reader_answers_the_routed_seat(void)
 {
     static TestGame tg;
@@ -691,6 +827,8 @@ int main(void)
     t_existing_stamp_survives_the_pause();
     t_json_key_names_the_routed_seat();
     t_web_surface_carries_the_key();
+    t_select_source_carrier_is_the_decoded_field();
+    t_q214_empty_waitroom_opens_no_prompt();
     t_reader_answers_the_routed_seat();
     t_second_json_producer_is_a_known_divergence();
     if (cases == 0) {

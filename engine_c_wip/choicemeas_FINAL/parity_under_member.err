@@ -1,0 +1,377 @@
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[SELECT_CARD_MULTI] n=2 count=2 zone=energy target=under_member
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[SELECT_CARD_MULTI] n=2 count=2 zone=energy target=under_member
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the paid energy left the energy zone  [activation_paid_under_energy_recovers_exact_nijigasaki_live]
+FAIL: the 虹ヶ咲 live reaches the hand  [activation_paid_under_energy_recovers_exact_nijigasaki_live]
+FAIL: the live leaves the waitroom  [activation_paid_under_energy_recovers_exact_nijigasaki_live]
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: first activation retrieves a 虹ヶ咲 live  [activation_once_per_turn_blocks_second_under_energy_payment_and_live_recovery]
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=gain_resource
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2642 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2642 ab=0 actor=0 action=gain_resource
+FAIL: control arm: with 0 energy under any member, no heart01 is granted (got 1 expected 0)  [live_start_with_under_energy_grants_one_heart01]
+FAIL: PROMPT CONTROL: the LiveStart condition is evaluated -- the 1-energy arm and the 0-energy arm do not agree  [live_start_with_under_energy_grants_one_heart01]
+[RESUME_ANY] kind=1 zone=hand target= route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00196080 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: 1 card is under sayaka after reveal -> under_member (got 0 expected 1)  [activation_reveals_same_name_hand_member_and_moves_it_under_self]
+FAIL: the revealed sayaka is the card under sayaka  [activation_reveals_same_name_hand_member_and_moves_it_under_self]
+FAIL: the revealed card is removed from hand, not duplicated  [activation_reveals_same_name_hand_member_and_moves_it_under_self]
+[RESUME_ANY] kind=1 zone=hand target= route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00196080 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: 1 card is under sayaka after the first activation (got 0 expected 1)  [sayaka_use_limit_enforced]
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+DEBUG [MOD_COST_ENTRY] op=add value=4 target=self
+DEBUG [MOD_COST_ENTRY] op=add value=4 target=self
+DEBUG [MOD_COST_ENTRY] op=add value=4 target=self
+FAIL: the left sayaka counts only the 3 cards under her (got 6 expected 3)  [two_live_start_sayaka_instances_count_only_their_own_under_cards]
+FAIL: the center sayaka counts only the 3 cards under her (got 6 expected 3)  [two_live_start_sayaka_instances_count_only_their_own_under_cards]
+DEBUG [MOD_COST_ENTRY] op=add value=4 target=self
+DEBUG [MOD_COST_ENTRY] op=add value=4 target=self
+DEBUG [MOD_COST_ENTRY] op=add value=4 target=self
+[TEST_BATON_TOUCH] test_play_to_stage(2640, area 1): area 1 already holds card 2639, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+FAIL: the displaced member's under-energy returns to the energy deck (got 0 expected 2)  [baton_touch_recycles_owner_under_energy]
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=0 hand_after=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=under_member target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: 1 energy moved back to the energy deck (got 0 expected 1)  [awakening_move_1_of_2]
+FAIL: 1 of the 2 under-cards remains (got 2 expected 1)  [awakening_move_1_of_2]
+FAIL: 3 heart02 (1 energy x 3 per card) (got 0 expected 3)  [awakening_move_1_of_2]
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=0 hand_after=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=under_member target=under_member route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=under_member target=under_member route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=0 hand_after=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=under_member target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: 1 energy moved back to the energy deck (got 0 expected 1)  [awakening_targets_energy_owner_member_only]
+FAIL: the energy owner gains heart02 x3 (got 0 expected 3)  [awakening_targets_energy_owner_member_only]
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=0 hand_after=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=under_member target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: 2 energy moved (got 0 expected 2)  [awakening_move_all_energy]
+FAIL: 0 under-cards remain (got 2 expected 0)  [awakening_move_all_energy]
+FAIL: 6 heart02 (2 energy x 3 per card) (got 0 expected 6)  [awakening_move_all_energy]
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+DEBUG [MOD_COST_ENTRY] op=add value=4 target=self
+[RESUME_ANY] kind=1 zone=hand target= route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00196080 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: exactly the material card is under her (got 0 expected 1)  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+FAIL: the material card is the one  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+FAIL: the material card left the hand  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+DEBUG [MOD_COST_ENTRY] op=add value=4 target=self
+FAIL: the material card is still under her (got 0 expected 1)  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+FAIL: and still not in hand  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+FAIL: +4 cost for 1 under member (got 0 expected 4)  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+FAIL: heart05=1 for 1 under member (got 0 expected 1)  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198dd0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[CHOICE_RESUME_END] pending=1 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198dd0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198dd0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[CHOICE_RESUME_END] pending=1 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198dd0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[CHOICE_RESUME_END] pending=1 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198dd0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=under_member target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the μ's member is deployed to the empty right area (got -1 expected 2640)  [kotori_deploy_to_empty_right]
+FAIL: nothing remains under kotori (got 1 expected 0)  [kotori_deploy_to_empty_right]
+[RESUME_ANY] kind=1 zone=under_member target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the μ's member is deployed to the only empty area (Left) (got -1 expected 2640)  [kotori_deploy_to_left_when_right_full]
+FAIL: nothing remains under kotori (got 1 expected 0)  [kotori_deploy_to_left_when_right_full]
+[RESUME_ANY] kind=1 zone=under_member target=under_member route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=under_member target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the first under member is the one deployed (got -1 expected 2640)  [kotori_multiple_under_only_one_deployed]
+FAIL: 1 card remains under kotori (got 2 expected 1)  [kotori_multiple_under_only_one_deployed]
+[DUMP karin ab#0] action=change_state target=opponent source=- dest=- count=1
+   extra[0]=state_change -> wait
+   extra[1]=original_value -> true
+   extra[2]=blade_limit_from_energy_under -> true
+   extra[3]=blade_limit_offset -> 1
+   extra[4]=blade_limit_operator -> <=
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: an opponent within the limit is waited  [energy_under_original_blade_limit_cost_moves_one_energy_from_zone_under_member]
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: a member exactly at the threshold IS waited (<=, not <)  [energy_under_original_blade_limit_boundary_exact_blade_waited]
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the threshold scales with energy under: 2 under -> <= 3 blades  [energy_under_original_blade_limit_threshold_scales_with_energy_under]
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: original blade 2 <= threshold 2; the +1 current-blade modifier is ignored  [energy_under_original_blade_limit_uses_original_blade_not_current]
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: PROMPT CONTROL: two eligible opponents require a selection prompt  [energy_under_original_blade_limit_multiple_candidates_selects_one]
+FAIL: exactly one member should be selected (got -1 expected 1)  [energy_under_original_blade_limit_multiple_candidates_selects_one]
+FAIL: the chosen member is waited  [energy_under_original_blade_limit_multiple_candidates_selects_one]
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: a single eligible opponent is auto-waited  [energy_under_original_blade_limit_single_candidate_auto_waited]
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: a non-Liella member on the stage fails the group condition (got 8 expected 7)  [non_liella_stage_member_blocks_wait_energy_placement_pl_sp_bp4_001_r]
+FAIL: the energy deck is untouched (got 2 expected 3)  [non_liella_stage_member_blocks_wait_energy_placement_pl_sp_bp4_001_r]
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2641 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2641 ab=0 actor=0 action=invalidate_ability
+[YELL_COND] host=2640 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_QUEUE] cid=2640 ability=0 passes=1 occurred=1 revealed=6
+[YELL_PERFORM] queued=1 entries=1 state=0 occurred=1 revealed=6
+[YELL_COND] host=2640 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=gain_resource
+[YELL_DRAIN] cid=2640 action=gain_resource has_cond=1 cond=0xa00196bb0 pending=0
+[YELL_EXEC_ENTER] host=2640 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=6
+[YELL_COND] host=2640 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_EXEC_COND] host=2640 occurred=1 revealed=6 result=1
+[YELL_COND] host=2640 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[2,0,4,0,0,0,0,0] filled=[0,0,3,3,0,0,0,0]
+[EARLY_SEAT] pl=0 won=0 no_excess=0 surplus=-1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[2,0,4,0,0,0,0,0] filled=[0,0,3,3,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=3 p2=0
+[CAN_PLACE_DECODE] cid=2641 ability=0 constant=0 trigger=ライブ開始時 action=invalidate_ability dest=-
+[CAN_PLACE_DECODE] cid=2641 ability=1 constant=0 trigger=ライブ成功時 action=move_cards dest=energy_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=2641 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_WAITROOM_BATCH] n=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[H] set_live=1 live_succeeded=0 zone_delta=1 deck_delta=1 orientation_is_wait=0 success_zone_n=0 discard_zone_n=7
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,0,3,0,2,2,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[H] set_live=0 live_succeeded=0 zone_delta=1 deck_delta=1 orientation_is_wait=0 success_zone_n=0 discard_zone_n=0
+FAIL: precondition: 元気全開 must reach the success live-card zone, or the ライブ成功時 that places the energy never runs. HARNESS LIMITATION in the C port: the performance allocates 3 heart04 where the live needs 4 (see [LIVE_ALLOCATION_CARD] on stderr), so the live FAILS and the window is never entered -- see genki_live_success_effect_fired_directly_places_waited_energy, which pins the effect itself  [live_success_places_one_waited_energy_card_for_the_opponent]
+FAIL: WWD's placed energy remains waited after the next active phase (got 1 expected 0)  [live_success_placed_energy_skips_next_active_phase_wwd_pl_sp_bp7_027_l]
+[DEBUT_COST_PENDING] card=2639 deferred=0xa00196880 eff=0xa00196880 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00196880 target=0x0 eff=0xa00196880 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa00196880 action=move_cards is_cost=0 host=2639
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=2639 deferred=0xa00196880 eff=0xa00196880 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0xa00196880 target=0x0 eff=0xa00196880 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=2639 deferred=0xa00196880 eff=0xa00196880 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00196880 target=0x0 eff=0xa00196880 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa00196880 action=move_cards is_cost=0 host=2639
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: PROMPT CONTROL: the 起動 {E} cost is charged  [margarete_bp4_010_r_activation_waits_self_and_places_waited_energy]
+FAIL: the activation cost waits this member  [margarete_bp4_010_r_activation_waits_self_and_places_waited_energy]
+FAIL: the {E} cost consumed one active energy; the placed card is WAITED (got 5 expected 4)  [margarete_bp4_010_r_activation_waits_self_and_places_waited_energy]
+FAIL: PROMPT CONTROL: the 起動 {E} cost is still charged  [margarete_bp4_010_r_empty_energy_deck_still_waits_self_without_placing_energy]
+FAIL: the wait IS the cost and applies regardless  [margarete_bp4_010_r_empty_energy_deck_still_waits_self_without_placing_energy]
+FAIL: PROMPT CONTROL: the self-wait cost really was paid  [margarete_bp4_010_r_energy_deck_pick_is_the_top_card_without_a_prompt]
+FAIL: 0 energy: the activation is refused (got 1 expected 0)  [margarete_bp4_010_r_no_energy_refused_without_waiting_self]
+FAIL: refused: the energy deck is untouched (got 1 expected 2)  [margarete_bp4_010_r_no_energy_refused_without_waiting_self]
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=6
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,1,1,8,2,1,1,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,1,1,0,0,1,0] filled=[0,0,1,2,0,0,1,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=10
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2639 ab=0 occurrence=0 use_limit=-1 effect=move_cards options=0
+[LIVE_SUCCESS_QUEUE] cid=2639 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=1 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,1,1,8,2,1,1,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,1,1,0,0,1,0] filled=[0,0,1,2,0,0,1,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=1 p2=0
+[CAN_PLACE_DECODE] cid=2639 ability=0 constant=0 trigger=ライブ成功時 action=move_cards dest=energy_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=2639 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0

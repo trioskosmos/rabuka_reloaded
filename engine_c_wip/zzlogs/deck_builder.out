@@ -1,0 +1,71 @@
+make t-nogate: running T=deck_builder WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_deck_builder src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_deck_builder.c
+./rb_verdict ./rb_engine_t_deck_builder deck_builder
+ok: deck builder accepts mixed main input
+ok: energy cards are removed from main deck
+ok: energy deck is filled to capacity
+ok: main deck entries receive copy ids
+ok: member copy resolves to member card
+ok: live copy resolves to live card
+ok: every energy entry is classified as energy
+ok: every energy entry is classified as energy
+ok: every energy entry is classified as energy
+ok: every energy entry is classified as energy
+ok: every energy entry is classified as energy
+ok: every energy entry is classified as energy
+ok: every energy entry is classified as energy
+ok: every energy entry is classified as energy
+ok: every energy entry is classified as energy
+ok: every energy entry is classified as energy
+ok: every energy entry is classified as energy
+ok: every energy entry is classified as energy
+ok: duplicate physical cards use distinct copies
+ok: copy modifier applies to selected copy
+ok: copy modifier does not leak to sibling
+ok: main deck overflow is rejected
+ok: overflow leaves output empty
+ok: non-energy energy input is rejected
+ok: invalid energy input leaves output empty
+ok: unknown card id is rejected
+ok: energy-only input uses default main-empty deck
+ok: energy-only deck still fills energy capacity
+ok: deck list expands quantities
+ok: deck list quantity creates two main cards
+ok: deck list energy is filled
+ok: second deck list builds independently
+ok: built decks initialize a game
+ok: opening energy draw leaves nine energy cards
+ok: opening setup places three energy cards
+ok: opening energy cards are active
+ok: deck builder resolves card numbers
+ok: resolved main card count is preserved
+ok: resolved energy count is filled
+ok: the card database has at least one energy card
+ok: LL-E-001-SD is NOT the first energy by index, so the pin is a real choice
+ok: the pinned energy template decodes
+ok: pinned energy template has cost 0
+ok: pinned template is classified as energy
+ok: single energy card is accepted
+ok: energy deck is padded to capacity
+ok: padding repeats the first supplied energy template, not the pin
+ok: padding repeats the first supplied energy template, not the pin
+ok: padding repeats the first supplied energy template, not the pin
+ok: padding repeats the first supplied energy template, not the pin
+ok: padding repeats the first supplied energy template, not the pin
+ok: padding repeats the first supplied energy template, not the pin
+ok: padding repeats the first supplied energy template, not the pin
+ok: padding repeats the first supplied energy template, not the pin
+ok: padding repeats the first supplied energy template, not the pin
+ok: padding repeats the first supplied energy template, not the pin
+ok: padding repeats the first supplied energy template, not the pin
+ok: known card numbers build
+ok: the negative fixture really is unknown to the database
+ok: an unknown card number is rejected, not skipped (Rust would skip)
+ok: a rejected build leaves the output empty
+ok: a trailing '+' still resolves to its base card
+ALL DECK BUILDER CHECKS PASSED
+PASSED: deck_builder  [exit=0, 0 result line(s), renormalised=0]

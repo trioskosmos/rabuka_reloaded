@@ -170,7 +170,16 @@ fn run_rollout(
         GameResult::Ongoing => {
             let end_s = state.player1.success_live_card_zone.cards.len() as f64
                 - state.player2.success_live_card_zone.cards.len() as f64;
-            let turns = (state.turn_number - obs.turn_number).max(1) as f64;
+            // `saturating_sub`, not `-` then `.max(1)`. Both `turn_number`s are
+            // `u8`, so a state that carries FEWER turns than the observation it
+            // was sampled from underflowed: debug builds panicked, release
+            // wrapped to ~250, and the `.max(1)` could not rescue it because it
+            // ran after the wrap. The value is a per-turn rate, so dividing by
+            // ~250 instead of 1 silently flattens it to nearly zero rather than
+            // looking wrong. The sampled state only ever advances from `obs`,
+            // so this has no reachable case today — but the guard belongs where
+            // the subtraction is, not three tokens away where it reads like one.
+            let turns = state.turn_number.saturating_sub(obs.turn_number).max(1) as f64;
             ((end_s - start_success) / turns, false)
         }
     }

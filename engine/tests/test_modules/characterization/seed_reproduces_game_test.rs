@@ -40,6 +40,7 @@
 use rabuka_engine::bin_common;
 use rabuka_engine::bot::{registry::BotKind, strategy_v2, strategy_v3};
 use rabuka_engine::card::CardDatabase;
+use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game_setup::{self, ActionType};
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::replay::observe;
@@ -47,16 +48,28 @@ use rabuka_engine::rng::Lcg;
 use rabuka_engine::turn::TurnEngine;
 use std::sync::Arc;
 
+/// The card data, embedded so the probe never depends on the working directory.
+/// Same file, same loader, as `helpers::load_real_database`.
+const CARDS_JSON: &str = include_str!("../../../../cards/cards.json");
+
 /// The deck under test. `bin_common::load_deck` reads
 /// `web_ui/decks/<name>.txt` and hard-errors if it is absent, so this cannot
 /// silently become a different matchup.
 const DECK: &str = "5CP3Z idou";
 
-/// How many times to replay the identical seeded game. Each replay starts from
-/// a fresh clone of the database, hence a fresh set of iteration orders. Two
-/// replays agreeing proves nothing; the point is that all of them agree, and
-/// more replays means more independently-ordered maps to disagree.
-const REPLAYS: usize = 4;
+/// How many times to replay the identical seeded game.
+///
+/// Each replay rebuilds the card database FROM SCRATCH rather than cloning it,
+/// and that distinction is the whole point. A `HashMap` clone reproduces the
+/// source map's bucket layout, so every clone iterates in the SAME order — which
+/// means a clone-based probe is structurally blind to "some code picks the first
+/// match out of a map". Cloning proved nothing about that class; re-parsing
+/// gives a new `RandomState` and a new layout, so any surviving
+/// order-dependence shows up as two replays disagreeing.
+///
+/// Card ids stay stable across fresh parses (`load_or_create` assigns them in
+/// `card_no` order), so the replays remain directly comparable.
+const REPLAYS: usize = 3;
 
 /// Per-game iteration cap, matching `sim_bench`. A game that reaches it has
 /// not finished, which `each_game_reaches_a_terminal_result` reports on
@@ -78,8 +91,14 @@ fn game_seeds(base: u32, game: u32) -> (u32, u64) {
     (engine, 0x5EED_1234_ABCD_0001 ^ u64::from(engine))
 }
 
-fn decision_player(gs: &GameState) -> &rabuka_engine::player::Player {
-    if gs.has_pending_choice() {
+/// Who has to answer right now.
+///
+/// `has_pending` is passed in rather than re-derived here so both routing
+/// helpers read the choice state the caller already resolved for this
+/// iteration. Deriving it twice is not just redundant: it invites the two
+/// helpers to disagree about the same position.
+fn decision_player(gs: &GameState, has_pending: bool) -> &rabuka_engine::player::Player {
+    if has_pending {
         if gs.can_player_act(0) {
             return &gs.player1;
         }
@@ -97,8 +116,8 @@ enum PolicyRoute {
     LiveSet,
 }
 
-fn policy_route(gs: &GameState) -> PolicyRoute {
-    if gs.has_pending_choice() {
+fn policy_route(gs: &GameState, has_pending: bool) -> PolicyRoute {
+    if has_pending {
         return PolicyRoute::Action;
     }
     match gs.current_phase {
@@ -133,11 +152,20 @@ fn policy_call<T>(call: impl FnOnce() -> T) -> T {
 /// loop is the one the benchmarks measure and the one the PPO pipeline collects
 /// from. If this loop and that one disagree, the discrepancy is worth knowing,
 /// but a divergence *between replays* is the bug this file exists to find.
-fn play(base_db: &CardDatabase, card_numbers: &[String], engine_seed: u32, arena_seed: u64, policy: BotKind) -> Replay {
-    // A fresh clone means fresh `HashMap`s, which means a fresh `RandomState`
-    // and a fresh iteration order for every map the game goes on to build.
-    // Card ids survive the clone, so the replays stay directly comparable.
-    let mut db = Arc::new(base_db.clone());
+fn play(card_numbers: &[String], engine_seed: u32, arena_seed: u64, policy: BotKind) -> Replay {
+    // Re-parsed, not cloned. `CardDatabase::clone()` copies the existing
+    // `HashMap`s, and a copied `HashMap` iterates in the same order as its
+    // source — so a cloned database would hand every replay an identical map
+    // layout and this file could not see order-dependence at all. Parsing from
+    // `CARDS_JSON` again allocates new maps with a new `RandomState`, which is
+    // what actually perturbs iteration order.
+    //
+    // The parse is the same one `helpers::load_real_database` and
+    // `bin_common::fresh_database` use, so this is the real loading path, not a
+    // test-only substitute.
+    let cards = CardLoader::load_cards_from_strs(CARDS_JSON)
+        .expect("cards.json parses through the real loader");
+    let mut db = Arc::new(CardDatabase::load_or_create(cards));
     let (t1, t2) = game_setup::build_two_decks(&mut db, card_numbers, card_numbers)
         .expect("build deck from the real card database");
 
@@ -192,11 +220,15 @@ fn play(base_db: &CardDatabase, card_numbers: &[String], engine_seed: u32, arena
             continue;
         }
 
-        let decision_id = decision_player(&gs).id.clone();
+        // One read of the choice state per iteration, shared by both routing
+        // helpers below. `auto_advance_one` may have opened or closed a prompt,
+        // so this is resolved after it, not before.
+        let has_pending = gs.get_pending_choice().is_some();
+        let decision_id = decision_player(&gs, has_pending).id.clone();
         let me = u8::from(decision_id != gs.player1.id);
         let policy_is_p1 = me == 0;
         let chosen = if policy == BotKind::Random {
-            match policy_route(&gs) {
+            match policy_route(&gs, has_pending) {
                 PolicyRoute::Mulligan => policy_call(|| {
                     BotKind::Random.choose_mulligan(&gs, &actions, &gs.card_database)
                 }),
@@ -220,7 +252,7 @@ fn play(base_db: &CardDatabase, card_numbers: &[String], engine_seed: u32, arena
                 _ => actions[rng.range(actions.len())].clone(),
             }
         } else {
-            match policy_route(&gs) {
+            match policy_route(&gs, has_pending) {
                 PolicyRoute::Mulligan => policy_call(|| {
                     policy.choose_mulligan(&gs, &actions, &gs.card_database)
                 }),
@@ -275,11 +307,10 @@ fn matrix() -> &'static [(BotKind, Vec<Replay>)] {
 }
 
 fn replays(policy: BotKind) -> Vec<Replay> {
-    let base = bin_common::fresh_database();
     let card_numbers = bin_common::load_deck(DECK);
     let (engine_seed, arena_seed) = game_seeds(1, 1);
     (0..REPLAYS)
-        .map(|_| play(&base, &card_numbers, engine_seed, arena_seed, policy))
+        .map(|_| play(&card_numbers, engine_seed, arena_seed, policy))
         .collect()
 }
 

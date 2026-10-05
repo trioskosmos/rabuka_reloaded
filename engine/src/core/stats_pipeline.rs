@@ -217,8 +217,22 @@ pub fn effective_need_heart(
         return Some(base.clone());
     }
     let mut adjusted = base.clone();
+    // Iterate the modifiers in a fixed order. `card_mods` is a `HashMap`, and
+    // `HeartMap` is a `SmallVec`, so inserting a colour that was not already
+    // present APPENDS it — which meant the physical order of `adjusted.hearts`
+    // depended on map iteration order.
+    //
+    // That order is not cosmetic. `check_heart_requirement` walks `need.hearts`
+    // spending a single shared `wildcard_remaining` budget as it goes and
+    // short-circuiting `return false` on the first shortfall, so which colour's
+    // deficit consumes the wildcard depends on the order it is handed. Sorting
+    // by `(index, as_str())` makes the requirement evaluation a function of the
+    // card data rather than of the map.
+    let mut ordered: Vec<(&HeartColor, &ModifierEntry)> = card_mods.iter().collect();
+    ordered.sort_by_key(|(color, _)| (color.index(), color.as_str()));
+
     // Q115/Q127: Set-to-X applies first (per-color), then additive stacks.
-    for (color, me) in card_mods {
+    for &(color, me) in &ordered {
         if me.set != 0 {
             adjusted.hearts.insert(*color, me.set.u8_count());
             log::debug!(
@@ -230,7 +244,7 @@ pub fn effective_need_heart(
             );
         }
     }
-    for (color, me) in card_mods {
+    for &(color, me) in &ordered {
         if me.additive != 0 {
             let new_val = crate::constants::saturate_u8(
                 i32::from(adjusted.hearts.get(color).copied().unwrap_or(0)) + i32::from(me.additive),

@@ -4035,19 +4035,39 @@ void rb_resolver_handle_select_target(RbAbilityResolver *self, GameState *g,
         return;
     }
     if (!strcmp(tgt, "position|destination") || !strcmp(tgt, "position_destination")) {
-        /* choice.rs:2710-2717 — a `position|destination` answer whose entry
-           carries `ChoiceRoute::Raw("position_change…")` is routed to
-           handle_position_change_choice BEFORE the SelectTargetKind match, and
-           handle_position_change_choice is what calls
-           execute_position_change_with_destination (choice.rs:3208). The C
-           stores no choice_card_no, but misc.c `h_execute_position_change` is
-           the ONLY producer of this target string and it is the port of
-           position.rs:91 `execute_position_change`, which always stamps
-           `Raw("position_change…")` on the entry before raising the prompt
-           (position.rs:143/197/266/367/419/480/546). So the route is
-           unconditional here, and "position_change:self" is the spelling
-           position.rs:480 writes for the destination-less step. */
-        rb_resolver_handle_position_change_choice(self, g, "position_change:self", sel);
+        /* choice.rs:2819-2826 — `Some(ChoiceRoute::Raw(s)) if
+           s.starts_with("position_change") => return self
+           .handle_position_change_choice(gs, choice_card_no, selected)`. The
+           route is the ENTRY's `choice_card_no`, and it is the ONLY thing that
+           tells handle_position_change_choice WHICH seat and WHICH source
+           position the answer applies to (choice.rs:3119-3155 splits it back
+           into target / explicit_source_pos).
+
+           This arm used to pass the LITERAL "position_change:self", which
+           discards both halves: the tail misc.c already stamped on the entry
+           (`position_change:{target}:{tail}`, position.rs:151/273/427) and the
+           real target. `explicit_source_pos` therefore stayed NULL and the
+           answer fell to the fallback at the bottom of
+           rb_resolver_handle_position_change_choice, which needs the ACTIVATING
+           member — but `resume_eff` is NULL on this path and `s_activating_card`
+           has already been cleared, so NOTHING moved and the swap was silently
+           dropped.
+
+           The entry's route string is read from the pair the header reserves for
+           it (`has_choice_route_raw` / `choice_route_raw`, ability_queue.c:466).
+           The fallback keeps the old literal for a prompt raised with no current
+           entry, which is the only way that stamp can be absent. */
+        char route_buf[80];
+        const char *route = "position_change:self";
+        int cur = g->queue.cur;
+        if (cur >= 0 && cur < g->queue.n_entries) {
+            const RbQueueEntry *en = &g->queue.entries[cur];
+            if (en->has_choice_route_raw && en->choice_route_raw[0]) {
+                snprintf(route_buf, sizeof(route_buf), "%s", en->choice_route_raw);
+                route = route_buf;
+            }
+        }
+        rb_resolver_handle_position_change_choice(self, g, route, sel);
         return;
     }
     /* area_select (result_handlers.rs:89-113). This arm was ABSENT here — the
@@ -5254,7 +5274,19 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
     if (saved_pending.target[0] && !strcmp(saved_pending.target, "success_replacement")) {
         int pl = (replacement_actor >= 0 && replacement_actor <= 1) ? replacement_actor : actor;
         int physical_index = map_choice_index(&saved_pending, selected_idx);
-        rb_handle_success_replacement_choice(g, pl, host, physical_index, !was_skip);
+        /* turn/actions/mod.rs:894 -- `if let Some(replaced_card_id) =
+         * game_state.pending_success_replacement_card_id.take()`. The `.take()`
+         * is load-bearing: it LEAVES None behind, so a second read of the same
+         * prompt cannot see the card again. Read from the DEDICATED field, not
+         * from the shared `resume_host` (whose value is whatever the last resume
+         * path left there). The `host` fallback can only be reached if some other
+         * producer raised target="success_replacement" without stamping the slot,
+         * which is not a shape this tree has; it keeps the pre-fix behaviour for
+         * it rather than silently replacing card 0. */
+        int replaced_card_id = g->queue.pending_success_replacement_card_id;
+        g->queue.pending_success_replacement_card_id = -1;   /* Option::take() */
+        if (replaced_card_id < 0) replaced_card_id = host;
+        rb_handle_success_replacement_choice(g, pl, replaced_card_id, physical_index, !was_skip);
         if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries)
             rb_queue_complete_current(g);
         g->queue.resume_mode = 0;

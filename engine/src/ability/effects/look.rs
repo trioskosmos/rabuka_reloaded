@@ -1175,8 +1175,17 @@ pub fn execute_reveal(
 
         let pg_source = gs.current_ability_source_card_id();
         let pg_owner = util::target_player_index(target, gs.ability_master_id());
-        for members in by_group.values() {
-            for &card_id in members {
+        // Groups in a fixed order. `by_group` is a `HashMap`, so iterating
+        // `.values()` revealed the groups in a different order every process,
+        // and `gs.revealed_cards` is the source list for the `SelectCard` choice
+        // that offers the revealed cards — so the AI resolving that choice by
+        // `rand_range` was picking a different card run to run, off the same
+        // seed. The set revealed was always the same; the ORDER is what the
+        // engine was accidentally randomising.
+        let mut groups: Vec<&String> = by_group.keys().collect();
+        groups.sort();
+        for group_name in groups {
+            for &card_id in &by_group[group_name] {
                 gs.push_revealed_card(card_id, pg_source, false, pg_owner, "ability");
             }
         }

@@ -182,11 +182,23 @@ impl DeckBuilder {
         let needed = 12_usize.saturating_sub(current_count);
 
         if needed > 0 {
-            // Find a template energy card
+            // Find a template energy card.
+            //
+            // `HashMap::iter()` has no defined order, so `find` here was
+            // first-match-wins over an arbitrary permutation of the whole card
+            // database: the chosen template — and therefore the card id of all
+            // 12 energy cards in every deck built by this path — changed from
+            // process to process. Anything keyed on the energy card's id (an
+            // ability, a cost, energy-deck order) then diverged between runs
+            // from the same seed.
+            //
+            // `min_by_key` on the card number makes the choice a function of the
+            // card data rather than of the map's iteration order.
             let template_energy_id = card_db
                 .cards
                 .iter()
-                .find(|(_, card)| card.is_energy())
+                .filter(|(_, card)| card.is_energy())
+                .min_by_key(|(_, card)| card.card_no.as_ref())
                 .map(|(id, _)| *id);
 
             if let Some(template_id) = template_energy_id {

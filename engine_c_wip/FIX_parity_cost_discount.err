@@ -1,0 +1,184 @@
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=modify_yell_count
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=modify_yell_count
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=modify_yell_count
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2640 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2639 ab=1 actor=0 action=modify_yell_count
+[QUEUE_EXEC] idx=1 n=2 cid=2640 ab=1 actor=0 action=modify_yell_count
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=modify_yell_count
+FAIL: 7 == 7 is not MORE than the opponent -> no +2 even at the >= 7 gate  (got 2, expected 0)
+        [c_equal_energy_denies_bonus]
+FAIL: 7 < 9 is not more than the opponent -> no +2  (got 2, expected 0)
+        [c_less_energy_denies_bonus]
+FAIL: P1 == P2 energy -> no +2 for P1  (got 2, expected 0)
+        [c_mirror_equal_energy_neither_gets_bonus]
+FAIL: P2 == P1 energy -> no +2 for P2  (got 2, expected 0)
+        [c_mirror_equal_energy_neither_gets_bonus]
+FAIL: 7 < 9 -> the +2 must be removed on the next recalc  (got 2, expected 0)
+        [c_plus2_turns_off_when_opponent_catches_up]
+FAIL: setup: no +2 (equal energy)  (got 2, expected 0)
+        [c_gate_without_bonus_offers_base_cost]
+FAIL: without the bonus the gate must price the baton at the base 9-2=7  (got 5, expected 7)
+        [c_gate_without_bonus_offers_base_cost]
+FAIL: the ENERGY ACTUALLY CHARGED must be base + 1 = 5, not the base 4  (got 4, expected 5)
+        [e_success_zone_deploy_spends_base_plus_one]
+FAIL: exactly base + 1 = 5 energy consumed out of base + 6 = 10  (got 6, expected 5)
+        [e_success_zone_deploy_spends_base_plus_one]
+FAIL: cost 4 reduced to 3: exactly 3 energy paid  (got 4, expected 3)
+        [f_reduction_applies_to_no_ability_member]
+FAIL: cost 4 reduced to 3  (got 4, expected 3)
+        [f_cost_four_pays_three_energy]
+FAIL: cost 4 reduced by 2 -> exactly 2 energy paid (the reductions stack)  (got 4, expected 2)
+        [f_reduction_stacks]
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+FAIL: resolution charges the REDUCED cost 2 (5 - 2 = 3), not the printed 4  (got 1, expected 3)
+        [g_reduction_charges_effective_cost]
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+[RESUME_ANY] kind=1 zone=stage target=change_state route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0xa00198b70 target=0x0 eff=0xa00198b70 cur=0 n=0 state=0 pending=1
+[STAGE_TARGET_RESULT] pick=1 slot=1 cid=2642 target=change_state
+[RESUME_EXEC] def=0xa00198b70 action=change_state is_cost=0 host=2639
+DEBUG [EXEC_CHANGE_STATE] entry: actor=1 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2640 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2640 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=2640 to selected_cards (len=1)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=2640 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the SECOND physical instance is the one that waited
+        [g_selects_one_eligible_opponent_physical_instance]
+FAIL: the reduced 3-energy cost was charged in full  (got 3, expected 0)
+        [g_selects_one_eligible_opponent_physical_instance]
+FAIL: no reduction from a stage-resident source even with many hand cards  (got 3, expected 0)
+        [h_on_stage_card_ignores_hand_for_other_card_cost]
+FAIL: CONTROL: 3 cards in hand prices the card at 20 - 2 = 18  (got 17, expected 18)
+        [i_hand_size_reduces_play_cost_with_zero_floor]
+FAIL: with 18 energy the play succeeds (20 - 2 reduction)  (got 0, expected 1)
+        [i_hand_size_reduces_play_cost_with_zero_floor]
+FAIL: all 18 energy is consumed  (got 18, expected 0)
+        [i_hand_size_reduces_play_cost_with_zero_floor]
+FAIL: the card must be playable for 0 energy with 25 cards in hand  (got 0, expected 1)
+        [i_hand_size_reduces_play_cost_with_zero_floor]
+FAIL: 国木田花丸 is discarded to the waitroom
+        [k_gameplay_accept_cost10_discards_hand]
+FAIL: 優木せつ菜 is discarded to the waitroom
+        [k_gameplay_accept_cost10_discards_hand]
+FAIL: 嵐千砂都 is discarded to the waitroom
+        [k_gameplay_accept_cost10_discards_hand]
+FAIL: the hand no longer holds 国木田花丸
+        [k_gameplay_accept_cost10_discards_hand]
+FAIL: exactly the three named cards were discarded  (got 0, expected 3)
+        [k_gameplay_accept_cost10_discards_hand]
+FAIL: PROMPT CONTROL: NO play-time choice is offered when the hand cannot cover the three required members
+        [k_gameplay_no_hand_cards_no_choice_pays15]
+FAIL: PROMPT CONTROL: the hand holds only the card being played, so no 10-energy alternative may be offered
+        [k_waitroom_fodder_cannot_enable_ten_energy_play]
+FAIL: PROMPT CONTROL: 嵐千砂都 is missing from the hand, so no choice
+        [k_gameplay_incomplete_hand_no_choice]
+FAIL: the second copy is the discarded fodder
+        [k_second_copy_can_be_used_as_one_fodder]
+FAIL: PROMPT CONTROL: a single multi-name card must not count for two slots
+        [k_one_card_cannot_cover_two_slots]
+FAIL: exactly three cards are discarded  (got 0, expected 3)
+        [k_optimal_assignment_with_multi_name]
+FAIL: PROMPT CONTROL: the card being played is excluded from the hand check, so it cannot be its own fodder
+        [k_played_card_not_counted_as_fodder]
+FAIL: PROMPT CONTROL: the energy card must not count as member fodder
+        [k_non_member_dual_name_does_not_count]
+FAIL: exactly three cards are discarded  (got 0, expected 3)
+        [k_with_extra_unrelated_cards_still_offers_choice]
+[QUEUE_PID_NORMALIZE] entry=0 card=2641 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2641 ab=0 actor=0 action=draw_card
+FAIL: exactly three cards are discarded  (got 0, expected 3)
+        [k_many_duplicates_still_finds_assignment]
+FAIL: 6 in hand - 1 played - 3 discarded = 2 remain  (got 5, expected 2)
+        [k_many_duplicates_still_finds_assignment]
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[QUEUE_PID_NORMALIZE] entry=0 card=2640 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=draw_card
+[ABILITY_LOG_OVERFLOW] verdict ring full (32 slots); dropped=1 dropping NEWEST (oldest kept) — last push len=67 head="自分の控え室からライブカードを1枚手札に加える"
+FAIL: PROMPT CONTROL: the fodder is exhausted, so the second play has no alternative -- a lingering set-cost would still offer one
+        [k_cost_cleared_after_play_and_second_play_costs_15]
+FAIL: PROMPT CONTROL: a stage-resident 国木田花丸 must not enable the 10-energy play
+        [k_stage_member_not_counted_as_hand_fodder]
+FAIL: PROMPT CONTROL: playing ミア with waitroom members must offer the play-time cost reduction (L2's decline arm is vacuous without this)
+        [l_accept_reduces_cost_by_2]
+FAIL: accepted: 13 - 2 = 11 paid, 2 energy remain  (got 0, expected 2)
+        [l_accept_reduces_cost_by_2]
+FAIL: accepted: the waitroom members are shuffled out into the deck  (got 2, expected 0)
+        [l_accept_reduces_cost_by_2]
+FAIL: accepted: the two waitroom members moved to the deck bottom  (got 0, expected 2)
+        [l_accept_reduces_cost_by_2]
+FAIL: PROMPT CONTROL: the choice is genuinely offered. Without this the three assertions below would pass on a board where the feature is simply dead, which is the vacuity the brief warns about
+        [l_decline_pays_full_cost]
+FAIL: PROMPT CONTROL: the choice is still offered with an empty waitroom
+        [l_no_waitroom_members_still_offers_choice]
+FAIL: accepted: the cost is reduced to 11 even with no waitroom members  (got 0, expected 2)
+        [l_no_waitroom_members_still_offers_choice]
+FAIL: paid 17 - 2 = 15 out of 20  (got 3, expected 5)
+        [n_reduces_cost_seventeen_group_member_by_two]
+FAIL: 10 negative assertion(s) could not be proven non-vacuous (see the VACUOUS lines above)
+make[2]: *** [Makefile:515: t-run] エラー 1
+make[1]: *** [Makefile:354: t] エラー 2
+make: *** [Makefile:536: t-nogate] エラー 2

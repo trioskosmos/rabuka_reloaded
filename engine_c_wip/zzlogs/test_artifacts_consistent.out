@@ -1,0 +1,11 @@
+make t-nogate: running T=test_artifacts_consistent WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+make t T=test_artifacts_consistent: NO SUCH SUITE: tests/test_test_artifacts_consistent.c does not exist.
+  This now fails on purpose. Before the check existed it printed nothing
+  and exited 0, which is indistinguishable from a green suite.
+  Real suites: make suites
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

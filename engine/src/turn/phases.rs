@@ -353,7 +353,7 @@ impl super::TurnEngine {
     fn execute_performance_phase(game_state: &mut GameState, is_first: bool) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("execute_performance_phase");
-        let nhm_flat: Vec<(
+        let mut nhm_flat: Vec<(
             i16,
             crate::card::HeartColor,
             crate::core::game_modifiers::ModifierEntry,
@@ -367,6 +367,12 @@ impl super::TurnEngine {
                     .map(move |(&color, entry)| (card_id, color, *entry))
             })
             .collect();
+        // Both levels are `HashMap`s, so this flatten ran in an arbitrary order.
+        // The consumer dedups `(card_id, color)` with first-wins semantics and
+        // resolves conflicting `set` values the same way, so which duplicate
+        // survived a snapshot restore depended on iteration order. Sorting makes
+        // the survivor a function of the card data.
+        nhm_flat.sort_by_key(|(card_id, color, _)| (*card_id, color.index(), color.as_str()));
         let player_id = if is_first {
             game_state.first_attacker().id.clone()
         } else {

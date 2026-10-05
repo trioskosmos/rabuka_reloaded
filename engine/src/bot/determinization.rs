@@ -169,6 +169,15 @@ impl DeterminizationSampler {
                 }
             }
         }
+        // Sorted, because `starting_counts` is a `HashMap` and the order of this loop
+        // sets the composition order of `remaining`. The shuffle below makes the
+        // final arrangement random, but it permutes whatever order it is handed —
+        // so a map-order-dependent input order still produced a different deck
+        // from the same seed. Sorting makes the pre-shuffle order a function of
+        // the counts rather than of the map.
+        let mut starting_counts: Vec<(String, usize)> = starting_counts.into_iter().collect();
+        starting_counts.sort_by(|a, b| a.0.cmp(&b.0));
+
         let mut remaining: Vec<String> = Vec::new();
         for (cn, total) in starting_counts {
             let seen = seen_counts.get(&cn).copied().unwrap_or(0);
@@ -231,10 +240,14 @@ impl DeterminizationSampler {
 
     /// Any non-energy card_no, used to pad undersized decks in fair mode.
     fn fallback_card_no(&self) -> Option<String> {
+        // `min_by_key`, not `find`: `find` over a `HashMap` made the padding
+        // card a function of iteration order, so an undersized deck was padded
+        // with a different card in every process.
         self.card_database
             .cards
             .values()
-            .find(|c| !matches!(c.card_type, crate::card::CardType::Energy))
+            .filter(|c| !matches!(c.card_type, crate::card::CardType::Energy))
+            .min_by_key(|c| c.card_no.as_ref())
             .map(|c| c.card_no.to_string())
     }
 }

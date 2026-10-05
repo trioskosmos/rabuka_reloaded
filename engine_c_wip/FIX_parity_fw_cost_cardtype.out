@@ -1,0 +1,19 @@
+make t-nogate: running T=parity_fw_cost_cardtype WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_fw_cost_cardtype src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_fw_cost_cardtype.c
+./rb_verdict ./rb_engine_t_parity_fw_cost_cardtype parity_fw_cost_cardtype
+-- FW-C1 offer gate is validate_mandatory_cost(Some(card_id)) --
+        fw_c1_self_cost_activation_is_offered: 7 assertion(s), 0 failure(s)
+        fw_c1_unpayable_mandatory_cost_is_still_refused: 3 assertion(s), 0 failure(s)
+-- FW-CT the ten cost.c card_type reads --
+        fw_ct_reveal_cost_card_type_comes_from_the_struct_field: 9 assertion(s), 0 failure(s)
+        fw_ct_absent_card_type_stays_unfiltered: 1 assertion(s), 0 failure(s)
+-- FW-C3 hand_cost_matching_indices distinct dedupe --
+        fw_c3_hand_cost_dedupes_by_normalized_name: 10 assertion(s), 0 failure(s)
+        fw_c3_control_without_distinct_the_prompt_opens: 3 assertion(s), 0 failure(s)
+
+==== parity_fw_cost_cardtype: 6 tests ok, 0 crashed (0 setup bugs) ====
+PASSED: parity_fw_cost_cardtype  [exit=0, 0 result line(s), renormalised=0]

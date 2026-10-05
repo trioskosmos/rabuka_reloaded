@@ -1,33 +1,22 @@
-//! Diagnostics: composite the presented frame into SRAM so a host tool can
-//! see it.
+//! Diagnostics: dump what the GBA is actually presenting, into SRAM.
 //!
-//! Why this exists: mGBA serves registers and IWRAM/EWRAM over its GDB stub
-//! but refuses both VRAM (`0x06000000`) and OAM (`0x07000000`) with `E06`, and
-//! it has no command-line screenshot. Judging "do the images show properly" by
-//! inference is how a completely broken decoder kept shipping as fine, so this
-//! dumps what the hardware is actually presenting.
+//! Why: mGBA serves registers and IWRAM/EWRAM over its GDB stub but refuses
+//! VRAM (`0x06000000`) and OAM (`0x07000000`) with `E06`, and has no CLI
+//! screenshot. Judging "do the images show" by inference is how a completely
+//! broken decoder shipped as fine for hours, so this captures the real thing.
 //!
-//! Encoding: the two layers here index into fixed palettes -- BG uses bank 15
-//! only (16 colours), OBJ uses the 240-colour card master palette. A sample is
-//! therefore exactly 8 bits: `0x00..=0x0F` is a BG index, `0x10 + i` is OBJ
-//! index `i`. Slot 0 is backdrop: BG colour 0 is transparent and is never
-//! stored, so it cannot collide, whereas OBJ index 239 would have collided
-//! with an 0xFF sentinel. That is lossless, so the host rebuilds the true image
-//! from the samples plus the two palette dumps.
+//! Format: one full-resolution 240x160 frame of 4bpp samples, 19,200 bytes,
+//! which fits the 32 KiB SRAM window with the palettes alongside.
+//!   value 0        backdrop (every layer transparent)
+//!   value 1..=14   the BG palette-15 colour index at that pixel, exact
+//!   value 15       a sprite covered this pixel (its colour is not stored)
 //!
-//! Half resolution (120x80) at 8bpp is 9,600 B per frame, which lets three
-//! frames plus both palettes fit the 32 KiB SRAM window.
-//!
-//! Cost matters: this runs on the GBA's 16.78 MHz ARM7 and the emulator
-//! appears to stall while it does. The BG pass is a single pixel-major sweep
-//! with an early exit on the front layer, and the OBJ pass walks the 128 OAM
-//! entries once and blits each sprite's rectangle -- not 9,600 per-pixel scans
-//! of all 128 objects, which was ~1.2M iterations and never finished a frame.
-//!
-//! Priority: this port runs `ui_back` on P2, card art on P1 and `ui_front` on
-//! P0, and sprites are always P1, so a sprite pixel is visible exactly where
-//! the P0 layer is transparent. The blit checks that one layer and nothing
-//! else, which is why no per-pixel priority map is needed.
+//! Full resolution and exact BG indices are the whole point. An earlier version
+//! sampled every second pixel to fit 8bpp, which turned 1px font strokes into
+//! speckle and made a working screen look like heavy glitch -- the diagnostic
+//! was the artefact. The BG layer is where text and chrome live and where
+//! corruption reads most clearly, so it is captured exactly; sprites are
+//! marked rather than colour-coded, which still shows their extent and layout.
 
 const SRAM: usize = 0x0E00_0000;
 const REG_RAM_CTRL: usize = 0x0400_0004;
@@ -35,14 +24,15 @@ const VRAM: usize = 0x0600_0000;
 const OBJ_VRAM: usize = 0x0601_0000;
 const OAM: usize = 0x0700_0000;
 
-const OUT_W: usize = 120;
-const OUT_H: usize = 80;
-const FRAME_BYTES: usize = OUT_W * OUT_H;
-const FRAMES: usize = 3;
+const OUT_W: usize = 240;
+const OUT_H: usize = 160;
+/// Two pixels per byte.
+const FRAME_BYTES: usize = OUT_W * OUT_H / 2;
 
 const HDR: usize = 0x0000;
 const FRAME_BASE: usize = 0x0020;
-const PAL_BASE: usize = FRAME_BASE + FRAME_BYTES * FRAMES;
+const PAL_BASE: usize = FRAME_BASE + FRAME_BYTES;
+const OBJ_BASE: usize = PAL_BASE + 0x220;
 
 #[inline]
 fn rd16(addr: usize) -> u16 {
@@ -80,7 +70,6 @@ const OBJ_SIZE: [(usize, usize); 16] = [
     (8, 64), (16, 64), (32, 64), (64, 64),
 ];
 
-/// Per-BG state needed to resolve a pixel, read once per frame.
 #[derive(Clone, Copy)]
 struct Bg {
     on: bool,
@@ -110,7 +99,7 @@ fn read_bg(n: usize, dispcnt: u16) -> Bg {
     }
 }
 
-/// Colour index this BG shows at a screen pixel, or 0 for transparent.
+/// Colour index this BG shows at a screen pixel, 0 = transparent.
 fn bg_index(bg: &Bg, x: usize, y: usize) -> u8 {
     if !bg.on {
         return 0;
@@ -143,33 +132,28 @@ fn bg_index(bg: &Bg, x: usize, y: usize) -> u8 {
     }
 }
 
-/// Framebuffer of sample values. In .bss (EWRAM), not IWRAM.
-static mut FB: [u8; FRAME_BYTES] = [0; FRAME_BYTES];
+/// Bit-per-pixel BG index, 240*160 = 38,400 bits = 4,800 bytes.
+static mut BGBITS: [u8; 4800] = [0; 4800];
 static mut STATE: u32 = 0;
-static mut SLOT: u32 = 0;
 
 fn sram_enable() {
-    // REG_RAM_CTRL bit 8 enables the SRAM window; bits 0-1 select 32 KiB.
     unsafe {
         core::ptr::write_volatile(REG_RAM_CTRL as *mut u16, (1 << 8) | 2);
     }
 }
 
-/// Capture one frame. Must be called after `GraphicsFrame::commit`, or OAM and
-/// the BG tilemaps still hold the previous frame.
+/// Capture one frame. Must run after `GraphicsFrame::commit`, or OAM and the
+/// BG tilemaps still hold the previous frame.
 ///
-/// This is expensive on a 16.78 MHz ARM7 -- roughly 40k tile lookups plus the
-/// OBJ blits, all through volatile VRAM reads -- so it captures a fixed number
-/// of frames and then switches itself off. Leaving it on every N frames makes
-/// the game look like it has hung, which is a measurement artefact that
-/// completely masks the bug being measured.
-///
-/// `skip` drops the first N presents before capturing, because the opening
-/// frames are still the blank first screen; capturing those tells you nothing.
-pub fn maybe_capture(skip: u32, _interval: u32) {
+/// `skip` drops the first N presents, because the opening frames are the blank
+/// first screen. This is expensive (one volatile tile lookup per pixel, plus
+/// the OBJ blits) so it captures a bounded number of frames and then disables
+/// itself; leaving it on makes the game look hung, which masks the bug.
+pub fn maybe_capture(skip: u32) {
     let shot = unsafe {
         let s = &mut *core::ptr::addr_of_mut!(STATE);
-        if *s >= FRAMES as u32 + skip {
+        // Two frames: an early menu and whatever came after it.
+        if *s >= skip + 2 {
             return;
         }
         let n = *s;
@@ -177,98 +161,91 @@ pub fn maybe_capture(skip: u32, _interval: u32) {
         if n < skip {
             return;
         }
-        (n - skip) as usize
+        n
     };
     sram_enable();
 
     let dispcnt = rd16(0x0400_0000);
     let obj_on = (dispcnt >> 12) & 1 == 1;
-    let obj_1d = (dispcnt >> 6) & 1 == 1;
 
-    // Front-to-back by priority: highest priority layer first, early exit on
-    // an opaque pixel.
-    let mut bgs = [read_bg(0, dispcnt), read_bg(1, dispcnt), read_bg(2, dispcnt), read_bg(3, dispcnt)];
+    let mut bgs = [
+        read_bg(0, dispcnt),
+        read_bg(1, dispcnt),
+        read_bg(2, dispcnt),
+        read_bg(3, dispcnt),
+    ];
     bgs.sort_by(|a, b| a.prio.cmp(&b.prio));
 
-    let fb: &mut [u8; FRAME_BYTES] = unsafe { &mut *core::ptr::addr_of_mut!(FB) };
+    let bits: &mut [u8; 4800] = unsafe { &mut *core::ptr::addr_of_mut!(BGBITS) };
+    for i in bits.iter_mut() {
+        *i = 0;
+    }
 
-    for oy in 0..OUT_H {
-        let y = oy * 2;
-        for ox in 0..OUT_W {
-            let x = ox * 2;
-            let mut s = 0x00u8;
+    // BG pass: frontmost opaque layer wins, index stored exactly.
+    for y in 0..OUT_H {
+        for x in 0..OUT_W {
+            let mut idx = 0u8;
             for bg in bgs.iter() {
                 let ci = bg_index(bg, x, y);
                 if ci != 0 {
-                    s = ci & 0x0F;
+                    idx = ci;
                     break;
                 }
             }
-            fb[oy * OUT_W + ox] = s;
+            if idx != 0 {
+                let b = y * OUT_W + x;
+                bits[b >> 3] |= 1 << (b & 7);
+            }
         }
     }
 
-    // Sprites: OAM 0 is highest priority, so draw 127 -> 0 and let later
-    // (higher priority) entries overwrite.
+    // OBJ pass: mark coverage. A sprite is visible where the P0 layer is
+    // transparent; this port puts card art on P1.
+    let mut sprite_bmp = [0u8; 4800];
     if obj_on {
-        // The P0 layer is the one that can hide sprites.
         let front = bgs.iter().find(|b| b.prio == 0).copied();
         for i in (0..128usize).rev() {
             let o = i * 8;
             let a0 = oam8(o) as u16 | ((oam8(o + 1) as u16) << 8);
             let a1 = oam8(o + 2) as u16 | ((oam8(o + 3) as u16) << 8);
             let a2 = oam8(o + 4) as u16 | ((oam8(o + 5) as u16) << 8);
-            if a0 & (1 << 15) == 0 {
-                continue; // disabled
-            }
-            if a0 & (1 << 9) != 0 {
-                continue; // affine, unused here
+            if a0 & (1 << 15) == 0 || a0 & (1 << 9) != 0 {
+                continue;
             }
             let eight = (a0 >> 15) & 1 == 1;
             if !eight && a0 & (1 << 14) != 0 {
                 continue;
             }
-            let mut oy0 = (a0 & 0xFF) as i32;
-            if oy0 >= 160 {
-                oy0 -= 256;
+            if (a2 >> 10) & 3 != 1 {
+                continue;
             }
-            let mut ox0 = (a1 & 0x1FF) as i32;
-            if ox0 >= 240 {
-                ox0 -= 512;
+            let mut oy = (a0 & 0xFF) as i32;
+            if oy >= 160 {
+                oy -= 256;
+            }
+            let mut ox = (a1 & 0x1FF) as i32;
+            if ox >= 240 {
+                ox -= 512;
             }
             let (sw, sh) = OBJ_SIZE[((a1 >> 12) & 0xF) as usize];
-            if (a2 >> 10) & 3 != 1 {
-                continue; // this port only puts card art on P1
-            }
             let tile = (a2 & 0x3FF) as usize;
             let hflip = (a1 >> 11) & 1 == 1;
             let vflip = (a1 >> 9) & 1 == 1;
             let tiles_w = sw / 8;
 
-            // Clip to the screen, then to our half-resolution grid.
-            let x_lo = ox0.max(0) as usize;
-            let y_lo = oy0.max(0) as usize;
-            let x_hi = (ox0 + sw as i32).min(240).max(0) as usize;
-            let y_hi = (oy0 + sh as i32).min(160).max(0) as usize;
-
+            let x_lo = ox.max(0) as usize;
+            let y_lo = oy.max(0) as usize;
+            let x_hi = (ox + sw as i32).min(240).max(0) as usize;
+            let y_hi = (oy + sh as i32).min(160).max(0) as usize;
             for y in y_lo..y_hi {
-                if y & 1 != 0 {
-                    continue; // sample even rows only
-                }
-                let oy = y >> 1;
                 for x in x_lo..x_hi {
-                    if x & 1 != 0 {
-                        continue; // sample even columns only
-                    }
-                    let ox = x >> 1;
-                    // A sprite shows wherever the P0 layer is transparent.
                     if let Some(front) = front {
                         if bg_index(&front, x, y) != 0 {
                             continue;
                         }
                     }
-                    let dx = x as i32 - ox0;
-                    let dy = y as i32 - oy0;
+                    let dx = x as i32 - ox;
+                    let dy = y as i32 - oy;
                     let mut sx = dx as usize;
                     let mut sy = dy as usize;
                     if hflip {
@@ -279,7 +256,6 @@ pub fn maybe_capture(skip: u32, _interval: u32) {
                     }
                     let slot = (sy / 8) * tiles_w + (sx / 8);
                     let ci = if eight {
-                        // OAM tile index counts 32-byte units; 8bpp doubles it.
                         vram8(OBJ_VRAM + tile * 64 + slot * 64 + (sy % 8) * 8 + (sx % 8))
                     } else {
                         let b = vram8(OBJ_VRAM + tile * 32 + slot * 32 + (sy % 8) * 4 + (sx % 8) / 2);
@@ -292,45 +268,37 @@ pub fn maybe_capture(skip: u32, _interval: u32) {
                     if ci == 0 {
                         continue;
                     }
-                    // Slot 0 is reserved for "backdrop": BG colour 0 is
-                    // transparent and never written, so 0 cannot collide with
-                    // a real BG sample. OBJ indices run 0..239, giving slots
-                    // 16..255 -- using 255 as a sentinel would collide with
-                    // OBJ index 239, which is a real palette entry.
-                    fb[oy * OUT_W + ox] = 16u8.saturating_add(ci);
+                    let p = y * OUT_W + x;
+                    sprite_bmp[p >> 3] |= 1 << (p & 7);
                 }
             }
         }
-        let _ = obj_1d;
     }
 
-    // Push the ring slot out to SRAM.
-    let slot = unsafe {
-        let s = &mut *core::ptr::addr_of_mut!(SLOT);
-        let cur = (*s % FRAMES as u32) as usize;
-        *s = s.wrapping_add(1);
-        cur
-    };
+    let slot = (shot - skip) as usize;
     let base = SRAM + FRAME_BASE + slot * FRAME_BYTES;
     for i in 0..FRAME_BYTES {
-        wr8(base + i, fb[i]);
+        wr8(base + i, bits[i]);
+    }
+    let sbase = SRAM + OBJ_BASE + slot * FRAME_BYTES;
+    for i in 0..FRAME_BYTES {
+        wr8(sbase + i, sprite_bmp[i]);
     }
 
-    // Palettes: BG bank 15 (16 colours) then the 256-entry OBJ palette.
-    for i in 0..0x200 {
+    // Palettes so the host can colour the BG indices exactly.
+    for i in 0..0x100 {
         let v = rd16(0x0500_0000 + i * 2);
         wr8(SRAM + PAL_BASE + i * 2, (v & 0xFF) as u8);
         wr8(SRAM + PAL_BASE + i * 2 + 1, (v >> 8) as u8);
     }
 
-    // Header last, so a torn ring is detectable.
     wr8(SRAM + HDR, b'S');
-    wr8(SRAM + HDR + 1, b'H');
+    wr8(SRAM + HDR + 1, b'F');
     wr8(SRAM + HDR + 2, OUT_W as u8);
     wr8(SRAM + HDR + 3, OUT_H as u8);
-    wr8(SRAM + HDR + 4, FRAMES as u8);
+    wr8(SRAM + HDR + 4, 2);
     wr8(SRAM + HDR + 5, slot as u8);
-    for (i, b) in (shot as u32).to_le_bytes().iter().enumerate() {
+    for (i, b) in shot.to_le_bytes().iter().enumerate() {
         wr8(SRAM + HDR + 8 + i, *b);
     }
 }

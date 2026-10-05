@@ -1,0 +1,29 @@
+make t-nogate: running T=prototype_closure WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_prototype_closure src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_prototype_closure.c
+tests/test_prototype_closure.c: In function 'main':
+tests/test_prototype_closure.c:289:21: warning: too many arguments for format [-Wformat-extra-args]
+  289 |     fprintf(stderr, "MARK A\n", "test_header_declares_the_three_rb_gsc_prototypes(");
+      |                     ^~~~~~~~~~
+tests/test_prototype_closure.c:291:21: warning: too many arguments for format [-Wformat-extra-args]
+  291 |     fprintf(stderr, "MARK B\n", "test_recently_moved_cards_signature(");
+      |                     ^~~~~~~~~~
+tests/test_prototype_closure.c:293:21: warning: too many arguments for format [-Wformat-extra-args]
+  293 |     fprintf(stderr, "MARK C\n", "test_mulligan_owner_index_signature(");
+      |                     ^~~~~~~~~~
+tests/test_prototype_closure.c:295:21: warning: too many arguments for format [-Wformat-extra-args]
+  295 |     fprintf(stderr, "MARK D\n", "test_rules_clear_turn_state_declared_once_in_header(");
+      |                     ^~~~~~~~~~
+tests/test_prototype_closure.c:297:21: warning: too many arguments for format [-Wformat-extra-args]
+  297 |     fprintf(stderr, "MARK E\n", "test_rules_clear_turn_state_empties_the_turn_sets(");
+      |                     ^~~~~~~~~~
+./rb_verdict ./rb_engine_t_prototype_closure prototype_closure
+MARK A
+MARK B
+FAIL: [crash] prototype_closure died on signal 11 (128+11): NO VERDICT WAS EMITTED. Treat this suite as INCONCLUSIVE, not green.
+make[2]: *** [Makefile:515: t-run] Error 139
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

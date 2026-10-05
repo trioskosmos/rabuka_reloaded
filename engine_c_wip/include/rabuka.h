@@ -449,7 +449,12 @@ int rb_parse_triggers(const char *triggers, RbTriggerKind *out, int max);
 const char *rb_canonical_trigger(const char *raw);
 const char *rb_trigger_zone_id(int is_stage);
 const char *rb_trigger_zone_label(int is_stage);
-const char *rb_trigger_to_texticon(const char *trigger);
+/* rb_trigger_to_texticon WAS HERE and was DELETED 2026-10-05, together with
+ * its definition in src/turn/triggers.c. Its only caller engine-wide is
+ * Rust game/display.rs:1569 and :1599 (the `bonus_triggers` badge map), and
+ * the C has no display layer, so it had zero reachable callers here. The
+ * tombstone and the full deleted body are at src/turn/triggers.c, which is
+ * where the Rust citation (triggers.rs:139-149) is recorded. */
 int rb_ability_has_trigger(const Ability *a, RbTriggerKind kind);
 const char *rb_ability_triggerless_text(const Ability *a);
 const char *rb_card_short_label(int card_id);
@@ -2263,6 +2268,50 @@ int  rb_resolve_card_ability_at(const GameState *g, int card_id, int ability_idx
 void rb_check_expired_effects(GameState *g, int which);
 void rb_advance_phase(GameState *g);
 
+/* rb_rules_clear_turn_state is DEFINED in src/ability/effects/rules.c:2500
+ * and CALLED from src/turn/phase.c:753 in the turn rollover, right beside the
+ * GameState-side folds of the same three Rust per-turn sets.
+ *
+ * The prototype lived mid-function inside phase.c and, before the body
+ * existed, inside a COMMENT block in both phase.c and live.c -- so the
+ * symbol once had two declarations, no definition, and no caller, while the
+ * checklist still read `[x]`. The definition now exists, so this is the
+ * single declaration and phase.c's local one is redundant.
+ *
+ * What it clears, against Rust turn/phases.rs:313-317:
+ *   :314 turn_limited_abilities_used.clear()
+ *        no clear needed -- the C use-limit table is keyed by turn
+ *        (ability_queue.c:1258/1267/1282 test q->use_turn != cur_turn),
+ *        which is the same guarantee the explicit clear buys Rust.
+ *   :315 cannot_activate_members.clear()  -> cannot_activate_members[2] = 0
+ *   :316 cannot_live_players.clear()
+ *        NOT cleared here, by design: the flag carries a turn stamp
+ *        (rules.c:2432-2433 write cannot_live_turn) and its only reader
+ *        (rb_rules_cannot_live_player, rules.c:2445) returns 0 when the
+ *        stamp is stale. A stamp is what BOTH Rust clear sites produce.
+ *   :317 wait_immune_members.clear()      -> n_wait_immune = 0
+ * The GameState-side members of the same sets (player_cannot_activate[2],
+ * n_cannot_active_cards, n_prohibition_effects) are cleared by phase.c
+ * itself, on either side of the call. */
+void rb_rules_clear_turn_state(GameState *g);
+
+/* The two readers this clear exists for. They are declared HERE for the
+ * first time: both were defined in rules.c (rb_rules_cannot_activate_player
+ * at :2451, rb_rules_cannot_live_player at :2441) and called from
+ * src/turn/live.c and src/turn/triggers.c, which each had to spell the
+ * prototype out locally -- so a caller in any other file, including a
+ * test, would get an implicit int() declaration and, at
+ * -Wimplicit-function-declaration, no argument checking at all. Same
+ * defect class as the rb_gsc_* prototypes above.
+ *
+ * Both consult a TURN STAMP and return 0 when the stamp is stale, which is
+ * what makes rb_rules_clear_turn_state's omission of cannot_live_players
+ * correct: the rollover produces the same observable result as Rust's
+ * explicit `cannot_live_players.clear()`.
+ */
+int  rb_rules_cannot_activate_player(GameState *g, int pl);
+int  rb_rules_cannot_live_player(GameState *g, int pl);
+
 /* ── check_timing + integrity checks (engine/src/turn/actions.rs:check_timing) ── */
 void rb_check_timing(GameState *g);
 void rb_check_victory_condition(GameState *g);
@@ -2430,15 +2479,26 @@ void rb_effect_look_and_select(GameState *g, int actor, AbilityEffect *e);
 int  rb_looked_at_pool(int pl, int *out_ids, int max);
 void rb_gain_ability(GameState *g, int actor, AbilityEffect *e);
 void rb_gain_ability_from_source(GameState *g, int actor, AbilityEffect *e, int host_cid);
-/* ⛔ 2026-10-04: six DECLARATIONS WITH NO DEFINITION were DELETED from this
- * header - rb_invalidate_ability, rb_activate_ability_effect,
- * rb_effect_modify_hearts, rb_cost_clear_deferred, rb_execute_effect_via_registry,
- * rb_translated_execute_custom_effect. Their bodies were deleted on 2026-10-02 and
- * the prototypes outlived them, so any caller was a LINK ERROR surfacing as a
- * linker complaint in unrelated code. Verified: zero callers tree-wide; every
- * remaining mention is a DELETED tombstone comment in the owning .c. Do NOT
- * re-add without reading CENSUS_wiring.md. A prototype with no definition is
- * worse than neither. (rb_load_rom is NOT one of these: its declaration is correctly
+/* ⛔ 2026-10-04, CORRECTED 2026-10-05: four declarations with no definition
+ * were deleted from this header - rb_invalidate_ability,
+ * rb_activate_ability_effect, rb_effect_modify_hearts, rb_cost_clear_deferred.
+ * Their bodies were deleted on 2026-10-02 and the prototypes outlived them, so
+ * any caller was a LINK ERROR surfacing as a linker complaint in unrelated
+ * code. Do NOT re-add without reading CENSUS_wiring.md. A prototype with no
+ * definition is worse than neither.
+ *
+ * ⚠️ THIS NOTE WAS FALSE AS WRITTEN. It also claimed
+ * rb_execute_effect_via_registry and rb_translated_execute_custom_effect had
+ * been deleted; both prototypes were still present and both are undefined
+ * (52 .o scanned with `nm --defined-only`: zero definitions). They were
+ * actually deleted 2026-10-05 -- see the note at their former line.
+ *
+ * ⚠️ AND IT OVERCLAIMED: rb_invalidate_ability, rb_activate_ability_effect and
+ * rb_effect_modify_hearts are NOT deleted. They are still declared, still
+ * undefined, and still landmines. Their declarations were out of scope for the
+ * 2026-10-05 change and remain open.
+ *
+ * (rb_load_rom is NOT one of these: its declaration is correctly
  * wrapped in the same #ifdef RB_ROM_STRINGS as its definition.) */
 void rb_suppress_ability_trigger(GameState *g, int actor, AbilityEffect *e, int host_cid);
 void rb_tick_gained(GameState *g);
@@ -2900,13 +2960,26 @@ void rb_queue_pause_for_choice(GameState *g, const RbChoice *choice);
 int rb_pay_cost(GameState *g, int actor, const AbilityEffect *cost);
 int rb_validate_cost(const GameState *g, int actor, const AbilityEffect *cost);
 int rb_pay_deferred_costs(GameState *g, int actor, const AbilityEffect *cost);
-void rb_invalidate_ability(GameState *g, int actor, AbilityEffect *e);
-void rb_activate_ability_effect(GameState *g, int actor, AbilityEffect *e, int host_cid);
-void rb_effect_modify_hearts(GameState *g, int actor, AbilityEffect *e);
-int rb_execute_effect_via_registry(GameState *g, int actor, AbilityEffect *effect, int host_cid);
-int rb_translated_execute_custom_effect(GameState *g, int actor, AbilityEffect *effect, const char *action_str);
-/* rb_cost_clear_deferred: declaration DELETED 2026-10-04 (body gone since
-   2026-10-02). See the block note above rb_suppress_ability_trigger. */
+/* rb_invalidate_ability, rb_activate_ability_effect, rb_effect_modify_hearts:
+   DECLARATIONS DELETED 2026-10-05 (main). Their bodies went on 2026-10-02 and
+   the prototypes outlived them -- verified zero definitions across all objects
+   via `nm --defined-only` plus a source scan. A prototype with no definition is
+   a live link landmine: the first caller added anywhere gets a linker error
+   that names unrelated code. The 2026-10-04 tombstone claimed these were
+   already deleted; they were not. Do NOT re-add without reading
+   CENSUS_wiring.md -- they may be dead for a reason. */
+/* rb_execute_effect_via_registry and rb_translated_execute_custom_effect:
+   DECLARATIONS DELETED 2026-10-05. The 2026-10-04 tombstone below CLAIMED
+   these two were already deleted; they were not -- both prototypes were still
+   live at this line and neither has a definition anywhere (verified: zero
+   definitions across all 52 .o via `nm --defined-only`, and zero definitions
+   by source scan). A prototype with no definition is a live link landmine.
+   Tombstone also listed rb_invalidate_ability, rb_activate_ability_effect and
+   rb_effect_modify_hearts as deleted; those three are STILL declared three
+   lines up and are equally undefined -- noted here rather than deleted,
+   because they are outside this change's scope. (rb_load_rom is NOT one of
+   these: its declaration is correctly wrapped in the same #ifdef RB_ROM_STRINGS
+   as its definition.) */
 int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect *cost, int pay);
 int rb_handle_pay_cost_all_discard(GameState *g, int actor, const char *selected);
 int rb_cost_has_skip_prompt(const AbilityEffect *cost);
@@ -3822,6 +3895,9 @@ int  rb_gsc_last_cost_wait_member(const GameState *g);
 int  rb_gsc_last_energy_placed_by_effect(const GameState *g);
 int  rb_gsc_last_energy_placed_by_player(const GameState *g);
 int  rb_gsc_current_ability_source_card_id(const GameState *g);
+int  rb_gsc_mulligan_owner_index(const GameState *g);
+int  rb_gsc_recently_moved_cards(const GameState *g, int *out, int max);
+void rb_gsc_set_recently_moved_cards(GameState *g, const int *cards, int n);
 void rb_gsc_push_revealed_card(GameState *g, int card_id);
 const char *rb_gsc_player_prefix_id(const GameState *g);
 

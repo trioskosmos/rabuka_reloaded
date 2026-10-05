@@ -100,17 +100,49 @@ pub fn apply_need_heart_modifiers(
     need: &mut [u8; 8],
     color_mods: &HashMap<crate::card::HeartColor, ModifierEntry>,
 ) {
+    // `HeartColor::index()` is NOT injective. `heart_color_table!` in
+    // `core/card.rs` maps `Heart00`, `BAll`, `Draw` and `Score` all to index 0,
+    // and `All` to 7 — eleven variants, eight buckets. Two distinct keys can
+    // therefore write the SAME slot, and `set` being last-write-wins, the
+    // survivor depended on `HashMap` iteration order: a set-modifier on one of
+    // those colours could be applied or silently dropped, run to run.
+    //
+    // Fixed by walking the INDEX space rather than the map. Buckets are visited
+    // in order, and within a bucket entries are visited by `as_str()` — the card
+    // data's own name for the colour, so the tie-break is stable across builds
+    // rather than depending on variant declaration order.
+    //
+    // Where the modifiers do not collide — every real card today — this is
+    // identical to iterating the map. It only makes the collision case
+    // deterministic, which is what the doc comment above was already promising
+    // when it said an out-of-range colour is ignored rather than wrapping.
+    let mut by_index: [Vec<(&crate::card::HeartColor, &ModifierEntry)>; 8] = Default::default();
     for (color, me) in color_mods {
-        if me.set != 0 {
-            if let Some(slot) = need.get_mut(color.index()) {
-                *slot = crate::constants::saturate_u8(i32::from(me.set));
+        if let Some(bucket) = by_index.get_mut(color.index()) {
+            bucket.push((color, me));
+        }
+    }
+    for bucket in by_index.iter_mut() {
+        bucket.sort_by_key(|(color, _)| color.as_str());
+    }
+
+    // Order: set-to-X first, then additive on top (Q115/Q127). The two passes
+    // stay separate — that is the rule, not an implementation detail.
+    for (idx, bucket) in by_index.iter().enumerate() {
+        for (_, me) in bucket {
+            if me.set != 0 {
+                if let Some(slot) = need.get_mut(idx) {
+                    *slot = crate::constants::saturate_u8(i32::from(me.set));
+                }
             }
         }
     }
-    for (color, me) in color_mods {
-        if me.additive != 0 {
-            if let Some(slot) = need.get_mut(color.index()) {
-                *slot = crate::constants::saturate_u8(i32::from(*slot) + i32::from(me.additive));
+    for (idx, bucket) in by_index.iter().enumerate() {
+        for (_, me) in bucket {
+            if me.additive != 0 {
+                if let Some(slot) = need.get_mut(idx) {
+                    *slot = crate::constants::saturate_u8(i32::from(*slot) + i32::from(me.additive));
+                }
             }
         }
     }

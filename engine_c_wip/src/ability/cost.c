@@ -1951,10 +1951,22 @@ static int pay_cost_inner(GameState *g, int actor, const AbilityEffect *cost) {
                     g->revealed_cost_cards[g->n_revealed_cost_cards++] = card_ids[i];
             }
             if (effect_uses_selected) {
+                /* `selected_cards` is `int[RB_MAX_RECENTLY_MOVED]` (8),
+                 * rabuka.h:1648 -- NOT RB_MAX_ZONE. The old clamp used
+                 * RB_MAX_ZONE (512) and so wrote up to 512 ints into an
+                 * 8-int field, smashing 2016 bytes of GameState past
+                 * `selected_cards` (`n_selected_cards`, `batch_movements`,
+                 * `position_change_events`, ...) whenever a mandatory reveal
+                 * cost had >= 9 matching cards. Rust keeps this relay in a
+                 * SmallVec<[i16;8]> inline capacity (mod.rs `selected_cards`),
+                 * so 8 is the faithful inline bound; the relay is a
+                 * recently-moved-style list, not a zone-sized one. */
+                int n_copy = n_ids < RB_MAX_RECENTLY_MOVED ? n_ids
+                                                           : RB_MAX_RECENTLY_MOVED;
                 g->n_selected_cards = 0;
-                for (int i = 0; i < n_ids && i < RB_MAX_ZONE; i++)
+                for (int i = 0; i < n_copy; i++)
                     g->selected_cards[i] = card_ids[i];
-                g->n_selected_cards = n_ids < RB_MAX_ZONE ? n_ids : RB_MAX_ZONE;
+                g->n_selected_cards = n_copy;
             }
             return 1;
         }

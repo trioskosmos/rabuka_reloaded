@@ -656,13 +656,17 @@ void rb_effect_select_effect(GameState *g, int actor, AbilityEffect *e, int host
     int n_hc = draw_heart_colors(e, heart_colors_arr, 8);
     int has_heart_colors = n_hc > 0;
     /* Rust selection.rs:45 `effect.source_any()` reads the DECODED `source`
-       FIELD, not an extras-table row. vm.c:735 is the only writer and it
-       assigns `e->source`, so `draw_extra(e, "source")` was ALWAYS NULL
-       (measured corpus-wide: 39 of 73 select nodes carry `source` in the
-       struct field and 0 in the extras table). Every such node therefore took
-       the area_select arm at draw.c:664 instead of execute_select. */
-    const char *src   = (e->source && *e->source) ? e->source
-                                                   : draw_extra(e, "source");
+       FIELD, not an extras-table row. vm.c:728-739 is the only writer and it
+       consumes `source`/`zone`/`destination`/`target` by assigning the struct
+       field, so `draw_extra(e, "source")` is ALWAYS NULL -- the old
+       `... : draw_extra(e, "source")` fallback was dead code that could only
+       ever yield NULL. Measured corpus-wide: 39 of 73 select nodes carry
+       `source` in the struct field and 0 in the extras table. Every such node
+       therefore took the area_select arm at draw.c:672 instead of
+       execute_select. Same holds for `destination`/`target`/`action`/`text`/
+       `count`/`card_type`/`condition`/`zone`: none are ever written to the
+       extras table, so an extras read of them is permanently NULL. */
+    const char *src   = (e->source && *e->source) ? e->source : NULL;
     const char *or_ct = draw_extra(e, "or_card_types");
     const char *chars = draw_extra(e, "characters");
     const char *group = draw_extra(e, "group_names");

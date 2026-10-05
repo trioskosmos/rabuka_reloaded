@@ -22,6 +22,12 @@ ROM_LO, ROM_HI = 0x08000000, 0x09FFFFFF
 def classify(pc):
     if ROM_LO <= pc < ROM_HI:
         return "rom"
+    # The BIOS is mirrored at 0x00000000..0x0000FFFF and agb reaches it via
+    # SWI (VBlankIntrWait, IntrWait, LZ77, division). Jumping there is normal,
+    # so it must not be reported as a derail -- doing so produced a false
+    # positive on every VBlank wait.
+    if pc < 0x00010000:
+        return "bios"
     if 0x02000000 <= pc < 0x02040000:
         return "ewram"
     if 0x03000000 <= pc < 0x03008000:

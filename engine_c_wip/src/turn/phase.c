@@ -747,9 +747,13 @@ wait_immune_members.clear()         phases.rs:281
            above has been asking for since 2026-10-03 — it now has a definition
            (rules.c), so the two declarations that used to live inside comment
            blocks in this file and in live.c are correctly absent.
-           Declared here for the same reason and with the same precedent as
-           rb_check_effect_position at src/turn/triggers.c:6-8. */
-        void rb_rules_clear_turn_state(GameState *g);
+           Now declared in include/rabuka.h, beside rb_advance_phase. It used
+           to be declared HERE, mid-function: legal C, but it left the symbol
+           invisible to every other translation unit, and before the body
+           existed in rules.c it was spelled only inside COMMENT blocks in this
+           file and in live.c -- so checklist item I2 could read `[x]` for a
+           symbol with no definition and no caller. The header also records what
+           it clears against Rust turn/phases.rs:313-317. */
         rb_rules_clear_turn_state(g);
         /* ── Rust's SECOND clear of the same three sets, and the one piece of it
            that was genuinely missing. `clear_live_only_state`

@@ -1,0 +1,121 @@
+make t-nogate: running T=harness_self WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_harness_self src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_harness_self.c
+./rb_verdict ./rb_engine_t_harness_self harness_self
+sizeof: GameState=1090528 TestGame=1090528 RbPlayer=20824 RbBag=2052; link stack=33554432 B
+ok: A1 TestGame wraps exactly one GameState (sizes equal)
+ok: A2 sizeof(GameState) keeps 14 of them inside the LINKED stack (1090528 <= 33554432/14 = 2396745)
+ok: A2b the linked stack was READ FROM THE MAKEFILE, not assumed (found --stack=33554432 B; a 0 here means §A measured nothing)
+ok: A4 sizeof(GameState) is EXACTLY the pinned 1090528 B (now 1090528) -- an append that moves it must fail here on purpose
+ok: A5 the PINNED size still fits the linked stack with RB_MIN_SAFE_LOCALS to spare (the pin and the budget agree)
+scanned tests/: 830 non-static state locals in 52 files; 3051 test_id( calls in 109 files
+ok: B1 non-static GameState/TestGame locals in tests/ stay <= 1432 (now 830)
+ok: B2 files holding a non-static state local stay <= 75 (now 52)
+ok: C1 test_id() aliases: the same card_no yields ONE id (so 'two distinct instances' is vacuous — use test_new_id)
+ok: C2 test_id() IS the shared template id (rb_find_card_by_no)
+ok: C3 test_new_id() hands out DISTINCT copies for the same card_no
+ok: C4 test_new_id() differs from test_id() for the same card_no
+ok: C5 two test_id() 'instances' collapse to one id: hand holds 2 cards that any identity assertion sees as the SAME card
+ok: C6 two test_new_id() instances stay separable in the hand
+ok: C7 test_new_id() returns -1 (loudly) once the copy pool is dry rather than handing back a colliding id
+copy pool: 1455 ids handed out, first -1 at request #1455
+ok: C8 test_card_copy_pool_reset() puts the pool back in play
+ok: E1 test_id() resolves the truncatable spelling (forgiving by design)
+ok: E2 test_id_exact() refuses the truncatable spelling
+ok: E3 ...and it resolved to the -PR print, a DIFFERENT card number
+ok: E4 test_id_exact() == test_id() on an exact key
+ok: E5 an unknown card number is -1, not some other card
+ok: E6 test_id_exact(NULL) is -1
+ok: E7 rb_card_no_eq refuses empty/NULL/negative — '' must not match every card
+ok: E8 rb_card_no_eq agrees on an exact key
+§F decode walk: 2639 cards / 2116 abilities, 35 multi-token trigger fields, 35 of them ライブ開始時, 登場
+ok: F1 multi-token trigger fields stay <= 35 (now 35) — test_fire_trigger_* matches by token where Rust matches the whole field
+ok: F2 every multi-token trigger field is still the ライブ開始時, 登場 shape
+ok: G1 a fresh TestGame has no cards anywhere
+ok: G2 test_set_live_card APPENDS: three calls leave three live cards
+ok: G3 test_set_live_card removes the card from the hand first
+ok: G4 adding a card moves the census by 1
+ok: G5 test_move_hand_to_waitroom moves 1
+ok: G6 a hand->waitroom move is census-neutral (no duplication, no drop)
+ok: G7 the card is in the waitroom, not the hand
+ok: G8 test_give_energy(n) leaves n energy cards, all Active
+ok: G9 test_give_energy_for writes the SEAT it was given
+ok: G10 test_spend_energy saturates at 0
+ok: G11 test_spend_energy only touches seat 0
+ok: G12 insert_deck_top appends to the count
+ok: G13 ...with the card in it
+ok: G14 test_deck_len reads the same zone
+ok: G15a two distinct stage fixtures resolve
+ok: G15 test_play_to_stage into an occupied area still plays (and warns)
+ok: G16 ...replacing the occupant on stage
+ok: G17 ...and sending it to the waitroom
+ok: G18 test_play_to_stage_baton plays into an occupied area on request
+ok: G19 ...with the same swap semantics
+double-baton: rc=1 touches 0 -> 2, arriving 2
+ok: G20 test_play_to_stage_double_baton is callable with two victims
+ok: G21 ...and it is a real route: it records a touch, or opens the pair choice, rather than silently doing nothing
+ok: G22 an unheld card is refused rather than played from nowhere
+ok: H1 a fresh TestGame marks seat 0 as the first attacker (Rust: p1)
+ok: H2 the stage fixture resolves
+ok: H3 test_play_to_stage_for(tg, 1, ..) actually debuts on seat 1
+ok: H4 ...and makes SEAT 1 the attacking seat, as Rust's set_active_side does
+ok: H5 the card landed on p2's centre
+ok: H6 test_play_to_stage_for(tg, 0, ..) debuts on seat 0
+ok: H7 ...and leaves seat 0 attacking
+ok: I1 test_phase_to_name / test_phase_from_name round trip over every RbPhase
+ok: I2 an unknown phase name is -1, not phase 0
+ok: I3 NULL phase name is -1
+ok: J1 a fresh TestGame has no pending choice
+ok: J2 pending_choice_count agrees
+ok: J3 pending_choice_type is "" with no prompt (not "Unknown")
+ok: J4 the answer helpers are no-ops when quiet
+ok: J5 advance_to_phase_strict to the phase we are already in succeeds
+ok: J6 arriving at the current phase costs zero passes
+ok: J7 test_card_name(-1) is "?"
+ok: J8 test_card_name returns a name for a real card
+ok: J9 test_card_copy_pool_reset is callable when nothing was copied
+ok: K1 no prompt -> 0 picks owed
+ok: K2 SelectCard{count:1} -> 1
+ok: K3 SelectCard{count:3} -> 3, NOT the old constant 1
+ok: K4 SelectCard{count:5} -> 5 (a 'look at five, take three'-shaped pick)
+ok: K5 a non-SelectCard prompt owes NO picks (SelectAutoAbility), matching Rust's `Live(_) => 0`
+ok: K6 the staged prompts were all cleared
+ok: L0 the filler print resolves
+ok: L1 test_filler_hand RETURNS an id and mutates nothing (it is not Rust's fill_decks)
+ok: L2 test_fill_decks leaves 30 filler cards in BOTH seats' decks
+ok: L3 ...and every one of them is the filler
+ok: L4 test_fill_energy_deck fills the ENERGY DECK only — it creates no active energy (test_give_energy_for is the route to that)
+ok: L5 ...and it writes the SEAT it was given
+ok: L6 an empty area has no occupant (-1 == Rust's None)
+ok: L7 the card being played is EXCLUDED from its own occupant answer
+ok: L8 any other query sees the staged card
+ok: L9 a different (or out-of-range) area has no occupant
+ok: L10 test_id_ref() agrees with test_id() in the C (documented divergence: in Rust it is the NEXT pool position, not the template)
+ok: M1 a test_id()-based 'these two are the same id' check passes -- this is the vacuity: the assertion can only ever be true
+ok: M2 staging test_id() twice is INDISTINGUISHABLE from staging one card twice: the zone census for that card_no reads 2, so any per-instance assertion written against it is either trivially true or wrong
+ok: M3a both test_new_id() calls returned a live id (pool exhausted if this is red -- rb_create_card_copy is monotonic and process-global)
+ok: M3b two test_new_id() calls for one card_no are DISTINCT ids, where two test_id() calls are the same id (M1)
+ok: M3c test_new_id() makes the two-distinct-card assertion OBSERVABLE: each id censuses as its own single instance, where the aliased test_id() form censused as one id present twice (M2)
+ok: M3d ...and the two readings differ, which is the whole point: a test written against test_id() is visibly wrong, not vacuous
+ok: M4 test_new_id() ids come from the copy pool, and the pool is the ONLY thing test_id() must leave alone
+ok: N0 at least one suite source was scanned by the sentinel guard
+scanned 176 suite(s) for uninitialised static state: 892 declaration site(s) with no initialiser in their OWN function, across 39 file(s)
+ok: N1 functions declaring a static TestGame/GameState with NO initialiser in that same function stay <= 892 (now 892). Rust's absent heart_override key is None (stats_pipeline.rs:30) and 0 is a LEGAL C value, so an uninitialised RbMods silently takes the override arm at stats_pipeline.c:160-162 and every member folds to eight zeros
+ok: N2 files holding such a declaration stay <= 39 (now 39)
+ok: N3 the scanner fixture file could be created in cwd
+ok: N3a a static TestGame with NO initialiser anywhere in its own function IS counted (1 site, 1 file)
+ok: N3b ...and is NOT counted when its OWN body calls test_game_new — so N1 is not a blanket ban on the idiom
+ok: N3c ...and IS counted when the only initialiser is in a SIBLING function the body merely CALLS. This is the exact shape of both real instances (recover_live's clear_p1 resets the zones, never the modifiers) and the case a file-scoped guard would have passed
+ok: N3d a FILE-SCOPE `static TestGame t_tg[16]` reached through a pointer is not counted by N1, which is a stated limitation rather than a silent pass: the array's per-function initialiser cannot be seen from a file-scope declaration, and no current suite relies on one (the scan measured 0 such sites). test_parity_recover_live.c is the counter-example and it is fixed by construction — 53 explicit test_game_new calls
+ok: N4a test_game_new() really does publish the -1 ABSENCE sentinel (src/core/modifiers.c:27); this is what N1 looks for and what a BSS-zero RbMods cannot supply
+ok: N4b heart_copy / heart_multiplier / blade_type carry the same -1 sentinel; each is read with a `>= 0` presence test, so 0 is a live value for all three (stats_pipeline.c:165 and :170, live.c:236-240)
+ok: N4c heart_multiplier_amt defaults to 2 — a NON-ZERO value, so a bare memset is not an initialiser here even where every sentinel would look right
+ok: N4d the fixture card resolved (PL!-sd1-010-SD)
+ok: N4e with every sentinel at -1 the member folds to its PRINTED base hearts (stats_pipeline.rs:36-48) — the value an uninitialised RbMods loses, measured as eight zeros
+ok: N4f ...and an EXPLICIT set-to-zero override still replaces the printed hearts outright (stats_pipeline.rs:30-33). N4e and N4f together are why this class of defect must be fixed with test_game_new and NEVER by redefining 0 to mean absent
+ok: N4g clearing the override restores the printed fold exactly
+FAIL:  2 checks failed
+FAILED: harness_self  [exit=1, 3 result line(s): assert=3 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=1]

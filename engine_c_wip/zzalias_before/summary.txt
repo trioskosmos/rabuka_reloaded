@@ -1,0 +1,5 @@
+parity_cce_gaps                    ok=35     FAIL=82    alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+parity_int_gaps                    ok=4      FAIL=41    alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+parity_queue_resume                ok=143    FAIL=5     alias_hits=0    frees_top=39     prompt_open=12     probe=LINKED ran=yes 
+alias_ownership                    ok=16     FAIL=0     alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+ALIAS_PROBE_TOTAL hits=0 probed=4 unusable=0

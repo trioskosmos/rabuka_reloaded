@@ -1519,7 +1519,7 @@ impl<'a> Display<'a> {
         // Snapshot the frame that was actually presented. Must come after the
         // commit, or OAM still holds the previous frame.
         #[cfg(feature = "diag-shot")]
-        crate::shot::maybe_capture(SHOT_SKIP, 30);
+        crate::shot::maybe_capture(SHOT_SKIP);
         // One priming frame is spent per `gfx.frame()` above, so the outgoing
         // screen's pins are gone by the time the next frame builds. See
         // `enter_screen`.

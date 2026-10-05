@@ -1635,6 +1635,18 @@ int rb_try_create_success_replacement_choice(GameState *g, int card_id, int play
     g->queue.actor = player_pl;
     g->queue.pending.actor = player_pl;
     g->queue.resume_actor = player_pl;
+    /* live.rs:1761 `game_state.pending_success_replacement_card_id = Some(card_id)`.
+     *
+     * The replaced card is carried in the DEDICATED field, exactly as Rust does,
+     * and NOT in the shared `resume_host`. `resume_host` is still written on the
+     * line below because other resume paths read it legitimately and its meaning
+     * is unchanged; what changed is that the success-replacement RESUME no longer
+     * DEPENDS on it. It was measured clobbered between this prompt being raised
+     * and the answer arriving -- 7 of 13 prompt/result pairs on the corpus carried
+     * prompt_original=293 but result_original=494 -- so the replacement was
+     * applied to the wrong card. Rust's `Option<i16>` is `-1` here, and 0 is a
+     * LEGAL card index, so presence is tested with `>= 0`, never `!= 0`. */
+    g->queue.pending_success_replacement_card_id = card_id;
     g->queue.resume_host = card_id;
     g->queue.resume_mode = 0;
     g->queue.pending.n_filtered_indices = n_filtered;

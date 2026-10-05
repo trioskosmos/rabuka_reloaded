@@ -1722,6 +1722,10 @@ int rb_game_init(GameState *g, const uint32_t *deck0, int n0,
      g->baton_touch_replaced_member_cost = -1;
      g->baton_touch_replaced_member_id = -1;
      g->baton_touch_arriving_card_id = -1;
+     /* Rust: `pending_success_replacement_card_id: Option<i16>` is None on a new
+      * game. memset leaves 0, and 0 is a LEGAL card index, so the -1 sentinel
+      * has to be written explicitly or every fresh game claims card 0. */
+     g->queue.pending_success_replacement_card_id = -1;
      for (int i = 0; i < 64; i++) g->gained_card_ids[i] = -1;
     /* game_setup.rs:555-558 — Player::new("p1", …, true) / Player::new("p2",
        …, false), i.e. P1 is the first attacker until RPS elects otherwise.

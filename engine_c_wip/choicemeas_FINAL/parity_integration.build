@@ -1,0 +1,11 @@
+tests/test_parity_integration.c:52:9: warning: 'FLAT_VERDICT' redefined
+   52 | #define FLAT_VERDICT() flat_verdict_failed(__func__)
+      |         ^~~~~~~~~~~~
+In file included from tests/test_parity_integration.c:24:
+include/test_game.h:378:9: note: this is the location of the previous definition
+  378 | #define FLAT_VERDICT() test_flat_verdict_failed(__func__)
+      |         ^~~~~~~~~~~~
+tests/test_parity_integration.c: In function 'natsumi_stage':
+tests/test_parity_integration.c:665:9: warning: unused variable 'filler' [-Wunused-variable]
+  665 |     int filler = test_id(tg, "PL!-sd1-010-SD");
+      |         ^~~~~~

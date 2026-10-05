@@ -1,0 +1,540 @@
+make t-nogate: running T=parity_full_round WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_full_round src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_full_round.c
+./rb_verdict ./rb_engine_t_parity_full_round parity_full_round
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2462, area 1): area 1 already holds card 2039, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=2 zone= target=double_baton_touch route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[QUEUE_EXEC] idx=0 n=1 cid=2462 ab=1 actor=0 action=sequential
+FAIL: [A1_both_have_blade_heart]: A1: 2 Liella! replaced -> 2 cards drawn (hand 2-1+2=3) (got 1 expected 3)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2462, area 1): area 1 already holds card 2039, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=2 zone= target=double_baton_touch route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[QUEUE_EXEC] idx=0 n=1 cid=2462 ab=1 actor=0 action=sequential
+FAIL: [A2_one_no_blade_heart]: A2: 2 Liella! replaced -> 2 cards drawn (got 1 expected 3)
+FAIL: [A2_one_no_blade_heart]: A2: exactly one replaced Liella! lacks blade_heart -> +2 blade (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2462, area 1): area 1 already holds card 2639, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=2 zone= target=double_baton_touch route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[QUEUE_EXEC] idx=0 n=1 cid=2462 ab=1 actor=0 action=sequential
+FAIL: [A3_q265_both_no_blade]: A3: 2 Liella! replaced -> 2 cards drawn (got 1 expected 3)
+FAIL: [A3_q265_both_no_blade]: A3: two blade-heart-less Liella! -> +4 blade (Q265) (got 0 expected 4)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=3 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2462, area 1): area 1 already holds card 2039, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=2 zone= target=double_baton_touch route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[QUEUE_EXEC] idx=0 n=1 cid=2462 ab=1 actor=0 action=sequential
+FAIL: [A4_draw_counts_replaced]: A4: drew 2 for the 2 REPLACED Liella!, ignoring the 5 pre-existing waitroom cards (got 2 expected 4)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=3 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2462, area 1): area 1 already holds card 488, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=2 zone= target=double_baton_touch route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[QUEUE_EXEC] idx=0 n=1 cid=2462 ab=1 actor=0 action=sequential
+FAIL: [A5_group_filter_liella]: A5: drew for the ONE replaced Liella! only (got 2 expected 3)
+FAIL: [A5_group_filter_liella]: A5: the blade gain is fed only by the Liella! member (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=3 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2462, area 0): area 0 already holds card 2026, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+FAIL: [A7_normal_debut_fires_nothing]: A7: played 1, drew 0 (got 1 expected 0)
+FAIL: [A7_normal_debut_fires_nothing]: A7: the deck is untouched - no draw on a non-baton debut (got 1 expected 0)
+FAIL: [A7_normal_debut_fires_nothing]: A7: no blade bonus on a non-baton debut (got 2 expected 0)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=3 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2462, area 0): area 0 already holds card 2026, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,0,2,1,0,0,2,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=4 hand_after=5
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=2 hand_after=2
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=6
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,2,7,0,0,2,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,0,0,5,0,0,0,0]
+[EARLY_SEAT] pl=0 won=0 no_excess=0 surplus=-1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,2,7,0,0,2,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,0,0,5,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=2 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=511 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_WAITROOM_BATCH] n=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2172, area 1): area 1 already holds card 2039, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=2 zone= target=double_baton_touch route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+   [B1 diag] stage=[2172,-1,-1] sumire=2172 l1=2037 l2=2039 waitroom=2 hand=1 energy=30
+FAIL: [B1_q193_q194_draw_and_deploy]: B1/Q193: Sumire occupies the CENTER area it was played into (got 0 expected 1)
+FAIL: [B1_q193_q194_draw_and_deploy]: B1/Q193: exactly one of the two Liella! members is back on stage (got 0 expected 1)
+FAIL: [B1_q193_q194_draw_and_deploy]: B1/Q193: the other Liella! member stayed in the waitroom (got 2 expected 1)
+FAIL: [B1_q193_q194_draw_and_deploy]: B1/Q193: ab#1 drew 2 (hand 2-1+2=3) (got 1 expected 3)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[RESUME_ANY] kind=2 zone= target=double_baton_touch route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[QUEUE_EXEC] idx=0 n=1 cid=2172 ab=1 actor=0 action=sequential
+[RESUME_ANY] kind=5 zone= target=left_side,right_side route=0 mode=1 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: [B2_no_baton_no_draw]: B2: no baton touch happened (the target area was empty) (got 2 expected 0)
+FAIL: [B2_no_baton_no_draw]: B2: no baton -> ab#1 does not trigger, no draw (got 3 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2172, area 0): area 0 already holds card 2037, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2172, area 0): area 0 already holds card 2037, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=2 zone= target=double_baton_touch route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2172, area 1): area 1 already holds card 2039, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2172, area 1): area 1 already holds card 2639, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=2 zone= target=double_baton_touch route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: [B6_no_liella_plays_normally]: B6: Sumire was placed on stage normally (non-vacuous control) (got 0 expected 1)
+FAIL: [B6_no_liella_plays_normally]: B6: no baton touch - no Liella! member was on stage (got 2 expected 0)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[TEST_BATON_TOUCH] test_play_to_stage(2172, area 1): area 1 already holds card 2039, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=2 zone= target=double_baton_touch route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: [B7_double_baton_pays_cost]: B7: the printed cost is what left the energy zone (got 30 expected 8)
+FAIL: [B7_double_baton_pays_cost]: B7: the cost-2 Liella! (bp1-005-R) is deployed back to the vacated area (got 0 expected 1)
+FAIL: [B7_double_baton_pays_cost]: B7: the deployed Liella! left the waitroom (got 1 expected 0)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=0 placed=2 hand_before=1 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=83 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=83 ab=0 actor=0 action=sequential
+FAIL: [F2_non_member_on_stage_no_trigger]: F2: the member with ライブ開始時 gains all-harts; the non-member neighbour is irrelevant
+[LIVE_ZONE_REFILL] pl=0 placed=2 hand_before=1 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=83 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=83 ab=0 actor=0 action=sequential
+FAIL: [F3_member_without_live_start]: F3: a stage neighbour without ライブ開始時 does not consume the each_time trigger
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=83 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=83 ab=0 actor=0 action=sequential
+[QUEUE_EXEC] idx=0 n=1 cid=1239 ab=0 actor=0 action=gain_resource
+   [F3c diag] all_heart(member=83)=0 all_heart(victory=1239)=1
+FAIL: [F3c_each_time_watcher_direct]: F3c: calling rb_trigger_each_time_for_member by hand DOES grant the all-hart - the engine simply never calls it
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=2 hand_before=2 hand_after=4
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=15
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,21,0,0,3,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,1,0,1,0,0,1,0] filled=[0,1,0,1,0,0,1,0]
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=15
+[LIVE_ALLOCATION] pl=1 lives=2 hearts=[0,3,0,21,0,0,3,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,1,0,1,0,0,1,0] filled=[0,1,0,1,0,0,1,0]
+[LIVE_ALLOCATION_CARD] idx=1 need=[0,1,0,1,0,0,1,0] filled=[0,1,0,1,0,0,1,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=24
+[EARLY_SEAT] pl=1 won=1 no_excess=0 surplus=21
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=509 ab=0 occurrence=0 use_limit=-1 effect=look_and_select options=0
+[LIVE_SUCCESS_QUEUE] cid=509 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=0 pending=1
+[LIVE_VICTORY_PHASE] initial pending=1
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001970a0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001970a0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001970a0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=24
+[EARLY_SEAT] pl=1 won=1 no_excess=0 surplus=21
+[LIVE_SUCCESS_TRIGGER] pl=1 owner=1 cid=2649 ab=0 occurrence=0 use_limit=-1 effect=look_and_select options=0
+[LIVE_SUCCESS_QUEUE] cid=2649 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_TRIGGER] pl=1 owner=1 cid=2650 ab=0 occurrence=0 use_limit=-1 effect=look_and_select options=0
+[LIVE_SUCCESS_QUEUE] cid=2650 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=2 queue=1->3 processed=0 pending=1
+[LIVE_VICTORY_PHASE] resume pending=1
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001970a0 cur=1 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001970a0 cur=1 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001970a0 cur=1 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=2 n=3 cid=2650 ab=0 actor=1 action=look_and_select
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001970a0 cur=1 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001970a0 cur=1 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001970a0 cur=1 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=24
+[EARLY_SEAT] pl=1 won=1 no_excess=0 surplus=21
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,21,0,0,3,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,1,0,1,0,0,1,0] filled=[0,1,0,1,0,0,1,0]
+[LIVE_ALLOCATION] pl=1 lives=2 hearts=[0,3,0,21,0,0,3,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,1,0,1,0,0,1,0] filled=[0,1,0,1,0,0,1,0]
+[LIVE_ALLOCATION_CARD] idx=1 need=[0,1,0,1,0,0,1,0] filled=[0,1,0,1,0,0,1,0]
+[LIVE_SCORE] p1=1 p2=2
+[CAN_PLACE_DECODE] cid=2649 ability=0 constant=0 trigger=ライブ成功時 action=look_and_select dest=-
+[CAN_PLACE_DECODE] cid=2650 ability=0 constant=0 trigger=ライブ成功時 action=look_and_select dest=-
+[LIVE_SUCCESS_PROMPT] pl=1 live=2 legal=2
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=1 p1_succ=2(+0) p2_succ=2(+0)
+[LIVE_VICTORY_PHASE] resume pending=1
+[RESUME_ANY] kind=1 zone=live_card_zone target=select_live_success route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=1 n=3 state=3 pending=1
+[CAN_PLACE_DECODE] cid=2649 ability=0 constant=0 trigger=ライブ成功時 action=look_and_select dest=-
+[LIVE_SUCCESS_CHOICE] pl=1 index=0 card=2649 can_place=1 live=2
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2406 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2406 ab=0 actor=0 action=sequential
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2406 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2406 ab=0 actor=0 action=sequential
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2406 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2406 ab=0 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2406 target=self count=6
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2406 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2406 ab=0 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2406 target=self count=6
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2406 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2406 ab=0 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2406 target=self count=6
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2406 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2406 ab=0 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2406 target=self count=6
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2406 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2406 ab=0 actor=0 action=sequential
+[LIVE_ZONE_REFILL] pl=0 placed=2 hand_before=1 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2406 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2406 ab=0 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2406 target=self count=6
+[QUEUE_EXEC] idx=1 n=2 cid=2639 ab=0 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=self count=6
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2406 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2406 ab=0 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2406 target=self count=6
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2406 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2406 ab=0 actor=0 action=sequential
+FAIL: [F15_turn_limit_second_activation]: F15: the first 起動 raised at least one prompt (non-vacuous control)
+FAIL: [F16_you_q186_cost_reduced]: F16: You is playable with only 4 energy (cost 20 - 16 reduction)
+FAIL: [F16_you_q186_cost_reduced]: F16: You really reached the stage (non-vacuous control) (got 0 expected 1)
+FAIL: [F16_you_q186_cost_reduced]: F16: exactly 4 energy was spent, i.e. the self cost reduction applied (got 0 expected 4)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=2 hand_after=2
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1161 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1161 ab=0 actor=0 action=sequential
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=1 hand_before=1 hand_after=2
+[LIVE_START_SCAN] pl=1 trigger=live_start zone=live_card_zone label=ライブ置場 cid=11 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=11 ab=0 actor=1 action=choice
+[CHOICE_C] options=3 any_number=0 pending_options=3
+[RESUME_ANY] kind=2 zone= target=choice route=5 mode=0 idx=2
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESULT] selected=2 available=3 reprompt=0
+--- §1a double baton blade grant per Liella! moved (chisato) ---
+  ok: A1: the double-baton prompt was raised (non-vacuous control)
+  ok: A1: double baton -> count=2
+  ok: A1: both replaced members have blade_heart -> +0 blade
+        A1_both_have_blade_heart: 4 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   A1_both_have_blade_heart
+  ok: A2: the double-baton prompt was raised (control)
+  ok: A2: double baton -> count=2
+        A2_one_no_blade_heart: 4 assertion(s), 2 failure(s), 0 setup bug(s)
+FAIL:   A2_one_no_blade_heart
+  ok: A3: the two on-stage members are two DISTINCT card ids
+  ok: A3: the double-baton prompt was raised (control)
+  ok: A3: double baton -> count=2
+        A3_q265_both_no_blade: 5 assertion(s), 2 failure(s), 0 setup bug(s)
+FAIL:   A3_q265_both_no_blade
+  ok: A4: the play was accepted
+  ok: A4: the double-baton prompt was raised (control)
+  ok: A4: double baton -> count=2
+  ok: A4: the waitroom really holds 5 pre-existing + 2 replaced cards
+        A4_draw_counts_replaced: 5 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   A4_draw_counts_replaced
+  ok: A5: the play was accepted
+  ok: A5: the double-baton prompt was raised (control)
+  ok: A5: both areas were replaced
+        A5_group_filter_liella: 5 assertion(s), 2 failure(s), 0 setup bug(s)
+FAIL:   A5_group_filter_liella
+  ok: A6: the play was accepted
+  ok: A6: exactly 1 card was drawn (non-vacuous control for the blade reading)
+  ok: A6: a single baton (one occupied area) records exactly 1
+  ok: A6: the replaced Liella! went to the waitroom
+  ok: A6: Chisato occupies the baton'd area
+  ok: A6: 1 replaced Liella! -> 1 card drawn (3-1+1)
+  ok: A6: 1 blade-heart-less Liella! -> +2 blade
+  ok: A6: the baton cost paid is the difference of the printed costs
+        A6_single_baton_one_liella: 8 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       A6_single_baton_one_liella
+  ok: A7: the normal debut was accepted
+  ok: A7: the debut really placed Chisato on stage (non-vacuous control)
+  ok: A7: a normal debut leaves no unresolved prompts
+  ok: A7: no baton touch was recorded
+        A7_normal_debut_fires_nothing: 7 assertion(s), 3 failure(s), 0 setup bug(s)
+FAIL:   A7_normal_debut_fires_nothing
+  ok: A8: the play was accepted
+  ok: A8: the bonus is active right after the baton debut
+  ok: A8: reached the live-card-set window by name
+  ok: A8: the live_end-duration blade bonus expired at live end
+        A8_blade_expires_at_live_end: 4 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       A8_blade_expires_at_live_end
+--- §1b double baton draw + deploy Q193/Q194 (sumire) ---
+  ok: B1: cards.json prints cost 22 for PL!SP-bp4-004-R+ (documents the Rust fixture's 20-energy / cost-5 assumption)
+  ok: B1: the play was accepted
+  ok: B1: the double-baton prompt was raised (non-vacuous control)
+  ok: B1/Q194: 2 baton touches recorded (double baton)
+        B1_q193_q194_draw_and_deploy: 8 assertion(s), 4 failure(s), 0 setup bug(s)
+FAIL:   B1_q193_q194_draw_and_deploy
+  ok: B2: the play was accepted
+  ok: B2: Sumire really landed on stage (non-vacuous control)
+        B2_no_baton_no_draw: 4 assertion(s), 2 failure(s), 0 setup bug(s)
+FAIL:   B2_no_baton_no_draw
+  ok: B3: the play was accepted
+  ok: B3: the replaced Liella! really went to the waitroom (non-vacuous control)
+  ok: B3: only 1 baton touch (only 1 occupied area)
+  ok: B3: Sumire occupies the baton'd LEFT area
+  ok: B3: no draw from ab#1 - only 1 baton touch occurred
+        B3_only_one_occupied_area: 5 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       B3_only_one_occupied_area
+  ok: B4: the play was accepted
+  ok: B4: the double-baton prompt was raised (non-vacuous control)
+  ok: B4: the double baton DID happen (2 replacements)
+  ok: B4: no draw - ab#1 requires the CENTER position and Sumire is at LEFT
+  ok: B4: Sumire sits at the LEFT area it was played into
+  ok: B4: the CENTER is empty after the double baton
+        B4_double_baton_to_left: 6 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       B4_double_baton_to_left
+  ok: B5: the play was accepted
+  ok: B5: the CENTER member really went to the waitroom (non-vacuous control)
+  ok: B5/Q194: only 1 baton touch - the LEFT member was deployed this turn
+  ok: B5/Q194: the locked LEFT member was not replaced
+  ok: B5: Sumire occupies the CENTER area it was played into
+  ok: B5/Q194: no draw from ab#1 - only 1 baton touch
+        B5_locked_member_excluded: 6 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       B5_locked_member_excluded
+  ok: B6: the play was accepted
+        B6_no_liella_plays_normally: 3 assertion(s), 2 failure(s), 0 setup bug(s)
+FAIL:   B6_no_liella_plays_normally
+  ok: B7: cards.json prints cost 22 - the Rust test's expected_cost=5 is stale
+  ok: B7: the play was accepted
+  ok: B7: the double-baton prompt was raised (non-vacuous control)
+  ok: B7: 2 baton touches
+  ok: B7: the cost-15 Liella! (bp1-004-R) stays in the waitroom
+        B7_double_baton_pays_cost: 8 assertion(s), 3 failure(s), 0 setup bug(s)
+FAIL:   B7_double_baton_pays_cost
+--- §2 full_round gaps ---
+  ok: F1: a fresh TestGame is on turn 1
+  ok: F1: and starts in the Main phase
+  ok: F1: at least turn 2 after 20 passes
+  ok: F1: P1's stage is empty after 20 passes (nothing was played)
+  ok: F1: P2's stage is empty after 20 passes (nothing was played)
+        F1_phase_walkthrough_two_turns: 5 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F1_phase_walkthrough_two_turns
+  ok: F2: the Rust fixture leaves TWO copies of Victory Road in the live zone (pre-push + set)
+  ok: F2: the ライブ開始時 member is on stage (precondition)
+  ok: F2: this member's own ライブ開始時 raises no prompt on an empty success zone
+        F2_non_member_on_stage_no_trigger: 4 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   F2_non_member_on_stage_no_trigger
+  ok: F3: the Rust fixture leaves TWO copies of Victory Road in the live zone (precondition)
+  ok: F3: the ability-less neighbour gains nothing
+        F3_member_without_live_start: 3 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   F3_member_without_live_start
+  ok: F3c: one Victory Road in the live zone
+  ok: F3c: the member is on stage
+  ok: F3c: the phase machine resolved the LiveStart ability but did NOT grant the all-hart
+        F3c_each_time_watcher_direct: 4 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   F3c_each_time_watcher_direct
+  ok: F4: the game ENDED once P2 alone reached a third success
+  ok: F4: P2 is the winner
+  ok: F4: P1 stays on two successes
+  ok: F4: P2 holds three successes
+        F4_solo_winner_third_success: 4 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F4_solo_winner_third_success
+  ok: F5: Distortion is in the live zone (the live-start window opened)
+  ok: F5: the live-start window was processed (non-vacuous control)
+  ok: F5/Q97: score +1 when all energy is active, even with no CatChu! member
+        F5_distortion_q97_all_active: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F5_distortion_q97_all_active
+  ok: F6/Q96: precondition - score is +1
+  ok: F6: the energy zone is no longer all-active (control)
+  ok: F6/Q96: the +1 is permanent even once energy stops being all-active
+        F6_distortion_q96_permanent: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F6_distortion_q96_permanent
+  ok: F7: the live-start window was processed (non-vacuous control)
+  ok: F7: the energy zone still holds 7 cards
+  ok: F7: the two differently-named CatChu! refresh all 4 wait energy
+  ok: F7: all-active energy then grants the +1
+        F7_distortion_refresh_with_catchu: 4 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F7_distortion_refresh_with_catchu
+  ok: F8: no wait energy, nothing to refresh
+  ok: F8: +1 still fires with no wait energy (all energy already active)
+        F8_distortion_no_wait_energy: 2 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F8_distortion_no_wait_energy
+  ok: F9: the live-start window was processed (non-vacuous control)
+  ok: F9: the energy zone still holds 8 cards
+  ok: F9: only 6 of the 8 wait cards are refreshed (the 6 cap binds)
+  ok: F9: not all active -> no +1
+        F9_distortion_max_cap_8_wait: 4 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F9_distortion_max_cap_8_wait
+  ok: F10: the live-start window was processed (non-vacuous control)
+  ok: F10: all 6 wait cards were refreshed
+  ok: F10: the zone still holds 6 cards
+  ok: F10: all active -> +1
+        F10_distortion_exact_max_boundary: 4 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F10_distortion_exact_max_boundary
+  ok: F11: the live-start window was processed (non-vacuous control)
+  ok: F11: the same-name condition is NOT met, so no wait energy is refreshed
+  ok: F11: the zone still holds 7 cards
+  ok: F11: not all active -> no +1
+        F11_distortion_same_name_not_met: 4 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F11_distortion_same_name_not_met
+  ok: F12: the two live cards are two DISTINCT card ids
+  ok: F12: the live-start window was processed (non-vacuous control)
+  ok: F12: all 7 wait energy became active
+  ok: F12/Q103: only the SECOND trigger's card gets the +1
+        F12_distortion_q103_two_triggers: 4 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F12_distortion_q103_two_triggers
+  ok: F13: the live-start window was processed (non-vacuous control)
+  ok: F13: two DISTINCT CatChu! names meet the condition -> all 4 refreshed
+  ok: F13: all active -> +1
+        F13_distortion_two_same_one_diff: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F13_distortion_two_same_one_diff
+  ok: F14: the live-start window was processed (non-vacuous control)
+  ok: F14: no wait energy, nothing to refresh
+  ok: F14: all active -> +1 even with same-name CatChu!
+        F14_distortion_same_name_all_act: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F14_distortion_same_name_all_act
+  ok: F15: Chika was played to center
+  ok: F15: the first 起動 was accepted
+  ok: F15: the self-cost moved Chika to the waitroom
+  ok: F15: the effect recovered the live card to hand
+  ok: F15: the blocked second 起動 changed nothing in hand
+  ok: F15: the blocked second 起動 left the waitroom untouched
+        F15_turn_limit_second_activation: 7 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   F15_turn_limit_second_activation
+  ok: F16: cards.json prints base cost 20 for LL-bp2-001-R+
+  ok: F16: the LEFT area starts empty
+        F16_you_q186_cost_reduced: 5 assertion(s), 3 failure(s), 0 setup bug(s)
+FAIL:   F16_you_q186_cost_reduced
+  ok: F17: reached turn 2 Main without a live being set
+  ok: F17: the turn-1 baseline score is +0
+  ok: F17: the turn-1 baseline blade is +0
+  ok: F17: Rise Up High! is in the live zone (the window opened)
+  ok: F17: the live-start window was processed (non-vacuous control)
+  ok: F17: Rise Up High! must not add score on turn 2 (turn gate)
+  ok: F17: Rise Up High! must not grant a blade on turn 2 (turn gate)
+        F17_rise_up_high_not_turn_2: 7 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F17_rise_up_high_not_turn_2
+  ok: F18: 愛♡スクリ～ム！ offered its answer-based choice (non-vacuous control)
+  ok: F18: P1's Left member gained the blade
+  ok: F18: P1's Center member gained the blade
+  ok: F18: P2's Left member gained the blade
+  ok: F18: P2's Center member gained the blade
+        F18_ai_screeam_p2_owned_live: 5 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       F18_ai_screeam_p2_owned_live
+
+=== parity_full_round ===
+tests passed          : 19
+tests failed (parity) : 15
+tests crashed (engine): 0
+assertions (in-parent): 0
+failures  (in-parent): 0
+fixture setup bugs    : 0
+see the per-test tally lines above for assertion counts
+PARITY DIVERGENCE: the run stayed red by design.
+FAILED: parity_full_round  [exit=1, 44 result line(s): assert=44 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=44]
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

@@ -1,0 +1,1 @@
+FAILED: parity_zone_source  [exit=0, 49 result line(s): assert=49 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=21]

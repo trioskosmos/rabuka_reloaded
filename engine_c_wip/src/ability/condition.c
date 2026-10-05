@@ -349,6 +349,10 @@ static int zone_count_filtered_ex(const struct GameState *g, int pl, const char 
 /* Forward */
 static int eval_condition_inner(const struct GameState *g, int actor, const Condition *c);
 static int eval_condition_inner_host(const struct GameState *g, int actor, int host_cid, const Condition *c);
+/* Defined below (condition.c:~1000) but read by eval_location's
+ * `activated_this_turn` arm, which Rust places before every other location
+ * predicate (ability/condition/card.rs:2482). */
+static int cond_truthy_field(const Condition *c, const char *key);
 int rb_check_phase_gate(const struct GameState *g, int actor, const Condition *c, int skip_gate);
 /* card.rs:409 check_aggregate_total. Declared here because the aggregate
    short-circuit runs at FOUR Rust call sites (condition.rs:518,
@@ -487,6 +491,85 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
         if (lv && lv->tag == RB_TAG_ARRAY && lv->arr_n>0 && lv->arr[0].tag==RB_TAG_STR) loc = lv->arr[0].s;
     }
     if (!loc) loc = "stage";
+    /* ── card.rs:2482-2508 — `activated_this_turn` (per-turn ACTIVATION
+     * history, not current state).
+     *
+     * Rust, inside evaluate_card_count_condition, AFTER the check_self
+     * early return (:2465-2467) and BEFORE `location` is read at all:
+     *
+     *     if condition.get_activated_this_turn() == Some(true) {
+     *         let n = gs.cards_activated_this_turn.iter().filter(|cid| {
+     *             card_db.get_card(*cid).is_some_and(|card| {
+     *                 if card_type == "member_card" && !card.is_member() {
+     *                     return false;
+     *                 }
+     *                 group_names.is_none_or(|gs| gs.is_empty()
+     *                     || gs.iter().any(|g| card_matches_group_str(card_db, *cid, Some(g))))
+     *             })
+     *         }).count();
+     *         return n >= count as usize;
+     *     }
+     *
+     * Three facts make this arm, not a fall-through, the correct wiring:
+     *
+     *  1. The subject is `GameState::cards_activated_this_turn`
+     *     (core/game_state/mod.rs:165), a per-CARD `SmallVec<[i16;8]>` of the
+     *     members switched OUT of wait this turn. It is NOT the stage and NOT
+     *     `stage_arrived`. Without the arm the condition fell through to the
+     *     `loc` scan below, so 「このターンにウェイトから/glay activated」 —
+     *     PL!-pb2-040-L — degenerated into "some member is in wait now", a
+     *     DIFFERENT set: a member activated this turn is no longer in wait,
+     *     so the fall-through answered false for every card that had actually
+     *     activated and true for cards that had not.
+     *
+     *  2. `card_type` is compared to the literal "member_card" and gates on
+     *     `card.is_member()`. Any OTHER card_type value does NOT filter — the
+     *     Rust `if` is not a match — so `card_type == "live_card"` counts every
+     *     activated card. Reproduced literally rather than "improved".
+     *
+     *  3. `group_names` is `Option<&[String]>`, and `is_none_or` treats BOTH
+     *     absent and EMPTY as "no group constraint". The C reads the ARRAY, so
+     *     absent => NULL (pass) and empty => n_groups 0 (pass); the
+     *     `gv->arr_n == 0` test below is what makes the empty case match.
+     *
+     * Placement is Rust's: after the `loc` DEFAULT is computed (so the rest of
+     * this function still sees a usable `loc`) but BEFORE every arm that could
+     * return — check_heart_type_all (:532), check_heart_colors (:533),
+     * check_card_property (:534) and check_aggregate_total (:535). Rust reads
+     * no location and runs none of those predicates on this path, and it
+     * RETURNS, so the negation fold in eval_condition_inner_host applies to
+     * the `n >= count` verdict exactly as it does to any other early return
+     * here. */
+    {
+        int att = 0;
+        if (cond_truthy_field(c, "activated_this_turn")) att = 1;
+        if (att) {
+            const char *act_ct = get_str(c, "card_type");
+            const CondValue *agn = find_val(c, "group_names");
+            int filter_by_member = (act_ct && !strcmp(act_ct, "member_card"));
+            int n = 0;
+            for (int i = 0; i < g->n_cards_activated_this_turn; i++) {
+                int cid = g->cards_activated_this_turn[i];
+                Card ac;
+                if (cid < 0 || !rb_decode_card_by_index((uint32_t)cid, &ac)) continue;
+                int is_member = !rb_card_is_live(cid) && !rb_card_is_energy(cid);
+                rb_free_card(&ac);
+                if (filter_by_member && !is_member) continue;
+                if (agn && agn->tag == RB_TAG_ARRAY && agn->arr_n > 0) {
+                    int any = 0;
+                    for (uint32_t k = 0; k < agn->arr_n && !any; k++) {
+                        const char *grp = (agn->arr[k].tag == RB_TAG_STR) ? agn->arr[k].s : NULL;
+                        if (grp && *grp && rb_card_matches_group_str(cid, grp)) any = 1;
+                    }
+                    if (!any) continue;
+                }
+                n++;
+            }
+            int thr = 1;
+            get_i(c, "count", &thr);
+            return n >= thr;
+        }
+    }
     int yell_trigger = 0;
     get_bool(c, "yell_trigger", &yell_trigger);
     int yell_negation = 0;
@@ -561,10 +644,33 @@ static int eval_location(const struct GameState *g, int actor, int host_cid, con
         if (hg && *hg) group = hg;
         have_hostc = 1;
     }
-    /* exclude_self: drop the activating card from the match set
-       (card.rs: `filter.exclude_self = self.activating_card_id`). */
+    /* exclude_self: drop the activating card from the match set.
+     *
+     * Rust `filter.exclude_self = self.activating_card_id`
+     * (ability/condition/card.rs:988), and `activating_card_id` is built as
+     * `game_state.activating_card` (ability/condition.rs:94) — it is NEVER the
+     * host card. The C read `host_cid`, which is the CALLER's card: for
+     * `rb_condition_allows(g, actor, effect, host_cid)` the host is whatever
+     * card the ability is attached to, and for `rb_eval_condition` it is -1.
+     * Those three differ whenever the condition is evaluated for a card other
+     * than the activating one (every constant scan re-points `activating_card`
+     * at the constant's own host before evaluating, so the two usually agree
+     * there) — but a live-card condition read off a stage member's ability
+     * while a DIFFERENT card is activating excluded the wrong card, so
+     * 「自分以外のメンバー」 counted the activating card in and excluded the
+     * card the ability actually belongs to.
+     *
+     * `host_cid` is retained as the FALLBACK for the shapes where Rust has no
+     * activating card at all (g->activating_card < 0): excluding nothing is the
+     * faithful answer there, and the old host-based behaviour was the only
+     * thing keeping `exclude_self` from degenerating into a no-op on the
+     * constant-scan path where neither is set. */
     int excl = 0; get_bool(c, "exclude_self", &excl);
-    int exclude_cid = (excl && host_cid >= 0) ? host_cid : -1;
+    int exclude_cid = -1;
+    if (excl) {
+        if (g->activating_card >= 0)      exclude_cid = g->activating_card;
+        else if (host_cid >= 0)           exclude_cid = host_cid;
+    }
     /* `unit: "types"` counts DISTINCT heart colours, not cards. Rust gates this
        on the stage specifically (card.rs:2440-2441), and only when NO card_type
        or group filter is present — the filter arms above take precedence there

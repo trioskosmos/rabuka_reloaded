@@ -46,7 +46,7 @@ _every assertion is about a count/size (len/count/>=1) — '3 options were offer
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/characterization/seed_reproduces_game_test.rs` | `each_replayed_game_reaches_a_terminal_result` | 363 |  |
+| `engine/tests/test_modules/characterization/seed_reproduces_game_test.rs` | `each_replayed_game_reaches_a_terminal_result` | 394 |  |
 | `engine/tests/test_modules/effects/recover/to_hand/pb2_kidou_self_to_waitroom_recover_mus_live_then_energy_per_mus_pl_pb2_007_pp_test.rs` | `a_mus_live_is_recovered_from_the_waitroom` | 85 |  |
 
 ## live_success_no_premise (1)
@@ -202,7 +202,7 @@ _every assertion is an INEQUALITY on a count and there is no assert_eq anywhere 
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/characterization/seed_reproduces_game_test.rs` | `each_replayed_game_reaches_a_terminal_result` | 363 | 2 inequality assertion(s) on a count, vs baseline+threshold |
+| `engine/tests/test_modules/characterization/seed_reproduces_game_test.rs` | `each_replayed_game_reaches_a_terminal_result` | 394 | 2 inequality assertion(s) on a count, vs baseline+threshold |
 
 ## unresolvable_card_id (1)
 

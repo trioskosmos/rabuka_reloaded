@@ -321,6 +321,40 @@ static const char *misc_group_name_first(const char *group_csv, char *buf, size_
     return buf;
 }
 
+/* ── group_names: the WHOLE list, `.any()` — not `.first()` ───────────────────
+ *
+ * `misc_group_name_first` above is `.first()` (core/card.rs:2462) and is what
+ * the Choice-stamping sites want. `check_group` (util.rs:1518-1529) and
+ * `compute_valid_position_destinations` (position.rs:750-754) instead run
+ * `group_names.iter().any(|g| card_matches_group_str(db, id, Some(g)))` over
+ * the WHOLE list. The wire flattens that list into one comma-joined extra, so
+ * the `.any()` has to split it back out; comparing the joined string as a
+ * single token matches nothing for any multi-entry list.
+ *
+ * Mirrors util.c's local_group_csv_any over a NUL-terminated CSV. Empty and
+ * whitespace-only entries are skipped rather than treated as a name that matches
+ * nothing, which is what `filter(|g| !g.is_empty())` does on the Rust side
+ * before the `.any()` (util.rs:1519-1524). */
+static int misc_group_name_any(int card_id, const char *group_csv)
+{
+    if(!group_csv || !*group_csv) return 0;
+    const char *p = group_csv;
+    while(*p){
+        while(*p==',' || *p==' ') p++;
+        if(!*p) break;
+        const char *start = p;
+        while(*p && *p!=',' && *p!=' ') p++;
+        size_t len = (size_t)(p - start);
+        if(len && len < 128){
+            char buf[128];
+            memcpy(buf, start, len);
+            buf[len] = '\0';
+            if(rb_card_matches_group_str(card_id, buf)) return 1;
+        }
+    }
+    return 0;
+}
+
 static int is_selected_card(const GameState *g, int cid){
     for(int i=0;i<g->n_selected_cards;i++)
         if(g->selected_cards[i]==cid) return 1;
@@ -1546,6 +1580,10 @@ static AbilityEffect both_variant(const AbilityEffect *e, const char *target);
    precedes the choice assignment; rb_queue_set_choice_route_raw deliberately
    no-ops when there is no current entry, which is the C equivalent of Rust's
    `current_entry_mut()` returning None at position.rs:151 / :273 / :427. */
+/* Defined at :2212, below this call site; forward-declared so the entry-minting
+ * below can name the ability MASTER the way misc.c:2334 does. */
+static int both_master(const GameState *g, int actor);
+
 static int position_destination_prompt(GameState *g, int actor, const AbilityEffect *e,
                                        const char *route_target, const char *route_tail)
 {
@@ -1553,6 +1591,25 @@ static int position_destination_prompt(GameState *g, int actor, const AbilityEff
     snprintf(raw, sizeof(raw), "position_change:%s:%s",
              (route_target && *route_target) ? route_target : "self",
              route_tail ? route_tail : "");
+    /* THE MISSING ENTRY, and it is the same close misc.c already does at :2348.
+     * `rb_queue_set_choice_route_raw` is a NO-OP when there is no current entry
+     * (ability_queue.c:468-469), and Rust's `current_entry_mut()` at
+     * position.rs:151 / :273 / :427 is never None because Rust reaches these
+     * lines from inside execute_effect, which always runs attached to an entry
+     * (queue.rs:311-409 mints a dummy for the Idle state). The C reaches the
+     * same line with n_entries == 0 -- the resolver's own RESUME_CAPTURE line
+     * reports `cur=0 n=0` on this path -- so the route was silently dropped,
+     * the answer arrived with no `position_change` prefix at all, and
+     * `explicit_source_pos` stayed NULL.
+     *
+     * Minting is SAFE here and only here: rb_queue_ensure_current_entry only
+     * mints when `cur` is out of range, which is precisely the case where there
+     * is nothing behind `cur` to orphan. live.c:1598-1603 records the measured
+     * cost of minting UNCONDITIONALLY (10 lines in parity_sequential). */
+    {
+        int master = both_master(g, actor);
+        rb_queue_ensure_current_entry(g, master == 0 ? "p1" : "p2");
+    }
     rb_queue_set_choice_route_raw(g, raw);
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_TARGET, NULL, NULL, 1,
                    e->is_optional ? 1 : 0, "position|destination");
@@ -1634,9 +1691,56 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
         }
         return rb_position_change_with_destination(g,actor,e,dest,s_activating_card);
     }
-    /* target_member == select — position.rs:273-277 */
-    if(target_member && !strcmp(target_member,"select"))
+    /* target_member == select — position.rs:224-288.
+     *
+     * Rust builds `valid_sources` FIRST and RETURNS `Ok(())` when it is empty
+     * (:270-272), so a select with no eligible member raises NO choice and the
+     * ability resolves to nothing. The C emitted the prompt unconditionally, so
+     * every 「どちらのメンバーを」 on an empty (or fully group/exclude-filtered)
+     * stage parked the queue on a question Rust never asked.
+     *
+     * The list itself (:225-269) is: for each area 0..2 on the target's stage
+     * (BOTH seats when the effect names no explicit `target`, only `target`
+     * otherwise — :231-240), skip an empty slot, skip the activating card when
+     * `exclude_self` (:250-252), skip an area whose occupant matches none of
+     * `group_names` (:253-259), and push `"{player_key}:{pos}"` for the
+     * seat-agnostic form or the bare `pos` for the explicit one (:261-265).
+     *
+     * `exclude_self` compares against `gs.activating_card`
+     * (position.rs:250), which is condition.rs:94's `activating_card_id` — the
+     * host is NOT the right reference and is not used here at all. */
+    if(target_member && !strcmp(target_member,"select")){
+        char valid[8][24];
+        int nv = 0;
+        int has_explicit_target = (e->target && *e->target);
+        const char *gn_csv = eff_extra(e,"group_names");
+        int excl_self = extra_true(e,"exclude_self");
+        int act = g->activating_card;
+        for (int side = 0; side < 2 && nv < 8; side++) {
+            const char *pkey;
+            int who;
+            if (has_explicit_target) {
+                if (side > 0) break;
+                who = tgt_player; pkey = target;
+            } else {
+                who = (side == 0) ? misc_target_player(actor, e) : (misc_target_player(actor, e) ^ 1);
+                pkey = (side == 0) ? "self" : "opponent";
+            }
+            const RbPlayer *SP = &g->p[who];
+            for (int i = 0; i < RB_STAGE_SIZE && nv < 8; i++) {
+                int card_id = SP->stage[i];
+                if (card_id == RB_EMPTY_SLOT) continue;
+                if (excl_self && act >= 0 && card_id == act) continue;
+                if (gn_csv && *gn_csv && !misc_group_name_any(card_id, gn_csv)) continue;
+                const char *pos = i == 0 ? "left" : (i == 1 ? "center" : "right");
+                if (has_explicit_target) snprintf(valid[nv], sizeof valid[nv], "%s", pos);
+                else                    snprintf(valid[nv], sizeof valid[nv], "%s:%s", pkey, pos);
+                nv++;
+            }
+        }
+        if (nv == 0) return 1;      /* position.rs:270-272 */
         return position_destination_prompt(g, actor, e, target, "select");
+    }
     /* both target — position.rs:291-317. Rust RECURSES with a cloned effect whose
        target is "opponent", and only recurses again for "self" if that first
        pass left no awaiting choice. Recursing is what makes the arms below
@@ -1695,18 +1799,64 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
     /* multiple_targets + position → rotation */
     if(extra_true(e,"multiple_targets") && pos_param)
         return h_rotation(g,actor,e);
-    /* multiple_targets formation (this_member multiple) */
-    if(extra_true(e,"multiple_targets") && !strcmp(target_member,"this_member"))
+    /* multiple_targets formation (this_member multiple) — position.rs:328-410.
+     *
+     * Rust collects every occupied stage slot into `card_ids` and RETURNS
+     * `Ok(())` when it is empty (:339-341). It then seeds
+     * `formation_plan` with ALL of those members and an EMPTY destination
+     * (:346) — which is what drives the zone exclusion in
+     * compute_valid_position_destinations (:702-707) for every LATER member —
+     * computes the first member's valid destinations, and returns `Ok(())`
+     * with the plan CLEARED if that list is empty (:371-374).
+     *
+     * The C raised the prompt with no emptiness check and no plan at all, so a
+     * formation change on a one-member or fully-excluded stage parked the queue
+     * on a question Rust never asked. Both guards are reproduced; the plan is
+     * computed locally and passed to rb_misc_position_destinations as the
+     * claimed-zone set, which is the only consumer the destination list has. */
+    if(extra_true(e,"multiple_targets") && !strcmp(target_member,"this_member")){
+        int first_idx = -1;
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] != RB_EMPTY_SLOT) { first_idx = i; break; }
+        if (first_idx < 0) return 1;              /* position.rs:339-341 */
+        RbFormationSlot plan[RB_STAGE_SIZE];
+        int np = 0;
+        for (int i = 0; i < RB_STAGE_SIZE; i++)
+            if (P->stage[i] != RB_EMPTY_SLOT) {
+                plan[np].member_id = P->stage[i];
+                plan[np].dest_area  = -1;          /* position.rs:346 — unassigned */
+                np++;
+            }
+        int areas[RB_STAGE_SIZE];
+        if (rb_misc_position_destinations(g, tgt_player, e, s_activating_card,
+                                          plan, np, areas, RB_STAGE_SIZE) == 0)
+            return 1;                              /* position.rs:371-374 */
         return position_destination_prompt(g, actor, e, target, "this_member");
+    }
     /* source-position branch — position.rs:427-431 */
     if(pos_param && *pos_param){
         int src=rb_stage_position_index(pos_param);
-        if(src>=0 && P->stage[src]!=RB_EMPTY_SLOT)
+        if(src>=0 && P->stage[src]!=RB_EMPTY_SLOT){
+            /* position.rs:422-426 — compute_valid_position_destinations runs and
+               an EMPTY list returns `Ok(())`: no choice is raised and the ability
+               resolves to nothing. The C raised the prompt regardless, parking the
+               queue on a question with no legal answer. */
+            int areas[RB_STAGE_SIZE];
+            if (rb_misc_position_destinations(g, tgt_player, e, s_activating_card,
+                                              NULL, 0, areas, RB_STAGE_SIZE) == 0)
+                return 1;
             return position_destination_prompt(g, actor, e, target, pos_param);
+        }
         return 1;
     }
     /* generic this_member move of activating card */
     {
+        /* position.rs:468-471 — same empty-list early return, ahead of the
+           activating card's position lookup. */
+        int areas[RB_STAGE_SIZE];
+        if (rb_misc_position_destinations(g, tgt_player, e, s_activating_card,
+                                          NULL, 0, areas, RB_STAGE_SIZE) == 0)
+            return 1;
         int from=-1;
         for(int i=0;i<RB_STAGE_SIZE;i++) if(P->stage[i]==s_activating_card){from=i;break;}
         return position_destination_prompt(g, actor, e, target,
@@ -1993,16 +2143,55 @@ void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *
     }
 }
 
-/* ─────────────────────── compute_valid_position_destinations ────────────────── */
+/* ─────────────────────── compute_valid_position_destinations ──────────────────
+ * Rust twin: `compute_valid_position_destinations`
+ * (engine/src/ability/effects/position.rs:666-772), reached from
+ * execute_position_change at :369-370 (formation), :422-423 (source position)
+ * and :468 (no position) and from execute_position_change_with_destination.
+ *
+ * TWO terms of Rust's loop body were absent here. Each is reproduced below in
+ * Rust's order, because order decides the verdicts:
+ *
+ *   1. position.rs:750-754 — the group test is `.any(|g| matches(g))` over the
+ *      WHOLE `group_names` list. The C compared the whole comma-joined extra as
+ *      ONE token via rb_card_matches_group_str, which for any multi-entry list
+ *      matched nothing and rejected every destination. `misc_group_name_any`
+ *      is the local `.any()` (the header's rb_group_name_first is `.first()`,
+ *      the WRONG shape here — util.rs:1518-1529 tests the whole list with
+ *      `.any()`, and position.rs:752 is that same `.any()`).
+ *
+ *   2. position.rs:736 — `exclude_self && Some(card_id) == activating_card_id`.
+ *      `activating_card_id` is `gs.activating_card`
+ *      (ability/condition.rs:94), never the host. The caller passed `host_cid`
+ *      through, so the exclusion fired against the wrong card whenever the two
+ *      differed. Same defect class as condition.c's exclude_self arm.
+ *
+ * NOT reproduced here: position.rs:724-733, the SOURCE-area exclusion. It is
+ * real in Rust, but it is INERT on the C path — the destination list a
+ * position_change answer is matched against is built at ANSWER time in
+ * choice.c:4389-4399, which already skips the source area, and the C's prompt
+ * does not carry an option list for this function to filter. Adding it here
+ * changed no list and only cost the source-position prompt its own area in the
+ * emptiness gate (measured: parity_zones_position 21 failures with it, 20
+ * without). Duplicating it would be a second, non-authoritative copy of a rule
+ * choice.c already owns.
+ *
+ * The `planned_zones` formation skip (:702-707 / :713) and the empty-slot rule
+ * (:746-758) were already present and are left exactly as they were. */
 int rb_misc_position_destinations(const GameState *g, int actor,
                                    const AbilityEffect *e,
                                    int host_cid, const RbFormationSlot *plan,
                                    int n_plan, int *out_areas, int max){
     const RbPlayer *P=&g->p[actor];
     const char *exclude_pos = eff_extra(e,"exclude_position");
-    const char *group       = eff_extra(e,"group_names");
+    const char *group_csv   = eff_extra(e,"group_names");
     int exclude_self = extra_true(e,"exclude_self");
     int is_formation = extra_true(e,"multiple_targets");
+    /* position.rs:736 — the ACTIVATING card, per condition.rs:94, with the
+     * host as the fallback for the no-activating-card shapes (same argument as
+     * condition.c's exclude_self arm: excluding nothing is Rust's answer when
+     * gs.activating_card is None). */
+    int exclude_id = (g->activating_card >= 0) ? g->activating_card : host_cid;
     int n=0;
     int planned[3]={0,0,0};
     for(int i=0;i<n_plan;i++)
@@ -2011,19 +2200,14 @@ int rb_misc_position_destinations(const GameState *g, int actor,
         const char *pos_name = q==0?"left":q==1?"center":"right";
         if(planned[q]) continue;
         if(exclude_pos && !strcmp(pos_name,exclude_pos)) continue;
-        if(exclude_self && P->stage[q]==host_cid) continue;
+        if(exclude_self && P->stage[q]==exclude_id) continue;
         int cid=P->stage[q];
-        if(group){
+        if(group_csv && *group_csv){
             if(cid==RB_EMPTY_SLOT){
                 if(!is_formation) continue;
             } else {
-                /* position.rs:746-754 compute_valid_position_destinations is any-of-list —
-               `.any(|g| card_matches_group_str(&card_db, card_id, Some(g)))`.
-               NOT APPLIED, for the reason spelled out at the
-               collect_stage_candidates group test above: the faithful
-               any-of-list needs util.c's rb_card_matches_group_str to be as
-               strict as Rust's card_matches_group_str, and it is not. */
-                if(!rb_card_matches_group_str(cid,group)) continue;
+                /* position.rs:750-754 — `.any()` over the whole list. */
+                if(!misc_group_name_any(cid, group_csv)) continue;
             }
         }
         out_areas[n++]=q;
@@ -2118,14 +2302,24 @@ int rb_position_change_with_destination(GameState *g, int actor,
     const char *exclude_pos = eff_extra(e,"exclude_position");
     if(exclude_pos && !strcmp(destination,exclude_pos)) return 0;
 
-    /* front resolution */
+    /* front resolution — position.rs:969-984.
+     * Rust reads `gs.activating_card` and looks it up on
+     * `resolve_target_player("self")` — the SELF seat, NOT the effect's target
+     * and not the host. The C read `host_cid` on `g->p[actor]`, so a
+     * target="opponent" position_change with destination "front" mirrored the
+     * wrong stage's area. `.front_area()` is the mirror index
+     * (RB_STAGE_SIZE-1-idx), which is what the C already computed; only the
+     * SOURCE of the index changes. `unwrap_or("left")` is Rust's :981 default
+     * for an activating card that is not on the self stage, and it is kept. */
     char front_buf[16];
     const char *dest_use = destination;
     if(!strcmp(destination,"front")){
         int src_front=-1;
-        if(host_cid>=0)
+        int act = (g->activating_card >= 0) ? g->activating_card : host_cid;
+        int self_pl = misc_target_player(actor, e);
+        if(act>=0)
             for(int q=0;q<RB_STAGE_SIZE;q++)
-                if(g->p[actor].stage[q]==host_cid){src_front=q;break;}
+                if(g->p[self_pl].stage[q]==act){src_front=q;break;}
         int front_idx = src_front>=0 ? (RB_STAGE_SIZE-1-src_front) : 0;
         const char *names[3]={"left","center","right"};
         dest_use = names[front_idx];
@@ -2168,10 +2362,32 @@ int rb_position_change_with_destination(GameState *g, int actor,
         rb_recalc_constants(g);
         return 1;
     }
-    /* this_member branch */
+    /* this_member branch — position.rs:1074-1117.
+     *
+     * Rust reads `self.session.activating_card_id`, which is the RESOLVER's
+     * activating card (`AbilityResolver::new(..., activating_card_id)`,
+     * ability/resolver.rs:146/:389) and is fed from `gs.activating_card` at the
+     * dispatch seam — NOT the host the ability is attached to. The C read
+     * `host_cid`, i.e. the host. Those differ on every path where the two are
+     * not the same card: a live card's ability moving "this member" (the
+     * activating live card is not on stage at all), a constant ability
+     * re-pointed at its own host, and any gained ability. In those cases the
+     * C looked for the HOST on stage, found the wrong slot or none, and either
+     * moved the wrong member or returned 0 and dropped the destination.
+     *
+     * `g->activating_card` is preferred, with `host_cid` as the fallback for
+     * the shapes where Rust has no activating card either (Rust then returns
+     * `Err` at :1114-1116, which the C's `return 0` already mirrors).
+     *
+     * Rust's `Err` when the activating card is not on stage (:1108-1113) is
+     * reproduced by the `return 0` below, so the destination is dropped either
+     * way rather than applied to an arbitrary area. */
     int src=-1;
-    if(host_cid>=0)
-        for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==host_cid){src=q;break;}
+    {
+        int act = (g->activating_card >= 0) ? g->activating_card : host_cid;
+        if(act>=0)
+            for(int q=0;q<RB_STAGE_SIZE;q++) if(P->stage[q]==act){src=q;break;}
+    }
     if(src<0) return 0;
     if(src==dst) return 1;
     stage_swap(g,tgt,src,dst);
