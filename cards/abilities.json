@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-06T03:02:20.538534",
+  "generated_at": "2026-10-06T03:49:59.221068",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "341a31b5",
+  "engine_commit": "d44b95ff",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -25871,12 +25871,34 @@
           {
             "text": "2人ともいる場合、さらにこのメンバーをアクティブにする",
             "condition": {
+              "type": "compound",
+              "operator": "and",
               "text": "2人ともいる場合",
-              "count": 2,
-              "operator": ">=",
               "target": "self",
-              "type": "comparison_condition",
-              "location": "stage"
+              "location": "stage",
+              "card_type": "member_card",
+              "conditions": [
+                {
+                  "type": "location_condition",
+                  "text": "自分のステージに「星空 凛」がいる場合",
+                  "characters": [
+                    "星空凛"
+                  ],
+                  "target": "self",
+                  "location": "stage",
+                  "card_type": "member_card"
+                },
+                {
+                  "type": "location_condition",
+                  "text": "自分のステージに「小泉花陽」がいる場合",
+                  "characters": [
+                    "小泉花陽"
+                  ],
+                  "target": "self",
+                  "location": "stage",
+                  "card_type": "member_card"
+                }
+              ]
             },
             "state_change": "active",
             "card_type": "member_card",

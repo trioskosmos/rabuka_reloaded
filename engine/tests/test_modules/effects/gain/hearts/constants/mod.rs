@@ -6,6 +6,7 @@ pub mod center_highest_cost_constant_heart_empty_and_single_member_test;
 pub mod combined_energy_fifteen_constant_heart_test;
 pub mod combined_energy_fifteen_heart02_boundary_test;
 pub mod combined_stage_count_constant_heart_test;
+pub mod cross_side_success_score_sum_ten_pr_024_pr_034_pr_test;
 pub mod energy_threshold_stacked_heart02_six_and_eight_test;
 pub mod energy_threshold_two_hearts_at_eight_test;
 pub mod group_live_need_heart_eight_constant_heart03_test;

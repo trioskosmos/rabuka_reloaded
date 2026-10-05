@@ -28,6 +28,7 @@ pub mod pl_s_bp6_015_n_debut_opponent_cost2_wait_test;
 pub mod riko_center_gated_live_start_low_blade_opponent_wait_test;
 pub mod self_discard_target_wait_pl_bp6_010_n_test;
 pub mod self_wait_and_nijigasaki_activation_test;
+pub mod self_wait_named_gate_draw_two_discard_one_reactivate_pl_pr_022_pr_test;
 pub mod self_wait_printemps_energy_pl_pb1_003_r_test;
 pub mod sp_bp5_choice_energy_test;
 pub mod wondermates_group_filter_negatives_test;

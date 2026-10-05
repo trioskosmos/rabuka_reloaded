@@ -4,6 +4,7 @@ pub mod b9_more_test;
 pub mod boosted_member_live_success_draw_test;
 pub mod costly_aqours_pl_s_bp7_002_r_test;
 pub mod debut_one_pl_hs_bp5_011_n_test;
+pub mod discard_appearance_draw_one_turn_once_pl_n_pr_033_pr_test;
 pub mod distinct_draw_regression_test;
 pub mod dollchestra_live_zone_gated_draw_test;
 pub mod dream_believers_test;

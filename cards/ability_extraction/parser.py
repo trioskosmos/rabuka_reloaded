@@ -1353,6 +1353,7 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
             effect["activation_position"] = extra_pos_from_cost
 
         _fix_sequential_chain(effect)
+        _fix_both_characters_condition(effect)
         effect = _clean(effect)
         _validate_effect(effect, triggerless_text[:40])
         ability["effect"] = effect
@@ -14251,6 +14252,59 @@ def _fix_sequential_chain(eff):
             and prev_source
         ):
             sub["source"] = prev_source
+
+
+def _fix_both_characters_condition(eff):
+    """「2人ともいる場合」 — the NAMED members, not N strangers off the zone.
+
+    The generic 「N人…場合」 rule emits a bare `count >= N` over the location, so
+    西木野真姫 (PL!-PR-022-PR) reactivated off three unnamed stage members. The
+    names are the ones the preceding clause just named (「「星空 凛」か「小泉花陽」
+    がいる場合」); rebuild the gate as an AND over one existence check per name —
+    exactly the two the text says are *both* there.
+    """
+    if eff.get("action") != "sequential":
+        return
+    named = None
+    for sub in eff.get("actions", []):
+        if not isinstance(sub, dict):
+            continue
+        cond = sub.get("condition")
+        if not isinstance(cond, dict):
+            continue
+        chars = cond.get("characters")
+        if chars:
+            named = list(chars)
+            continue
+        text = (cond.get("text") or "").strip()
+        m = re.fullmatch(r"(\d+)人とも(?:いる|ある)?場合", text)
+        if not m or not named:
+            continue
+        want = int(m.group(1))
+        if len(named) < want:
+            continue
+        cond.clear()
+        cond.update(
+            {
+                "type": "compound",
+                "operator": "and",
+                "text": text,
+                "target": "self",
+                "location": "stage",
+                "card_type": "member_card",
+                "conditions": [
+                    {
+                        "type": "location_condition",
+                        "text": f"自分のステージに「{name}」がいる場合",
+                        "characters": [name],
+                        "target": "self",
+                        "location": "stage",
+                        "card_type": "member_card",
+                    }
+                    for name in named[:want]
+                ],
+            }
+        )
 
 
 def _fix_condition_enrichment(eff, t):

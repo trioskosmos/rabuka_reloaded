@@ -3264,8 +3264,15 @@ let actual = if condition.get_member_has_resource_under() == Some(true) {
             self.stage_satisfies_characters(condition, stage_ids, push_rich)
         } else {
             if let Some(expected_source) = condition.get_appearance_source() {
-                let card_to_check = self.activating_card_id;
-                let ok = card_to_check.is_some_and(|cid| {
+                // WHO appeared is not always the activating card. For a 「登場」
+                // ability the two coincide, but a watcher (自動 — 中須かすみ
+                // 「自分の控え室からメンバーが登場したとき」) resolves on ANOTHER
+                // card's arrival: `activating_card_id` is the watcher, which never
+                // moved, so reading its source always failed and the draw never
+                // fired. Test every card that arrived on this stage instead — for
+                // the self-referential shape the activating card is on the stage
+                // and carries its own source, so both spellings land here.
+                let ok = stage_ids.iter().any(|&cid| {
                     self.game_state.get_card_appearance_source(cid) == Some(expected_source)
                 });
                 if !ok {
@@ -4078,7 +4085,36 @@ pub(crate) fn count_cards_with_filters(
             {
                 return self.count_for_preceding_moved_score(condition);
             }
-            return self.get_count_for_target(condition, target);
+            // 「自分と相手の成功ライブカード置き場にあるすべてのライブカードのスコアの
+            // 合計が10以上であるかぎり」 (PL!-PR-024-PR / PL!N-PR-034-PR) aggregates
+            // BOTH seats. `resolve_condition_player("both")` deliberately collapses to
+            // self — it exists for the self-vs-opponent comparison shape, where
+            // `comparison_target` supplies the other side — so a plain
+            // `get_count_for_target(condition, target)` reads only my zone and the
+            // opponent's lives are silently dropped from the sum. Add the opponent's
+            // half here, where the score total is actually assembled.
+            // The sum is only half of the comparison. When `comparison_target` is set
+            // (PL!S-pb1-022-L 「スコアが相手と等しい場合」), `comparison_target_count`
+            // already supplies the opponent's total as the RIGHT side, and the LEFT
+            // side must stay mine alone — folding theirs in here would compare
+            // (mine+theirs) against theirs and flip every tied-score clause in the
+            // corpus. Only the literal-threshold shape (「…合計が10以上」) needs the
+            // other seat folded in, and that one has no `comparison_target`.
+            let mut total = self.get_count_for_target(condition, target);
+            if self.resolve_target_for_scope(condition) == "both"
+                && condition.get_comparison_target().is_none()
+            {
+                let opp = self.get_count_for_target(condition, "opponent");
+                log::debug!(
+                    target: "rabuka_engine::ability::condition::card",
+                    "[SCORE_BOTH] self={} opponent={} combined={}",
+                    total,
+                    opp,
+                    total.saturating_add(opp)
+                );
+                total = total.saturating_add(opp);
+            }
+            return total;
         }
         if comparison_type == Some("cost") {
             if condition.get_location().is_none()

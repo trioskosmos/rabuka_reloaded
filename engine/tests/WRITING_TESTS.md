@@ -1,5 +1,79 @@
 # Writing Gameplay Tests — Complete Guide
 
+## Quick recipe (start here)
+
+Six steps. Everything below is the long-form reference for when a step bites you.
+
+**1. Copy an existing test with the same clause shape — do not write from scratch.**
+Search the suite for a Japanese phrase from the card's ability text before you type
+anything:
+
+```powershell
+Get-ChildItem -Recurse engine\tests\test_modules -Filter *.rs |
+    Select-String -Pattern "控え室からコスト" -List
+```
+
+If an exact phrase has no hit, find the nearest *clause shape* (起動 self-wait cost,
+appearance_source watcher, look-and-select from deck, …) and copy that file wholesale:
+setup → drive → drain → assert. Keep its idiom; swap in your print.
+
+**2. Stage real prints.** `let card = game.id("PL!S-bp6-008-R");` — the exact card number
+from `cards/cards.json`. Two numbers that share a character and a number are different
+cards (`bp2` ≠ `pb2`); pin the identity (§ *Card identity: always pin the print*).
+
+**3. Stock the decks — this is game rules, not test convenience.**
+
+```rust
+let filler = game.id("PL!-sd1-010-SD");
+fill_decks(&mut game, filler);   // clears both main decks, pushes 30 fillers each
+```
+
+- **Main-deck refresh (rule 10.2.2.1):** when a draw finds the main deck empty *and* the
+  waitroom is non-empty, the waitroom is shuffled onto the bottom of the deck
+  (`Player::refresh`, `engine/src/core/player.rs`). If the waitroom is empty too, the draw
+  **silently does nothing** and logs `[EMPTY_DECK_DRAW]` — so a test that needs N draws
+  must leave N cards somewhere, and a refresh test must park cards in the waitroom first.
+- **Energy deck:** `game.give_energy(n)` fills the energy *zone*, not the energy deck.
+  An ability that *draws* energy (e.g. ひまり / rina) needs
+  `fill_energy_deck(&mut game, player, n)` as well, or it hits the same silent no-op.
+- Never call `fill_decks` before capturing a `deck_before` baseline — it clears first
+  (§ Common Mistake 3).
+
+**4. Drive real gameplay, then drain every prompt.**
+
+```rust
+game.play_to_stage(card, MemberArea::Center);
+try_activate_ability(&mut game, card);              // returns Result — assert the Ok
+while game.has_pending_choice() { game.select_indices(&[0]); }
+```
+
+Use `try_*` when the refusal itself matters; discard the `Result` only if the *observable
+state* is the whole point and the `Err` is pinned by a neighbouring assertion.
+
+**5. Assert the printed behavior** — zone membership, `get_orientation_modifier`,
+hand/deck counts — and for cross-player effects assert **both** players.
+
+**6. Run one filter, read the whole output.**
+
+```powershell
+Start-Process cargo -ArgumentList "test","--test","run_all","<filter>","--","--nocapture","--test-threads=1" `
+    -WorkingDirectory "$PWD\engine" -NoNewWindow -Wait `
+    -RedirectStandardOutput "$env:TEMP\t.out" -RedirectStandardError "$env:TEMP\t.err"
+```
+
+stdout = harness results, stderr = compile warnings **and panic messages**. Read
+`$env:TEMP\t.out` / `t.err` with the Read tool. Never `2>&1 | Out-File` (PowerShell
+silently hard-truncates every line) and never filter console output instead of reading
+the file — you will draw conclusions from lines that were never written. For engine
+internals, rerun the same command with `$env:RUST_LOG="debug"` and grep the captured
+stderr for `[CONDITION]` / `[SCORE_CMP]` / `[PCOND]`, or set
+`$env:RABUKA_TRACE_DIR=<dir>` for a per-test zone-change trace.
+
+Full suite gate: `cargo test --test run_all` **and** `cargo test --lib` (two targets;
+neither is a superset of the other).
+
+---
+
 ## Philosophy
 
 - **Real cards only.** Every test uses real card numbers from `cards/cards.json` with real abilities from `cards/abilities.json`.
@@ -371,7 +445,7 @@ game.state.player1.main_deck.cards.insert(0, my_test_card);
 advance_to_live_card_set_p1(&mut game);  // 1 draw happens → my_test_card is in hand now!
 
 // ✅ CORRECT: One filler shields the test card
-fill_decks(&mut game);
+fill_decks(&mut game, filler);
 game.state.player1.main_deck.cards.insert(1, my_test_card);
 // Deck: [filler_0, test_card, filler_1, ...]
 // Passes draw filler_0 → test_card is now at deck[0]
@@ -386,7 +460,7 @@ game.state.player1.main_deck.cards.push(card);         // puts on BOTTOM (end)
 
 ### 3. `fill_decks` baseline ordering
 
-`fill_decks()` pushes 20 cards. If you capture `let deck_before = ...` BEFORE calling fill_decks, the baseline is 0. Any assertion using `deck_before` after fill_decks will be wrong. Capture baselines AFTER fill_decks, or use relative comparisons.
+`fill_decks(game, filler)` clears both main decks and pushes 30 cards each. If you capture `let deck_before = ...` BEFORE calling fill_decks, the baseline is 0. Any assertion using `deck_before` after fill_decks will be wrong. Capture baselines AFTER fill_decks, or use relative comparisons.
 
 ### 4. Not clearing pending choices loop
 
@@ -856,7 +930,7 @@ Tracked in `game_state.mulligan_selected_indices`. The display sends `mulligan_s
 
 ## Filler Card Reference
 
-`fill_decks()` adds 20 filler cards to each player's deck. Fillers have zero abilities and zero triggers.
+`fill_decks(game, filler)` clears both main decks and adds 30 filler cards to each player's deck. Fillers have zero abilities and zero triggers.
 
 | card_no | type | cost | notes |
 |---------|------|------|-------|
@@ -882,7 +956,7 @@ fn test_live_start_ability() {
     let filler = game.id("PL!-sd1-010-SD");
     let live_card = game.id("PL!-sd1-020-SD");
 
-    fill_decks(&mut game);
+    fill_decks(&mut game, filler);
     game.add_to_hand(live_card);
     game.add_to_hand(karin);
     game.add_to_hand(filler);
@@ -954,11 +1028,16 @@ fn test_activate_recover() {
 
 ## Checking Your Test Count
 
-```bash
-cargo test --test run_all 2>&1 | grep "test result"
+Capture the run to files and Read them — never `2>&1 | ...` and never console-filter
+instead of reading (PowerShell corrupts/truncates the capture):
+
+```powershell
+Start-Process cargo -ArgumentList "test","--test","run_all" -WorkingDirectory "$PWD\engine" `
+    -NoNewWindow -Wait -RedirectStandardOutput "$env:TEMP\full.out" -RedirectStandardError "$env:TEMP\full.err"
+Select-String -Path "$env:TEMP\full.out" -Pattern "test result"
 ```
 
-You should see a few thousand `passed; 0 failed`. The exact count varies as tests are added, but zero failures is the invariant.
+You should see `passed; 0 failed`. The exact count varies as tests are added, but zero failures is the invariant.
 
 ---
 
