@@ -184,7 +184,11 @@ static const char *current_test = "(none)";
  * 自動  U+81EA U+52D5 = E8 87 AA E5 8B 95 = \350\207\252\345\213\225  (this one
  *       WAS correct in the rescued file.)
  */
-#define TRIG_DEBUT        "\347\231\233\345\240\264"                            /* 登場 */
+#define TRIG_DEBUT        "\347\231\273\345\240\264"                            /* 登場 U+767B U+5834 */
+/* TRIG_DEBUT was \347\231\233\345\240\264 -> E7 99 9B E5 A0 B4, whose lead is
+ * U+767D. 登場 is U+767B U+5834 = E7 99 BB E5 A0 B4. The wrong lead occurred
+ * NOWHERE in cards/cards.json or in engine/src/*.rs, so rb_trigger_is matched
+ * no printed 登場 ability. */
 #define TRIG_LIVE_START   "\343\203\251\343\202\244\343\203\226\351\226\213\345\247\213\346\231\202" /* ライブ開始時 */
 #define TRIG_LIVE_SUCCESS "\343\203\251\343\202\244\343\203\226\346\210\220\345\212\237\346\231\202" /* ライブ成功時 */
 #define TRIG_AUTO         "\350\207\252\345\213\225"                            /* 自動 */

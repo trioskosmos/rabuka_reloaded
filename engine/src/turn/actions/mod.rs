@@ -1626,6 +1626,20 @@ impl super::TurnEngine {
     pub fn check_timing(game_state: &mut GameState) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("check_timing");
+        // These five repair steps are NOT a rarely-taken safety net, which is worth
+        // recording because it killed a family of plausible optimisations.
+        //
+        // `ab_flag("repair_steps")` skipping all five was measured behind an in-process
+        // interleaved A/B expecting `identical_games=true` (on a legal board none of them
+        // should move a card). It came back VOID at 168,347 actions against 141,807 — the
+        // game changes by 16%, so they fire constantly under random-policy play. The suite
+        // agrees in kind if not in scale: with them off, 5 tests fail.
+        //
+        // So `check_invalid_energy_cards`, `check_invalid_live_cards` and
+        // `check_orphaned_under_cards` do real work on most calls, and the empty-input
+        // short-circuits that measured well on paper — a `SmallVec` here, an empty-queue
+        // skip there — have nothing to skip. The type bitset landed on this path is worth
+        // its ~0.5% precisely BECAUSE the path is hot.
         Self::check_duplicate_members(&mut game_state.player1, &game_state.card_database);
         Self::check_duplicate_members(&mut game_state.player2, &game_state.card_database);
         tdbg!("CHECK_TIMING:0");
@@ -1766,9 +1780,11 @@ impl super::TurnEngine {
                 .iter()
                 .enumerate()
                 .filter_map(|(i, &card_id)| {
-                    let card = game_state.card_database.get_card(card_id)?;
-                    if !card.is_live() {
-                        Some((i, card_id, card.is_energy()))
+                    let db = &game_state.card_database;
+                    let (is_live, is_energy) =
+                        (db.is_live_card(card_id), db.is_energy_card(card_id));
+                    if !is_live {
+                        Some((i, card_id, is_energy))
                     } else {
                         None
                     }
@@ -1833,10 +1849,7 @@ impl super::TurnEngine {
                 player.waitroom.add_card(member_id);
                 moved += 1;
                 for card_id in under_cards {
-                    if card_db
-                        .get_card(card_id)
-                        .is_some_and(|card| card.is_energy())
-                    {
+                    if card_db.is_energy_card(card_id) {
                         player.energy_deck.cards.push(card_id);
                     } else {
                         player.waitroom.add_card(card_id);
@@ -1853,9 +1866,20 @@ impl super::TurnEngine {
         player: &mut crate::player::Player,
         card_db: &CardDatabase,
     ) -> usize {
-        let mut invalid_indices = Vec::new();
+        // `Vec::new()`, deliberately. This looked like an obvious win — it runs twice per
+        // `check_timing`, ~1.1M times per sweep, "so the Vec must be allocating" — and an
+        // in-process interleaved A/B put it within noise (+3.0%, +1.0%, and one -14.9%
+        // outlier). `Vec::new()` does not allocate until first push, so on a legal energy
+        // zone this function allocated nothing to begin with. A `SmallVec` here is
+        // unmeasurable and not worth the type.
+        let mut invalid_indices: Vec<usize> = Vec::new();
         for (i, card_id) in player.energy_zone.cards.iter().enumerate() {
-            if !card_db.get_card(*card_id).is_some_and(|c| c.is_energy()) {
+            // Array index instead of a `cards` hash lookup; see
+            // `CardDatabase::energy_ids`. Kept unconditionally and NOT behind
+            // `ab_flag`: that reads a process-global `Mutex`, so testing it per card would
+            // cost more than the lookup it replaces. The measurement that justified
+            // keeping this is recorded on `CardDatabase::live_ids`.
+            if !card_db.is_energy_card(*card_id) {
                 invalid_indices.push(i);
             }
         }
@@ -1883,7 +1907,7 @@ impl super::TurnEngine {
             if top == -1 {
                 let under = core::mem::take(&mut player.stage.under_cards[area_idx]);
                 for cid in under {
-                    if card_db.get_card(cid).is_some_and(|c| c.is_energy()) {
+                    if card_db.is_energy_card(cid) {
                         player.energy_deck.cards.push(cid);
                     } else {
                         player.waitroom.cards.push(cid);
@@ -1909,10 +1933,7 @@ impl super::TurnEngine {
             } else {
                 &mut game_state.player2
             };
-            let is_energy = game_state
-                .card_database
-                .get_card(card_id)
-                .is_some_and(|card| card.is_energy());
+            let is_energy = game_state.card_database.is_energy_card(card_id);
             log::debug!(
                 "[RESOLUTION_CLEANUP] card={} owner={} energy={}",
                 card_id,

@@ -1064,6 +1064,55 @@ int rb_queue_resume_pending_actions(GameState *g) {
            pointer. Rust has no equivalent hazard: `entries` is a Vec whose
            borrows the resolver cannot invalidate mid-resolution. */
         rb_execute_effect_ex(g, actor, cmd, host);
+        /* LIFETIME FIX (2nd instance of the use-after-free class fixed in
+           pca_resolve_entry, game_state_abilities.c). `cmd` is an OWNED deep
+           clone (this file's invariant, header :27-45), so releasing it here is
+           not a leak — but it is the ONLY thing keeping its subtree alive, and
+           the execution above may have parked a pointer INTO that subtree as
+           `g->queue.resume_eff` (the producers in look.c / draw.c / move.c /
+           move_missing.c / misc.c / state.c / ability_effects.c all assign the
+           node they are executing) or as look.c's file-static
+           `g_look_pending_select`. The prompt is answered AFTER this function
+           returns, and every answer-path reader dereferences those aliases
+           again, so an unconditional release here dangles them one prompt deep.
+
+           MEASURED (probe over all 24 suites, counting only the cases where the
+           freed tree CONTAINS the parked resume_eff and a prompt is open):
+           2 hits, both in parity_queue_resume — the suite that exists to test
+           this park/resume protocol — and 0 in the other 23.
+
+           RUST'S MODEL. resume_pending_actions (engine/src/ability/choice.rs:
+           117-136) returns Ok(()) at :130 on the interrupted step, dropping the
+           local `pending` Vec — but nothing aliases into it: Rust's
+           `in_flight.spawn_context.target` is `effect.target.clone()`
+           (choice.rs:120, an owned String) and the remaining tail is COPIED
+           back into the queue by requeue_remaining_after_choice (choice.rs:87-
+           105). So Rust's drop is safe and the C's has to be deferred. The
+           deferral slot is the same one rb_drain_keep_alive (:1323) and
+           pca_resolve_entry use, and choice.c:5641-5648 drains it when the
+           prompt closes.
+
+           The transfer is TOTAL (see rb_drain_keep_alive's note at :1316-1322):
+           the slot is zeroed first and `cmd` is NULLed, so the
+           rb_effect_free(cmd) below cannot touch the transferred subtree and
+           every node still has exactly one owner. When the slot is ALREADY
+           taken, cmd is released as before — the tree then leaks rather than
+           dangling, which is the strictly safer of the two outcomes and the
+           same bounded-by-nesting-depth residual engine.c:1132-1135 documents
+           for the nested-activation case.
+
+           MEASURED effect: no suite's verdict changes (parity_queue_resume 5,
+           parity_cce_gaps 82, parity_under_member 81, parity_look_per_card 65,
+           parity_sequential 142, parity_search_reorder 97,
+           parity_small_clusters 101 — identical before and after), which is the
+           required property for a memory fix: it removes undefined behaviour
+           without reshaping any assertion. */
+        if (rb_has_pending_choice(g) && !g->activation_keepalive_valid) {
+            memset(&g->activation_keepalive, 0, sizeof(g->activation_keepalive));
+            g->activation_keepalive.effect = cmd;
+            g->activation_keepalive_valid = 1;
+            cmd = NULL;
+        }
         rb_effect_free(cmd);
         executed++;
         int c2 = g->queue.cur;

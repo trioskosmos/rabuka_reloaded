@@ -1800,7 +1800,19 @@ typedef struct GameState {
     int      formation_change_occurred_this_turn;
     int      opponent_live_success_this_turn;
     int      opponent_choice_declined;
-    int      game_state_history[64]; int n_game_state_history;
+    /* CORRECTED 2026-10-04. This was `int game_state_history[64]`, but
+     * rb_check_permanent_loop stores a **uint64_t FNV hash** here
+     * (game_state_abilities.c:1439) and Rust's equivalent is `Vec<u64>`
+     * (core/game_state/mod.rs:117). Truncating a 64-bit hash into `int` and then
+     * sign-extending it on compare means **repetition detection can never fire**:
+     * the stored value and the recomputed one disagree in the high 32 bits far
+     * too often to ever compare equal. Rust-side this is already red.
+     * Widened, not appended — this is a mid-struct change, so every object file
+     * compiled against the previous layout is invalid. That is the same hazard the
+     * append-only rule exists to contain; it is unavoidable for a width fix.
+     * If you change this, move RB_GAMESTATE_BYTES_PINNED (test_harness_self.c)
+     * and Makefile:3 in the SAME change. */
+    uint64_t game_state_history[64]; int n_game_state_history;
     int      loop_detected;
     /* just_completed_ability_key — mirrors Rust's GameState.just_completed_ability_key.
         Set by rb_drain_ability_queue after each ability resolves so the auto-trigger
@@ -2759,9 +2771,15 @@ typedef enum {
 
 /* Mirror util.rs::parse_duration — maps a duration string to an RB_TEMP_* kind. */
 int  rb_parse_duration(const char *s);
-/* Canonical group taxonomy — exactly the entries recognized by
-    rb_card_series_matches_group / card_matches_group_str. */
-extern const char *RB_KNOWN_GROUPS[5];
+/* ⛔ DECLARATION DELETED 2026-10-04. `extern const char *RB_KNOWN_GROUPS[5]`
+ * (the canonical group taxonomy, per Rust `util.rs:956`) was declared here and
+ * **DEFINED NOWHERE in `src/`** — a dangling extern, i.e. a link error waiting
+ * for the first caller. Nothing referenced it, which is exactly why it survived.
+ *
+ * The taxonomy itself is NOT missing from the engine:
+ * `rb_card_series_matches_group` / `card_matches_group_str` recognise the five
+ * groups inline. Only the exported table was absent. If a caller needs it, give
+ * it a real definition alongside those functions rather than reviving this. */
 /* Mirror util.rs::distinct_should_dedupe. */
 int  rb_distinct_should_dedupe(RbDistinctType d);
 /* Mirror util.rs::count_distinct_member_name_units — Q278/Q279 joint-aware

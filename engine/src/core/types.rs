@@ -976,7 +976,7 @@ pub struct MovementEvent {
     /// The card whose ability/action caused the move (None = rule/cost with no source card).
     pub cause_card_id: Option<i16>,
     /// The player whose effect/action caused the move.
-    pub cause_player_id: String,
+    pub cause_player_id: ArcStr,
     /// Whether the move was caused by a card effect (true) vs cost/rules (false).
     pub effect_only: bool,
     /// Monotonically increasing counter for ordering events.
@@ -1001,7 +1001,7 @@ pub struct PositionChangeEvent {
     /// The card whose ability/action caused the move (None = rule/cost with no source card).
     pub cause_card_id: Option<i16>,
     /// The player whose effect/action caused the move.
-    pub cause_player_id: String,
+    pub cause_player_id: ArcStr,
     /// Whether the move was caused by a card effect (true) vs cost/rules (false).
     pub effect_only: bool,
 }

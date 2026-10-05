@@ -344,3 +344,272 @@ bound. The shape of the answer:
   FLAT + `parity_rules_conditions2`), and 25 FLAT suites remain unattributable.
   So the figure is **now bounded from above by a named count**, with the
   residual stated suite by suite in cluster H rather than hidden.
+
+## 5. THE 20 UNVERIFIED + 1 BROKEN -- every suite now reports a verdict
+
+`BASELINE3.md` measured green/red/unverified/broken = **29 / 116 / 20 / 1**
+over 166 suites, and said so itself: 20 suites "ran to completion, rc 0, but
+emit **no verdict line of any form**. These cannot be called passing."
+
+**MEASURED, all 166 suites, one pass, strictly sequential, every suite run
+through `tools/verdict_runner.c`:**
+
+| state | suites |
+|---|---|
+| verdict present (`PASSED` / `FAILED`) | **166 / 166** |
+| no verdict at all (INCONCLUSIVE) | **0** |
+| did not link | **0** |
+| PASSED | 49 |
+| FAILED | 117 |
+
+Corpus: **3 783** result lines, reconciling two independent enumerations.
+
+### 5a. The premise in the brief was wrong, and checking it is the finding
+
+The brief stated that "main has just wired the verdict runner to write one per
+suite" as `verdicts/<suite>.json`. **It had not.** `tools/verdict_runner.c`
+printed one text verdict line and nothing else; there was no `verdicts/`
+directory anywhere in the tree. Since `tools/verdict_runner.c` is a file this
+task owns, the wiring was done here -- see 5c -- with **no Makefile change**,
+because the runner writes its own record and the Makefile already routes every
+suite through it.
+
+### 5b. Classification of the 20, and of the 1 BROKEN
+
+The runner's `PASSED` requires exit 0 **and** zero counted result lines. That is
+stronger than "no FAIL lines" and stronger than `$?`, but it is *not* the same
+as "the suite executed assertions". Probing for that (how many per-case result
+lines does a PASSED suite actually emit?) exposed **8 suites that reported
+PASSED while reporting nothing per-case at all**:
+
+| class | suites | resolution |
+|---|---|---|
+| **(b) unrecognised shape** -- emits output, but in a private grammar the corpus does not recognise: `audit_warnings` (`audit_warnings: %d checks, %d failed`), `decode_skew` (`=== decode-skew audit: %d checks, ...`), `null_effect_guard` (`null-effect guard: %d assertions, %d failures, %d crashes`), `parity_choice_routing` / `parity_orphan_producers` / `parity_q68_cannot_live` (`CHECK` that prints only on failure, plus `=== %d failed ===`) | 6 | **Normalised by the shared runner.** Each now emits exactly one verdict plus a readable per-suite summary. Their leading `<name>: ` prefix is why BASELINE3's recognisers missed them -- they are counted, not lost. |
+| **(c) genuinely asserts nothing** -- `parity_conditions` | 1 | **FIXED. 23 real assertions added**, see 5d. |
+| **(c) meta-suite, conditional by design** -- `coverage_gate` | 1 | Kept. It reconciles the corpus, so in a single-suite context there is nothing to reconcile and it SKIPs with a printed reason. That is the honest answer, not a pass. |
+
+**The 1 BROKEN, `audit_conditions`, is NOT broken, and the reason matters.**
+BASELINE3 recorded it as "exits 2, produces no verdict line at all". Its
+`main` opens with
+
+```c
+if (rb_load("../cards/build") < 0 && rb_load("cards/build") < 0) {
+```
+
+so it resolves the card database **relative to the working directory**, one
+level above `engine_c_wip`. Any snapshot placed elsewhere -- including the one
+this measurement used -- loses that path, the suite prints `cannot load card
+db`, returns 2, and asserts nothing. Run from `engine_c_wip` it loads fine and
+reports **24 result lines: 12 assertions + 12 setup bugs**, every one of the
+form `[PL!S-bp5-013-N] has no condition v=1 key=- in abilities 0..7`. So it is
+an ordinary **RED with 12 unresolved fixtures**, and its BROKEN classification
+was an artefact of the measurement context.
+
+This is now a *rule*, not a story: the rewritten gate fails any suite that is
+`FAILED` with `n_result_lines == 0` as its own state (**G2**, below), because
+"exited non-zero having asserted nothing" and "measured something and it was
+wrong" are different findings and must not share a row.
+
+### 5c. `verdicts/<suite>.json` -- the structured verdict
+
+`tools/verdict_runner.c` now writes one record per run, alongside (not instead
+of) the text verdict line the Makefile greps:
+
+```
+verdicts/<suite>.json    12 fields: suite, verdict, exit, signal,
+                         n_result_lines, n_assert, n_vacuous, n_setup_bug,
+                         n_test_bug, n_fatal, n_crash, n_renormalised
+```
+
+* `verdict` is one of **`PASSED` / `FAILED` / `INCONCLUSIVE`**. A suite killed
+  on a signal used to emit no verdict at all, so every consumer read it as green;
+  it is now a third, spelled-out value.
+* `exit` is recorded **for forensics only** and is never used as a verdict.
+  `COVERAGE_HARNESS.md` 3 proves it disagrees with the output in both directions.
+* Directory from `$RB_VERDICT_JSON_DIR` (default `verdicts`); `$RB_VERDICT_JSON=0`
+  suppresses the file for a one-off run.
+* `engine_c_wip/verdicts/` added to `.gitignore` (regenerated evidence, never
+  source). One appended line; the existing 9 216 bytes are byte-identical.
+
+### 5d. `parity_conditions` went from 0 assertions to 23 that can fail
+
+It was a pure diagnostic dump -- decode two cards, print their conditions, drive
+two scenarios, print the modifiers, `return 0`. It emitted no result line of any
+kind, which is why BASELINE3 could only call it UNVERIFIED; under the verdict
+layer it then became **the one non-meta suite in the corpus reporting PASSED
+while executing zero assertions**.
+
+Every number it was already printing is now asserted, and each control exists
+because without it the assertion beside it is satisfied by the zero value:
+
+* `test_id_exact`, **not** `test_id`/`rb_find_card_by_no` -- the forgiving
+  lookup has a substring fallback that resolves a *different real card* on a
+  near-miss (CARD-NUMBER TRAP). All three fixtures verified to occur **exactly
+  once** in `cards/build/cards_gen.rs` (`PL!SP-bp4-024-L`, `PL!SP-pb1-001-R`,
+  `PL!-sd1-010-SD`; and `PL!SP-pb1-001-P` occurs **0** times, so the fallback
+  could not have been hiding there).
+* `n_abilities >= 1` guards the decode loop, and `decoded == n_abilities`
+  makes the loop total -- with 0 abilities "every ability decoded" is 0 == 0.
+* **Both sides of every filter.** A one-sided `matches == 1` is satisfied by a
+  filter that returns 1 for everything, so the negative card is asserted in the
+  same breath: Liella! on `pb1-001-R` is 1, on `sd1-010-SD` is 0, μ's on
+  `pb1-001-R` is 0.
+* **All three `set_live_card` controls.** With no member in the live slot the
+  live never runs, no `gain_resource` fires, and "0 blades" is the answer
+  whether or not the behaviour works. This is precisely the defect a peer found
+  in the Rust sibling `live_start_heart_requirement_reduction_counts_live_slot_cards_only_test.rs`:
+  nine real tests, **none staging a member in the live slot**. Here the blades
+  are captured **mid-scenario** (2 on each side) *and* after live end (0 on each
+  side), so the pair "granted then expired" is assertable; an end-only capture
+  would see 0 == 0 and could not fail.
+* The snapshot total is asserted as the **relation** `base score + earned
+  modifier`, not as a literal 7 -- a literal would survive the modifier being
+  dropped if the base score moved to compensate.
+
+**Result: 23 checks, 0 failed. PROVEN load-bearing by mutation** -- five
+expectations perturbed in a scratch copy (`score_mod` 1->2, blade 2->1, snapshot
+relation +1, and both live-slot controls inverted) produced **5 failures**, each
+naming the assertion it broke:
+
+```
+FAIL: PL!SP-bp4-024-L's live-start modify_score applies exactly +1 (got 1, expected 2)
+FAIL: the snapshot total is the card's base score plus the score modifier it earned (got 7, expected 8)
+FAIL: control: scenario 2 must put player 1's member into the live slot
+FAIL: control: scenario 2 must put player 2's member into the live slot
+FAIL: player 1's left-side Liella! member holds the 2 blades granted after a successful live (got 2, expected 1)
+```
+
+Corpus effect: **+23 assertions that can fail, +0 failures.**
+
+## 6. `coverage_gate` reads structured verdicts, not stdout
+
+`tests/test_coverage_gate.c` walked `tests/*.log` and grepped them. It now reads
+`verdicts/*.json` and nothing else. Two independent reasons, both measured:
+
+1. **A log is prose.** The gate had to re-implement the runner's notion of a
+   result prefix -- a ten-tag table, a boundary rule, and a `[exit=` marker used
+   to tell the runner's own verdict from a suite's legacy `FAILED: <case>` line.
+   ~150 lines whose only job is to agree with the runner, and agreeing only
+   because both read the same bytes.
+2. **The gate was measuring its own previous output.** `run-all-tests` redirects
+   each suite's stdout into `tests/<stem>.log`, and the gate's own log is one of
+   those files. The walk counted those `FAIL:` lines while the per-suite census
+   skipped the same file -- so **G3's gap equalled the previous run's failure
+   count** (152 lines on the first complete evidence set) and could not pass in
+   the context it exists to judge. That is what produced the reported
+   **170 checks / 166 failures** in a zero-log context against **~294** in a log
+   context: the number tracked the size of its own last output, not the corpus.
+
+A verdict record is written by the suite's own run, and `run-all-tests` produces
+one for `coverage_gate` like any other suite, so the gate needs **no self-exemption
+anywhere** -- the two sides of G3 are the same set of files by construction
+rather than by a patch.
+
+### Before / after, measured
+
+| context | before (log-scraping) | after (structured verdicts) |
+|---|---|---|
+| corpus-shaped evidence set | ~294 checks, failures scaling with the previous run's output | **1004 checks, 0 failures** |
+| evidence set with 1 broken record | failures dominated by self-measurement | **1005 checks, 2 failures** -- and both name the same single real defect (`audit_conditions`), once per-suite and once in the aggregate |
+| no / partial evidence set | 166-170 failures blaming a manifest for a runner never asked to fill it | **1 check, 0 failures**, with the condition and the reason printed |
+
+```
+info: sources=166 verdicts=166 result-lines(corpus)=3783 PASSED=49 FAILED=117
+      INCONCLUSIVE=0 unreadable=0 exit-only-red=0
+info: the corpus-wide result-line count RECONCILES with the sum of the per-suite
+      counts, and every verdict record is readable
+1004 checks, 0 failures
+```
+
+### What each rule now reads
+
+* **G1 MANIFEST-VS-GLOB** -- bidirectional, over `verdicts/`: every
+  `tests/test_<stem>.c` has a record, **and** every record has a suite (a record
+  for a deleted suite is a count for a suite that does not exist).
+* **G2 TALLY TOTAL, VERDICT MATCHES IT** -- replaces the old log-prefix census.
+  Per suite the six breakdown counters sum to `n_result_lines` (nothing counted
+  is missing from the tally); `PASSED` requires `n_result_lines == 0`; and
+  `FAILED` with `n_result_lines == 0` is its **own** state -- *asserted*, not
+  merely reported, because that is the shape of the one BROKEN suite. An
+  unreadable record is `UNREADABLE`, never "a suite with zero failures":
+  collapsing those two is how a broken evidence set reads as a clean corpus.
+* **G3 RECONCILES** -- directory walk of `verdicts/` vs per-suite sum, with no
+  self-exclusion, because none is needed.
+* **G4 EVERY SUITE REPORTED** -- exactly one verdict, and not `INCONCLUSIVE`.
+* **G5 VERDICT ARITHMETIC** -- `#PASSED + #FAILED + #INCONCLUSIVE + #UNREADABLE`
+  equals the record count, and `#PASSED > 0`.
+
+The condition-first skip is kept, and tightened: a partial set (`make t` writes
+exactly one record) is detected by comparing record count against suite count,
+not merely by "is the directory empty", because 166 records for 168 suites is
+just as unanswerable as 0 records for 168. Nothing is relaxed -- on a
+corpus-shaped set every rule runs in full.
+
+## 7. Cannot-fail assertions -- settled by reading, all five named
+
+All five named files live under `engine/tests/**`, which this task may **not**
+edit, so each was read and adjudicated rather than changed. Two of the five
+brief claims are **disproven**; one is confirmed and is a real cannot-fail.
+
+| claim | verdict |
+|---|---|
+| `nahone_live_start_same_name_test.rs` -- `blade1 >= 1` | **DISPROVEN.** `blade1 >= 1` never stands alone. At lines 314-319 and 868-873 it is one **conjunct of a two-sided exclusivity disjunction** `(b1 >= 1 && b2 == 0) \|\| (b1 == 0 && b2 >= 1)`, which fails when *neither* or *both* are buffed -- the strongest available form. At 876/879 it sits in an `if heart1 == 1` branch paired with `assert_eq!(blade2, 0)`. The file has **20 tests** built on `assert_eq!(..., 1)` exact equality. |
+| `dive_ab0_..._test.rs` -- "its only assertion is `guard <= 20`" | **DISPROVEN; the peer's dispute is UPHELD.** The `guard` is a *liveness guard inside the prompt-draining loop*, not the file's only assertion. It is followed by **three strong ones**: `placements == 1`, `placed ^ static_placed` (XOR), and `!static_placed`. The brief also misquotes the bound (the file says `<= 10`). The sibling `dive_ab0_phase_gate_and_multi_copy_live_zone_limit_edges_test.rs` carries **30 assertions**. |
+| `live_success_surplus_score_zero_floor_test.rs:83` -- bound `-2` while comment and message both say `>= 0` | **CONFIRMED.** Line 81's comment says "total should still be >=0" and line 84's message says "total stays >=0"; the assertion is `p1_constant_total_score_bonus >= -2`. Not vacuous -- it can fail below -2 -- but strictly weaker than its own stated intent in the direction that matters. Correct bound is `>= 0`. |
+| `live_success_look_three_deck_size_q36_test.rs:34` -- `<=` permits "nothing happened" | **CONFIRMED, and worse than stated.** `deck_after <= deck_before` under the message "LiveSuccess should draw cards". `<=` is satisfied by the deck being **unchanged** (nothing happened) *and* by the deck being **smaller for any other reason** (cards lost). It is weak in both directions; the honest form is `deck_after < deck_before`, or `deck_before - deck_after >= 1`. |
+| `live_score_tie_live_zone_placement_across_rounds_test.rs:257` -- `turn_number >= 1` | **CONFIRMED, and it genuinely cannot fail.** `turn_number` is initialised to **`1`** (`engine/src/core/game_state/mod.rs:677`), so `>= 1` is satisfied by the constructed value. The comment on line 256 says "the rollover ran: turn counter advanced past the first round", so the intended assertion is `>= 2`, or a before/after comparison. The enclosing test does carry one strong assertion (251-255, the success-zone emptiness), so it is the *last* line that is dead, not the test. |
+
+**For the engine owner:** three of these need a one-line change each
+(`>= 0`, `<` , `>= 2`) and none of the three is currently reporting a real
+defect -- they are reporting a weaker guarantee than they describe.
+
+## 8. Measurement method notes (the traps, and what they cost)
+
+* **This toolchain is MSYS2/PE: `cc -o name` produces `name.exe`.** Naming the
+  bare path makes `rb_verdict`'s `execv` fail, the child prints
+  `FAIL: [setup-bug]`, and **all 166 suites measure as FAILED.** First pass
+  produced exactly that false corpus.
+* **The shared tree runs `make clean` underneath you.** A pass that began with
+  all 166 suites linking and ended with 166 link failures was not a regression:
+  an object had been removed mid-pass. Every measurement here was therefore taken
+  in an isolated snapshot, `make clean` verified to **0 objects** before
+  `make all` (51 objects), then linked and run.
+* **`OBJ_LIB` names `src/web_server.o` AND `src/main.o`.** `main.o` defines its
+  own `main`, so a suite linked against the full object list fails with
+  `multiple definition of main` -- all 166, not a subset. Both are dropped for
+  suite links, which is what the Makefile's own comment about `OBJ_LIB` intends.
+* **`make t-nogate` is the measurement path** and was used throughout. The
+  `data:` guard was **not** weakened, nothing was regenerated, and
+  `guard_data_blob.sh` / `regen_all.sh` were not touched.
+* **`test_id(` budget ratchet:** no suite was added, so
+  `test_harness_self.c` §D1/D2 was not tripped and **no cap was re-baselined**.
+  `sizeof(GameState)` / `RB_GAMESTATE_BYTES_PINNED` untouched (no `src/**` edit).
+
+### Regression check
+
+`tools/corpus_diff.py`, before vs after, all 166 suites:
+
+```
+suites: 166   changed: 0   unchanged: 166
+corpus failing assertions: 3783 -> 3783  (+0)
+corpus FAILED case lines:  117 ->  117  (+0)
+before/after verdicts: {'PASSED': 49, 'FAILED': 117}
+```
+
+**Zero regressions.** The +23 assertions added to `parity_conditions` are
+invisible here precisely because they all pass -- and they were proven able to
+fail by the mutation run in 5d.
+
+### Files changed
+
+| file | change |
+|---|---|
+| `tools/verdict_runner.c` | writes `verdicts/<suite>.json` (12 fields, 3 verdict values); `INCONCLUSIVE` recorded on a signal death; `$RB_VERDICT_JSON_DIR` / `$RB_VERDICT_JSON=0` |
+| `tests/test_coverage_gate.c` | reads structured verdicts; G1 bidirectional; G2 redefined as tally-integrity + verdict/count agreement + exit-only-red as its own asserted state; no self-exclusion; partial-set skip |
+| `tests/test_parity_conditions.c` | 0 -> 23 assertions, all anti-vacuity-controlled, mutation-proven |
+| `tools/corpus_measure.py` | new: link+run+census every suite in one sequential pass |
+| `tools/corpus_classify.py`, `tools/silent_probe.py`, `tools/corpus_diff.py` | new: state classification, "PASSED but silent" probe, before/after diff |
+| `.gitignore` | one appended line for `engine_c_wip/verdicts/` (existing bytes byte-identical) |
+
+**Not touched:** `include/rabuka.h`, the `Makefile`, anything in `src/**`, and
+everything under `engine/**`.

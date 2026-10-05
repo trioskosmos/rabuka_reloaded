@@ -15,52 +15,87 @@
  * totals, so nobody can quietly publish a FAIL count measured on the wrong
  * surface again.
  *
- * WHAT IT ASSERTS.  Five things, all from the evidence `make run-all-tests`
- * writes into the tests directory as one .log per suite.  Every suite now runs
- * through tools/verdict_runner.c,
- * so each log carries exactly one verdict line as its last word.
+ * WHAT IT ASSERTS.  Five things, all read from ONE structured verdict per
+ * suite -- `verdicts/<suite>.json`, written by tools/verdict_runner.c, which
+ * every suite now runs through.
+ *
+ * WHY IT READS THE JSON AND NOT THE LOGS.  It used to walk the per-suite `.log`
+ * files under tests/ and grep them, and that is the defect this rewrite
+ * removes, for two independent reasons, both measured rather than argued:
+ *
+ *   1. A LOG IS PROSE.  The gate had to re-implement the runner's notion of a
+ *      result prefix -- a five-tag table, a boundary rule, and a `[exit=`
+ *      marker used to tell the runner's own verdict from a suite's legacy
+ *      `FAILED: <case>` line.  That is 150 lines of duplicated parsing whose
+ *      only job is to agree with the runner, and it agreed only because both
+ *      were reading the same bytes.  The runner already knows the answer,
+ *      exactly, because it is the thing that decided it.
+ *   2. THE GATE WAS MEASURING ITS OWN PREVIOUS OUTPUT.  `make run-all-tests`
+ *      redirects each suite's stdout into `tests/<stem>.log`, and the gate's
+ *      own log is one of those files.  A first version counted its own `FAIL:`
+ *      lines in the corpus-wide walk and compared that total against a
+ *      per-suite census that skipped the same file -- so G3 reported a gap
+ *      EQUAL TO THE PREVIOUS RUN'S FAILURE COUNT (152 lines on the first
+ *      complete evidence set) and could not pass in the very context it
+ *      exists to judge.  The exclusion that made the two sides comparable was
+ *      a patch over the symptom; not writing the evidence at all removes the
+ *      class.  Per-suite the same effect was visible as `170 checks / 166
+ *      failures` in a zero-log context against `294` in a log context -- the
+ *      number moved with the size of the previous run's output, not with the
+ *      corpus.
+ *
+ * The JSON is a fixed 12-field record with one value per fact, so there is
+ * nothing left to parse loosely and nothing to re-implement.
  *
  * WHEN IT RUNS AT ALL.  The five rules below are only meaningful over that
- * evidence, and `make t` -- the single-suite runner -- does not produce any:
- * it prints one suite's verdict to stdout and writes no log.  So a bare
- * `make t T=coverage_gate` used to run all five rules against an EMPTY tests/
- * directory, and G1 then failed once per suite, blaming a manifest for a runner
- * that was never asked to fill it.  The gate now measures that condition first
- * (are there any .log files under tests/ at all?) and SKIPS with a printed
- * reason when
- * there are none.  In a context that does produce logs nothing is skipped and
- * nothing is relaxed -- G1-G5 run in full, and G1 still requires a log for
- * every tests/test_<stem>.c.
+ * evidence.  `make t` -- the single-suite runner -- launches exactly one suite
+ * and its one verdict file cannot answer a corpus-wide question, so a bare
+ * `make t T=coverage_gate` runs in a directory holding one verdict.  The gate
+ * measures that condition first (are there any verdicts at all, and are there
+ * as many as there are suites?) and SKIPS with a printed reason when the
+ * evidence set is not corpus-shaped.  In a context that does produce a
+ * full-set nothing is skipped and nothing is relaxed: G1-G5 run in full, and
+ * G1 still requires a verdict for every tests/test_<stem>.c.
  *
- *   G1  MANIFEST-VS-GLOB.  Every tests/test_<stem>.c has a tests/<stem>.log,
- *       and every tests/<stem>.log has a tests/test_<stem>.c.  A suite that ran
- *       but left no log, or a log left behind by a deleted suite, is a hole in
- *       every number anyone has published.
+ *   G1  MANIFEST-VS-GLOB.  Every tests/test_<stem>.c has a
+ *       verdicts/<stem>.json, and every verdicts/<stem>.json has a
+ *       tests/test_<stem>.c.  A suite that ran but left no verdict, or a
+ *       verdict left behind by a deleted suite, is a hole in every number
+ *       anyone has published.
  *
- *   G2  THE NORMALISATION IS TOTAL, PER SUITE.  For each log:
- *           count("^FAIL:")  ==  count(any recognised failure prefix)
- *       i.e. ZERO surviving `FAILED`, `FAILED:`, `FAIL [`, `CRASH`, `VACUOUS`,
- *       `SETUP BUG:`, `SETUPBUG`, `TEST BUG:` or `FATAL` lines.  A suite that
- *       regresses to a non-canonical prefix turns this red on its own.
+ *   G2  THE TALLY IS TOTAL AND THE VERDICT MATCHES IT.  Per suite, the six
+ *       breakdown counters sum to `n_result_lines` -- nothing the runner
+ *       counted is missing from the tally.  And the verdict agrees with the
+ *       count it was decided on: PASSED requires `n_result_lines == 0`, and a
+ *       FAILED verdict with `n_result_lines == 0` is reported as its own
+ *       state, because that suite failed on a non-zero exit while asserting
+ *       nothing.  That is the shape of the one BROKEN suite in the corpus
+ *       (`audit_conditions`, exit 2, no assertion, no verdict line at all), so
+ *       this rule is what stops it reading as an ordinary red.
  *
- *   G3  THE CORPUS TOTAL RECONCILES.  The corpus-wide `^FAIL` count, taken by
- *       one streaming pass over the whole tests/ directory, equals the sum of
- *       the per-suite counts.  These are two different enumerations -- one by
- *       directory walk, one by suite stem -- so a disagreement means a log was
- *       skipped, read twice, or counted for a suite that does not exist.
- *       This is the assertion that makes "corpus-wide" mean something.
+ *   G3  THE CORPUS TOTAL RECONCILES.  The corpus-wide result-line count,
+ *       taken by one directory walk of verdicts/ with no knowledge of the
+ *       suite list, equals the sum over suite stems.  Two enumerations, one
+ *       set; a disagreement means a verdict was skipped or counted twice.
  *
- *   G4  EVERY SUITE REPORTED A VERDICT.  Each log contains `^PASSED` XOR
- *       `^FAILED`, exactly one.  A log with neither is a suite that died on a
- *       signal and is INCONCLUSIVE -- the exact failure mode
- *       COVERAGE_HARNESS.md 9 says nothing could previously detect.
+ *   G4  EVERY SUITE REPORTED A VERDICT.  Each record carries exactly one of
+ *       PASSED / FAILED / INCONCLUSIVE, and none is INCONCLUSIVE.  A suite
+ *       killed on a signal used to leave no verdict line at all, so every
+ *       log-scraping consumer read it as "no failures seen" -- green.  It is
+ *       now a third, spelled-out state.
  *
- *   G5  VERDICT ARITHMETIC.  corpus ^PASSED + corpus ^FAILED == number of
- *       logs, so a suite cannot emit two verdicts or a verdict can go missing
- *       without the corpus total moving.
+ *   G5  VERDICT ARITHMETIC.  #PASSED + #FAILED + #INCONCLUSIVE equals the
+ *       number of verdict files, so a suite cannot emit two verdicts or a
+ *       verdict can go missing without the corpus total moving.  #PASSED must
+ *       be greater than zero: a corpus that can only report failure is the
+ *       defect this whole layer exists to end.
+ *
+ * `exit` IS READ BUT NEVER USED AS A VERDICT.  COVERAGE_HARNESS.md 3 proves it
+ * disagrees with the output in BOTH directions.  It is reported for forensics
+ * only.
  *
  * IT WEAKENS NOTHING.  No assertion in any suite was relaxed, skipped or
- * retuned to make this pass; it only READS the logs.
+ * retuned to make this pass; it only READS the verdicts.
  *
  * ASCII ONLY, like every other file in this tree.
  * --------------------------------------------------------------------------- */
@@ -84,228 +119,135 @@ static int failures;
         }                                                                    \
     } while (0)
 
-/* -- the prefixes a NON-CANONICAL result line may begin with.
- *
- * The canonical form is `FAIL:` and is NOT in this list -- it is CANON, the
- * other side of the G2 comparison.  The list therefore holds ONLY forms that
- * `FAIL:` plus a boundary does not already cover.
- *
- * `FAIL ` and bare `FAIL` used to be here, and are the reason a first version
- * of this gate reported every CANONICAL line as legacy: under the boundary
- * rule bare `FAIL` matches `FAIL: ...`, because head[4] is a colon.  Any
- * surviving `FAIL <text>` line is caught by the G2/G3 equality instead -- it
- * raises ^FAIL without raising ^FAIL:. */
-typedef struct { const char *tag; int count; } PrefixTag;
+/* -- ONE SUITE'S STRUCTURED VERDICT ---------------------------------------
+ * A fixed-shape record written by tools/verdict_runner.c.  One value per fact,
+ * so there is no prefix table, no boundary rule and no marker string to
+ * re-derive here: the runner counted the lines, and this file reads the count.
+ * `exit` is carried for forensics and is never used as a verdict. */
+enum { V_PASSED, V_FAILED, V_INCONCLUSIVE, V_UNREADABLE };
 
-static const char *const CANON = "FAIL:";
-
-static const char *const TAGS[] = {
-    "FAILED",        /* legacy per-case verdict, space padded  */
-    "FAILED:",       /* legacy per-case verdict                */
-    "FAIL [",        /* legacy bracket-tagged assertion        */
-    "CRASH",         /* child died on a signal                */
-    "VACUOUS:",      /* assertion proves nothing               */
-    "VACUOUS",       /* ... and the space-padded per-case form */
-    "SETUP BUG:",    /* fixture never resolved                */
-    "SETUPBUG",      /* ... and the compact per-case form     */
-    "TEST BUG:",     /* a RED-pinned case passed              */
-    "FATAL:",        /* fatal harness disagreement            */
-    NULL
-};
-
-/* One log's census. */
 typedef struct {
     char name[256];
-    long canon;        /* ^FAIL:                                      */
-    long legacy;       /* every recognised NON-CANONICAL prefix        */
-    long passed;       /* ^PASSED                                     */
-    long failed;       /* ^FAILED  (includes the `FAILED:` verdict)    */
-    long verdicts;     /* PASSED:/FAILED: lines in the runner's format */
-    long lines;        /* total lines, for the report                  */
+    int  verdict;         /* one of the four above                         */
+    long exit_code;
+    long signal;
+    long n_result_lines;
+    long n_assert, n_vacuous, n_setup_bug, n_test_bug, n_fatal, n_crash;
+    long n_renormalised;
     int  found;
-} LogCensus;
+} Verdict;
 
-/* -- streaming line-prefix scanner -----------------------------------------
- * Only the first 32 bytes of a line matter here, so lines of any length are
- * handled without a buffer and without truncation. */
-#define HEADMAX 40
-
-static void scan_line_head(FILE *f, char *head, int *len)
+/* -- read one integer field out of a verdict file ---------------------------
+ * The records are machine-written with one field per line and no nesting, so
+ * a line-oriented lookup is exact and needs no JSON parser.  Absent field
+ * returns `dflt`, which the callers treat as UNREADABLE rather than as zero:
+ * a missing counter is not a suite that counted nothing. */
+static long json_long(const char *buf, const char *key, long dflt)
 {
-    int c;
-    *len = 0;
-    c = fgetc(f);
-    while (c != EOF && c != '\n') {
-        if (*len < HEADMAX) head[(*len)++] = ( char)c;
-        c = fgetc(f);
-    }
+    char pat[64];
+    const char *p;
+    snprintf(pat, sizeof pat, "\"%s\"", key);
+    p = strstr(buf, pat);
+    if (!p) return dflt;
+    p = strchr(p + strlen(pat), ':');
+    if (!p) return dflt;
+    p++;
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    if (*p < '0' && *p != '-') return dflt;
+    return strtol(p, NULL, 10);
 }
 
-static int head_is(const char *head, int len, const char *pfx)
-{
-    size_t n = strlen(pfx);
-    if ((size_t)len < n) return 0;
-    return memcmp(head, pfx, n) == 0;
-}
-
-/* A result prefix only counts when a BOUNDARY follows it.  Without that rule
- * "FAILURE:" and "CRASHES:" are counted as failures, and this file would then
- * blame a suite for a sentence. */
-static int head_boundary(const char *head, int len, size_t plen)
-{
-    if ((size_t)len == plen) return 1;
-    switch (head[plen]) {
-    case ':': case ' ': case '\t': case '[': return 1;
-    default: return 0;
-    }
-}
-
-/* Count `^<pfx>` occurrences that are followed by a boundary.  Case-SENSITIVE,
- * which is the whole point: on PowerShell `-match` is case-insensitive and
- * inflates the count (a summary line reading "failures (shared) : 54" is
- * counted as a failure). */
-static long count_prefix(FILE *f, const char *pfx, long *n_lines)
-{
-    char head[HEADMAX + 1];
-    int len;
-    size_t plen = strlen(pfx);
-    long n = 0;
-    rewind(f);
-    for (;;) {
-        scan_line_head(f, head, &len);
-        if (len == 0 && feof(f)) break;
-        if (n_lines) (*n_lines)++;
-        head[len] = 0;
-        if (head_is(head, len, pfx) && head_boundary(head, len, plen)) n++;
-    }
-    return n;
-}
-
-/* The runner's verdict lines, recognised by their own shape rather than by
- * counting every `FAILED:` -- because `FAILED: <case>` is ALSO a legitimate
- * legacy form, and a gate that cannot tell the two apart proves nothing.
- *   PASSED: <stem>
- *   FAILED: <stem>  [exit=<n>, <breakdown>]          */
-/* Count the runner's verdict lines by their PRIVATE MARKER rather than by
- * counting every `FAILED:` -- because `FAILED: <case>` is ALSO a legitimate
- * legacy form, and a gate that cannot tell the two apart proves nothing.
- * `[exit=` appears in tools/verdict_runner.c's output and nowhere else in the
- * corpus, and it is on BOTH the PASSED and the FAILED verdict, so the test is
- * exact:
- *
- *     PASSED: <stem>  [exit=0, 0 result line(s), renormalised=N]
- *     FAILED: <stem>  [exit=<n>, <breakdown>]                       */
-#define VS_MARK "[exit="
-#define VS_MARKLEN 6
-
-/* Latch on the literal marker, not merely on a '[' after a space: a first
- * attempt keyed on '[' matched any bracketed aside a suite printed
- * ("assertions [5 checks]") and reported five verdicts where there was one.
- * `n_pass` / `n_fail` separate the two verdict KINDS, because `^PASSED` and
- * `^FAILED` each count their own verdict line and both have to come back off
- * again -- doing that with a single total made every PASSED log report a legacy
- * count of -1. */
-static long count_verdicts(FILE *f, long *n_pass, long *n_fail)
-{
-    int c, m = 0, marker = 0, is_pass = 0;
-    long n = 0;
-    if (n_pass) *n_pass = 0;
-    if (n_fail) *n_fail = 0;
-    rewind(f);
-    for (;;) {
-        is_pass = 0; marker = 0; m = 0;
-        {
-            int first = 0, second = 0;
-            while ((c = fgetc(f)) != EOF && c != '\n') {
-                if (first < 1) first = c;
-                else if (second < 1) second = c;
-                if (marker) continue;
-                if (c == VS_MARK[m]) { m++; if (m == VS_MARKLEN) marker = 1; }
-                else m = (c == VS_MARK[0]) ? 1 : 0;
-            }
-            is_pass = (first == 'P' && second == 'A');
-            if (c == EOF && first == 0) break;
-        }
-        if (marker) {
-            n++;
-            if (is_pass) { if (n_pass) (*n_pass)++; }
-            else if (n_fail) (*n_fail)++;
-        }
-        if (c == EOF) break;
-    }
-    return n;
-}
-
-static void census_log(const char *path, LogCensus *c)
+/* Returns 1 when every field this gate needs was present and numeric.  A
+ * verdict file that cannot be read is its own state, not a suite with zero
+ * failures -- collapsing the two is how this gate was wrong before. */
+static int read_verdict(const char *path, Verdict *v)
 {
     FILE *f = fopen(path, "rb");
-    const char *const *t;
-    long vp = 0, vf = 0;
-    memset(c, 0, sizeof *c);
-    if (!f) return;
-    c->found = 1;
-    c->canon  = count_prefix(f, CANON, &c->lines);
-    c->verdicts = count_verdicts(f, &vp, &vf);
-    c->passed = count_prefix(f, "PASSED", NULL);
-    c->failed = count_prefix(f, "FAILED", NULL);
-    /* Every recognised prefix EXCEPT the canonical one.  `FAILED` subsumes
-     * `FAILED:` (that is the point -- `^FAILED` is the published counter), so
-     * it is counted once and `FAILED:` is NOT counted again; each verdict line
-     * is then taken back off the kind it belongs to.  A suite's own
-     * `FAILED: <case>` line stays in the legacy count, which is exactly where a
-     * regression shows up. */
-    c->legacy = (c->passed - vp) + (c->failed - vf);
-    for (t = TAGS; *t; t++) {
-        if (strcmp(*t, "FAILED") == 0) continue;   /* already in c->failed */
-        if (strcmp(*t, "FAILED:") == 0) continue;  /* subsumed by `FAILED`  */
-        c->legacy += count_prefix(f, *t, NULL);
-    }
+    char buf[4096];
+    size_t n;
+    const char *p;
+    memset(v, 0, sizeof *v);
+    if (!f) return 0;
+    n = fread(buf, 1, sizeof buf - 1, f);
     fclose(f);
+    buf[n] = 0;
+    /* The RECORD's name, not the path it was reached by.  Storing the path
+     * made every message read `verdicts/verdicts/x.json.json`, which is noise
+     * in exactly the output a reader uses to find the offending file. */
+    {
+        const char *base = path, *q;
+        for (q = path; *q; q++) if (*q == '/') base = q + 1;
+        snprintf(v->name, sizeof v->name, "%s", base);
+    }
+    p = strstr(buf, "\"verdict\"");
+    if (!p) return 0;
+    p = strchr(p, ':');
+    if (!p) return 0;
+    p = strchr(p + 1, '"');
+    if (!p) return 0;
+    p++;
+    if (!strncmp(p, "PASSED", 6))       v->verdict = V_PASSED;
+    else if (!strncmp(p, "FAILED", 6))  v->verdict = V_FAILED;
+    else if (!strncmp(p, "INCONCLUSIVE", 12)) v->verdict = V_INCONCLUSIVE;
+    else return 0;
+    v->exit_code       = json_long(buf, "exit", -1);
+    v->signal          = json_long(buf, "signal", -1);
+    v->n_result_lines  = json_long(buf, "n_result_lines", -1);
+    v->n_assert        = json_long(buf, "n_assert", -1);
+    v->n_vacuous       = json_long(buf, "n_vacuous", -1);
+    v->n_setup_bug     = json_long(buf, "n_setup_bug", -1);
+    v->n_test_bug      = json_long(buf, "n_test_bug", -1);
+    v->n_fatal         = json_long(buf, "n_fatal", -1);
+    v->n_crash         = json_long(buf, "n_crash", -1);
+    v->n_renormalised  = json_long(buf, "n_renormalised", -1);
+    if (v->exit_code < 0 || v->n_result_lines < 0 || v->n_assert < 0) return 0;
+    v->found = 1;
+    return 1;
 }
 
-/* `test_foo.c` -> `foo`, into a caller-supplied buffer. */
-static const char *stem_name(const char *nm)
+/* The six breakdown counters account for EVERY line the runner counted. */
+static long v_breakdown(const Verdict *v)
 {
-    static char stem[256];
-    size_t l = strlen(nm), sl = l - 5 - 2;      /* drop "test_" and ".c" */
-    if (sl >= sizeof stem) sl = sizeof stem - 1;
-    memcpy(stem, nm + 5, sl);
-    stem[sl] = 0;
-    return stem;
+    return v->n_assert + v->n_vacuous + v->n_setup_bug +
+           v->n_test_bug + v->n_fatal + v->n_crash;
 }
 
-static int cmp_census(const void *a, const void *b)
+static const char *v_state_name(const Verdict *v)
 {
-    return strcmp(((const LogCensus *)a)->name, ((const LogCensus *)b)->name);
+    switch (v->verdict) {
+    case V_PASSED:       return "PASSED";
+    case V_FAILED:       return "FAILED";
+    case V_INCONCLUSIVE: return "INCONCLUSIVE";
+    default:             return "UNREADABLE";
+    }
+}
+
+/* G1 derives a stem in each of its two directions and does NOT share a helper
+ * between them, because the two inputs have different shapes -- `test_x.c`
+ * loses a 5-byte prefix and a 2-byte suffix, while `x.json` loses only the
+ * suffix.  A shared helper is how the two derivations drift into agreeing on
+ * the wrong string. */
+
+static int cmp_verdict(const void *a, const void *b)
+{
+    return strcmp(((const Verdict *)a)->name, ((const Verdict *)b)->name);
 }
 
 /* -- the CONDITION, not the symptom ----------------------------------------
+ * Does the directory this gate is pointed at hold ANY verdict records, and are
+ * there as many of them as there are suites?
  *
- * The single fact that decides whether this gate can run at all: does the
- * directory it is pointed at hold ANY .log evidence?
+ * `make t` runs ONE suite, so it leaves exactly one verdict file, and a
+ * corpus-wide question cannot be answered from it.  Asserting on the absence
+ * per-suite scales the wrong way: every rule below would fire once per suite,
+ * so the failure count grows with the corpus while the corpus gets healthier.
+ * The condition is one bit.  Measure it, print it, and skip -- and assert
+ * nothing on its behalf.
  *
- * `make t` runs a suite through $(VERDICT) on STDOUT and writes no log at all;
- * only `make run-all-tests` writes tests/<stem>.log. So `make t T=coverage_gate`
- * and any other bare-suite invocation run this gate in a directory that will
- * NEVER contain the evidence it reconciles, and every one of its assertions
- * then reports the ABSENCE of files as though a suite had lost its log.
- *
- * Asserting on that absence is asserting on the symptom, and it scales the
- * wrong way: adding a suite adds another manifest entry with no log, so the
- * failure count grows with the corpus while the corpus gets healthier. The
- * condition -- "this context produces no logs" -- is one bit and does not scale.
- *
- * So: measure the condition, and if it holds, SKIP with a reason. An absent
- * evidence set is not a hole in anybody's numbers; it is the absence of the run
- * that would have produced them, and saying so is the honest answer. Asserting
- * per-suite on it instead means a reader cannot tell "this suite has no log"
- * from "no logs were ever written", which are opposite findings.
- *
- * The per-suite G1 assertion below is NOT weakened: in any context that DOES
- * produce logs -- `make run-all-tests`, or a re-run of the gate over that
- * evidence -- every tests/test_<stem>.c must still have its tests/<stem>.log,
+ * The per-suite G1 assertion below is NOT weakened: in any corpus-shaped
+ * context every tests/test_<stem>.c must still have its verdicts/<stem>.json,
  * and this function is what routes the other context away before that runs. */
-static int count_log_files(const char *dir)
+static int count_verdict_files(const char *dir)
 {
     DIR *d = opendir(dir);
     struct dirent *e;
@@ -314,7 +256,7 @@ static int count_log_files(const char *dir)
     while ((e = readdir(d)) != NULL) {
         const char *nm = e->d_name;
         size_t l = strlen(nm);
-        if (l < 5 || strcmp(nm + l - 4, ".log") != 0) continue;
+        if (l < 6 || strcmp(nm + l - 5, ".json") != 0) continue;
         n++;
     }
     closedir(d);
@@ -322,41 +264,34 @@ static int count_log_files(const char *dir)
 }
 
 /* -- corpus-wide total by an INDEPENDENT enumeration ---------------------
- * Walk tests/ as a directory and add up ^FAIL: in every log, with no knowledge
- * of the suite list. G3 compares this against the per-suite sum.
+ * Walk the verdict directory as a directory and add up n_result_lines, with no
+ * knowledge of the suite list.  G3 compares this against the per-suite sum.
  *
- * ONE exclusion, and it is not an exemption: the gate's OWN log. The per-suite
- * census below deliberately skips it -- it is written by the very run that
- * produces the evidence, so it is empty of verdicts at the moment the gate
- * reads the directory -- and the walk MUST skip exactly the same file or the
- * two enumerations are not two enumerations of one set. They are two
- * enumerations of DIFFERENT sets, and G3 then measures the size of the gate's
- * own previous output instead of anything about the corpus.
- *
- * MEASURED, before this exclusion: the walk counted every ^FAIL: line the gate
- * had itself emitted on its previous run, so G3 reported a gap equal to the
- * previous run's failure count (152 lines on the first complete evidence set)
- * and could not pass in the very context it exists to judge. The two sides are
- * now the same set of files, which is the only thing that makes their
- * agreement mean anything. */
-static long corpus_total_by_walk(const char *dir, const char *self)
+ * There is NO SELF-EXCLUSION here, and that is the point of the rewrite.  The
+ * log version had to name its own log and skip it, because `make run-all-tests`
+ * writes `tests/coverage_gate.log` from the very run that produces the
+ * evidence -- so the walk counted the gate's previous output and G3 measured
+ * the size of that instead of the corpus.  A gate does not write a verdict for
+ * itself into the evidence set it is reading, so the two sides are now the
+ * same set of files by construction rather than by a patch. */
+static long corpus_total_by_walk(const char *dir, int *n_read, int *n_bad)
 {
     DIR *d = opendir(dir);
     struct dirent *e;
     long total = 0;
+    *n_read = 0;
+    *n_bad = 0;
     if (!d) return -1;
     while ((e = readdir(d)) != NULL) {
         const char *nm = e->d_name;
         size_t n = strlen(nm);
-        char path[512];
-        FILE *f;
-        if (n < 5 || strcmp(nm + n - 4, ".log") != 0) continue;
-        if (self && !strcmp(nm, self)) continue;         /* the gate's own log */
+        char path[1024];
+        Verdict v;
+        if (n < 6 || strcmp(nm + n - 5, ".json") != 0) continue;
         snprintf(path, sizeof path, "%s/%s", dir, nm);
-        f = fopen(path, "rb");
-        if (!f) continue;
-        total += count_prefix(f, CANON, NULL);
-        fclose(f);
+        (*n_read)++;
+        if (!read_verdict(path, &v)) { (*n_bad)++; continue; }
+        total += v.n_result_lines;
     }
     closedir(d);
     return total;
@@ -364,20 +299,19 @@ static long corpus_total_by_walk(const char *dir, const char *self)
 
 int main(void)
 {
-    static LogCensus tab[512];
+    static Verdict tab[512];
     int n = 0, i;
-    long sum_per_suite = 0, sum_passed = 0, sum_failed = 0, n_legacy = 0;
-    long by_walk, n_no_verdict = 0;
-    int n_sources, n_logs;
-    const char *dir = "tests";
-    const char *self = "coverage_gate";
+    long sum_lines = 0, sum_passed = 0, sum_failed = 0, sum_inconclusive = 0;
+    long by_walk, n_no_verdict = 0, n_unreadable = 0, n_assertionless_red = 0;
+    int n_sources, n_files, n_walk_read, n_walk_bad;
+    const char *dir = "verdicts";
+    const char *src = "tests";
 
-    /* -- G1: manifest vs glob -------------------------------------------- */
+    /* -- G0: is the suite manifest even present? -------------------------- */
     n_sources = 0;
     {
         int any = 0;
-        /* count the sources with a bounded directory scan */
-        DIR *d = opendir(dir);
+        DIR *d = opendir(src);
         struct dirent *e;
         if (!d) {
             CHECK(0, "cannot open tests/ -- run this from the engine_c_wip root");
@@ -397,156 +331,232 @@ int main(void)
     }
 
     /* -- THE CONDITION FIRST ---------------------------------------------
-     * Zero logs means this invocation is in a context that never writes them
-     * (`make t` does not; `make run-all-tests` does). Every assertion below
-     * would fire on that one fact, once per suite, so route the whole gate
-     * around it. Nothing is relaxed: in a context that DOES produce logs this
-     * branch is not taken and G1-G5 run in full. */
-    if (count_log_files(dir) == 0) {
-        printf("SKIP: tests/ holds NO *.log files, so there is nothing to "
+     * The evidence has to be corpus-shaped before a corpus-wide question can
+     * be asked of it.  `make t` runs ONE suite and leaves ONE verdict record,
+     * and `RB_VERDICT_JSON=0` leaves none; in either context every assertion
+     * below would fire once per suite, so the failure count would grow with
+     * the corpus while the corpus got healthier.  Measure the condition, print
+     * it, and skip.  Nothing is relaxed: on a corpus-shaped set this branch is
+     * not taken and G1-G5 run in full. */
+    n_files = count_verdict_files(dir);
+    if (n_files <= 0) {
+        printf("SKIP: %s/ holds NO *.json verdict records, so there is nothing to "
                "reconcile and no manifest entry can be judged.\n"
-               "SKIP: reason -- this gate only means anything over the evidence "
-               "`make run-all-tests` writes. `make t T=coverage_gate` runs one "
-               "suite on stdout and never creates a log, so a bare run is in a "
-               "context that cannot produce the evidence; reporting one "
-               "manifest failure per suite there describes the RUNNER, not the "
-               "corpus.\n"
-               "SKIP: to actually run this gate: `make run-all-tests`, then run "
-               "it again over the tests/*.log that produced.\n");
-        printf("info: sources=%d logs=0 ^FAIL(corpus)=0 ^PASSED=0 ^FAILED=0 "
-               "non-canonical=0 no-verdict=0\n", n_sources);
+               "SKIP: reason -- this gate only means anything over a corpus-shaped "
+               "evidence set. `make t T=<stem>` runs ONE suite and writes ONE "
+               "verdict; `RB_VERDICT_JSON=0` writes none. Reporting one manifest "
+               "failure per suite there describes the RUNNER, not the corpus.\n"
+               "SKIP: to actually run this gate: `make run-all-tests` (or the "
+               "tools/corpus_measure.py pass that writes one verdict per suite).\n",
+               dir);
+        printf("info: sources=%d verdicts=0 result-lines(corpus)=0 PASSED=0 "
+               "FAILED=0 INCONCLUSIVE=0 unreadable=0\n", n_sources);
+        printf("\n%d checks, %d failures\n", checks, failures);
+        return failures ? 1 : 0;
+    }
+    if (n_files != n_sources) {
+        printf("SKIP: %s/ holds %d verdict record(s) for %d suite source(s). The "
+               "set is not corpus-shaped, so the corpus-wide rules (G3, G5) would "
+               "be reconciling a partial set against a whole manifest and calling "
+               "the difference a defect.\n"
+               "SKIP: reason -- a partial run is a partial measurement; the "
+               "missing records are suites that did not run, which is a fact "
+               "about the RUNNER and not a hole in the corpus.\n",
+               dir, n_files, n_sources);
+        printf("info: sources=%d verdicts=%d result-lines(corpus)=0 PASSED=0 "
+               "FAILED=0 INCONCLUSIVE=0 unreadable=0\n", n_sources, n_files);
         printf("\n%d checks, %d failures\n", checks, failures);
         return failures ? 1 : 0;
     }
 
-    /* -- G1: manifest vs glob -------------------------------------------- */
+    /* -- G1: manifest vs glob, both directions --------------------------- */
     {
-        char path[512];
-        FILE *f;
-        DIR *d = opendir(dir);
+        char path[1024];
+        DIR *d = opendir(src);
         struct dirent *e;
         if (!d) { CHECK(0, "cannot open tests/"); return 1; }
         while ((e = readdir(d)) != NULL) {
             const char *nm = e->d_name;
             size_t l = strlen(nm);
+            char stem[256];
+            size_t sl;
+            FILE *f;
             if (l < 8 || strncmp(nm, "test_", 5) != 0 ||
                 strcmp(nm + l - 2, ".c") != 0) continue;
-            /* ... and each must have produced a log.  This gate is the one
-             * exception: it is written by the run that produces the evidence,
-             * so its own log cannot exist yet (and `make run-all-tests` would
-             * otherwise overwrite the evidence with an empty file). */
-            if (!strcmp(stem_name(nm), "coverage_gate")) continue;
-            {
-                char stem[256];
-                size_t sl = l - 5 - 2;            /* drop "test_" and ".c" */
-                if (sl >= sizeof stem) sl = sizeof stem - 1;
-                memcpy(stem, nm + 5, sl);
-                stem[sl] = 0;
-                snprintf(path, sizeof path, "%s/%s.log", dir, stem);
-                f = fopen(path, "rb");
-                CHECK(f != NULL,
-                      "G1 manifest-vs-glob: tests/test_%s.c has no tests/%s.log -- "
-                      "it either was not run or its log was deleted", stem, stem);
-                if (f) fclose(f);
-            }
+            sl = l - 5 - 2;                     /* drop "test_" and ".c" */
+            if (sl >= sizeof stem) sl = sizeof stem - 1;
+            memcpy(stem, nm + 5, sl);
+            stem[sl] = 0;
+            snprintf(path, sizeof path, "%s/%s.json", dir, stem);
+            f = fopen(path, "rb");
+            /* The gate needs NO self-exemption here, and that is the point of
+             * the rewrite: a verdict record is written by the suite's own run,
+             * and `make run-all-tests` produces one for coverage_gate along
+             * with every other suite.  The log version had to exempt its own
+             * log, because that file was written by the very run that creates
+             * the evidence -- which is also how it came to count its own
+             * previous output as corpus data. */
+            CHECK(f != NULL,
+                  "G1 manifest-vs-glob: tests/test_%s.c has no %s/%s.json -- it "
+                  "either was not run, or its verdict record was deleted. A suite "
+                  "with no verdict is invisible to every corpus total.",
+                  stem, dir, stem);
+            if (f) fclose(f);
         }
         closedir(d);
     }
-
-    /* -- census every log ----------------------------------------------- */
+    /* ... and the other direction: a verdict whose suite is gone. */
     {
         DIR *d = opendir(dir);
         struct dirent *e;
-        if (!d) { CHECK(0, "cannot open tests/"); return 1; }
-        while ((e = readdir(d)) != NULL && n < (int)(sizeof tab / sizeof tab[0])) {
+        if (!d) { CHECK(0, "cannot open %s/", dir); return 1; }
+        while ((e = readdir(d)) != NULL) {
             const char *nm = e->d_name;
             size_t l = strlen(nm);
-            char path[512];
-            LogCensus c;
-            if (l < 5 || strcmp(nm + l - 4, ".log") != 0) continue;
-            /* The gate's OWN log is written by the very run that produces the
-             * evidence, and it is empty of verdicts because it ran first.
-             * Counting it would make the gate fail on itself forever. */
-            if (!strncmp(nm, self, strlen(self)) &&
-                (!nm[strlen(self)] || !strcmp(nm + strlen(self), ".log"))) continue;
-            snprintf(path, sizeof path, "%s/%s", dir, nm);
-            census_log(path, &c);
-            snprintf(c.name, sizeof c.name, "%s", nm);
-            if (c.found) tab[n++] = c;
+            char stem[256], path[1024];
+            size_t sl;
+            FILE *f;
+            if (l < 6 || strcmp(nm + l - 5, ".json") != 0) continue;
+            sl = l - 5;                          /* drop ".json" */
+            if (sl >= sizeof stem) sl = sizeof stem - 1;
+            memcpy(stem, nm, sl);
+            stem[sl] = 0;
+            snprintf(path, sizeof path, "%s/test_%s.c", src, stem);
+            f = fopen(path, "rb");
+            CHECK(f != NULL,
+                  "G1 manifest-vs-glob: %s/%s.json exists but tests/test_%s.c "
+                  "does not -- the suite was deleted or renamed and this record "
+                  "is now a count for a suite that does not exist.",
+                  dir, stem, stem);
+            if (f) fclose(f);
         }
         closedir(d);
     }
-    qsort(tab, (size_t)n, sizeof tab[0], cmp_census);
-    n_logs = n;
-    CHECK(n_logs > 0,
-          "G4/G5: there are NO tests/*.log files, so there is no evidence to "
-          "reconcile. Run 'make run-all-tests' first -- this gate reads what it "
-          "writes, and it is not allowed to pass on an absence of evidence.");
+
+    /* -- load every verdict ---------------------------------------------- */
+    {
+        DIR *d = opendir(dir);
+        struct dirent *e;
+        if (!d) { CHECK(0, "cannot open %s/", dir); return 1; }
+        while ((e = readdir(d)) != NULL && n < (int)(sizeof tab / sizeof tab[0])) {
+            const char *nm = e->d_name;
+            size_t l = strlen(nm);
+            char path[1024];
+            Verdict v;
+            if (l < 6 || strcmp(nm + l - 5, ".json") != 0) continue;
+            snprintf(path, sizeof path, "%s/%s", dir, nm);
+            if (!read_verdict(path, &v)) {
+                /* A record the gate cannot read is UNREADABLE, never a suite
+                 * that counted nothing.  Collapsing the two is how a broken
+                 * evidence set reads as a clean corpus. */
+                memset(&v, 0, sizeof v);
+                v.verdict = V_UNREADABLE;
+                snprintf(v.name, sizeof v.name, "%s", nm);
+                n_unreadable++;
+            }
+            tab[n++] = v;
+        }
+        closedir(d);
+    }
+    qsort(tab, (size_t)n, sizeof tab[0], cmp_verdict);
+    CHECK(n == n_files,
+          "G4/G5: loaded %d verdict record(s) but %s/ holds %d .json file(s). "
+          "A record that failed to load is counted as UNREADABLE, never as a "
+          "suite with zero failures.",
+          n, dir, n_files);
 
     for (i = 0; i < n; i++) {
-        const LogCensus *c = &tab[i];
-        sum_per_suite += c->canon;
-        sum_passed     += c->passed;
-        sum_failed     += c->failed;
-        n_legacy       += c->legacy;
-        /* -- G2: normalisation is total for THIS suite ------------------- */
-        CHECK(c->legacy == 0,
-              "G2 prefix normalisation: tests/%s still emits %ld non-canonical "
-              "result line(s). The corpus vocabulary is exactly `FAIL: `; "
-              "tools/verdict_runner.c rewrites every recognised prefix and its "
-              "table is missing one, or this log predates the runner. (The "
-              "runner's own `FAILED: <stem>  [exit=...]` verdict is excluded by "
-              "shape, not by count.)",
-              c->name, c->legacy);
-        /* -- G4: exactly one verdict, and nothing else claiming one ----- */
-        CHECK(c->verdicts == 1,
-              "G4 verdict: tests/%s carries %ld runner verdict line(s); exactly "
-              "one is required. None means the suite died on a signal "
-              "(INCONCLUSIVE -- never green, and COVERAGE_HARNESS.md 9 says "
-              "nothing could detect that before).",
-              c->name, c->verdicts);
-        CHECK(c->passed + c->failed == c->verdicts,
-              "G4 verdict: tests/%s has %ld `^PASSED` + %ld `^FAILED` but %ld "
-              "verdict line(s). A bare `FAILED <case>` is the legacy per-case "
-              "form and is a G2 failure, not a second verdict.",
-              c->name, c->passed, c->failed, c->verdicts);
-        if (c->verdicts != 1) n_no_verdict++;
+        const Verdict *v = &tab[i];
+        /* -- G2: the tally is total, and the verdict matches it ---------- */
+        CHECK(v->verdict != V_UNREADABLE,
+              "G2 verdict record: %s/%s.json cannot be read. It is not a suite "
+              "with zero failures -- it is an unreadable measurement, and "
+              "counting it as clean is the defect this gate exists to prevent.",
+              dir, v->name);
+        if (v->verdict == V_UNREADABLE) continue;
+        CHECK(v_breakdown(v) == v->n_result_lines,
+              "G2 tally integrity: %s/%s.json reports n_result_lines=%ld but its "
+              "six breakdown counters sum to %ld. Something the runner counted "
+              "is missing from the tally, so the corpus total would be under "
+              "counting that suite.",
+              dir, v->name, v->n_result_lines, v_breakdown(v));
+        CHECK(!(v->verdict == V_PASSED && v->n_result_lines != 0),
+              "G2 verdict/count agreement: %s/%s.json is PASSED with "
+              "n_result_lines=%ld. PASSED is defined as zero counted result "
+              "lines, so this record contradicts itself.",
+              dir, v->name, v->n_result_lines);
+        if (v->verdict == V_FAILED && v->n_result_lines == 0) {
+            /* The one BROKEN suite in the corpus is exactly this shape: a
+             * non-zero exit and no assertion at all.  It is neither a green
+             * suite nor a suite that measured something, and reporting it as
+             * an ordinary red hides the difference. */
+            n_assertionless_red++;
+            CHECK(0,
+                  "G2 verdict/count agreement: %s/%s.json is FAILED with "
+                  "n_result_lines=0 and exit=%ld. It failed on its EXIT while "
+                  "asserting nothing -- a broken suite, not a measurement. "
+                  "(This is the shape of `audit_conditions`.)",
+                  dir, v->name, v->exit_code);
+        }
+
+        /* -- G4: exactly one verdict, and it is a decidable one -------- */
+        CHECK(v->verdict == V_PASSED || v->verdict == V_FAILED,
+              "G4 verdict: %s/%s.json is %s. A suite killed on a signal emitted "
+              "no verdict line at all, so every log-scraping consumer read it "
+              "as \"no failures seen\" -- green. It is a third state now and it "
+              "must not be silently folded into either of the other two.",
+              dir, v->name, v_state_name(v));
+        if (v->verdict == V_INCONCLUSIVE) n_no_verdict++;
+
+        sum_lines += v->n_result_lines;
+        if (v->verdict == V_PASSED)       sum_passed++;
+        else if (v->verdict == V_FAILED)  sum_failed++;
+        else if (v->verdict == V_INCONCLUSIVE) sum_inconclusive++;
     }
 
     /* -- G3: corpus total reconciles ------------------------------------- */
-    by_walk = corpus_total_by_walk(dir, "coverage_gate.log");
-    CHECK(by_walk == sum_per_suite,
-          "G3 reconciliation: a directory walk of tests/*.log counts %ld "
-          "^FAIL lines, the per-suite census sums to %ld. They are two "
-          "independent enumerations and must agree.",
-          by_walk, sum_per_suite);
+    by_walk = corpus_total_by_walk(dir, &n_walk_read, &n_walk_bad);
+    CHECK(n_walk_read == n_files && n_walk_bad == 0,
+          "G3: the directory walk read %d verdict file(s) (%d unreadable) but "
+          "the per-suite load saw %d. The two sides are not the same set.",
+          n_walk_read, n_walk_bad, n_files);
+    CHECK(by_walk == sum_lines,
+          "G3 reconciliation: a directory walk of %s/*.json counts %ld result "
+          "line(s), the per-suite sum is %ld. They are two independent "
+          "enumerations and must agree.",
+          dir, by_walk, sum_lines);
 
     /* -- G5: verdict arithmetic ------------------------------------------ */
-    CHECK(sum_passed + sum_failed == (long)n_logs,
-          "G5 verdict arithmetic: %ld PASSED + %ld FAILED != %ld logs",
-          sum_passed, sum_failed, (long)n_logs);
+    CHECK(sum_passed + sum_failed + sum_inconclusive + n_unreadable == (long)n,
+          "G5 verdict arithmetic: %ld PASSED + %ld FAILED + %ld INCONCLUSIVE + "
+          "%ld UNREADABLE != %d verdict record(s). A verdict can go missing "
+          "without the corpus total moving.",
+          sum_passed, sum_failed, sum_inconclusive, n_unreadable, n);
     CHECK(n_no_verdict == 0,
-          "G4: %ld suite(s) reported NO verdict. Before the verdict layer a "
+          "G4: %ld suite(s) reported INCONCLUSIVE. Before the verdict layer a "
           "segfault was byte-identical to a pass; it is now a third state.",
           n_no_verdict);
+    CHECK(n_assertionless_red == 0,
+          "G2: %ld suite(s) are FAILED with zero counted result line(s) -- they "
+          "asserted nothing and failed on their exit code.",
+          n_assertionless_red);
     CHECK(sum_passed > 0,
           "G5: zero suites reported PASSED -- the corpus still cannot report "
           "success, which is the defect this whole layer exists to end");
 
-    printf("info: sources=%d logs=%d ^FAIL(corpus)=%ld ^PASSED=%ld ^FAILED=%ld "
-           "non-canonical=%ld no-verdict=%ld\n",
-           n_sources, n_logs, sum_per_suite, sum_passed, sum_failed,
-           n_legacy, n_no_verdict);
-    printf("info: the corpus-wide ^FAIL count RECONCILES with the sum of the "
-           "per-suite counts, and every log carries exactly one verdict line\n");
+    printf("info: sources=%d verdicts=%d result-lines(corpus)=%ld PASSED=%ld "
+           "FAILED=%ld INCONCLUSIVE=%ld unreadable=%ld exit-only-red=%ld\n",
+           n_sources, n_files, sum_lines, sum_passed, sum_failed,
+           sum_inconclusive, n_unreadable, n_assertionless_red);
+    printf("info: the corpus-wide result-line count RECONCILES with the sum of "
+           "the per-suite counts, and every verdict record is readable\n");
 
     /* The per-suite table, so a reader can see WHICH suites are red rather
      * than only that the corpus is. */
-    printf("--- per-suite ^FAIL (canonical) ---\n");
+    printf("--- per-suite verdict (from %s/*.json) ---\n", dir);
     for (i = 0; i < n; i++)
-        printf("  %-6ld %-8s %s\n", tab[i].canon,
-               tab[i].passed ? "PASSED" : (tab[i].failed ? "FAILED" : "NO-VERDICT"),
-               tab[i].name);
+        printf("  %-6ld %-13s exit=%-4ld %s\n", tab[i].n_result_lines,
+               v_state_name(&tab[i]), tab[i].exit_code, tab[i].name);
 
     printf("\n%d checks, %d failures\n", checks, failures);
     return failures ? 1 : 0;

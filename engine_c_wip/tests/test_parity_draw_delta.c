@@ -481,7 +481,7 @@ static void a2b_control_same_card_draws_to_five(void)
 /* The group names the ENGINE's card record carries, read back from cards.bin by
  * rb_card_group_name. These are the short forms, not cards.json's `series`. */
 #define MUS_GROUP   "\xCE\xBC\x27\x73"                       /* "μ's"  (CE BC 27 73) */
-#define NIJI_GROUP  "\xE8\x99\xB9\xE3\x83\xB6\xE3\x82\xB5"   /* "虹ヶ咲"            */
+#define NIJI_GROUP  "\xE8\x99\xB9\xE3\x83\xB6\xE5\x92\xB2"   /* U+8679 U+30F6 U+54B2 */
 
 /* ── B1. sweet_sweet_holiday_pl_bp6_023_l_draws_extra_with_mus_live_in_
  *      success_zone (success_zone_group_pl_bp6_023_l_test.rs:10-33) ─────────

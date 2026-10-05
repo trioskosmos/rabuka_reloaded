@@ -620,7 +620,7 @@ impl AbilityResolver {
                             old_position: source_old,
                             new_position: source_new,
                             cause_card_id: cause_cid,
-                            cause_player_id: mover_pid.clone(),
+                            cause_player_id: mover_pid.as_str().into(),
                             effect_only: true,
                         });
                 }
@@ -631,7 +631,7 @@ impl AbilityResolver {
                             old_position: source_new,
                             new_position: source_old,
                             cause_card_id: cause_cid,
-                            cause_player_id: mover_pid.clone(),
+                            cause_player_id: mover_pid.as_str().into(),
                             effect_only: true,
                         });
                 }
@@ -912,7 +912,7 @@ impl AbilityResolver {
                     old_position: old_pos,
                     new_position: new_pos,
                     cause_card_id: cause_cid,
-                    cause_player_id: mover_pid.clone(),
+                    cause_player_id: mover_pid.as_str().into(),
                     effect_only: true,
                 });
             gs.push_movement_event(moved_card_id, "stage", "stage", cause_cid, &mover_pid, true);
@@ -1182,7 +1182,7 @@ impl AbilityResolver {
                         old_position: old_pos,
                         new_position: new_pos,
                         cause_card_id: gs.activating_card,
-                        cause_player_id: String::new(),
+                        cause_player_id: crate::core::types::ArcStr::default(),
                         effect_only: true,
                     });
             }

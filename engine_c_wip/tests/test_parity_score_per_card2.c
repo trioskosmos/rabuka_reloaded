@@ -216,7 +216,7 @@ static void fatal_handler(int sig)
 #define G_MUS    "\xCE\xBC's"                             /* mu's (U+03BC) */
 #define G_AQOURS "Aqours"
 #define G_LIELLA "Liella!"
-#define G_NIJI   "\xE8\x99\xB9\xE3\x82\xB1\xE3\x82\xB5\xE3\x82\xAF" /* 虹ヶ咲 (U+8679, NOT U+8671) */
+#define G_NIJI   "\xE8\x99\xB9\xE3\x83\xB6\xE5\x92\xB2" /* U+8679 U+30F6 U+54B2 (NOT U+8671) */
 #define TRIGGER_LIVE_START  "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE9\x96\x8B\xE5\xA7\x8B\xE6\x99\x82" /* ライブ開始時 */
 #define TRIGGER_LIVE_SUCCESS "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE6\x88\x90\xE5\x8A\x9F\xE6\x99\x82" /* ライブ成功時 */
 

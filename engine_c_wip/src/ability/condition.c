@@ -25,7 +25,7 @@ static int eval_multi_location(const struct GameState *g, int actor, int host_ci
    card.rs:evaluate_location_condition) calls it in the middle of its chain. */
 int rb_check_heart_colors(const struct GameState *g, int actor, const Condition *c);
 /* Cluster D. Defined further down, called by the comparison/location twins
-   above: card_total_hearts (card.rs:4263-4271), cond_group_names (the
+   above: card_total_hearts (card.rs:4453-4461), cond_group_names (the
    `group_names.first()` reader), compare_counts_op (util.rs:2210) and
    cond_truthy_field (`all.unwrap_or(false)` over any decoder tag). */
 static int card_total_hearts(const Card *cc);
@@ -1382,6 +1382,43 @@ static int moved_cards_match_cost_limit(const struct GameState *g,
     return 0;
 }
 
+/* state.rs:988-995 `is_watched_placement` — the destination gate a
+   `movement:"moves"` energy watcher applies to ONE batch_movements entry.
+   Rust compares `m.dest_zone` as a String; the C stores the same field as an
+   RbZoneId (rabuka.h:1476), so the comparison goes through the canonical zone
+   table with rb_zone_equivalent (core/data.c:1029) — the same idiom the
+   destination filter at condition.c:3573 already uses. An unrecognised
+   want_dest can never equal a real zone, so it must resolve to "no match"
+   rather than letting RB_ZONEID_UNKNOWN match everything. */
+static int moves_watched_placement(const RbBatchMovement *m,
+                                   const char *want_dest, RbZoneId want_zone) {
+    int dz_ok;
+    if (want_dest[0]) {
+        dz_ok = (want_zone != RB_ZONEID_UNKNOWN) &&
+                rb_zone_equivalent((RbZoneId)m->dest_zone, want_zone);
+    } else {
+        /* A bare 「置き場に置かれた」 watches ONLY energy arrivals. Rust tests the
+           two SPELLINGS "energy" / "energy_zone"; rb_zone_id_from_str maps both
+           onto RB_ZONEID_ENERGY (tests/test_audit_zones.c:314), so one compare. */
+        dz_ok = ((RbZoneId)m->dest_zone == RB_ZONEID_ENERGY);
+    }
+    return dz_ok && m->effect_only;
+}
+
+/* state.rs:1012-1035 `dest_ok` — the destination re-check inside energy_ok. NOTE
+   this one does NOT require effect_only (unlike moves_watched_placement), and
+   Rust writes the zone as a bare `(energy || energy_zone || under_member) &&
+   == want_dest`. The set-membership conjunct is implied by the equality that
+   follows it, so only the equality is load-bearing; it is kept explicit here so
+   the shape still matches the Rust if the set is ever widened. */
+static int moves_dest_ok(const RbBatchMovement *m, const char *want_dest, RbZoneId want_zone) {
+    if (!want_dest[0]) return 1;                  /* state.rs:1012-1014 */
+    if (want_zone == RB_ZONEID_UNKNOWN) return 0;
+    RbZoneId d = (RbZoneId)m->dest_zone;
+    int in_set = (d == RB_ZONEID_ENERGY || d == RB_ZONEID_UNDER_MEMBER);
+    return in_set && rb_zone_equivalent(d, want_zone);
+}
+
 static int eval_movement(const struct GameState *g, int actor, int host_cid, const Condition *c) {
     (void)host_cid;
     const char *mv = get_str(c, "movement");
@@ -1471,6 +1508,164 @@ static int eval_movement(const struct GameState *g, int actor, int host_cid, con
         int check_id = baton_touch_check_card(g, get_str(c, "location"));
         if (check_id < 0) return 0;               /* state.rs:722 — no such card → fail */
         if (!cond_group_names_match(check_id, bt_groups)) return 0;  /* state.rs:718 */
+    }
+
+    /* movement=="moves" — condition/state.rs:917-1103. The C had NO arm for this
+       value at all, so all 8 corpus `movement:"moves"` nodes fell through to
+       `return has_any ? 1 : 0` below.
+       MEASURED here over cards/abilities.json (own count, not inherited):
+       8 nodes; energy_placed 5, self_effect_only 3, watches_area_move 2,
+       destination 1, cost_limit 0. CRUCIALLY every one of those flags lives in
+       the NESTED `trigger_event` object, not at the condition's top level — so a
+       top-level-only read silently drops all of them and the arm degenerates to
+       this_card_moved. That nested object is exactly Rust's `te`
+       (state.rs:856, :920/:922/:984/:1084) and the C already carries it as a
+       nested Condition (vm.c:1644 cond_add_cond "trigger_event"; fetched with
+       get_cond, condition.c:127). */
+    if (mv && !strcmp(mv, "moves")) {
+        const Condition *te = get_cond(c, "trigger_event");
+        /* Rust `player` is the resolved condition player (state.rs:861-862
+           resolve_condition_player(target)), NOT the raw actor. */
+        const int pl = target_player_idx(actor, c);
+
+        /* state.rs:918-923 — condition first, trigger_effect as the fallback.
+           -1 is Rust's None; 0/1 are a present true/false. */
+        int self_effect_only = -1, energy_placed = -1, watches_area_move = 0;
+        int t = 0;
+        if (get_bool(c, "self_effect_only", &t))                             self_effect_only = t;
+        else if (te && get_bool(te, "self_effect_only", &t))                  self_effect_only = t;
+        if (get_bool(c, "energy_placed", &t))                                 energy_placed = t;
+        else if (te && get_bool(te, "energy_placed", &t))                     energy_placed = t;
+        if (get_bool(c, "watches_area_move", &t))                             watches_area_move = t;
+        else if (te && get_bool(te, "watches_area_move", &t))                 watches_area_move = t;
+
+        /* state.rs:979-982 — destination, condition first then te, "" if neither. */
+        const char *want_dest = get_str(c, "destination");
+        if (!want_dest && te) want_dest = get_str(te, "destination");
+        if (!want_dest) want_dest = "";
+        const RbZoneId want_zone = rb_zone_id_from_str(want_dest);
+
+        /* state.rs:935-961 `this_card_moved`:
+             in_pce || (in_tam && in_current_batch) || in_trigger_batch        */
+        int this_card_moved = 0;
+        if (g->activating_card >= 0) {
+            const int cid = g->activating_card;
+            for (int i = 0; i < g->n_position_change_events; i++)   /* :936-940 in_pce */
+                if (g->position_change_events[i].card_id == cid) { this_card_moved = 1; break; }
+            if (!this_card_moved) {
+                int in_tam = 0;
+                for (int i = 0; i < g->n_turn_area_movements; i++)  /* :941-945 */
+                    if (g->turn_area_movements[i].moved_card_id == cid) { in_tam = 1; break; }
+                if (in_tam) {
+                    /* in_current_batch (:946-951). Rust's `self.moved_cards` is the
+                       evaluator's borrowed effect slice (ability/condition.rs:59)
+                       and the C has no counterpart field. The already-landed
+                       `position_change` arm above (condition.c:1446-1457) collapses
+                       the same three Rust disjuncts onto the C's own
+                       entry-trigger / recently_moved pair, so this arm follows that
+                       established convention rather than inventing a second one. */
+                    int ec = 0;
+                    const int *ev = rb_entry_trigger_moved_cards(g, &ec);
+                    for (int q = 0; q < ec; q++)
+                        if (ev[q] == cid) { this_card_moved = 1; break; }
+                    for (int q = 0; q < g->n_recently_moved && !this_card_moved; q++)
+                        if (g->recently_moved[q] == cid) this_card_moved = 1;
+                }
+            }
+            /* in_trigger_batch (:956-959). Deferred cross-seat resolutions run AFTER
+               the movement batch is cleared, so the enqueue-time snapshot of the
+               triggering batch is the durable record that THIS card's move caused
+               this very trigger. */
+            if (!this_card_moved) {
+                int ec = 0;
+                const int *ev = rb_entry_trigger_moved_cards(g, &ec);
+                for (int q = 0; q < ec; q++)
+                    if (ev[q] == cid) { this_card_moved = 1; break; }
+            }
+        }
+
+        /* state.rs:962-976 `area_ok`. A DIFFERENT card moving does not satisfy
+           「このメンバーがエリアを移動する」 — Rust's explicit `false` arm, so the
+           self_effect_only shortcut is gated on this_card_moved, NOT on its own. */
+        int area_ok = 0;
+        if (this_card_moved) {
+            if (self_effect_only < 0) {
+                area_ok = 1;                       /* is_none_or -> vacuously true */
+            } else {
+                /* :969-975. Rust's `area_by` is last_area_move_by_player, which is
+                   the LAST turn_area_movements entry's cause_player_id
+                   (core/game_state/mod.rs:1005-1008); the C stores cause_player_id
+                   as a player index, so the identity test is an index equality
+                   against the resolved condition player. */
+                int area_by = -1, area_id = rb_entry_snapshot_last_area_move_card_id(g);
+                if (g->n_turn_area_movements > 0) {
+                    const RbBatchMovement *last = &g->turn_area_movements[g->n_turn_area_movements - 1];
+                    if (area_id < 0) area_id = last->moved_card_id;
+                    area_by = last->cause_player_id;
+                }
+                area_ok = (area_id >= 0) && (area_by == pl);
+            }
+        }
+
+        /* state.rs:977 `let energy_ok = energy_placed.is_none_or(|_| { ... })`.
+           is_none_or is vacuously TRUE when the flag is absent, which is why
+           energy_ok starts at 1 and is only recomputed when the flag is present. */
+        int energy_ok = 1;
+        if (energy_placed >= 0) {
+            energy_ok = 0;
+            int energy_player = -1, seen_placement = 0;
+            /* :1002-1009 live_has / energy_val. Rust ORs a per-entry
+               snapshot_movements scan with this live scan; RbQueueEntry
+               (rabuka.h:1001-1041) carries trigger_moved_cards but NO movement
+               snapshot, so only the live half is representable here and energy_val
+               is evaluated over the live batch alone. */
+            for (int i = g->n_batch_movements - 1; i >= 0; i--) {
+                const RbBatchMovement *m = &g->batch_movements[i];
+                if (!moves_watched_placement(m, want_dest, want_zone)) continue;
+                energy_ok = 1;
+                if (!seen_placement) {             /* :1047-1057: MOST RECENT wins,
+                                                    so a mixed batch whose latest
+                                                    placement is opponent-caused
+                                                    must not satisfy the flag. */
+                    energy_player = m->cause_player_id;
+                    seen_placement = 1;
+                }
+            }
+            /* :1060 `energy_val && dest_ok && player_ok` */
+            if (energy_ok) {
+                int dest_ok = 0;
+                for (int i = 0; i < g->n_batch_movements && !dest_ok; i++)
+                    if (moves_dest_ok(&g->batch_movements[i], want_dest, want_zone)) dest_ok = 1;
+                energy_ok = dest_ok;
+            }
+            /* :1058-1059 player_ok — note the `unwrap_or(false)`, so an ABSENT
+               self_effect_only is already true here; only a present TRUE one
+               constrains the placer. */
+            if (energy_ok && self_effect_only) energy_ok = (energy_player == pl);
+        }
+
+        /* state.rs:1085-1089 the disambiguation, then the four-way verdict.
+           watches_area_move separates pure-energy texts (Ren bp7-005 ab#1, no move
+           language) from 〜か compounds (Sumire bp5-004 ab#0, either disjunct).
+
+           ON THE PEER PATCH'S TAUTOLOGY: it wrote
+               (energy_placed.is_none() && (self_effect_only.is_some() || 1))
+           where Rust (state.rs:1086-1088) writes
+               energy_placed.is_none() && (self_effect_only.is_some()
+                                           || condition.get_movement().unwrap_or("") == "moves")
+           The `|| 1` IS a tautology, but Rust's own disjunct it replaced is ALSO
+           constant-true: the arm is only ever entered through
+           `match condition.get_movement() { "moves" => ... }` (state.rs:864-917),
+           so `get_movement() == "moves"` cannot be false here. The peer line was
+           therefore VALUE-CORRECT and merely redundant — not a bug. It is written
+           here in the reduced, non-tautological form `energy_placed.is_none()`,
+           with the reason recorded so the dropped disjunct is not re-added. */
+        int has_area_check  = watches_area_move || (energy_placed < 0);
+        int has_energy_check = (energy_placed >= 0);
+        if (!has_area_check && !has_energy_check)      return 1;   /* :1094-1095 */
+        if (has_area_check && has_energy_check)        return (area_ok || energy_ok); /* :1096 */
+        if (has_area_check)                            return area_ok;             /* :1098 */
+        return energy_ok;                                                    /* :1100 */
     }
 
     int has_any = g->n_recently_moved > 0;
@@ -3584,10 +3779,49 @@ static int resolve_moved_cards_source(const struct GameState *g, int actor, cons
     }
     /* apply filters */
     int filtered = 0;
+    /* card.rs:1901-1909 — the per-candidate filter, verbatim:
+     *
+     *     let type_ok = card_type.is_empty()
+     *         || util::card_matches_type(card_db, cid, Some(card_type));
+     *     let has_bh = wants_blade_heart_prop
+     *         && card_db.get_card(cid).is_some_and(|c| c.has_blade_heart());
+     *     let bh_reject = wants_blade_heart_prop
+     *         && ((negate && has_bh) || (!negate && !has_bh));
+     *     if !type_ok || bh_reject { return false; }
+     *
+     * `bh_reject` is a PER-CARD rejection inside the filter, not a negation of
+     * the count — which is why card.rs:2013-2022 does NOT flip `passed` when
+     * wants_blade_heart_prop is set:
+     *     let result = if wants_blade_heart_prop { passed }   // already applied
+     *               else if negate { !passed } else { passed };
+     *
+     * The C had only `ctype` and `group` here. `card_property` and `negation`
+     * were dropped, so for a moved-card condition carrying
+     * card_property: has_blade_heart + negation (PL!N-pb1-009-R ab#0,
+     * 「このターン、ブレードハートを持たないメンバーカードが自分の
+     * ライブカード置き場から控え室に置かれている場合」) EVERY moved card passed
+     * and the count came out as the raw number that moved. With a blade-heart
+     * member leaving the live zone the C therefore drew a card and granted
+     * heart03/05/06; Rust filters that card out, count 0 >= 1 fails, and the
+     * ability stays silent.
+     *
+     * check_card_property is NOT the right helper here: it applies `negation`
+     * to the ZONE's verdict (card.rs:3117-3124) rather than rejecting a single
+     * candidate, which is the different rule. The per-card form below matches
+     * card.rs:1903-1906 exactly. */
+    const char *mprop = get_str(c, "card_property");
+    int mneg = 0; get_bool(c, "negation", &mneg);
     for (int i = 0; i < n && filtered < max; i++) {
         int cid = ids[i];
         if (ctype && !card_matches_card_type_filter(cid, ctype)) continue;
         if (group && !rb_card_matches_group_str(cid, group)) continue;
+        if (mprop && !strcmp(mprop, "has_blade_heart")) {
+            Card cc;
+            int decoded = rb_decode_card_by_index((uint32_t)cid, &cc);
+            int has_bh = decoded ? rb_card_has_blade_heart(&cc) : 0;
+            if (decoded) rb_free_card(&cc);
+            if ((mneg && has_bh) || (!mneg && !has_bh)) continue;
+        }
         if (dst && *dst) {
             int destination_ids[RB_MAX_ZONE];
             int destination_n = zone_ids(g, pl, dst, destination_ids, RB_MAX_ZONE);
@@ -3731,10 +3965,43 @@ static int count_for_player_target(const GameState *g, int actor, int pl, const 
     return zone_len_impl(g, pl, location);
 }
 
-/* ── get_count_for_target: count for a specific target player ── */
+/* ── get_count_for_target: count for a specific target player ──
+ * Mirror engine/src/ability/condition/card.rs:4410-4436
+ * `get_count_for_target(&self, condition, target)`.
+ *
+ * TWO things that body does that the C did not, and both were live defects:
+ *
+ * 1. `if resource_type == Some("energy") { return player.energy_zone.cards.len() }`
+ *    is the FIRST statement (card.rs:4414-4417). It is keyed on
+ *    `resource_type`, NOT on `comparison_type`, and it returns the ENERGY-ZONE
+ *    LENGTH. The C had no such arm: it forwarded to count_for_player_target,
+ *    which only knows `comparison_type == "energy"`, so a condition carrying
+ *    `resource_type: "energy"` with NO `comparison_type` and NO `location`
+ *    fell through to zone_len_impl(.., NULL), which returns 0.
+ *
+ * 2. The player comes from the `target` ARGUMENT via
+ *    `resolve_condition_player(target)` (card.rs:47-65, :4415/:4418) — the
+ *    condition's own `target` field is NOT consulted here. The C called
+ *    target_player_idx(actor, c), which reads `target` (falling back to
+ *    `scope`) off the CONDITION, and only overrode it when the argument was
+ *    literally "opponent". So a call with target == "self" on a condition
+ *    whose `target` field says "opponent" counted the OPPONENT.
+ *
+ * Together those two are the whole of PL!S-bp6-022-L ab#0
+ * 「相手のエネルギーが自分より多い場合」, whose wire fields are
+ * target=opponent / resource_type=energy / operator=">" /
+ * comparison_target=self (verified by decoding the card, not by reading the
+ * text). Rust counts the opponent's energy as `count` and self's as the
+ * threshold, so 3 > 1 passes and 2 > 2 FAILS. The C computed
+ * threshold = zone_len_impl(.., NULL) = 0, so `count > 0` was true at a tie
+ * and the card scored on equal energy. */
 static int get_count_for_target(const GameState *g, int actor, const Condition *c, const char *target) {
-    int pl = target_player_idx(actor, c);
-    if (target && !strcmp(target, "opponent")) pl = actor ^ 1;
+    /* card.rs:4415 / :4418 — resolve_condition_player(target): the ARGUMENT
+     * decides the seat. "opponent" is the other one; anything else (including
+     * "both" and NULL) is the self seat, which `actor` already is. */
+    int pl = (target && !strcmp(target, "opponent")) ? (actor ^ 1) : actor;
+    const char *rt = get_str(c, "resource_type");
+    if (rt && !strcmp(rt, "energy")) return g->p[pl].energy.n;
     const char *loc = get_str(c, "location");
     const char *ct = get_str(c, "comparison_type");
     return count_for_player_target(g, actor, pl, loc, ct);
@@ -4029,7 +4296,7 @@ static int get_group_card_count(const struct GameState *g, int actor, const Cond
 }
 
 /* ── evaluate_resource_condition: resource counting conditions ── */
-/* Mirror Card::total_hearts (core/card.rs:4263-4271): base_heart.values_sum()
+/* Mirror Card::total_hearts (core/card.rs:4453-4461): base_heart.values_sum()
    when the card prints base hearts, else need_heart.values_sum(). A card that
    prints neither contributes 0 — the previous port returned -1 here and every
    aggregate added it unchecked, so one heartless member made the running total

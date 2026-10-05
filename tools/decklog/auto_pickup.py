@@ -7,6 +7,7 @@ analysis. Nothing here needs a browser or a login.
 
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -47,13 +48,22 @@ def candidate_files():
     return out
 
 
-def best_candidate():
+def best_candidate(min_codes):
+    """Newest qualifying code file.
+
+    A bare codes.txt is the final artefact the script writes on DONE, so it always
+    qualifies. Partial checkpoints only qualify once they pass min_codes - otherwise an
+    old checkpoint sitting in Downloads gets picked up and the watcher declares victory
+    on a fraction of the corpus.
+    """
     cands = candidate_files()
     if not cands:
         return None
-    # most codes wins; ties broken by newest
     cands.sort(key=lambda t: (t[0], t[1]), reverse=True)
-    return cands[0]
+    for n, mtime, p in cands:
+        if p.name == "codes.txt" or n >= min_codes:
+            return n, mtime, p
+    return None
 
 
 def merge_codes(src):
@@ -124,33 +134,29 @@ def run(script, *args):
 
 
 def main():
-    log("waiting for the browser harvest to produce codes")
-    idle_notice = 0
+    min_codes = int(os.environ.get("MIN_CODES", "30000"))
+    processed = 0
+    log(f"waiting for the browser harvest (need codes.txt, or >={min_codes:,} codes)")
     while True:
-        best = best_candidate()
-        if best and best[0] > 0:
-            log(f"found {best[2].name} with {best[0]} codes")
+        best = best_candidate(min_codes)
+        if best and best[0] > processed:
+            n = best[0]
+            log(f"found {best[2].name} with {n:,} codes")
             total = merge_codes(best[2])
             pick_meta()
-            if total < 100:
-                log("that is suspiciously small; waiting for a better file")
-                time.sleep(60)
-                continue
-            break
-        idle_notice += 1
-        if idle_notice % 20 == 0:
-            log("still waiting for codes.txt in Downloads ...")
+            processed = total
+            log(f"starting the card phase for {total:,} codes")
+            run("harvest_all.py", "--skip-codes", "--workers", "8")
+            log("running the analysis")
+            p = subprocess.run([str(PY), str(HERE / "analyze_combos.py"),
+                                "--owners", str(HERE / "search_meta.jsonl")],
+                               cwd=str(REPO))
+            log(f"analysis exited {p.returncode}")
+            log(f"ROUND COMPLETE for {total:,} codes - going back to waiting "
+                f"for a larger harvest")
+            time.sleep(60)
+            continue
         time.sleep(30)
-
-    log(f"starting the card phase for {total} codes")
-    run("harvest_all.py", "--skip-codes", "--workers", "8")
-
-    log("running the analysis")
-    p = subprocess.run([str(PY), str(HERE / "analyze_combos.py"),
-                        "--owners", str(HERE / "search_meta.jsonl")],
-                       cwd=str(REPO))
-    log(f"analysis exited {p.returncode}")
-    log("DONE - cards, HTML and analysis are in tools/decklog/")
 
 
 if __name__ == "__main__":

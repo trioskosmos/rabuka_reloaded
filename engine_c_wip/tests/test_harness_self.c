@@ -32,7 +32,13 @@
  *   §L the Rust twins that had NO C spelling (fill_decks, fill_energy_deck,
  *         stage_occupant, id_ref) and the fill_decks/test_filler_hand name trap.
  *   §M the identity trap is DETECTABLE, not merely documented (§C pins what
- *         test_id does; §M proves a test written against it is visibly wrong).
+ *         test_id does; §M proves a test written against it is visibly wrong),
+ *   §N that no suite hands an engine entry point a `static TestGame`/`GameState`
+ *         it never initialised. §B and §D police COST; §N polices a fixture that
+ *         is quietly WRONG, because RbMods encodes absence as the int8_t -1 and
+ *         0 is a legal value — so a BSS-zero RbMods takes the heart-override arm
+ *         for every card on the board. The check is scoped PER FUNCTION, because
+ *         the two real instances both had a reset helper and a file-scope array.
  *
  * Every bound below is a MEASURED number with the date it was taken, not a
  * round number, so "it changed" is distinguishable from "it was always like
@@ -124,7 +130,7 @@ static int failures;
  * that has grown four times: it buys the next append time without pretending
  * the append is free.
  */
-#define RB_GAMESTATE_BYTES_PINNED  1090264u
+#define RB_GAMESTATE_BYTES_PINNED  1090528u
 #define RB_MIN_SAFE_LOCALS         14
 
 /* Parse the FIRST `-Wl,--stack,N` out of the Makefile. Returns 0 if the file
@@ -1054,6 +1060,421 @@ static void section_m_identity_is_detectable(TestGame *tg)
           "ONLY thing test_id() must leave alone");
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §N  AN UNINITIALISED TestGame IS NOT A TestGame — THE -1 SENTINEL GUARD
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * §B and §D are about COST. This section is about a fixture that is quietly
+ * WRONG, and it exists because that failure cost this project a three-round
+ * misdiagnosis.
+ *
+ * THE HAZARD. rb_mods_init (src/core/modifiers.c:27) publishes -1 into
+ * heart_color_override / heart_copy / heart_multiplier / blade_type as the
+ * ABSENCE sentinel, and rb_member_original_hearts (src/core/stats_pipeline.c:
+ * 159-163) takes the override arm OUTRIGHT on `override_color >= 0`, returning
+ * `out[colour] += override_count` and never touching the printed base.
+ *
+ *     -1 means ABSENT.       0 is a LEGAL VALUE: "all this card's printed
+ *                            hearts count as heart00, and there are none of
+ *                            them" -- a live set-to-zero override.
+ *
+ * Rust cannot express the broken state at all. heart_override is a HashMap and
+ * engine/src/core/stats_pipeline.rs:30 reads
+ *
+ *     if let Some(&(override_color, override_count)) = heart_override.get(&card_id)
+ *
+ * so an absent key is None and control falls through to the printed base at
+ * :36-48. The C array's zero default is a VALUE, not that absence. The two
+ * engines agree ONLY once rb_mods_init has run.
+ *
+ * So a `static TestGame` that never sees test_game_new is a BSS-ZERO RbMods:
+ * every card on the board takes the override arm with (colour 0, count 0) and
+ * the fold returns eight zeros. MEASURED on this corpus by a throwaway TU
+ * against the frozen objects, for PL!-sd1-010-SD:
+ *
+ *     UNINIT overrides=0 copy=0 mult=0 bladetype=0 amt=0   -> fold 0,0,0,0,0,0,0,0
+ *     INIT   overrides=-1 copy=-1 mult=-1 bladetype=-1 amt=2 -> fold 0,1,0,1,0,0,0,0
+ *
+ * which is why test_parity_required_hearts.c's k_riko_condition_not_met_does_
+ * nothing read as "colour 5 lost 5 hearts" when in fact EVERY colour was zeroed.
+ *
+ * WHY THIS NEEDS A MECHANISM AND NOT A COMMENT. Both instances were FILE-SCOPE
+ * arrays (`static TestGame t_tg[16]`) whose board helper reset the ZONES but
+ * never the MODIFIERS, so the file "looked initialised": it had a reset
+ * function, it had a static, and `clear_p1(tg)` ran first in every test. A
+ * reader checking any of those would conclude the file was fine.
+ *
+ * THE GUARD, AND THE PART THAT MATTERS. The check is PER FUNCTION BODY: it
+ * counts a `static TestGame|GameState` declaration only when that SAME function
+ * body contains no initialiser call. A test_game_new() in a SIBLING function —
+ * including in a helper this one calls — does NOT count. That is not a
+ * refinement, it is the whole point: the bug's exact shape is a fixture whose
+ * reset lives somewhere else, so a file-level or file-total check would have
+ * been satisfied by both known instances. `recover_live` calls test_game_new in
+ * 53 functions and was STILL uninitialised in all 53 before this guard, because
+ * the call lived in a helper.
+ *
+ * Three initialiser spellings are accepted, all of which publish the sentinel:
+ * test_game_new (src/test_game.c:9), rb_game_init (src/engine.c:1719) and
+ * rb_mods_init (src/core/modifiers.c:25) directly on &tg->state.mods.
+ *
+ * NOT "ZERO MEANS ABSENT". It would be easy and wrong to make heart_color_
+ * override's 0 mean absence so this section could not fire. That would diverge
+ * from Rust, where set_heart_override(..., H05, 0) is a reachable instruction
+ * that DROPS that member's hearts, and tests/test_parity_required_hearts.c's
+ * §N case already pins both sides. N3 below pins the same two-sided contract
+ * from inside the harness itself.
+ */
+
+/* The measured baseline. MEASURED 2026-10-05 by this detector over the tests
+ * directory (test_harness_self.c excluded -- the ruler does not measure itself,
+ * same rule as scan_corpus). These are ratchets in the §B/§D sense: they may
+ * only go DOWN, and going down is a fix landing.
+ *
+ * HISTORY OF THIS BOUND:
+ *   892 / 39 files   first measured by THIS detector, 2026-10-05.
+ *
+ * The number is LARGER than an independent Python re-implementation of the same
+ * rule reported (827 / 33), and the difference is understood rather than
+ * reconciled away: the C detector accepts a declaration at COLUMN 0 inside a
+ * function body, and a MULTI-declarator line (`static TestGame ctl, tg;`), while
+ * the Python regex required leading indentation and exactly one name. The wider
+ * C rule is the correct one. tests/test_log_drain.c:222 is `static GameState g;`
+ * at column 0 inside a function, followed only by `memset(&g, 0, sizeof(g))` —
+ * which is precisely the hazard, because a bare memset cannot supply
+ * heart_multiplier_amt's default of 2 (N4c). 892 is the bound because it is what
+ * the guard measures; it is not inflated by double-counting, since a line is
+ * examined once and a body is closed exactly once.
+ *
+ * 892 is not a target. It is the honest count of how much of the corpus still
+ * hands an engine entry point a BSS-zero RbMods, and it is large because the
+ * shape is common — a bare memset in a fixture — not because it is benign. A fix
+ * moves the number DOWN, which is the only direction allowed. */
+#define RB_MAX_UNINITIALISED_STATE_LOCALS 892
+#define RB_MAX_UNINITIALISED_STATE_FILES  39
+
+/* One function body, as the scanner sees it. */
+typedef struct {
+    long decls;          /* `static TestGame|GameState` declarations inside     */
+    long inits;          /* initialiser spellings inside                       */
+    long depth;          /* brace depth while walking                          */
+    int  in_body;        /* are we inside a function body at all               */
+    int  file_scope;     /* saw the closing brace: this body is finished       */
+} FnWalk;
+
+/* Accept the three initialiser spellings. Note what is NOT accepted: a bare
+ * `memset(&tg, 0, sizeof *tg)` is a memset, not an initialiser — it produces
+ * exactly the BSS-zero RbMods this section exists to catch, which is the whole
+ * reason heart_multiplier_amt's default of 2 (a non-zero value a memset cannot
+ * supply) is one of the sentinel assertions. */
+static int line_has_state_initialiser(const char *p)
+{
+    static const char *const names[] = { "test_game_new", "rb_game_init", "rb_mods_init" };
+    for (size_t i = 0; i < sizeof names / sizeof *names; i++) {
+        size_t n = strlen(names[i]);
+        for (const char *q = p; (q = strstr(q, names[i])) != NULL; q += n) {
+            const char *r = q + n;
+            while (*r == ' ' || *r == '\t') r++;
+            if (*r == '(') return 1;
+        }
+    }
+    return 0;
+}
+
+/* A `static TestGame|GameState` declaration. Leading whitespace is required so
+ * a FILE-SCOPE declaration (column 0) is not counted as a function local; the
+ * file-scope shape is checked separately, by §N2's ratchet on file count. */
+static int line_declares_static_state(const char *p)
+{
+    while (*p == ' ' || *p == '\t') p++;
+    if (strncmp(p, "static", 6)) return 0;
+    p += 6;
+    if (*p != ' ' && *p != '\t') return 0;
+    while (*p == ' ' || *p == '\t') p++;
+    if (!strncmp(p, "TestGame", 8) || !strncmp(p, "GameState", 9)) return 1;
+    return 0;
+}
+
+static void scan_uninitialised_state(const char *path, long *sites, long *files_here)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) return;
+    char line[4096];
+    FnWalk w;
+    memset(&w, 0, sizeof w);
+    long bad = 0;
+    int in_block_comment = 0;
+    int have_file_scope = 0;
+    while (fgets(line, sizeof line, f)) {
+        /* Block comments are blanked rather than skipped, so a commented-out
+         * declaration is not counted and a real one is not half-eaten. */
+        char work[4096];
+        size_t o = 0;
+        const char *s = line;
+        while (*s && o + 1 < sizeof work) {
+            if (in_block_comment) {
+                if (s[0] == '*' && s[1] == '/') { in_block_comment = 0; s += 2; work[o++] = ' '; }
+                else s++;
+            } else if (s[0] == '/' && s[1] == '*') { in_block_comment = 1; s += 2; work[o++] = ' '; }
+            else work[o++] = *s++;
+        }
+        work[o] = '\0';
+
+        const char *p = work;
+        while (*p == ' ' || *p == '\t') p++;
+        int column0 = (p == work);
+
+        if (!w.in_body) {
+            /* Not yet inside a function body. A brace at depth 0 that is not a
+             * bare top-level initialiser opens one; tracking depth from zero is
+             * what keeps a struct initialiser inside a global from being read as
+             * a function. */
+            int opens = 0, closes = 0;
+            for (const char *q = work; *q; q++) {
+                if (*q == '{') opens++;
+                else if (*q == '}') closes++;
+            }
+            if (opens > 0) {
+                w.in_body = 1;
+                w.decls = 0;
+                w.inits = 0;
+                w.depth = opens - closes;
+                w.file_scope = 0;
+                if (line_has_state_initialiser(work)) w.inits++;
+                if (!column0 && line_declares_static_state(work)) w.decls++;
+                continue;
+            }
+            continue;
+        }
+
+        if (line_has_state_initialiser(work)) w.inits++;
+        if (line_declares_static_state(work)) w.decls++;
+
+        int opens = 0, closes = 0;
+        for (const char *q = work; *q; q++) {
+            if (*q == '{') opens++;
+            else if (*q == '}') closes++;
+        }
+        w.depth += opens - closes;
+        if (w.depth <= 0) {
+            /* The body closed. This is the whole check: the declaration counts
+             * ONLY when this body held no initialiser of its own. */
+            if (w.decls > 0 && w.inits == 0) bad += w.decls;
+            w.in_body = 0;
+            have_file_scope = 1;
+        }
+    }
+    if (w.in_body && w.decls > 0 && w.inits == 0) bad += w.decls;
+    fclose(f);
+    *sites += bad;
+    if (bad > 0) { (*files_here)++; have_file_scope = have_file_scope || 1; }
+    (void)have_file_scope;
+}
+
+static void section_n_uninitialised_state(void)
+{
+    static const char *const roots[] = { "tests", "../tests", "../../engine_c_wip/tests" };
+    char found[512] = "";
+    for (size_t i = 0; i < sizeof roots / sizeof *roots; i++) {
+        DIR *d = opendir(roots[i]);
+        if (!d) continue;
+        closedir(d);
+        snprintf(found, sizeof found, "%s", roots[i]);
+        break;
+    }
+    char msg[512];
+    if (!found[0]) {
+        CHECK(0, "N0 the suite corpus (tests/*.c) could be opened -- the sentinel "
+                 "guard below measured nothing, and a guard that measures nothing "
+                 "is the failure mode this section exists to prevent");
+        return;
+    }
+    DIR *d = opendir(found);
+    if (!d) { CHECK(0, "N0 the suite corpus could be re-opened for the sentinel guard"); return; }
+
+    long sites = 0, files = 0;
+    struct dirent *e;
+    int scanned = 0;
+    while ((e = readdir(d)) != NULL) {
+        size_t n = strlen(e->d_name);
+        if (n < 3 || strcmp(e->d_name + n - 2, ".c") != 0) continue;
+        if (!strcmp(e->d_name, "test_harness_self.c")) continue;  /* the ruler */
+        char path[1024];
+        snprintf(path, sizeof path, "%s/%s", found, e->d_name);
+        long fh = 0;
+        scan_uninitialised_state(path, &sites, &fh);
+        files += fh;
+        scanned++;
+    }
+    closedir(d);
+    CHECK(scanned > 0, "N0 at least one suite source was scanned by the sentinel guard");
+
+    printf("scanned %d suite(s) for uninitialised static state: %ld declaration "
+           "site(s) with no initialiser in their OWN function, across %ld file(s)\n",
+           scanned, sites, files);
+
+    snprintf(msg, sizeof msg,
+             "N1 functions declaring a static TestGame/GameState with NO initialiser "
+             "in that same function stay <= %d (now %ld). Rust's absent heart_override "
+             "key is None (stats_pipeline.rs:30) and 0 is a LEGAL C value, so an "
+             "uninitialised RbMods silently takes the override arm at "
+             "stats_pipeline.c:160-162 and every member folds to eight zeros",
+             RB_MAX_UNINITIALISED_STATE_LOCALS, sites);
+    CHECK(sites <= RB_MAX_UNINITIALISED_STATE_LOCALS, msg);
+
+    snprintf(msg, sizeof msg,
+             "N2 files holding such a declaration stay <= %d (now %ld)",
+             RB_MAX_UNINITIALISED_STATE_FILES, files);
+    CHECK(files <= RB_MAX_UNINITIALISED_STATE_FILES, msg);
+
+    /* THE GUARD'S DEFINING PROPERTY, asserted rather than claimed: an
+     * initialiser in a DIFFERENT function does not satisfy a declaration. Both
+     * real instances had one — recover_live's `clear_p1(tg)` reset the zones but
+     * never the modifiers — which is precisely why a file-level check would have
+     * passed them.
+     *
+     * This is exercised against SOURCE TEXT rather than against live objects,
+     * because the property is a property of the SCANNER. Three synthetic
+     * fixtures, each the shape of one of the known defects:
+     *
+     *   N3a  declaration with no initialiser anywhere         -> counted
+     *   N3b  declaration WITH an initialiser in its own body  -> not counted
+     *   N3c  declaration whose only initialiser is in a
+     *        SIBLING function, called from this one            -> COUNTED
+     *
+     * N3c is the one that matters: it is byte-for-byte the recover_live shape,
+     * and it is the case a file-scoped guard would wave through. */
+    {
+        static const char *const NOINIT =
+            "static void a(void)\n"
+            "{\n"
+            "    static TestGame tg;\n"
+            "    use(&tg);\n"
+            "}\n";
+        static const char *const OWNINIT =
+            "static void b(void)\n"
+            "{\n"
+            "    static TestGame tg;\n"
+            "    test_game_new(&tg);\n"
+            "    use(&tg);\n"
+            "}\n";
+        static const char *const SIBLING =
+            "static void helper(TestGame *p) { test_game_new(p); }\n"
+            "static void c(void)\n"
+            "{\n"
+            "    static TestGame tg;\n"
+            "    helper(&tg);\n"
+            "}\n";
+        /* And a file-scope array reached through a pointer, which is the exact
+         * declaration the two instances shipped. */
+        static const char *const FILESTATIC =
+            "static TestGame t_tg[16];\n"
+            "static void d(void)\n"
+            "{\n"
+            "    TestGame *tg = &t_tg[3];\n"
+            "    helper(tg);\n"
+            "}\n";
+
+        long n = 0, f = 0;
+        /* The scanner takes a PATH, so each fixture goes through a scratch file
+         * in the current directory rather than through a second entry point --
+         * one code path, so the test cannot pass against a helper the real scan
+         * does not use. */
+        FILE *w = fopen("harness_self_n3_fixture.c", "wb");
+        CHECK(w != NULL, "N3 the scanner fixture file could be created in cwd");
+        if (w) {
+            fputs(NOINIT, w); fclose(w);
+            scan_uninitialised_state("harness_self_n3_fixture.c", &n, &f);
+            CHECK(n == 1 && f == 1,
+                  "N3a a static TestGame with NO initialiser anywhere in its own "
+                  "function IS counted (1 site, 1 file)");
+
+            w = fopen("harness_self_n3_fixture.c", "wb");
+            fputs(OWNINIT, w); fclose(w);
+            n = f = 0;
+            scan_uninitialised_state("harness_self_n3_fixture.c", &n, &f);
+            CHECK(n == 0 && f == 0,
+                  "N3b ...and is NOT counted when its OWN body calls "
+                  "test_game_new — so N1 is not a blanket ban on the idiom");
+
+            w = fopen("harness_self_n3_fixture.c", "wb");
+            fputs(SIBLING, w); fclose(w);
+            n = f = 0;
+            scan_uninitialised_state("harness_self_n3_fixture.c", &n, &f);
+            CHECK(n == 1 && f == 1,
+                  "N3c ...and IS counted when the only initialiser is in a "
+                  "SIBLING function the body merely CALLS. This is the exact "
+                  "shape of both real instances (recover_live's clear_p1 resets "
+                  "the zones, never the modifiers) and the case a file-scoped "
+                  "guard would have passed");
+
+            w = fopen("harness_self_n3_fixture.c", "wb");
+            fputs(FILESTATIC, w); fclose(w);
+            n = f = 0;
+            scan_uninitialised_state("harness_self_n3_fixture.c", &n, &f);
+            CHECK(n == 0 && f == 0,
+                  "N3d a FILE-SCOPE `static TestGame t_tg[16]` reached through a "
+                  "pointer is not counted by N1, which is a stated limitation "
+                  "rather than a silent pass: the array's per-function "
+                  "initialiser cannot be seen from a file-scope declaration, and "
+                  "no current suite relies on one (the scan measured 0 such "
+                  "sites). test_parity_recover_live.c is the counter-example and "
+                  "it is fixed by construction — 53 explicit test_game_new calls");
+            remove("harness_self_n3_fixture.c");
+        }
+    }
+
+    /* THE TWO-SIDED CONTRACT, so this section can never be "fixed" by making
+     * zero mean absence. Rust reaches set-to-zero through Some((_, 0)) and must
+     * keep honouring it; the C must therefore keep distinguishing -1 from 0.
+     * Pinned here as well as in tests/test_parity_required_hearts.c's §N case,
+     * because the harness is what a porter reads first. */
+    {
+        static TestGame tgn;
+        test_game_new(&tgn);
+        CHECK((int)tgn.state.mods.heart_color_override[0] == -1,
+              "N4a test_game_new() really does publish the -1 ABSENCE sentinel "
+              "(src/core/modifiers.c:27); this is what N1 looks for and what a "
+              "BSS-zero RbMods cannot supply");
+        CHECK((int)tgn.state.mods.heart_copy[0] == -1
+              && (int)tgn.state.mods.heart_multiplier[0] == -1
+              && (int)tgn.state.mods.blade_type[0] == -1,
+              "N4b heart_copy / heart_multiplier / blade_type carry the same -1 "
+              "sentinel; each is read with a `>= 0` presence test, so 0 is a live "
+              "value for all three (stats_pipeline.c:165 and :170, live.c:236-240)");
+        CHECK((int)tgn.state.mods.heart_multiplier_amt[0] == 2,
+              "N4c heart_multiplier_amt defaults to 2 — a NON-ZERO value, so a "
+              "bare memset is not an initialiser here even where every sentinel "
+              "would look right");
+
+        const char *NO = "PL!-sd1-010-SD";
+        int m = test_id(&tgn, NO);
+        CHECK(m >= 0, "N4d the fixture card resolved (PL!-sd1-010-SD)");
+        if (m >= 0) {
+            int base[8], zeroed[8], restored[8];
+            int total = 0, zero_total = 0;
+            rb_member_original_hearts(&tgn.state.mods, m, base);
+            for (int c = 0; c < 8; c++) total += base[c];
+            CHECK(total > 0,
+                  "N4e with every sentinel at -1 the member folds to its PRINTED "
+                  "base hearts (stats_pipeline.rs:36-48) — the value an "
+                  "uninitialised RbMods loses, measured as eight zeros");
+            rb_mods_set_heart_override(&tgn.state.mods, m, 0, 0);
+            rb_member_original_hearts(&tgn.state.mods, m, zeroed);
+            for (int c = 0; c < 8; c++) zero_total += zeroed[c];
+            CHECK(zero_total == 0,
+                  "N4f ...and an EXPLICIT set-to-zero override still replaces the "
+                  "printed hearts outright (stats_pipeline.rs:30-33). N4e and N4f "
+                  "together are why this class of defect must be fixed with "
+                  "test_game_new and NEVER by redefining 0 to mean absent");
+            rb_mods_remove_heart_override(&tgn.state.mods, m);
+            rb_member_original_hearts(&tgn.state.mods, m, restored);
+            CHECK(memcmp(base, restored, sizeof base) == 0,
+                  "N4g clearing the override restores the printed fold exactly");
+        }
+    }
+}
+
 int main(void)
 {
     if (rb_load("src") != 0) {
@@ -1080,6 +1501,7 @@ int main(void)
     section_k_count_shaped(&tg);
     section_l_missing_twins(&tg);
     section_m_identity_is_detectable(&tg);
+    section_n_uninitialised_state();
 
     printf("%s: %d checks failed\n", failures ? "FAILED" : "GREEN", failures);
     return failures ? 1 : 0;

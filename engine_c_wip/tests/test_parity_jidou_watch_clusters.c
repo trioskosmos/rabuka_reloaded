@@ -2188,14 +2188,21 @@ static int q167_energy_after(int use_qualifying_partner, int *out_played)
                   "print the SAME cost, or the two boards differ by their play cost as "
                   "well as by the ability and the comparison below is meaningless "
                   "(qualifying %d, non-qualifying %d)", cq, cn);
-            /* U+8FF1 ren U+30CE no U+7A7A kuu = E8 BF 91 E3 83 8E E7 A9 BA. This is
+            /* U+84EE ren U+30CE no U+7A7A kuu = E8 93 AE E3 83 8E E7 A9 BA. This is
              * the group's CANONICAL name in the C data (card.c maps the printed
-             * series onto it), so the romanisation is NOT accepted here. */
-            CHECK(rb_card_matches_group_str(replacer, "\xE8\xBF\x91\xE3\x83\x8E\xE7\xA9\xBA") !=
-                  (other >= 0 && rb_card_matches_group_str(other, "\xE8\xBF\x91\xE3\x83\x8E\xE7\xA9\xBA")),
+             * series onto it), so the romanisation is NOT accepted here.
+             *
+             * These three literals were E8 BF 91 (U+8FD1), which occurs NOWHERE
+             * in cards/cards.json or in engine/src/*.rs. src/core/card.c:374 and
+             * engine/src/core/card.rs map_series_to_group both return U+84EE
+             * (E8 93 AE), so rb_card_matches_group_str(replacer, ...) was always
+             * 0: the second precondition compared 0 != 0 and the third asserted
+             * a falsehood. */
+            CHECK(rb_card_matches_group_str(replacer, "\xE8\x93\xAE\xE3\x83\x8E\xE7\xA9\xBA") !=
+                  (other >= 0 && rb_card_matches_group_str(other, "\xE8\x93\xAE\xE3\x83\x8E\xE7\xA9\xBA")),
                   "D2 PRECONDITION: the two partners must differ on the printed group, "
                   "which is the only difference between the boards");
-            CHECK(rb_card_matches_group_str(replacer, "\xE8\xBF\x91\xE3\x83\x8E\xE7\xA9\xBA"),
+            CHECK(rb_card_matches_group_str(replacer, "\xE8\x93\xAE\xE3\x83\x8E\xE7\xA9\xBA"),
                   "D2 PRECONDITION: the qualifying partner really is inside the printed "
                   "group -- without this the board is not qualifying at all and the "
                   "Q167 delta below measures nothing");

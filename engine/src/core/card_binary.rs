@@ -403,6 +403,21 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
         .map(|(id, _)| *id)
         .collect();
 
+    // Same type bits as the JSON loader — see `CardDatabase::index_card_types`. Built
+    // BEFORE the struct literal because it reads `card_no_to_id`, which is moved in
+    // below; `Card` carries no id field, so the id comes from that map.
+    let mut live_ids: Vec<bool> = Vec::new();
+    let mut energy_ids: Vec<bool> = Vec::new();
+    for (&id, card) in cards.iter() {
+        let i = (id.max(0)) as usize;
+        if i >= live_ids.len() {
+            live_ids.resize(i + 1, false);
+            energy_ids.resize(i + 1, false);
+        }
+        live_ids[i] = card.is_live();
+        energy_ids[i] = card.is_energy();
+    }
+
     super::card::CardDatabase {
         normalized_no_to_id: card_no_to_id
             .keys()
@@ -413,6 +428,8 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
         auto_abilities,
         constant_cards,
         next_id,
+        live_ids,
+        energy_ids,
     }
 }
 

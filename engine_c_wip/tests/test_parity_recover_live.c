@@ -156,6 +156,10 @@ static const char *current_test = "(none)";
 static TestGame t_tg[16];
 static TestGame t_tg_n[5];   /* the N defect pins use their own slots */
 
+/* N6 uses its own slot so it cannot perturb an N1..N5 board, and so a red N6
+ * is attributable to the sentinel rather than to a neighbour's leftovers. */
+static TestGame t_tg_n6;
+
 static void on_fatal_signal(int sig)
 {
     fprintf(stderr,
@@ -651,6 +655,7 @@ static void dump_abilities(int cid, const char *tag)
 static void test_a_mei_debut_counts_total_energy_not_active(void)
 {
     TestGame *tg = &t_tg[0];
+    test_game_new(tg);
     clear_p1(tg);
     int card = mid(tg, MEI_13);
     int filler = mid(tg, FILLER_MUS);
@@ -686,6 +691,7 @@ static void test_a_mei_debut_counts_total_energy_not_active(void)
 static void test_a_mei_no_retrieve_when_total_below_11(void)
 {
     TestGame *tg = &t_tg[1];
+    test_game_new(tg);
     clear_p1(tg);
     int card = mid(tg, MEI_13);
     int filler = mid(tg, FILLER_MUS);
@@ -768,6 +774,7 @@ static void test_a_mei_no_retrieve_when_total_below_11(void)
 static void test_a_mei_noop_when_waitroom_has_no_live_card(void)
 {
     TestGame *tg = &t_tg[2];
+    test_game_new(tg);
     clear_p1(tg);
     int card = mid(tg, MEI_13);
     int filler = mid(tg, FILLER_MUS);
@@ -832,6 +839,7 @@ static void mari_board(TestGame *tg, int active, int *out_mari,
 static void test_b_recovers_high_score_aqours_live_and_activates_four(void)
 {
     TestGame *tg = &t_tg[3];
+    test_game_new(tg);
     clear_p1(tg);
     int mari, aq_high, niji_low;
     mari_board(tg, 2, &mari, &aq_high, &niji_low);
@@ -855,6 +863,7 @@ static void test_b_recovers_high_score_aqours_live_and_activates_four(void)
 static void test_b_wrong_group_live_skips_energy_activation(void)
 {
     TestGame *tg = &t_tg[4];
+    test_game_new(tg);
     clear_p1(tg);
     int mari, aq_high, niji_low;
     mari_board(tg, 2, &mari, &aq_high, &niji_low);
@@ -877,6 +886,7 @@ static void test_b_wrong_group_live_skips_energy_activation(void)
 static void test_b_aqours_live_below_six_skips_activation(void)
 {
     TestGame *tg = &t_tg[5];
+    test_game_new(tg);
     clear_p1(tg);
     int mari, aq_high, niji_low;
     mari_board(tg, 2, &mari, &aq_high, &niji_low);
@@ -914,6 +924,7 @@ static void test_b_aqours_live_below_six_skips_activation(void)
 static void test_b_cost_paid_without_recoverable_live(void)
 {
     TestGame *tg = &t_tg[6];
+    test_game_new(tg);
     clear_p1(tg);
     int mari = mid(tg, MARI);
     pin_id(mari, MARI);
@@ -938,6 +949,7 @@ static void test_b_cost_paid_without_recoverable_live(void)
 static void test_b_recovery_is_mandatory_and_excludes_members(void)
 {
     TestGame *tg = &t_tg[7];
+    test_game_new(tg);
     clear_p1(tg);
     int mari, aq_high, niji_low;
     mari_board(tg, 2, &mari, &aq_high, &niji_low);
@@ -976,6 +988,7 @@ static void test_b_recovery_is_mandatory_and_excludes_members(void)
 static void test_b_recovered_live_activates_only_available_energy(void)
 {
     TestGame *tg = &t_tg[8];
+    test_game_new(tg);
     clear_p1(tg);
     int mari, aq_high, niji_low;
     mari_board(tg, 1, &mari, &aq_high, &niji_low);
@@ -1017,6 +1030,7 @@ static void hanano_setup(TestGame *tg, int *out_hanano)
 static void test_c_pay_2e_recovers_score3_live(void)
 {
     TestGame *tg = &t_tg[9];
+    test_game_new(tg);
     clear_p1(tg);
     int hanano;
     hanano_setup(tg, &hanano);
@@ -1048,6 +1062,7 @@ static void test_c_pay_2e_recovers_score3_live(void)
 static void test_c_recover_is_mandatory_once_cost_paid(void)
 {
     TestGame *tg = &t_tg[10];
+    test_game_new(tg);
     clear_p1(tg);
     int hanano;
     hanano_setup(tg, &hanano);
@@ -1070,6 +1085,7 @@ static void test_c_recover_is_mandatory_once_cost_paid(void)
 static void test_c_turn1_blocks_second_activation(void)
 {
     TestGame *tg = &t_tg[11];
+    test_game_new(tg);
     clear_p1(tg);
     int hanano;
     hanano_setup(tg, &hanano);
@@ -1107,6 +1123,7 @@ static void test_c_turn1_blocks_second_activation(void)
 static void test_c_insufficient_energy_no_recover(void)
 {
     TestGame *tg = &t_tg[12];
+    test_game_new(tg);
     clear_p1(tg);
     int hanano;
     hanano_setup(tg, &hanano);
@@ -1130,6 +1147,7 @@ static void test_c_insufficient_energy_no_recover(void)
 static void test_c_score7_live_is_not_recovered(void)
 {
     TestGame *tg = &t_tg[13];
+    test_game_new(tg);
     clear_p1(tg);
     int hanano;
     hanano_setup(tg, &hanano);
@@ -1173,6 +1191,7 @@ static void kinako_setup(TestGame *tg, int *out_me)
 static void test_d_kinako_recovers_liella_live(void)
 {
     TestGame *tg = &t_tg[14];
+    test_game_new(tg);
     clear_p1(tg);
     int me;
     kinako_setup(tg, &me);
@@ -1210,6 +1229,7 @@ static void test_d_kinako_recovers_liella_live(void)
 static void test_d_kinako_empty_hand_refused(void)
 {
     TestGame *tg = &t_tg[15];
+    test_game_new(tg);
     clear_p1(tg);
     int me;
     kinako_setup(tg, &me);
@@ -1233,6 +1253,7 @@ static void test_d_kinako_empty_hand_refused(void)
 static void test_d_kinako_no_liella_live_gains_nothing(void)
 {
     TestGame *tg = &t_tg[0];
+    test_game_new(tg);
     clear_p1(tg);
     int me;
     kinako_setup(tg, &me);
@@ -1274,6 +1295,7 @@ static void test_d_kinako_no_liella_live_gains_nothing(void)
 static void test_e_paid_three_energy_recovers_liella_live(void)
 {
     TestGame *tg = &t_tg[1];
+    test_game_new(tg);
     clear_p1(tg);
     int me = mid(tg, MEI_PB2);
     pin_id(me, MEI_PB2);
@@ -1303,6 +1325,7 @@ static void test_e_paid_three_energy_recovers_liella_live(void)
 static void test_e_unpayable_energy_keeps_live_in_waitroom(void)
 {
     TestGame *tg = &t_tg[2];
+    test_game_new(tg);
     clear_p1(tg);
     int me = mid(tg, MEI_PB2);
     pin_id(me, MEI_PB2);
@@ -1336,6 +1359,7 @@ static void test_e_unpayable_energy_keeps_live_in_waitroom(void)
 static void subunit_case(const char *me_no, const char *target_no, const char *group)
 {
     TestGame *tg = &t_tg[3];
+    test_game_new(tg);
     clear_p1(tg);
     int me = mid(tg, me_no);
     if (!pin_id(me, me_no)) return;
@@ -1391,6 +1415,7 @@ static void test_f_sp_pb2_021_recovers_kaleidoscore_card(void)
 static void test_f_5yncri5e_rejects_a_same_series_catChu_card(void)
 {
     TestGame *tg = &t_tg[4];
+    test_game_new(tg);
     clear_p1(tg);
     int me = mid(tg, SHIKISAMA);
     if (!pin_id(me, SHIKISAMA)) return;
@@ -1437,6 +1462,7 @@ typedef struct {
 static void ginko_setup(GinkoBoard *b, TestGame *tg, int live_count)
 {
     rb_card_copy_pool_reset();
+    test_game_new(tg);
     clear_p1(tg);
     b->tg = tg;
     b->ginko = mid(tg, GINKO);
@@ -1584,6 +1610,7 @@ static void test_g_ginko_two_waitroom_lives_do_not_offer_cost(void)
 static void test_h_seras_pays_two_energy_and_discards_to_recover(void)
 {
     TestGame *tg = &t_tg[8];
+    test_game_new(tg);
     clear_p1(tg);
     int me = mid(tg, SERAS);
     pin_id(me, SERAS);
@@ -1638,6 +1665,7 @@ static void test_h_seras_pays_two_energy_and_discards_to_recover(void)
 static void test_h_seras_decline_preserves_energy_hand_and_waitroom(void)
 {
     TestGame *tg = &t_tg[9];
+    test_game_new(tg);
     clear_p1(tg);
     int me = mid(tg, SERAS);
     pin_id(me, SERAS);
@@ -1666,6 +1694,7 @@ static void test_h_seras_decline_preserves_energy_hand_and_waitroom(void)
 static void test_h_seras_wrong_group_only_recovers_nothing(void)
 {
     TestGame *tg = &t_tg[10];
+    test_game_new(tg);
     clear_p1(tg);
     int me = mid(tg, SERAS);
     pin_id(me, SERAS);
@@ -1708,6 +1737,7 @@ static void test_h_seras_wrong_group_only_recovers_nothing(void)
 static void test_h_cl1002_accept_energy_retrieves_dollchestra(void)
 {
     TestGame *tg = &t_tg[11];
+    test_game_new(tg);
     clear_p1(tg);
     int me = mid(tg, SAYAKA_CL);
     pin_id(me, SAYAKA_CL);
@@ -1748,6 +1778,7 @@ static void test_h_cl1002_accept_energy_retrieves_dollchestra(void)
 static void test_h_cl1002_decline_stays_in_waitroom(void)
 {
     TestGame *tg = &t_tg[12];
+    test_game_new(tg);
     clear_p1(tg);
     int me = mid(tg, SAYAKA_CL);
     pin_id(me, SAYAKA_CL);
@@ -1776,6 +1807,7 @@ static void test_h_cl1002_decline_stays_in_waitroom(void)
 static void test_h_cl1008_self_to_waitroom_retrieves_hasunosora(void)
 {
     TestGame *tg = &t_tg[13];
+    test_game_new(tg);
     clear_p1(tg);
     int me = mid(tg, IZUMI);
     pin_id(me, IZUMI);
@@ -1806,6 +1838,7 @@ static void test_h_cl1008_self_to_waitroom_retrieves_hasunosora(void)
 static void test_i_success_score_nine_recovers_mus_live(void)
 {
     TestGame *tg = &t_tg[14];
+    test_game_new(tg);
     clear_p1(tg);
     int filler = mid(tg, FILLER_MUS);
     if (filler >= 0) fill_decks(tg, filler, 30);
@@ -1834,6 +1867,7 @@ static void test_i_success_score_nine_recovers_mus_live(void)
 static void test_i_empty_success_zone_does_not_recover_live(void)
 {
     TestGame *tg = &t_tg[15];
+    test_game_new(tg);
     clear_p1(tg);
     int filler = mid(tg, FILLER_MUS);
     if (filler >= 0) fill_decks(tg, filler, 30);
@@ -1885,6 +1919,7 @@ static int fire_live_success(TestGame *tg, int live)
 static void test_j_ab1_different_group_moved_to_hand(void)
 {
     TestGame *tg = &t_tg[0];
+    test_game_new(tg);
     clear_p1(tg);
     int live = mid(tg, BRING_LOVE);
     pin_id(live, BRING_LOVE);
@@ -1913,6 +1948,7 @@ static void test_j_ab1_different_group_moved_to_hand(void)
 static void test_j_ab1_same_group_not_moved(void)
 {
     TestGame *tg = &t_tg[1];
+    test_game_new(tg);
     clear_p1(tg);
     int live = mid(tg, BRING_LOVE);
     if (live < 0) return;
@@ -1938,6 +1974,7 @@ static void test_j_ab1_same_group_not_moved(void)
 static void test_j_ab1_mixed_discard_only_different_group_moves(void)
 {
     TestGame *tg = &t_tg[2];
+    test_game_new(tg);
     clear_p1(tg);
     int live = mid(tg, BRING_LOVE);
     if (live < 0) return;
@@ -1963,6 +2000,7 @@ static void test_j_ab1_mixed_discard_only_different_group_moves(void)
 static void test_j_ab1_empty_stage_moves_one_eligible_card(void)
 {
     TestGame *tg = &t_tg[3];
+    test_game_new(tg);
     clear_p1(tg);
     int live = mid(tg, BRING_LOVE);
     if (live < 0) return;
@@ -1988,6 +2026,7 @@ static void test_j_ab1_empty_stage_moves_one_eligible_card(void)
 static void test_j_ab1_empty_discard_nothing_happens(void)
 {
     TestGame *tg = &t_tg[4];
+    test_game_new(tg);
     clear_p1(tg);
     int live = mid(tg, BRING_LOVE);
     if (live < 0) return;
@@ -2026,6 +2065,7 @@ static void name_pair_case(const char *reveal_no, const char *target_no,
                            const char *expect_recovered, const char *tag)
 {
     TestGame *tg = &t_tg[5];
+    test_game_new(tg);
     clear_p1(tg);
     int reveal = mid(tg, reveal_no);
     int target = mid(tg, target_no);
@@ -2103,6 +2143,7 @@ static void test_k_link_104_cannot_recover_base(void)
 static void test_k_no_matching_live_in_waitroom_fails(void)
 {
     TestGame *tg = &t_tg[6];
+    test_game_new(tg);
     clear_p1(tg);
     int hino = mid(tg, HINO);
     if (!pin_id(hino, HINO)) return;
@@ -2128,6 +2169,7 @@ static void test_k_no_matching_live_in_waitroom_fails(void)
 static void test_k_no_live_card_in_hand_fails(void)
 {
     TestGame *tg = &t_tg[7];
+    test_game_new(tg);
     clear_p1(tg);
     int hino = mid(tg, HINO);
     if (!pin_id(hino, HINO)) return;
@@ -2163,6 +2205,7 @@ static void test_k_no_live_card_in_hand_fails(void)
 static void test_l_recover_with_heart06_ge3(void)
 {
     TestGame *tg = &t_tg[8];
+    test_game_new(tg);
     clear_p1(tg);
     int nico = mid(tg, NICO);
     pin_id(nico, NICO);
@@ -2213,6 +2256,7 @@ static void test_l_recover_with_heart06_ge3(void)
 static void test_l_heart06_too_low_not_recovered(void)
 {
     TestGame *tg = &t_tg[9];
+    test_game_new(tg);
     clear_p1(tg);
     int nico = mid(tg, NICO);
     pin_id(nico, NICO);
@@ -2246,6 +2290,7 @@ static void test_l_heart06_too_low_not_recovered(void)
 static void test_l_no_eligible_card_skips(void)
 {
     TestGame *tg = &t_tg[10];
+    test_game_new(tg);
     clear_p1(tg);
     int nico = mid(tg, NICO);
     pin_id(nico, NICO);
@@ -2269,6 +2314,7 @@ static void test_l_no_eligible_card_skips(void)
 static void test_l_recover_same_live_used_as_discard_cost(void)
 {
     TestGame *tg = &t_tg[11];
+    test_game_new(tg);
     clear_p1(tg);
     int nico = mid(tg, NICO);
     pin_id(nico, NICO);
@@ -2312,6 +2358,7 @@ static void test_l_recover_same_live_used_as_discard_cost(void)
 static void test_l_one_card_recovered_even_if_multiple_eligible(void)
 {
     TestGame *tg = &t_tg[12];
+    test_game_new(tg);
     clear_p1(tg);
     int nico = mid(tg, NICO);
     pin_id(nico, NICO);
@@ -2357,6 +2404,7 @@ static void test_l_one_card_recovered_even_if_multiple_eligible(void)
 static void test_m_treasure_niji_live_added_on_accept(void)
 {
     TestGame *tg = &t_tg[13];
+    test_game_new(tg);
     clear_p1(tg);
     int lat = mid(tg, TREASURE);
     pin_id(lat, TREASURE);
@@ -2398,6 +2446,7 @@ static void test_m_treasure_niji_live_added_on_accept(void)
 static void test_m_treasure_declined_adds_nothing(void)
 {
     TestGame *tg = &t_tg[14];
+    test_game_new(tg);
     clear_p1(tg);
     int lat = mid(tg, TREASURE);
     pin_id(lat, TREASURE);
@@ -2429,6 +2478,7 @@ static void test_m_treasure_declined_adds_nothing(void)
 static void test_m_treasure_niji_member_not_added(void)
 {
     TestGame *tg = &t_tg[15];
+    test_game_new(tg);
     clear_p1(tg);
     int lat = mid(tg, TREASURE);
     pin_id(lat, TREASURE);
@@ -2457,6 +2507,7 @@ static void test_m_treasure_niji_member_not_added(void)
 static void test_m_treasure_no_movement_does_not_fire(void)
 {
     TestGame *tg = &t_tg[0];
+    test_game_new(tg);
     clear_p1(tg);
     int lat = mid(tg, TREASURE);
     pin_id(lat, TREASURE);
@@ -2504,6 +2555,7 @@ static void test_m_treasure_no_movement_does_not_fire(void)
 static void test_n1_activate_path_drops_a_sequential_cost_cost(void)
 {
     TestGame *tg = &t_tg_n[0];
+    test_game_new(tg);
     clear_p1(tg);
     int hanano = mid(tg, HANANO);           /* bare pay_energy cost */
     int kinako = mid(tg, KINAKO);           /* sequential_cost cost */
@@ -2523,6 +2575,7 @@ static void test_n1_activate_path_drops_a_sequential_cost_cost(void)
 
     /* THE DEFECT: the sequential_cost cost is not. Same entry point, same
      * helper, only the cost's shape differs. */
+    test_game_new(tg);
     clear_p1(tg);
     fill_decks(tg, mid(tg, FILLER_MUS), 30);
     tg->state.p[0].stage[AREA_CENTER] = kinako;
@@ -2555,6 +2608,7 @@ static void test_n1_activate_path_drops_a_sequential_cost_cost(void)
 static void test_n2_discard_selection_ignores_the_card_type_filter(void)
 {
     TestGame *tg = &t_tg_n[1];
+    test_game_new(tg);
     clear_p1(tg);
     int mari = mid(tg, MARI);
     pin_id(mari, MARI);
@@ -2605,6 +2659,7 @@ static void test_n3_zone_selection_drops_cost_limit_need_heart_and_name(void)
      *     test_c_score7_live_is_not_recovered and the test_k_q237_*
      *     negatives respectively; both of those pin their own premise first. */
     TestGame *tg = &t_tg_n[2];
+    test_game_new(tg);
     clear_p1(tg);
     int inc = mid(tg, BUTTERFLY);   /* need_heart heart06 = 5 */
     int dec = mid(tg, LIVE_MUS);    /* need_heart heart06 = 1 */
@@ -2649,6 +2704,7 @@ static void test_n3_zone_selection_drops_cost_limit_need_heart_and_name(void)
      *     engine/src/ability/move_cards.rs:1283-1291. */
 static void test_n4_different_group_names_reference_is_unimplemented(void){
     TestGame *tg = &t_tg_n[3];
+    test_game_new(tg);
     clear_p1(tg);
     int live = mid(tg, BRING_LOVE);
     pin_id(live, BRING_LOVE);
@@ -2684,6 +2740,7 @@ static void test_n4_different_group_names_reference_is_unimplemented(void){
 static void test_n5_no_mandatory_energy_gate_on_activation(void)
 {
     TestGame *tg = &t_tg_n[4];
+    test_game_new(tg);
     clear_p1(tg);
     int hanano = mid(tg, HANANO);
     pin_id(hanano, HANANO);
@@ -2707,6 +2764,107 @@ static void test_n5_no_mandatory_energy_gate_on_activation(void)
              "n5: DEFECT - a 起動 whose mandatory E E cost exceeds the 1 active energy "
              "still ran its effect; Rust check_mandatory_activation_cost "
              "(turn/actions/mod.rs:408) would refuse it");
+}
+
+/* N6. THE ABSENCE-SENTINEL REGRESSION. This is the second instance of the
+ * defect that made test_parity_required_hearts.c's
+ * k_riko_condition_not_met_does_nothing read as a heart-pipeline bug for three
+ * rounds: this file declared `static TestGame t_tg[16]` / `t_tg_n[5]` and never
+ * called test_game_new, so every board in it was a BSS-ZERO RbMods.
+ *
+ * WHY THAT IS NOT A COSMETIC DIFFERENCE. rb_mods_init (src/core/modifiers.c:27)
+ * publishes -1 into heart_color_override / heart_copy / heart_multiplier /
+ * blade_type as the ABSENCE sentinel, and rb_member_original_hearts
+ * (src/core/stats_pipeline.c:159-163) takes the override arm outright on
+ * `override_color >= 0`. Zero is a LEGAL value there — "all this card's printed
+ * hearts count as heart00, zero of them" — so an uninitialised array does not
+ * read as absent, it reads as a live set-to-zero override and every member on
+ * the board folds to eight zeros. MEASURED on this corpus with a throwaway TU
+ * against the frozen objects:
+ *
+ *     UNINIT  heart_color_override=0 heart_copy=0 heart_multiplier=0 blade_type=0
+ *     INIT    heart_color_override=-1 heart_copy=-1 heart_multiplier=-1 blade_type=-1
+ *     ZERO-OVERRIDE fold = 0,0,0,0,0,0,0,0     <- what every board in this file saw
+ *     SENTINEL    fold = 0,1,0,1,0,0,0,0     <- PL!-sd1-010-SD's printed base
+ *
+ * Rust cannot express the broken state at all: heart_override is a HashMap and
+ * stats_pipeline.rs:30 reads `if let Some(&(override_color, override_count)) =
+ * heart_override.get(&card_id)`, where an absent key is None and control falls
+ * through to the printed base at :36-48. The C array's zero default is a VALUE,
+ * so the two engines only agree once rb_mods_init has run.
+ *
+ * This case pins the invariant itself rather than any one ability's verdict, so
+ * a future fixture that skips the initialiser is caught by name. It asserts
+ * BOTH SIDES of the sentinel: the -1 that means absent, and the explicit 0 that
+ * Rust reaches through Some((_, 0)) and must keep honouring. It must never be
+ * "fixed" by making zero mean absence — that diverges from Rust, where
+ * set_heart_override(..., H05, 0) drops that member's hearts on purpose.
+ */
+static void test_n6_absent_mods_sentinel_is_minus_one_not_zero(void)
+{
+    TestGame *tg = &t_tg_n6;
+    test_game_new(tg);
+
+    int m = mid(tg, FILLER_MUS);   /* PL!-sd1-010-SD, mu's member */
+    if (!pin_id(m, FILLER_MUS)) return;
+
+    /* THE SENTINELS. These are exactly the values rb_mods_init publishes
+     * (modifiers.c:27), so a regression reads "the absence sentinel is gone"
+     * rather than an unattributable heart delta somewhere downstream. */
+    CHECK_EQ((int)tg->state.mods.heart_color_override[m], -1,
+             "n6: heart_color_override holds the -1 ABSENCE sentinel "
+             "(modifiers.c:27); Rust's absent HashMap key is None "
+             "(stats_pipeline.rs:30), and 0 would read as a LIVE set-to-0 "
+             "override that discards this member's printed base");
+    CHECK_EQ((int)tg->state.mods.heart_copy[m], -1,
+             "n6: heart_copy holds -1 (modifiers.c:27); 0 would make the fold "
+             "read card 0's hearts instead of this card's (stats_pipeline.rs:37-43)");
+    CHECK_EQ((int)tg->state.mods.heart_multiplier[m], -1,
+             "n6: heart_multiplier holds -1 (modifiers.c:27); 0 would collapse "
+             "the member into heart00 (stats_pipeline.rs:51-55)");
+    CHECK_EQ((int)tg->state.mods.blade_type[m], -1,
+             "n6: blade_type holds -1 (modifiers.c:27); 0 is a legal blade "
+             "colour and would recolour this member's yell icons "
+             "(src/turn/live.c:236-240)");
+    CHECK_EQ((int)tg->state.mods.heart_multiplier_amt[m], 2,
+             "n6: heart_multiplier_amt holds its DEFAULT 2 (modifiers.c:27), a "
+             "non-zero value that a bare memset cannot supply");
+
+    /* THE FOLD. Derived from the engine's own decode rather than from a
+     * literal, so a card-generation change moves this with the data. */
+    int base[8];
+    rb_member_original_hearts(&tg->state.mods, m, base);
+    int total = 0;
+    for (int c = 0; c < 8; c++) total += base[c];
+    CHECK(total > 0,
+          "n6: with every sentinel at -1 and no override applied, the member "
+          "folds to its PRINTED base hearts, not to eight zeros "
+          "(stats_pipeline.rs:36-48)");
+    CHECK(base[0] == 0,
+          "n6: and specifically the heart00 bucket stays EMPTY — the zero "
+          "override arm would have put every printed heart here");
+
+    /* THE INVERSE, so the check above is two-sided rather than "zero always
+     * means absent". Rust reaches the same value through Some((_, 0)) and must
+     * not have it silently dropped. */
+    rb_mods_set_heart_override(&tg->state.mods, m, 0, 0);
+    int zeroed[8];
+    rb_member_original_hearts(&tg->state.mods, m, zeroed);
+    int zero_total = 0;
+    for (int c = 0; c < 8; c++) zero_total += zeroed[c];
+    CHECK_EQ(zero_total, 0,
+             "n6: an EXPLICIT set-to-zero override really does replace the "
+             "member's printed hearts outright (stats_pipeline.rs:30-33). This "
+             "is the arm an uninitialised array was silently taking, and Rust "
+             "distinguishes it from absence by the Option, not by the value");
+
+    rb_mods_remove_heart_override(&tg->state.mods, m);
+    int restored[8];
+    rb_member_original_hearts(&tg->state.mods, m, restored);
+    for (int c = 0; c < 8; c++)
+        CHECK_EQ(restored[c], base[c],
+                 "n6: clearing the override restores the printed fold exactly "
+                 "(colour %d back to the value the sentinel path produced)", c);
 }
 
 /* ======================================================================
@@ -2939,6 +3097,7 @@ int main(void)
     run("n3_filter_fields_dropped",test_n3_zone_selection_drops_cost_limit_need_heart_and_name);
     run("n4_diff_group_names",     test_n4_different_group_names_reference_is_unimplemented);
     run("n5_no_energy_gate",       test_n5_no_mandatory_energy_gate_on_activation);
+    run("n6_mods_absence_sentinel", test_n6_absent_mods_sentinel_is_minus_one_not_zero);
 
     rb_unload();
 

@@ -614,7 +614,14 @@ impl<'a> ConditionContext<'a> {
     /// run that needs it can record that it used it.
     #[cfg(not(feature = "no_std"))]
     fn baton_touch_trace() -> bool {
-        std::env::var_os("ABILITY_DEBUG_BATON_TOUCH").is_some()
+        // Cached. This is called from `evaluate_baton_touch_condition`, i.e. once per
+        // baton-touch condition evaluation, and `std::env::var_os` linearly scans the
+        // process environment on every call — a real cost on a path the doc above already
+        // records as sensitive ("logging perturbs allocation layout and changes
+        // outcomes"). The flag is supplied before the process starts, via `ARENA --env`,
+        // so reading it once is behaviourally identical.
+        static TRACE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        *TRACE.get_or_init(|| std::env::var_os("ABILITY_DEBUG_BATON_TOUCH").is_some())
     }
 
     /// `no_std` console targets have no process environment to probe, so the

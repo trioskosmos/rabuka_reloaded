@@ -416,7 +416,58 @@ pub struct CardDatabase {
     /// Card ids carrying at least one **常時** ability. See
     /// [CardDatabase::has_constant_ability].
     pub constant_cards: HashSet<i16>,
+    /// `is_live` and `is_energy` per card id, as a dense array indexed by the id.
+    ///
+    /// Card ids are assigned densely from 0, so a direct array index answers "is this a
+    /// live card?" with no hashing at all — against the `get_card(id).is_some_and(..)`
+    /// hash lookup it replaces.
+    ///
+    /// This exists because of `check_timing`, not for `is_live()` calls in general. That
+    /// function runs ~550k times per 80-game sweep and its own frame measured 6.01 us/call
+    /// — MORE than the `recalculate_constants` it wraps (3.52 us) — and most of that is
+    /// repair steps that resolve every card in a zone through the database:
+    /// `check_invalid_energy_cards` alone walks both energy zones on every call.
+    ///
+    /// Those steps are hot, not a rarely-taken safety net: skipping all five of them
+    /// (`ab_flag("repair_steps")`) changed the game by 16% of its actions, so there is no
+    /// empty-input shortcut available here and the only lever is making the work cheaper.
+    ///
+    /// Measured on identical games (`total_actions` equal in both arms): **-0.7%, -0.1%,
+    /// -0.8%** over three interleaved runs. Each reading is inside noise; the consistent
+    /// sign is the signal. That figure covers the energy-zone walk and the live-zone
+    /// filter — the two sites that run on EVERY call. Extending the same lookup to
+    /// `check_duplicate_members`, `check_orphaned_under_cards` and the resolution-zone
+    /// cleanup measured WITHIN NOISE, because those loops only execute when there are
+    /// pending duplicates or orphans to move.
+    pub live_ids: Vec<bool>,
+    pub energy_ids: Vec<bool>,
     pub next_id: i16,
+}
+
+impl CardDatabase {
+    /// Is `card_id` a ライブ card? Array index; see [`Self::live_ids`].
+    #[inline]
+    pub fn is_live_card(&self, card_id: i16) -> bool {
+        self.live_ids.get(card_id.max(0).usize_count()).copied() == Some(true)
+    }
+
+    /// Is `card_id` an energy card? Array index; see [`Self::energy_ids`].
+    #[inline]
+    pub fn is_energy_card(&self, card_id: i16) -> bool {
+        self.energy_ids
+            .get(card_id.max(0).usize_count())
+            .copied() == Some(true)
+    }
+
+    fn index_card_types(&mut self, card_id: i16, card: &Card) {
+        let i = card_id.max(0).usize_count();
+        if i >= self.live_ids.len() {
+            self.live_ids.resize(i + 1, false);
+            self.energy_ids.resize(i + 1, false);
+        }
+        self.live_ids[i] = card.is_live();
+        self.energy_ids[i] = card.is_energy();
+    }
 }
 
 #[cfg(all(test, not(feature = "no_std")))]
@@ -462,6 +513,8 @@ impl CardDatabase {
             normalized_no_to_id: HashMap::default(),
             auto_abilities: HashMap::default(),
             constant_cards: HashSet::default(),
+            live_ids: Vec::new(),
+            energy_ids: Vec::new(),
             next_id: 0,
         }
     }
@@ -548,6 +601,18 @@ impl CardDatabase {
         if self.has_constant_ability(template_id) {
             self.constant_cards.insert(copy_id);
         }
+        // A copy has the template's TYPE, so it inherits the type bits — the same way it
+        // inherits the ability indices above. Without this the new id reads as neither
+        // live nor energy, and `check_invalid_energy_cards` would mill it straight back
+        // out of the energy zone.
+        let t = template_id.max(0).usize_count();
+        let i = copy_id.max(0).usize_count();
+        if i >= self.live_ids.len() {
+            self.live_ids.resize(i + 1, false);
+            self.energy_ids.resize(i + 1, false);
+        }
+        self.live_ids[i] = self.live_ids.get(t).copied() == Some(true);
+        self.energy_ids[i] = self.energy_ids.get(t).copied() == Some(true);
         self.cards.insert(copy_id, card);
         copy_id
     }
@@ -567,6 +632,7 @@ impl CardDatabase {
             let card_id = db.card_no_to_id[card.card_no.as_ref()];
             db.index_auto_ability(card_id, &card);
             db.index_constant_ability(card_id, &card);
+            db.index_card_types(card_id, &card);
             db.cards.insert(card_id, card);
         }
 

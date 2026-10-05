@@ -512,6 +512,69 @@ static int parse_deck_content_ids(const char *body, int *ids, int max_ids, int *
  * this file's to edit. A file-local extern is the minimal correct wiring. */
 extern void rb_setup_settle_single_player_state(GameState *g);
 
+/* ── THE RbMods ABSENCE-SENTINEL INVARIANT FOR THIS FILE ─────────────────────
+ *
+ * RbMods encodes "this modifier is ABSENT" as -1, while 0 is a LEGAL stored
+ * value. rb_mods_init (src/core/modifiers.c:25-31) is what establishes that
+ * encoding:
+ *
+ *     for (i...) { m->heart_copy[i] = -1; m->heart_multiplier[i] = -1;
+ *                  m->heart_multiplier_amt[i] = 2; m->blade_type[i] = -1;
+ *                  m->heart_color_override[i] = -1; }
+ *
+ * A ZEROED RbMods is therefore not "absent" -- it reads, for EVERY card id, as
+ * "heart colour overridden to 0", "hearts copied from card 0", "hearts
+ * multiplied into colour 0" and "blade type 0". Four readers take the wrong
+ * arm on that value:
+ *
+ *   src/core/stats_pipeline.c:159-163  heart_color_override  (>= 0 -> override)
+ *   src/core/stats_pipeline.c:165-167  heart_copy            (>= 0 -> copy)
+ *   src/core/stats_pipeline.c:170-176  heart_multiplier      (>= 0 -> collapse)
+ *   src/turn/live.c:236-240            blade_type            (>= 0 -> override)
+ *
+ * RUST CITATION. Rust has no such encoding: every one of these is a HashMap
+ * (engine/src/core/game_modifiers.rs:179 blade_type_modifiers, :214
+ * heart_color_multiplier, :217 heart_copy) and GameModifiers::new at
+ * game_modifiers.rs:260-297 initialises each to HashMap::default(), i.e. EMPTY.
+ * Absence is "no key present"; a stored HeartColor of 0 is a perfectly ordinary
+ * present value, and so is a stored heart_override count of 0
+ * (set_heart_override, game_modifiers.rs:437). So a zeroed C RbMods is a state
+ * Rust cannot even represent.
+ *
+ * WHY THIS FILE NEEDS THE EXPLICIT CALL. rb_mods_init has exactly TWO callers in
+ * src/ (src/engine.c:1706 inside rb_game_init, and src/test_game.c:9). This file
+ * is neither. It reached an initialised RbMods only INDIRECTLY, through
+ * make_test_deck -> rb_init_game_from_built_decks -> rb_game_init, and that
+ * coupling was implicit, undocumented, and -- at two call sites -- UNCHECKED:
+ *
+ *   :749  api/game-state      `if (!s->initialized) make_test_deck(s);`
+ *   :888  rb_web_server_run   `... calloc(...); make_test_deck(s);`
+ *
+ * Both DISCARD make_test_deck's return value. When it fails (deck build fails, or
+ * rb_init_game_from_built_decks returns non-zero) s->initialized stays 0, the
+ * GameState is left as raw calloc zeroes, and the very next line of either
+ * endpoint reads the four arms above off that zeroed struct. :749 then calls
+ * serialize_state on it; api/execute-action's sibling at :751 at least checks
+ * the return. api/rooms/create (:693) clears s->initialized WITHOUT clearing
+ * state, so a re-init is always available -- but available is not performed.
+ *
+ * THE INVARIANT, made explicit and total:
+ *
+ *     Any GameState this file hands to serialize_state, to
+ *     rb_generate_action_candidates, or to any rb_* engine call is one whose
+ *     RbMods has been through rb_mods_init -- regardless of whether the game
+ *     init that follows it succeeded.
+ *
+ * It is established at the single point the GameState comes into existence
+ * (the calloc in rb_web_server_run) so that it CANNOT depend on a later init
+ * succeeding, and it is re-established by make_test_deck on every re-init.
+ * NON-STATIC, and deliberately not declared in any header (include/rabuka.h is
+ * not this file's to edit), so that tests/test_web_server_mods_init.c can assert
+ * the invariant against this file's own code rather than against a copy of it.
+ * There is no other caller in src/; the whole point is that it does not NEED to
+ * be one. */
+void rb_web_state_created(GameState *g) { rb_mods_init(&g->mods); }
+
 static int make_test_deck(Sandbox *s)
 {
     int main_ids[2][40];
@@ -538,6 +601,13 @@ static int make_test_deck(Sandbox *s)
     s->built_deck[0] = built0;
     s->built_deck[1] = built1;
     rb_seed(0xCAFE);
+    /* Re-establish the RbMods absence-sentinel invariant on the RE-INIT path
+       too, not only at creation: api/rooms/create (:693) clears
+       s->initialized and leaves s->state in place, so this is the function that
+       re-arms a board which has been sitting uninitialised for a while. Doing
+       it here as well means a caller cannot reach a half-armed RbMods by
+       arranging for the first init to fail. See rb_web_state_created above. */
+    rb_web_state_created(&s->state);
     if (rb_init_game_from_built_decks(&s->state, &built0, &built1) != 0) return 0;
     rb_setup_settle_single_player_state(&s->state);
     s->initialized = 1;
@@ -746,7 +816,14 @@ static void handle_request(Sandbox *s, int fd, HttpRequest *r, const char *web_r
         return;
     }
     if (!strcmp(path, "api/game-state/version")) { char b[64]; snprintf(b, sizeof(b), "{\"version\":%d}", s->version); send_json(fd, 200, b); return; }
-    if (!strcmp(path, "api/game-state")) { Buffer b = {0}; if (!s->initialized) make_test_deck(s); serialize_state(s, &b); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return; }
+    /* api/game-state REQUIRES an initialised board -- serialize_state runs
+       unconditionally below -- so the re-init is not optional and its failure is
+       not ignorable. The old one-liner dropped make_test_deck's return value and
+       serialised whatever was in s->state, which on an init failure is a raw
+       zeroed GameState whose RbMods claims every card has heart colour 0.
+       Refusing is the safe direction: 400 instead of a plausible-looking but
+       wrong board. See rb_web_state_created above. */
+    if (!strcmp(path, "api/game-state")) { Buffer b = {0}; if (!s->initialized && !make_test_deck(s)) { send_json(fd, 400, "{\"error\":\"game initialization failed\"}"); return; } serialize_state(s, &b); send_json(fd, 200, b.data ? b.data : "{}"); buffer_free(&b); return; }
     if (!strcmp(path, "api/execute-action") && !strcmp(method, "POST")) {
         if (!s->initialized && !make_test_deck(s)) {
             send_json(fd, 400, "{\"error\":\"game initialization failed\"}");
@@ -885,7 +962,16 @@ int rb_web_server_run(const char *host, int port, const char *web_root, const ch
         if (rl && strcmp(rl, "1") == 0) rb_ability_debug_set(1);
     }
     if (rb_load(data_dir) != 0) return 1;
-    Sandbox *s = (Sandbox *)calloc(1, sizeof(Sandbox)); if (!s) return 1; make_test_deck(s);
+    /* THE point the GameState comes into existence. Its first member is the
+       GameState (src/web_server.c:51), so calloc has just zeroed an RbMods --
+       which, per rb_web_state_created above, means "every card has heart colour
+       0 / copies card 0 / blade type 0", NOT "absent". Arm it here, BEFORE
+       make_test_deck, so the invariant holds even if make_test_deck fails. The
+       old code called make_test_deck and threw away its result, leaving a
+       zeroed GameState live on every endpoint; its return is now checked. */
+    Sandbox *s = (Sandbox *)calloc(1, sizeof(Sandbox)); if (!s) return 1;
+    rb_web_state_created(&s->state);
+    if (!make_test_deck(s)) { free(s); return 1; }
     SOCKET server = socket(AF_INET, SOCK_STREAM, 0); int yes = 1; setsockopt(server, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof(yes));
     struct sockaddr_in addr; memset(&addr, 0, sizeof(addr)); addr.sin_family = AF_INET; addr.sin_port = htons((unsigned short)port); inet_pton(AF_INET, host, &addr.sin_addr);
     if (bind(server, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR || listen(server, 16) == SOCKET_ERROR) return 1;

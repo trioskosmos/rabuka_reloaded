@@ -1,6 +1,6 @@
 CC      ?= gcc
 CFLAGS  ?= -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated
-# sizeof(GameState) is 1090264 bytes (1064.7 KiB) -- MEASURED 2026-10-04 with
+# sizeof(GameState) is 1090528 bytes (1065.0 KiB) -- MEASURED 2026-10-04 with
 # sizeof() in a throwaway TU against the current header, not estimated.
 #
 # HISTORY, because this number has been wrong repeatedly and a wrong number here

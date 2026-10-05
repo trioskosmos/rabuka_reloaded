@@ -48,7 +48,7 @@ fn manually_move(game: &mut TestGame, cid: i16, from: usize, to: usize) {
         old_position: from as u8,
         new_position: to as u8,
         cause_card_id: None,
-        cause_player_id: "p1".to_string(),
+        cause_player_id: "p1".into(),
         effect_only: false,
     });
     game.state.record_card_movement(cid);

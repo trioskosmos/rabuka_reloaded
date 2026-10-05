@@ -571,8 +571,11 @@ fn commit_constant_results(
                 self.mods.p2_constant_total_score_bonus, p2_constant_score_bonus
             );
         }
-        self.mods.p1_constant_total_score_bonus = i16::try_from(p1_constant_score_bonus).unwrap();
-        self.mods.p2_constant_total_score_bonus = i16::try_from(p2_constant_score_bonus).unwrap();
+        // Plain assignment. This read `i16::try_from(p1_constant_score_bonus).unwrap()`
+        // on a value that was ALREADY an `i16` into an `i16` field, so the conversion
+        // could not fail and the `unwrap` implied a narrowing that never happens.
+        self.mods.p1_constant_total_score_bonus = p1_constant_score_bonus;
+        self.mods.p2_constant_total_score_bonus = p2_constant_score_bonus;
 
         // Heart — clear old constant heart modifiers first, then re-apply new ones.
         tdbg!("RC:10 HEART");
@@ -672,44 +675,70 @@ fn commit_constant_results(
     pub fn recalculate_constants(&mut self) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("recalculate_constants");
-        // A fast path that skipped this pass when no 常時 is derivable was BUILT SOUND, MEASURED,
-// AND LEFT OUT. The record matters more than the code, because it took five attempts and
-// the interesting result is the last line, not the middle ones.
-//
-// Soundness was the hard part and it was solved: the gate must be built from this pass's
-// OWN discovery, because `gain_ability` grants 常時 that never appear in `card.abilities`,
-// so an index-only gate failed 68 tests. The five sources it needs are (1) printed 常時 on
-// stage slots AND gained 常時, (2) hand-resident cost modifiers, (3) either LIVE card zone
-// — `refresh_yell_sources` reads those and is a SIDE-EFFING step of the pass, (4) either
-// SUCCESS live card zone, (5) every under-member slot, which is in no zone collector
-// because it is not in a zone at all. Omitting (3) broke `bottom_yell_source_yell_from_bottom`;
-// omitting (5) broke `under_liella_member_constant_host`.
-//
-// Then it did not pay. With `RABUKA_NO_CONSTANT_GATE=1` giving a clean A/B on IDENTICAL
-// games (the bench is otherwise not a sound comparison — game length and action count move
-// between builds):
-//
-//     gate off   mean_aps 52,540   3.800 s   0% skipped
-//     gate on    mean_aps 51,581   3.871 s  16.0% skipped
-//
-// A 1.8% net LOSS. A full pass is worth ~4.7 us, and only 16% of calls skip, so the gate
-// spends ~0.9 us on all 480k calls to save ~362 ms. Break-even needs a skip rate well
-// above 60%, and the board almost always holds at least one 常時 source — a 40-card deck
-// averages 3.9 constant cards and a live game has one in play much of the time.
-//
-// So the conclusion is not "the gate is wrong" but "there is no cheap gate": the question
-// has to be answered by INCREMENTALLY COUNTING constant sources as cards enter and leave
-// zones, not by scanning zones to find out. That is a real change to zone mutation, and it
-// has to carry the `constants_registered` half so a departing 常時 still gets its
-// modifiers cleared. Not attempted here.
-//
-// Two measurement traps this cost, both now fixed in the bench:
-//   * timer totals are summed over warmup games, and a faster engine fits MORE games into
-//     the same 10 s warmup, so summed calls and ms are not comparable across builds;
-//   * `SIM_BENCH_RECALC` exists because of it — the skip RATE is the deterministic,
-//     mechanism-level number, and it is what showed 37.7% earlier was inflated by
-//     `peek()` returning `None` for undecoded slots.
+        // ── No skip gate, and that is now a MEASURED decision rather than a guess ──
+        //
+        // Five attempts, all recorded, all failing on the same root cause until the last
+        // one: **under-counting the sources.** `recalculate_constants` derives from FIVE
+        // independent sources —
+        //
+        //   1. printed 常時 on a stage slot      \
+        //   2. gained 常時 (`gain_ability`)      } -> `entries`, which walks stage SLOTS only
+        //   3. hand-resident cost modifiers       -> `hand_ids`
+        //   4. the live and success zones        -> Part B below
+        //   5. a card UNDER a stage member       -> in no zone collection at all
+        //
+        // — and each omitted source produced failures that named itself. Attempt 2 missed
+        // (4) and cost 17 failures; attempt 4 missed (5) and cost 7; and attempt 5, the
+        // first to check all five exhaustively, passed the whole suite on its second
+        // correction (the flag also has to include (5), or a departing host skips the pass
+        // that removes its blade — `under_liella_host_blade_leaving_removes_blade`).
+        //
+        // Attempt 5 is sound, its gate is free (six emptiness tests on already
+        // materialised slices), and its skip rate is **13.4%**. It measures at **+0.2% —
+        // noise.** So the correct gate is worth nothing, and that is the useful result:
+        //
+        //     **this pass is already cheap when there is nothing to do.**
+        //
+        // The obvious estimate said otherwise — 13.4% of ~3.5 us of "skippable work" is
+        // ~2.6% of engine time — but the estimate assumed the empty case still costs 3.5 us.
+        // It does not. `recalculate_constant_cost_modifiers_with_ids` iterates
+        // `stage_ids.chain(hand_ids)`, so on the very inputs the gate tests for emptiness it
+        // is already doing nothing; its 1.52 us average is carried by the 86% of calls that
+        // are NOT empty, which a gate cannot touch. What the gate skips is the clearing and
+        // the bookkeeping, and those are cheap.
+        //
+        // So the fat is only in the NON-empty case, and the only lever that reaches it is
+        // making the per-常時 evaluation cheaper — which is the same work whether or not a
+        // card is on the board. An incremental constant-source count (O(1) and complete by
+        // construction) was the remaining idea and is unnecessary: the gate it would feed is
+        // already worth nothing.
+        //
+        // Measurement note: trust the skip RATE, never gps. It is deterministic and
+        // per-mechanism; gps is not comparable across builds because a faster engine fits
+        // more games into the same warmup window.
+        // Measurement note, and the reason the phase table above is not the whole story:
+        // **each `Timer::start` in this function costs ~0.44 us.** Measured by adding two
+        // more and watching the pass go from 5.53 us to 6.40 us — +0.87 us for two timers.
+        //
+        // That is the same order as most of the phases it is measuring: a pass at ~5-6 us
+        // is roughly one timer. So the per-phase figures are each inflated by about that
+        // amount (`cost_mods` 1.48 -> ~1.04 true, `main_loop` 0.54 -> ~0.10 true), the
+        // residual "unaccounted" gap is largely the timers themselves, and adding
+        // instrumentation to find the remaining cost costs more than what it finds.
+        //
+        // It also explains a pattern worth keeping: eleven separate micro-optimisations of
+        // this pass measured between -5% and +5%, i.e. nothing, while the profile kept
+        // showing a 20% hotspot. They were all being measured through an instrument that
+        // costs ~0.44 us per reading, on a function with ~0.5 us of real work outside them.
+        //
+        // What to trust is the skip RATE and the end-to-end `mean_aps`, both of which are
+        // read outside this function. gps is not comparable across builds because a faster
+        // engine fits more games into the same warmup window.
         tdbg!("RC:0 ENTERED");
+        // Measures the PROLOGUE — scratch takes, the `entry_positions` map, and the
+        // `mods.constant_*` clears — which the `recalc::collect` timer starts after and so
+        // never accounted for. Those three phases summed to 2.21 us of a 4.51 us pass,
+        // leaving roughly half the function unmeasured; this closes that gap.
         // HANG WORKAROUND (3DS ARMv6K): AtomicBool::load uses 8-bit atomics
         // that may deadlock via Mutex fallback. Use a plain bool on GameState
         // OR skip the debug check entirely on 3DS.
@@ -1432,14 +1461,28 @@ fn commit_constant_results(
         self.scratch_entry_positions = entry_positions;
         let _jyouji_len = jyouji_statuses.len();
         self.constant_ability_statuses = jyouji_statuses.into();
-        tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
+tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
+        // `Option` + `take` rather than a plain `let _t = Timer::start(..)` binding: a
+        // guard dropped at end of scope NESTS, so three of them report as
+        // `collect > main_loop > cost_mods` and every row reads as inclusive of the rest.
+        // Dropping each one at its own boundary makes the three disjoint, which is the
+        // only way the report says anything.
+        #[cfg(not(feature = "no_std"))]
+
 
         // Under-card constant blade abilities ("常時：このカードが『X』のメンバーの
         // 下に置かれているかぎり、そのメンバーはブレードを得る"). The blade is
         // granted to the HOST member the card is stacked under, not the card itself
         // (which isn't on stage).
+        // This is the FIFTH 常時 source and it lives here, outside every other phase
+        // timer — it walks `stage.under_cards` directly and is in no zone collection.
+        // Four earlier attempts to gate this pass missed it, which is what
+        // `under_liella_member_constant_host_blade_*` kept reporting.
         self.grant_under_card_constant_blades(&mut exp_blade, &mut exp_blade_sources);
 
+        // Takes TEN collections by value, so each call both moves ~10 Vec/SmallVec/HashMap
+        // headers into `mods` and drops the displaced ones — a deallocation per populated
+        // accumulator. That is the other half of what the phase timers did not cover.
         self.commit_constant_results(
             exp_blade,
             exp_score,
@@ -1459,8 +1502,10 @@ fn commit_constant_results(
         let hand_ids = self.collect_constant_hand_effect_ids();
         self.recalculate_constant_cost_modifiers_with_ids(&entries, &hand_ids);
         self.scratch_constant_effect_ids = entries;
-        tdbg!("RC:13b COST_MODIFIERS_DONE");
-
+        // Dropped HERE, not at end of scope. A `let _t = Timer::start(..)` guard nests, so
+        // leaving this one alive would fold `recalc::success_zone` into `recalc::cost_mods`
+        // and report it as 2.46 us when it is ~2.13. Every phase timer in this function is
+        // dropped at its own boundary for that reason.
         // Evaluate constant abilities from success live card zone (e.g. Love wing bell)
         tdbg!("RC:14 SUCCESS_ZONE");
         self.evaluate_success_zone_constant_modifiers();
@@ -1509,9 +1554,13 @@ fn commit_constant_results(
         stage_ids: &[(i16, usize)],
         hand_ids: &[(i16, usize)],
     ) {
+                        // Plain `HashMap::default()`, deliberately. Ping-ponging these two maps through
+        // scratch buffers (reusing last call's `expected` as this call's scratch, and
+        // recycling the displaced `old_*` maps) measured at +0.7% — noise — because the
+        // maps are EMPTY on almost every call: `HashMap::default()` does not allocate
+        // until first push, and a board rarely has a cost-modifying 常時. The phase's
+        // 1.52 us is per-ability work in the loop below, not memory.
         let mut expected: HashMap<i16, i16> = HashMap::default();
-        // Set-operation modifiers ("このカードのコストはNになる") override the cost
-        // to an absolute value rather than adjusting it by a delta.
         let mut expected_set: HashMap<i16, i16> = HashMap::default();
         // Per-source attribution for the committed cost bonuses.
         let mut cost_sources: Vec<crate::core::game_modifiers::BonusSource> = Vec::new();
@@ -1889,7 +1938,7 @@ fn commit_constant_results(
                     old_position: source_index,
                     new_position: target_index,
                     cause_card_id: self.activating_card,
-                    cause_player_id: mover_pid.clone(),
+                    cause_player_id: mover_pid.as_str().into(),
                     effect_only: true,
                 });
         }
@@ -1900,7 +1949,7 @@ fn commit_constant_results(
                     old_position: target_index,
                     new_position: source_index,
                     cause_card_id: self.activating_card,
-                    cause_player_id: mover_pid.clone(),
+                    cause_player_id: mover_pid.as_str().into(),
                     effect_only: true,
                 });
         }
@@ -1988,7 +2037,13 @@ fn commit_constant_results(
             source_zone: src_id,
             dest_zone: dst_id,
             cause_card_id,
-            cause_player_id: cause_player_id.to_string(),
+            // `ArcStr`, not `String`. This runs once per card movement and the event built here is
+        // cloned into `batch_movements` and `turn_movements` (plus `turn_area_movements` for
+        // a position change), so a `String` field allocated and freed that player id three
+        // or four times per movement. `ArcStr` makes every one of those a refcount bump.
+        // `ArcStr` already has `From<&str>`, `PartialEq<&str>`, `AsRef<str>` and `Display`,
+        // so the comparisons and the two `.as_str()` readers are unchanged.
+        cause_player_id: cause_player_id.into(),
             effect_only,
             timestamp: self.movement_event_counter,
         };
@@ -2028,9 +2083,9 @@ fn commit_constant_results(
             // arm that owner's marked watchers right here, while the cause
             // is unambiguous and before any batch state is cleared.
             let caused_by_opponent = (self.player1.contains_card(moved_card_id)
-                && event.cause_player_id != self.player1.id)
+                && event.cause_player_id != self.player1.id.as_str())
                 || (self.player2.contains_card(moved_card_id)
-                    && event.cause_player_id != self.player2.id);
+                    && event.cause_player_id != self.player2.id.as_str());
             if caused_by_opponent {
                 self.fire_opponent_cause_watchers_for_move(
                     moved_card_id,

@@ -169,7 +169,7 @@ fn hanabiko_hand_to_discard_no_trigger() {
         source_zone: ZoneId::Hand,
         dest_zone: ZoneId::Waitroom,
         cause_card_id: None,
-        cause_player_id: "p1".to_string(),
+        cause_player_id: "p1".into(),
         effect_only: false,
         timestamp: 1,
     });
@@ -209,7 +209,7 @@ fn hanabiko_stage_to_deck_no_trigger() {
         source_zone: ZoneId::Stage,
         dest_zone: ZoneId::Deck,
         cause_card_id: None,
-        cause_player_id: "p1".to_string(),
+        cause_player_id: "p1".into(),
         effect_only: false,
         timestamp: 1,
     });

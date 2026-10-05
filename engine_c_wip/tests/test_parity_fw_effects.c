@@ -190,7 +190,30 @@ static void FW_F3_blade_grant_reaches_the_trace_ring(void)
     (void)before;
 
     AbilityEffect e;
-    mk_gain_resource(&e, "blade", 3, "\xE3\x81\x82\xE3\x81\xAE\xE3\x83\x96\xE3\x83\xAD\xE3\x83\xBC\xE3\x83\x89"); /* ブレード�Eomic text */
+    mk_gain_resource(&e, "blade", 3,
+        /* The LABEL is a real card's printed ability line, because that is what Rust
+         * hands the trace writer: resource.rs:229-230 passes
+         * `gs.activating_card.unwrap_or(-1)` and `&effect.text`, and on a real
+         * ability `effect.text` IS that card's ability line. The literal here
+         * used to be a 9-byte Japanese word meaning "broad", which is 0
+         * occurrences across cards/cards.json, engine/src and engine/tests --
+         * fabricated, so nothing downstream could fail on a wrong label.
+         *
+         * PL!S-bp6-011-N is used because its ability line is 123 bytes and so
+         * FITS the C's `ability_text[RB_MODS_TRACE_TEXT]` (128, rabuka.h:205).
+         * That is deliberate: an exact compare would otherwise also be asserting
+         * that the C does not truncate, and it DOES --
+         * rb_mods_trace_push (modifiers.c:337-341) copies at most 127 bytes,
+         * while Rust's field is a String (core/modifiers.rs AbilityApplication)
+         * and keeps all of it. That capacity divergence is real, is NOT what
+         * this test is for, and is reported separately. Choosing a fitting line
+         * keeps this assertion about the LABEL RULE (resource.rs:230).
+         * Escapes, because the Write path here can emit CP932. */
+        "{{toujyou.png|\xE7\x99\xBB\xE5\xA0\xB4}}\xE6\x8E\xA7\xE3\x81\x88\xE5\xAE\xA4\xE3\x81\x8B\xE3\x82\x89"
+        "\xE7\x99\xBB\xE5\xA0\xB4\xE3\x81\x97\xE3\x81\xA6\xE3\x81\x84\xE3\x82\x8B\xE5\xA0\xB4\xE5\x90\x88"
+        "\xE3\x80\x81\xE3\x82\xAB\xE3\x83\xBC\xE3\x83\x89\xE3\x82\x922\xE6\x9E\x9A\xE5\xBC\x95\xE3\x81\x8D"
+        "\xE6\x89\x8B\xE6\x9C\xAD\xE3\x82\x921\xE6\x9E\x9A\xE6\x8E\xA7\xE3\x81\x88\xE5\xAE\xA4\xE3\x81\xAB"
+        "\xE7\xBD\xAE\xE3\x81\x8F\xE3\x80\x82"); /* ブレード�Eomic text */
 
     rb_execute_misc_effect(&tg.state, 0, &tg.state.p[0], &e, NULL);
 
@@ -210,9 +233,17 @@ static void FW_F3_blade_grant_reaches_the_trace_ring(void)
         CHECK_EQ(t->target_card_id, host,
                  "FW-F3 the credited card is the trace target");
         CHECK_EQ(t->amount, 3, "FW-F3 the trace amount is the granted blade count");
-        CHECK(t->ability_text[0] != '\0',
-              "FW-F3 the trace LABEL is effect.text (resource.rs:230 `&effect.text`), "
-              "got an empty string");
+        CHECK(strcmp(t->ability_text, e.text) == 0,
+              "FW-F3 the trace LABEL is effect.text EXACTLY (resource.rs:230 "
+              "`&effect.text`), not merely non-empty -- a truncated or "
+              "mis-copied label now fails this");
+
+        /* Non-vacuity: the label is a REAL card's ability line and is longer
+         * than a short ASCII token, so a silently blank or stubbed label cannot
+         * satisfy an exact compare. */
+        CHECK(strlen(e.text) >= 100,
+              "FW-F3 the label fixture is a full 123-byte corpus ability line, "
+              "so the exact compare above is not satisfiable by a stub");
     }
 
     /* The attribution rule on its own: credit a DIFFERENT card than the

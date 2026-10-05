@@ -55,7 +55,14 @@
 
 /* 『虹ヶ咲』 (U+8671 U+30F6 U+54B2) — the 虹ヶ咲 group's name, compared against
  * the card database's series-derived group string. */
-#define NIJI_GROUP "\xe8\x99\xa6\xe3\x82\xb1\xe5\x92\xb2"
+#define NIJI_GROUP "\xe8\x99\xb9\xe3\x83\xb6\xe5\x92\xb2"
+/* The canonical spelling is fixed three ways and all three AGREE on
+ * U+8679 U+30F6 U+54B2: cards/cards.json, src/core/card.c:371
+ * (rb_card_series_to_group) and engine/src/core/card.rs map_series_to_group.
+ * The annotation above said U+8671 and the bytes were U+8666 U+30B1 -- a
+ * pair that occurs NOWHERE in the corpus. rb_card_matches_group_str then
+ * compared a string no card can carry, so the negative assertion at :2062
+ * passed for the wrong reason rather than proving the filler is not Nijigasaki. */
 
 /* 澁谷かのん PL!SP-sd1-001-SD, ラブライブ！スーパースター!! (CatChu!), so its
  * SERIES-derived group is 『Liella!』 and its UNIT-level group is not. The Rust

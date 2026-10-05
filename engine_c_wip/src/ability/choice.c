@@ -10,7 +10,11 @@ extern int rb_complete_double_baton(GameState *g, int selected_pair);
    deliberately absent from rabuka.h, so the consumer spells them out here. */
 extern int  rb_queue_take_pending_actions_owned(GameState *g, AbilityEffect **out, int max_out);
 extern void rb_queue_repark_pending_actions(GameState *g, AbilityEffect *const *actions,
-                                            int count, int from);
+                                             int count, int from);
+/* Defined in src/core/game_state_abilities.c (engine/src/core/game_state/
+ * abilities.rs:2900-2916): the queue entry's player_id, with
+ * owner_of_card(activating_card) as the fallback. */
+extern int rb_resolve_master_id(const GameState *g);
 
 void rb_move_execute_selected_cards_from_zone(GameState *g, int actor, const char *zone,
     const int *indices, int n_indices, const char *card_type, int cost_limit,
@@ -1307,7 +1311,30 @@ static int rb_queue_cost_action_for_choice(GameState *g, const RbChoice *ch,
                     const char *a = ab.cost->action ? ab.cost->action : "";
                     strncpy(out_act, a, outlen - 1); out_act[outlen - 1] = '\0';
                 }
-                rb_free_ability(&ab);
+                /* DEFECT (alias class). This decodes the WHOLE card ability
+                 * only to read `ab.cost->action` into out_act (copied by
+                 * strncpy above, so out_act is already safe), then frees it --
+                 * while `g->queue.resume_parent` can still point INTO
+                 * ab.effect. The alias probe measures this exact free
+                 * (FREED_VIA=rb_free_ability.effect) firing on slot
+                 * queue.resume_parent, slot_value == freed_root, in
+                 * parity_integration_extra and parity_cost_and_effect.
+
+                 * THE FIX is the landed deferral protocol, not an owning
+                 * clone: hand the decoded pair to g->activation_keepalive while
+                 * a prompt is open and let the existing drains release it
+                 * (choice.c release site on the !rb_has_pending_choice arm;
+                 * engine.c teardown when no prompt is left). Same shape as
+                 * ability_queue.c's drain and pca_resolve_entry. The
+                 * `!activation_keepalive_valid` guard keeps the single-owner
+                 * contract: when the slot is already taken the tree is left
+                 * detached rather than double-owned. */
+                if (rb_has_pending_choice(g) && !g->activation_keepalive_valid) {
+                    g->activation_keepalive = ab;
+                    g->activation_keepalive_valid = 1;
+                    memset(&ab, 0, sizeof(ab));   /* transfer was total */
+                }
+                rb_free_ability(&ab);   /* frees nothing when transferred */
                 if (has) return 1;
             }
         }
@@ -3343,6 +3370,27 @@ void rb_move_finalize_card_movement(GameState *g, int actor,
  * (game_state_abilities.c:827 `rb_resolve_master_id` = g->active), NOT seat 0 —
  * `rb_resolve_target_player` hard-codes "self" to 0 and is therefore wrong for
  * the second leg of a target="both" effect resolved on P2's turn. */
+
+/* Mirror util::target_player_index (engine/src/ability/util.rs, reached from
+ * choice.rs:1413 / :1490 / :2137 as `gs.resolve_target_player(target)`), whose
+ * rule is engine/src/core/game_state/abilities.rs:2962-2981:
+ *
+ *     ("self",     master_p2) => player2 | ("self",     _) => player1
+ *     ("opponent", master_p2) => player1 | ("opponent", _) => player2
+ *     ("p1" | "player1")      => player1   ("p2" | "player2") => player2
+ *
+ * TWO divergences from that rule were here.
+ *
+ * 1. "p2"/"player2" were folded into the OPPONENT arm and XOR'd off the
+ *    master. They are LITERAL seat names in Rust, so "p2" is always seat 1
+ *    whatever the master is. That is what sent the deferred half of
+ *    「自分と相手はそれぞれ、自身の控え室から…�� to the wrong seat.
+ * 2. The master was `g->active`, the TURN player. It is
+ *    `ability_master_id()` — the CURRENT QUEUE ENTRY's player_id
+ *    (abilities.rs:2900-2904), with `owner_of_card(activating_card)` as the
+ *    fallback (abilities.rs:2911-2914). rb_resolve_master_id (below) is that
+ *    pair; it was g->active.
+ */
 static int choice_effect_target_seat(const GameState *g, int answering_seat)
 {
     const char *t = NULL;
@@ -3350,12 +3398,16 @@ static int choice_effect_target_seat(const GameState *g, int answering_seat)
         if (g->queue.pending.target_player_id[0]) t = g->queue.pending.target_player_id;
         else if (g->queue.pending.target[0])     t = g->queue.pending.target;
     }
-    int master = g ? g->active : 0;
+    int master = g ? rb_resolve_master_id(g) : 0;
     if (master < 0 || master > 1)
         master = (answering_seat >= 0 && answering_seat <= 1) ? answering_seat : 0;
     if (!t || !t[0]) return master;
-    if (!strcmp(t, "opponent") || !strcmp(t, "p2") || !strcmp(t, "player2")) return master ^ 1;
-    if (!strcmp(t, "self")    || !strcmp(t, "p1") || !strcmp(t, "player1")) return master;
+    /* abilities.rs:2964-2968 — only "self" and "opponent" are relative; every
+     * other spelling, including "both" and anything unrecognised, is resolved
+     * as Rust's match does, which returns player1 for the relative pair and
+     * player1 for the rest. */
+    if (!strcmp(t, "opponent")) return master ^ 1;
+    if (!strcmp(t, "self"))    return master;
     int pl = rb_resolve_target_player(g, t);
     return (pl >= 0 && pl <= 1) ? pl : master;
 }
@@ -4934,10 +4986,17 @@ static int choice_is_committed_cost_reprompt(const RbChoice *ch)
      * the prompt is the optional step's own allow_skip 「〜てもよい」 prompt,
      * the answer named no card at all                      (choice.rs:315).
 
-   A SelectCard SKIP is deliberately excluded: Rust routes it to
-   handle_general_skip (result_handlers.rs:225-227), which never reaches
-   consume_deferred_gate — that call sits at choice.rs:1016, INSIDE
-   handle_select_card. Only an empty SELECTION consults the gate. */
+   A SelectCard SKIP is NOT excluded, and the note that used to say so was
+   wrong: it cited `handle_general_skip (result_handlers.rs:225-227)` and there
+   is no `result_handlers.rs` in the tree. build_choice_result
+   (turn/actions/mod.rs:1078-1087) turns EVERY SelectCard answer into
+   `CardSelected { indices }` and never into `ChoiceResult::Skip`, so a declined
+   optional SelectCard still reaches consume_deferred_gate (choice.rs:1048,
+   inside handle_select_card). What decides the arm is `indices.is_empty()` —
+   the same "no index" signal as this C's `was_skip` — which the
+   `n_indices > 0` test above already reads. `ch->allow_skip` is what keeps a
+   MANDATORY empty SelectCard out, matching the `decline` rule derived at
+   :5061-5062. See the note on the call site for the measurement. */
 static int choice_deferred_conditional_gate(const RbChoice *ch,
                                             const AbilityEffect *cont, int n_indices)
 {
@@ -5127,9 +5186,56 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
        optional step drops the parked tail (choice.rs:307-321). Doing it here,
        once, keeps the tail out of BOTH routes that would otherwise replay it —
        the owned pending-action batch and the `cont` walk — so `cont` is retired
-       for the rest of this resume instead of only clearing the batch. */
-    if (!(was_skip && kind == RB_CHOICE_SELECT_CARD) &&
-        choice_deferred_conditional_gate(&saved_pending, cont, n_indices)) {
+       for the rest of this resume instead of only clearing the batch.
+
+       ⛔ CORRECTION 2026-10-05 (use-after-free fix fallout). The condition
+       `!(was_skip && kind == RB_CHOICE_SELECT_CARD)` that used to guard this
+       block was WRONG, and the justification it carried is cited to a file
+       that does not exist: there is no `result_handlers.rs` in the tree (the
+       dispatch is `dispatch_choice_result` in engine/src/ability/choice.rs).
+       build_choice_result, turn/actions/mod.rs:1078-1087, is the line that
+       decides it, and it is quoted verbatim in the note at :5043-5056 above:
+
+           Choice::SelectCard { .. } => {
+               let indices = card_indices.unwrap_or_else(...);
+               Ok(ChoiceResult::CardSelected { indices })
+           }
+
+       EVERY SelectCard answer becomes `CardSelected { indices }` — an answer
+       naming no card is `CardSelected([])`, NEVER `ChoiceResult::Skip`. So a
+       declined optional SelectCard is still a `SelectCard` answer and DOES
+       reach consume_deferred_gate (choice.rs:1048, inside handle_select_card,
+       called before any cost routing). `indices.is_empty()` is the decline
+       marker, not the RESULT VARIANT, and this C's `was_skip` is the same
+       "no index" signal. Excluding the SelectCard kind therefore suppressed
+       Rust's drop for exactly the shape Rust drops it for.
+
+       MEASURED, and this is why it stayed hidden: the exclusion agreed with
+       the observable answer only because the ability that raised the prompt
+       had ALREADY been freed (game_state_abilities.c's pca_resolve_entry
+       free-while-prompt-open, now fixed), so `cont` was a dangling pointer and
+       `choice_deferred_conditional_gate`'s `cont->action` read was already
+       undefined. With the lifetime fixed the stale exclusion became visible as
+       two real regressions, both of which assert what Rust asserts:
+         * parity_under_member kotori_live_start_skip_does_not_gain_heart —
+           「手札にあるコスト2以下の『μ's』のメンバーカードを1枚公開し、この
+           メンバーの下に置いてもよい。そうした場合、好きなハートの色を1つ
+           指定する。…そのハートを1つ得る」 (cards/abilities.json:1626-1680,
+           PL!-bp6-003-R＋ ab#0, a `sequential` whose first leg is
+           `optional: true` and whose second leg is the heart colour + gain).
+           The first leg's allow_skip prompt declined, the tail ran anyway, and
+           a heart was named where Rust names none.
+         * parity_cce_gaps h3_q158_skip_no_blade — the same 「そう場合」 shape,
+           「そうした場合」 branch and blade obtained on a decline.
+
+       The re-derived arm in choice_deferred_conditional_gate is already
+       Rust-shaped: it fires only on an EMPTY answer (`n_indices > 0` returns 0),
+       only on a prompt the optional step raised (`ch->allow_skip`), and only
+       when the parked parent is a CONDITIONAL `sequential` (pause.rs:54). A
+       mandatory SelectCard answered empty is therefore still excluded, which is
+       the `decline` rule the same note derives at :5061-5062. Nothing else
+       changes: no test is weakened and no other dispatch arm is touched. */
+    if (choice_deferred_conditional_gate(&saved_pending, cont, n_indices)) {
         rb_queue_take_pending_actions(g);
         cont = NULL;
     }

@@ -75,6 +75,11 @@ void rb_move_execute_move_cards_ported(GameState *g, int actor, AbilityEffect *e
 /* Defined in src/core/modifiers.c; not declared in rabuka.h. */
 void rb_on_cards_left_zones(GameState *g, int card_id);
 void rb_remove_revealed_card(GameState *g, int card_id);
+/* E5/E6 -- modifiers.rs:2121-2132 / :2139-2158. Same local-extern pattern as
+ * the two above: defined in src/core/modifiers.c, not in rabuka.h (main owns
+ * that header and accumulates cross-file requests centrally). */
+void rb_remove_revealed_cost_card(GameState *g, int card_id);
+void rb_remove_from_source_hands(GameState *g, const int *card_ids, int n_ids);
 /* Defined in src/ability/util.c; not declared in rabuka.h. */
 int  rb_dedupe_by_normalized_name(const int *items, int n, int *out, int max);
 /* Defined in src/core/zones.c; not declared in rabuka.h. Mirrors
@@ -1765,6 +1770,52 @@ int rb_move_resolve_from_revealed_cards(GameState *g, int actor, AbilityEffect *
         g->n_revealed--;
         taken[nt++] = cid;
     }
+    /* move/mod.rs:614-633 -- the three post-drain steps. All three were missing,
+     * and all three are card-duplication bugs without them, because a REVEAL
+     * PEEKS: taking a revealed card copies it, and nothing else removes the
+     * original.
+     *
+     *   1. remove_from_source_hands(&taken)   -- E6, modifiers.rs:2139-2158.
+     *      Removes the hand slot, but ONLY for ids in revealed_cost_cards (a
+     *      paid cost, not a peek). A deck-top peek leaves the card in hand.
+     *   2. the deck sweep (:618-623) -- "the reveal only peeked, not drained.
+     *      If the card was from a deck-top reveal, it's still in the deck and
+     *      must be removed here to avoid duplication." player1 first, else
+     *      player2 -- the else-if is Rust's, so an id in BOTH decks loses one
+     *      slot, not two.
+     *   3. the waitroom sweep (:627-632) -- yell cards went to the waitroom
+     *      after check_live_success drained the resolution zone (Rule 8.4.7), so
+     *      the same duplication exists there. Same player1-else-player2 shape.
+     * RbPlayer's `deck` is main_deck and `discard` is the waitroom
+     * (rabuka.h:795-806); Vec::remove(pos) is a shift-down plus a decrement. */
+    rb_remove_from_source_hands(g, taken, nt);
+    for (int pl = 0; pl < 2; pl++) {
+        RbBag *d = &g->p[pl].deck;
+        /* One seat only: Rust's `if let Some(pos) = player1 { .. } else if let
+         * Some(pos) = player2 { .. }`. A `done` flag is needed rather than a
+         * bare `break`, which would only leave the per-id loop. */
+        int done = 0;
+        for (int i = 0; i < nt && !done; i++) {
+            int hit = -1;
+            for (int j = 0; j < d->n; j++) if (d->cards[j] == taken[i]) { hit = j; break; }
+            if (hit < 0) continue;
+            for (int j = hit; j + 1 < d->n; j++) d->cards[j] = d->cards[j + 1];
+            d->n--;
+            done = 1;
+        }
+    }
+    for (int pl = 0; pl < 2; pl++) {
+        RbBag *w = &g->p[pl].discard;
+        int done = 0;
+        for (int i = 0; i < nt && !done; i++) {
+            int hit = -1;
+            for (int j = 0; j < w->n; j++) if (w->cards[j] == taken[i]) { hit = j; break; }
+            if (hit < 0) continue;
+            for (int j = hit; j + 1 < w->n; j++) w->cards[j] = w->cards[j + 1];
+            w->n--;
+            done = 1;
+        }
+    }
     for (int i = 0; i < nt && i < max; i++) out_ids[i] = taken[i];
     return nt;
 }
@@ -1820,6 +1871,20 @@ int rb_move_resolve_from_selected_cards(GameState *g, int actor, AbilityEffect *
         remove_card_from_any_zone(&g->p[actor], &last_vacated, out_ids[i]);
         if (last_vacated >= 0)
             g->baton_last_vacated_area[actor] = last_vacated;
+        /* move/mod.rs:1535-1536 -- the card left a zone, so its REVEAL
+         * provenance must leave too:
+         *     gs.remove_revealed_card(card_id);
+         *     gs.remove_revealed_cost_card(card_id);
+         * Rust calls both inside the same per-taken loop, after
+         * remove_card_from_any_zone and before on_cards_left_zones. Without
+         * them the id stays in revealed_cards[] / revealed_cost_cards[] after
+         * the card has been moved out from under it, so a later
+         * `source: "revealed_cards"` take can hand back a card that is no
+         * longer in the zone it was taken from -- and rb_remove_from_source_hands
+         * (E6) would then clear a hand slot for a card that is already gone.
+         * E5's twin was previously absent from this tree entirely. */
+        rb_remove_revealed_card(g, out_ids[i]);
+        rb_remove_revealed_cost_card(g, out_ids[i]);
     }
     return take;
 }
@@ -2615,6 +2680,38 @@ void rb_move_handle_energy_zone_selection(
     rb_clear_pending_choice(g);
 }
 
+/* ── place_taken_drop_reveal_provenance ──
+   The head of Rust `place_taken_cards` (move/mod.rs:1954-1960), which the C
+   inlines per call site rather than sharing:
+
+       for &card_id in taken {
+           let was_cost_revealed = gs.revealed_cost_cards.contains(&card_id);
+           if was_cost_revealed { gs.remove_revealed_card(card_id); }
+           gs.remove_revealed_cost_card(card_id);
+       }
+
+   The gate is asymmetric and both halves matter:
+     * `remove_revealed_cost_card` runs UNCONDITIONALLY -- every taken id drops
+       its cost-reveal provenance;
+     * `remove_revealed_card` runs ONLY for a cost-revealed id. A yell reveal
+       (not a cost) must keep its entry in revealed_cards[], because those cards
+       are still physically in the resolution zone for the rest of the live.
+
+   Do NOT spread this call onto every rb_place_card_in_zone call site. It is
+   once per BATCH, at the two C sites that are the place_taken_cards twins, and
+   both removals are "remove the FIRST match" -- calling either twice on an id
+   that appears twice in the list would strip two entries where Rust strips one. */
+static void place_taken_drop_reveal_provenance(GameState *g, const int *taken, int n) {
+    if (!g || !taken || n <= 0) return;
+    for (int i = 0; i < n; i++) {
+        int was_cost_revealed = 0;
+        for (int k = 0; k < g->n_revealed_cost_cards; k++)
+            if (g->revealed_cost_cards[k] == taken[i]) { was_cost_revealed = 1; break; }
+        if (was_cost_revealed) rb_remove_revealed_card(g, taken[i]);
+        rb_remove_revealed_cost_card(g, taken[i]);
+    }
+}
+
 /* ── execute_move_cards (main entry) ── */
 void rb_move_execute_move_cards(GameState *g, int actor, AbilityEffect *e) {
     if (!g || !e) return;
@@ -2634,6 +2731,9 @@ void rb_move_execute_move_cards(GameState *g, int actor, AbilityEffect *e) {
     int dest_pl = use_p2 ? 1 : actor;
     int dest_is_under_member = destination && !strcmp(destination, "under_member");
     int um_pos = dest_is_under_member ? rb_move_under_member_pos(g, dest_pl) : -1;
+    /* move/mod.rs:1954-1960 -- place_taken_cards drops the reveal provenance of
+     * every card in the batch BEFORE any of them is placed. */
+    place_taken_drop_reveal_provenance(g, out_ids, n);
     for (int i = 0; i < n; i++) {
         int cid = out_ids[i];
         find_and_remove_card(P, cid);
@@ -2818,6 +2918,8 @@ void rb_move_execute_selected_cards_from_zone(
             rb_move_maybe_prompt_success_replacement(g, pl, card_ids[0], destination, target))
             return;
         rb_zone_remove_at_indices(g, pl, zone, filtered, nf);
+        /* move/mod.rs:1954-1960 -- see place_taken_drop_reveal_provenance. */
+        place_taken_drop_reveal_provenance(g, card_ids, n_ids);
         for (int i = 0; i < n_ids; i++) {
             /* util.rs:2341-2359 — placement.rs:307-309, used in place of
                rb_place_card_in_zone, which has no under_member arm and would

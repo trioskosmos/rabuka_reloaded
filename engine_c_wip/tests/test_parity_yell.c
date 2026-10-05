@@ -226,7 +226,11 @@ static void dump_trigger_miss(const char *card_no)
  * CP932 re-encode of this file cannot silently turn it into a different
  * string.  蓮ノ空 = E8 8E B2 / E3 83 8E / E7 A9 BA.  core/card.c maps the
  * series ラブライブ！蓮ノ空女学院スクールアイドルクラブ to exactly this. */
-#define HASU_GROUP     "\xE8\x8E\xB2\xE3\x83\x8E\xE7\xA9\xBA"
+#define HASU_GROUP     "\xE8\x93\xAE\xE3\x83\x8E\xE7\xA9\xBA"
+/* The lead escape was E8 8E B2 (U+8236), a variant 蓮 that occurs NOWHERE in
+ * cards/cards.json or in engine/src/*.rs. src/core/card.c:374 and
+ * engine/src/core/card.rs map_series_to_group both return U+84EE = E8 93 AE,
+ * so rb_card_matches_group_str was comparing a token no card record carries. */
 
 #define MITSUKI        "PL!HS-bp6-027-L"  /* 月夜見海月, unit スリーズブーケ
                                             * 自動 ターン1回: on yell, up to 3

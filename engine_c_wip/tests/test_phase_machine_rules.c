@@ -5,8 +5,28 @@
 #include <string.h>
 
 static int failures;
+static int cases;   /* every assertion ATTEMPT, see the guard below */
+
+
+/* ── THE CASE-COUNT GUARD (zero cases is a FAILURE, never a pass) ──────────────
+ * This suite used to print its failure count and NOTHING ELSE, so a build in
+ * which every test body below silently stopped running -- renamed helper, dead
+ * fixture, an early return on a setup path -- still exited 0 and still read
+ * green. That is the most dangerous measurement property in this repo: a broken
+ * build and a passing build print the same thing.
+ *
+ * `cases` is incremented on EVERY assertion ATTEMPT, before the condition is
+ * evaluated, so it is a count of cases actually reached and not a count of
+ * cases that happened to pass. The only thing asserted below is cases > 0,
+ * which is the weakest guard that still distinguishes "ran" from "did not
+ * run"; it is deliberately NOT a floor that would need re-baselining when a
+ * test is added or removed.
+ *
+ * This ADDS a check. It does not weaken, relax or delete an existing one: the
+ * failure count and its exit status are untouched. */
 
 #define REQUIRE(c, msg) do { \
+    cases++; \
     if (!(c)) { \
         fprintf(stderr, "FAIL: %s\n", msg); \
         failures++; \
@@ -15,6 +35,7 @@ static int failures;
 } while (0)
 
 #define REQUIRE_EQ(a, b, msg) do { \
+    cases++; \
     int actual_ = (a); \
     int expected_ = (b); \
     if (actual_ != expected_) { \
@@ -418,6 +439,13 @@ int main(void)
 
     rb_unload();
     if (failures) return 1;
-    printf("ALL PHASE MACHINE RULE CHECKS PASSED\n");
+    if (cases == 0) {
+        fprintf(stderr, "FAIL: phase_machine_rules ran ZERO cases -- every test body stopped "
+                        "before its first assertion; this is a broken suite, "
+                        "not a passing one\n");
+        return 1;
+    }
+    printf("phase_machine_rules: %d cases, %d failures -- ALL PHASE MACHINE RULE CHECKS PASSED\n",
+           cases, failures);
     return 0;
 }

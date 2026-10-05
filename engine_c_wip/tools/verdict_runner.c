@@ -74,6 +74,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
+#include <sys/stat.h>
 
 /* -- how many LEADING bytes of a line are held for normalisation ----------
  * Normalisation only ever rewrites the PREFIX, so the window has to cover the
@@ -220,6 +221,80 @@ static void vs_flush(VsStream *st)
     fflush(st->out);
 }
 
+/* -- THE STRUCTURED VERDICT ------------------------------------------------
+ *
+ * The text verdict line above is still printed -- it is what a human reads at
+ * the bottom of a log, and the Makefile's run-all-tests greps for it -- but a
+ * CONSUMER should never have to scrape a log to learn whether a suite passed.
+ * That is the defect this file exists to remove, and leaving the answer only in
+ * stdout re-creates it one layer up: a gate that parses logs is measuring the
+ * size and shape of text, and the day a suite's prose changes the gate's
+ * verdict changes with it.
+ *
+ * So every run ALSO writes ONE JSON object per suite, and that -- not stdout --
+ * is the corpus's measurement surface:
+ *
+ *     verdicts/<suite>.json
+ *
+ * The directory comes from $RB_VERDICT_JSON_DIR, defaulting to `verdicts`
+ * beside the runner's working directory (the engine_c_wip root, which is where
+ * every suite is launched from).  $RB_VERDICT_JSON=0 turns the file off for a
+ * one-off run that must not leave artefacts.
+ *
+ * WHY THE THREE VERDICT VALUES, and why INCONCLUSIVE is a value rather than an
+ * absence: a suite killed on a signal emitted NO verdict line at all, so every
+ * log-scraping consumer counted it as "no failures seen" -- green.  Written
+ * down, it is a third state that cannot be confused with either of the other
+ * two, because it is spelled out.
+ *
+ * `exit` is recorded for forensics only.  It is NOT the verdict, and nothing
+ * downstream may read it as one: COVERAGE_HARNESS.md 3 shows suites exiting 0
+ * while carrying FAIL lines AND suites exiting non-zero carrying none.
+ * `n_result_lines` is the assertion count the verdict was actually decided on.
+ */
+static void vs_write_json(const char *name, const char *verdict,
+                          int exit_code, int signalled)
+{
+    const char *dir = getenv("RB_VERDICT_JSON_DIR");
+    char path[1024];
+    FILE *f;
+    const char *off = getenv("RB_VERDICT_JSON");
+
+    if (off && strcmp(off, "0") == 0) return;
+    if (!dir || !*dir) dir = "verdicts";
+    if (mkdir(dir, 0777) != 0 && errno != EEXIST) {
+        fprintf(stderr, "FAIL: [setup-bug] rb_verdict: mkdir %s failed: %s\n",
+                dir, strerror(errno));
+        return;
+    }
+    snprintf(path, sizeof path, "%s/%s.json", dir, name);
+    f = fopen(path, "wb");
+    if (!f) {
+        fprintf(stderr, "FAIL: [setup-bug] rb_verdict: cannot write %s: %s\n",
+                path, strerror(errno));
+        return;
+    }
+    fprintf(f,
+        "{\n"
+        "  \"suite\": \"%s\",\n"
+        "  \"verdict\": \"%s\",\n"
+        "  \"exit\": %d,\n"
+        "  \"signal\": %d,\n"
+        "  \"n_result_lines\": %ld,\n"
+        "  \"n_assert\": %ld,\n"
+        "  \"n_vacuous\": %ld,\n"
+        "  \"n_setup_bug\": %ld,\n"
+        "  \"n_test_bug\": %ld,\n"
+        "  \"n_fatal\": %ld,\n"
+        "  \"n_crash\": %ld,\n"
+        "  \"n_renormalised\": %ld\n"
+        "}\n",
+        name, verdict, exit_code, signalled,
+        VS_N_TOTAL, VS_N_ASSERT, VS_N_VACUOUS, VS_N_SETUP,
+        VS_N_TESTBUG, VS_N_FATAL, VS_N_CRASH, VS_N_REWRITTEN);
+    fclose(f);
+}
+
 /* -- main ------------------------------------------------------------------ */
 int main(int argc, char **argv)
 {
@@ -321,17 +396,20 @@ int main(int argc, char **argv)
                         "WAS EMITTED. Treat this suite as INCONCLUSIVE, not "
                         "green.\n", name, signalled, signalled);
         fflush(NULL);
+        vs_write_json(name, "INCONCLUSIVE", exit_code, signalled);
         return exit_code;
     }
     if (VS_N_TOTAL == 0 && exit_code == 0) {
         printf("PASSED: %s  [exit=0, 0 result line(s), renormalised=%ld]\n",
                name, VS_N_REWRITTEN);
+        vs_write_json(name, "PASSED", exit_code, 0);
     } else {
         printf("FAILED: %s  [exit=%d, %ld result line(s): assert=%ld vacuous=%ld "
                "setup-bug=%ld crash=%ld test-bug=%ld fatal=%ld renormalised=%ld]\n",
                name, exit_code, VS_N_TOTAL, VS_N_ASSERT, VS_N_VACUOUS,
                VS_N_SETUP, VS_N_CRASH, VS_N_TESTBUG, VS_N_FATAL,
                VS_N_REWRITTEN);
+        vs_write_json(name, "FAILED", exit_code, 0);
     }
     fflush(NULL);
     return exit_code;

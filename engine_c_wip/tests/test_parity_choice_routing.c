@@ -120,8 +120,28 @@ const char *rb_wire_pending_choice_player_id(const GameState *g);
 void rb_queue_pause_for_auto_ability_choice(GameState *g, const RbChoice *choice);
 
 static int failures;
+static int cases;   /* every assertion ATTEMPT, see the guard below */
+
+
+/* ── THE CASE-COUNT GUARD (zero cases is a FAILURE, never a pass) ──────────────
+ * This suite used to print its failure count and NOTHING ELSE, so a build in
+ * which every test body below silently stopped running -- renamed helper, dead
+ * fixture, an early return on a setup path -- still exited 0 and still read
+ * green. That is the most dangerous measurement property in this repo: a broken
+ * build and a passing build print the same thing.
+ *
+ * `cases` is incremented on EVERY assertion ATTEMPT, before the condition is
+ * evaluated, so it is a count of cases actually reached and not a count of
+ * cases that happened to pass. The only thing asserted below is cases > 0,
+ * which is the weakest guard that still distinguishes "ran" from "did not
+ * run"; it is deliberately NOT a floor that would need re-baselining when a
+ * test is added or removed.
+ *
+ * This ADDS a check. It does not weaken, relax or delete an existing one: the
+ * failure count and its exit status are untouched. */
 
 #define CHECK(condition, message) do { \
+    cases++; \
     if (!(condition)) { \
         fprintf(stderr, "FAIL: %s\n", message); \
         failures++; \
@@ -673,6 +693,12 @@ int main(void)
     t_web_surface_carries_the_key();
     t_reader_answers_the_routed_seat();
     t_second_json_producer_is_a_known_divergence();
-    printf("=== %d failed ===\n", failures);
+    if (cases == 0) {
+        fprintf(stderr, "FAIL: parity_choice_routing ran ZERO cases -- every test body stopped "
+                        "before its first assertion; this is a broken suite, "
+                        "not a passing one\n");
+        return 1;
+    }
+    printf("parity_choice_routing: %d cases, %d failures\n", cases, failures);
     return failures ? 1 : 0;
 }

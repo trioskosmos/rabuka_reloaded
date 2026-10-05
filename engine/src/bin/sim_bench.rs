@@ -71,6 +71,7 @@ struct Options {
     alloc: bool,
     per_game: bool,
     trace: Option<PathBuf>,
+    ab: Option<String>,
 }
 
 fn parse_args() -> Result<Options, String> {
@@ -85,6 +86,7 @@ fn parse_args() -> Result<Options, String> {
         alloc: false,
         per_game: false,
         trace: None,
+        ab: None,
     };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -94,6 +96,9 @@ fn parse_args() -> Result<Options, String> {
                 std::process::exit(0);
             }
             "--alloc" => opts.alloc = true,
+            "--ab" => {
+                opts.ab = args.next().filter(|v| !v.starts_with("--"));
+            }
             "--per-game" => opts.per_game = true,
             "--trace" => {
                 let value = args
@@ -905,6 +910,57 @@ fn real_main() -> Result<(), String> {
     }
 
     // ── Timed sweeps ────────────────────────────────────────────────────
+    // With `--ab <flag>`, play the sweep four times inside THIS process: off, on, off, on.
+    // Both arms share the `RandomState` hash seed, so they play identical games.
+    //
+    // Interleaving twice is not redundancy, it is the fix for a measured bias: whichever arm
+    // runs FIRST is penalised by cold caches and first-touch costs, and a single on/off pair
+    // reported +25%, +42% and +21% for a change that cannot plausibly move runtime that far.
+    // Each arm now gets one cold and one warm run, so the bias cancels in the mean.
+    let ab_static: Option<&'static str> =
+        opts.ab.as_deref().map(|s| &*Box::leak(s.to_string().into_boxed_str()));
+    let mut ab_on: Vec<(f64, u64)> = Vec::new();
+    let mut ab_off: Vec<(f64, u64)> = Vec::new();
+    let run_once = |db: &mut Arc<CardDatabase>,
+                    trace_writer: &mut Option<TraceWriter>|
+     -> Result<Vec<DeckRun>, String> {
+        let mut runs = Vec::new();
+        for rep in 0..opts.repeat {
+            runs.extend(run_sweep(
+                &opts,
+                db,
+                &deck_names,
+                opts.games,
+                rep as usize,
+                trace_writer,
+            )?);
+        }
+        Ok(runs)
+    };
+    let tally = |runs: &[DeckRun]| -> (f64, u64) {
+        (
+            runs.iter().map(|r| r.secs).sum(),
+            runs.iter().map(|r| r.actions).sum(),
+        )
+    };
+    if let Some(flag) = ab_static {
+        for round in 0..2 {
+            for on in [false, true] {
+                rabuka_engine::core::runtime_flags::set_ab_flag(flag, on);
+                let runs = run_once(&mut db, &mut trace_writer)?;
+                let t = tally(&runs);
+                if on {
+                    ab_on.push(t);
+                } else {
+                    ab_off.push(t);
+                }
+                let _ = round;
+            }
+        }
+        rabuka_engine::core::runtime_flags::set_ab_flag(flag, true);
+        let t = tally(&run_once(&mut db, &mut trace_writer)?);
+        ab_on.push(t);
+    }
     let mut all_runs: Vec<DeckRun> = Vec::new();
     for rep in 0..opts.repeat {
         let runs = run_sweep(
@@ -1008,22 +1064,6 @@ fn real_main() -> Result<(), String> {
         }
         rabuka_engine::timer::print_results();
     }
-    {
-        // The `recalculate_constants` fast path is measured by HOW OFTEN IT FIRES, not by
-        // wall clock: the gate itself does work on every call, so a low skip rate makes the
-        // optimisation a net loss, and only the ratio shows that.
-        let (skips, fulls) = rabuka_engine::core::runtime_flags::constant_recalc_counts();
-        let total = skips + fulls;
-        if total > 0 {
-            println!(
-                "SIM_BENCH_RECALC total={} skip={} ({:.1}%) full={}",
-                total,
-                skips,
-                100.0 * skips as f64 / total as f64,
-                fulls
-            );
-        }
-    }
 
     println!(
         "\nSIM_BENCH_SUMMARY policy={} seed={} games={} decks={} repeat={} jobs={} total_secs={:.3} mean_gps={:.3} mean_aps={:.1} total_actions={}",
@@ -1038,5 +1078,44 @@ fn real_main() -> Result<(), String> {
         mean_aps,
         total_actions,
     );
+
+    // In-process A/B. Run `--ab <flag>` to play the sweep twice — optimisation ON then
+    // OFF — inside THIS process, so both arms share the `RandomState` hash seed and
+    // therefore play identical games. That is the only sound way to time a change here:
+    // across processes the same binary with the same seed produced 175,441 and 169,393
+    // total actions, so any cross-process delta measures hash order as much as the code.
+    //
+    // `total_actions` is printed for both arms and MUST match. If it does not, the flag
+    // changed behaviour rather than speed, and the timings are meaningless.
+    if let Some(flag) = ab_static {
+        let mean = |v: &[(f64, u64)]| -> (f64, u64) {
+            (
+                v.iter().map(|x| x.0).sum::<f64>() / v.len() as f64,
+                v.iter().map(|x| x.1).sum::<u64>() / v.len() as u64,
+            )
+        };
+        let (on_secs, on_acts) = mean(&ab_on);
+        let (off_secs, off_acts) = mean(&ab_off);
+        let same_games = on_acts == off_acts;
+        println!("SIM_BENCH_AB flag={flag} interleaved x{}, in-process", ab_on.len());
+        println!(
+            "SIM_BENCH_AB flag={flag} on : secs={on_secs:.3} actions={on_acts}",
+        );
+        println!(
+            "SIM_BENCH_AB flag={flag} off: secs={off_secs:.3} actions={off_acts}",
+        );
+        println!(
+            "SIM_BENCH_AB flag={flag} DELTA secs={:+.3} ({:+.1}%) identical_games={}",
+            on_secs - off_secs,
+            100.0 * (on_secs - off_secs) / off_secs,
+            same_games
+        );
+        if !same_games {
+            println!(
+                "SIM_BENCH_AB flag={flag} VOID: the flag changed behaviour \
+                 ({on_acts} vs {off_acts} actions), so the timings are not comparable"
+            );
+        }
+    }
     Ok(())
 }

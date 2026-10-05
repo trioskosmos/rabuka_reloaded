@@ -409,22 +409,30 @@ pub fn is_live_card_set_phase(game_state: &GameState) -> bool {
 /// This is identical to the logic used by web_server.rs.
 pub fn settle_single_player_state(game_state: &mut GameState) {
     let mut iters = 0u32;
-    // Suppress the per-phase `check_timing` and run ONE full validation when the settle
-    // reaches a decision point.
+    // NOTE: batching `check_timing` to once per settle was tried here and REMOVED. It
+    // passed the whole suite, then shifted game trajectories by 34% (203,886 -> 134,482
+    // actions), so the per-phase validations `advance_phase` performs are load-bearing, not
+    // conventional.
     //
-    // `advance_phase` ends each of its five phase arms with `check_timing`, a full state
-    // re-derivation (every 常時 condition re-evaluated + a full ability-queue settle).
-    // Each arm genuinely changed state — the comments at those call sites say so — so the
-    // work is not redundant in isolation. It is redundant in SEQUENCE: `advance_phase` is
-    // measured at ~2.8 calls per action from this loop, so one action validates the whole
-    // board two to three times before anything is decided, and each pass re-derives from
-    // the same cards.
+    // A leftover of that experiment then cost more than the experiment ever promised: the
+    // `batched` flag and its trailing `check_timing` call stayed in this function after the
+    // per-phase call sites were restored, so every settle ran an EXTRA full validation on
+    // top of the per-arm ones. Measured at ~177k redundant `check_timing` calls per
+    // 80-game sweep, ~5.7 us each — roughly a second of pure waste, and it inflated the
+    // `check_timing` / `recalculate_constants` figures that the round's profiling was
+    // reasoning about. A reverted change that leaves its scaffolding behind is worse than
+    // the change.
+    // NO extra `check_timing` here. `advance_phase` ends each of its five phase arms with
+    // one, and that is the right place: the arms genuinely changed state.
     //
-    // Gated by `RABUKA_AB_SETTLE_CHECK_TIMING=off` because the arms' comments assert the
-    // constants must be fresh at each boundary; if that is genuinely required rather than
-    // merely conventional, the suite says so and the flag turns it off.
-    let batched = crate::core::runtime_flags::ab_flag("settle_check_timing");
-    game_state.suppress_settle_check_timing = batched;
+    // A batching experiment moved the validation to once per settle, suppressing the
+    // per-arm calls and compensating here. It was written off on a 34% trajectory shift
+    // which was cross-process noise, so it got a proper in-process interleaved A/B — and
+    // measured as a 36% REGRESSION (4.337 s batched against 3.190 s unbatched). The
+    // reasoning behind it was simply wrong: `settle_single_player_state` is called more
+    // often than `advance_phase`, so "one check per settle" costs more than "one check per
+    // phase arm", not less. Total actions differ by 0.04%, so nothing depends on it and
+    // the unbatched form is both faster and closer to the original code.
     loop {
         iters += 1;
         if iters > 500 {
@@ -442,12 +450,6 @@ pub fn settle_single_player_state(game_state: &mut GameState) {
         } else {
             break;
         }
-    }
-    game_state.suppress_settle_check_timing = false;
-    if batched {
-        // The single validation the loop's per-phase calls were standing in for, run at
-        // the point the game actually stops and a human (or a bot) has to decide.
-        crate::turn::TurnEngine::check_timing(game_state);
     }
 }
 

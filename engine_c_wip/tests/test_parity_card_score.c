@@ -1673,11 +1673,30 @@ static        TestGame tg; test_game_new(&tg);
         CHECK_EQ(tg.state.n_revealed, 2,
                  "PL!S-bp7-022-L control: the negative board reveals 2 cards, the "
                  "positive board 1, so a +0 cannot come from an empty zone");
-        CHECK(!rb_card_matches_group_str(rina, "\x41\x75\xE3\x82\xAF\xE3\x83\xBC\xE3\x83\xAB\x21")
-                  && !rb_card_matches_group_str(rika, "\x41\x75\xE3\x82\xAF\xE3\x83\xBC\xE3\x83\xAB\x21"),
-              "PL!S-bp7-022-L control: neither revealed card is in the Aqours! group "
-              "(\x41\x75... is the UTF-8 of the unit name, written in escapes "
-              "because the Write path here can emit CP932)");
+        /* The group string is ASCII "Aqours" on BOTH sides — src/core/card.c:370
+         * (the twin of engine/src/core/card.rs:862
+         *   "ラブライブ！サンシャイン!!" => "Aqours".into())
+         * and engine/src/core/card_binary.rs:160. The literal here used to be
+         * "\x41\x75\xE3\x82\xAF\xE3\x83\xBC\xE3\x83\xAB\x21", i.e. `Auクール！`
+         * — a corrupted `Aqours` — which matches NO card in the corpus, so both
+*   `!rb_card_matches_group_str(...)` calls were trivially true and the
+         *   "neither revealed card is in the group" control proved nothing.
+         * Escapes are kept because the Write path here can emit CP932.
+         * Rust: live_success_group_heart_gated_live_score_test.rs:45-56
+         *   `aquarium_live_success_non_aqours_hearts_do_not_score` — the same
+         *   two fixtures (PL!N-PR-026-PR, PL!N-bp1-021-N), same negative.
+         * NON-VACUITY: the positive arm above reveals PL!S-sd1-001-SD, an
+         * Aqours card, so this same predicate must be TRUE for it. Asserted
+         * here so the two negatives cannot both pass because the string matches
+         * nothing at all. */
+        int aqours_probe = test_new_id(&tg, "PL!S-sd1-001-SD");
+        CHECK(rb_card_matches_group_str(aqours_probe, "\x41\x71\x6F\x75\x72\x73"),
+              "PL!S-bp7-022-L control: the group literal \"Aqours\" DOES match an Aqours "
+              "card (card.c:370 = card.rs:862), so the two negatives below are real");
+        CHECK(!rb_card_matches_group_str(rina, "\x41\x71\x6F\x75\x72\x73")   /* "Aqours" */
+                  && !rb_card_matches_group_str(rika, "\x41\x71\x6F\x75\x72\x73"),
+              "PL!S-bp7-022-L control: neither revealed card is in the Aqours group "
+              "(\"Aqours\", card.c:370 = card.rs:862)");
         fire_live_success(&tg, 0, live);
         drain_skip(&tg);
         CHECK_EQ(score_of(&tg, live), 0, "PL!S-bp7-022-L: non-Aqours revealed members -> +0");

@@ -2437,6 +2437,21 @@ static void test_surplus_zero_does_not_look_or_reorder(void)
 /*       PL!-sd1-019-SD START:DASH!! — a whole-turn run to the live.       */
 /* ===================================================================== */
 
+/* P1's total card count across hand + deck + waitroom + energy + live +
+ * success + stage + under-member. Used by the q36 conservation assertion
+ * below; a `look` that returns cards must leave this unchanged. */
+static int q36_p1_total(const TestGame *tg)
+{
+    const RbPlayer *p = &tg->state.p[0];
+    int total = p->hand.n + p->deck.n + p->discard.n + p->energy.n
+              + p->live.n + p->success.n;
+    for (int i = 0; i < RB_STAGE_SIZE; i++) {
+        if (p->stage[i] >= 0) total++;
+        total += p->under_cards[i].n;
+    }
+    return total;
+}
+
 static void test_q36_look_three_does_not_increase_deck_size(void)
 {
     static TestGame tg;
@@ -2458,6 +2473,7 @@ static void test_q36_look_three_does_not_increase_deck_size(void)
         test_add_to_deck_pl(&tg, 1, filler);
     }
     int deck_before = tg.state.p[0].deck.n;
+    int q36_total_before = q36_p1_total(&tg);
 
     advance_to_live_set(&tg);
     CHECK(strstr(rb_phase_name(tg.state.phase), "LiveCardSet") != NULL,
@@ -2468,13 +2484,35 @@ static void test_q36_look_three_does_not_increase_deck_size(void)
     advance_to_live_victory(&tg);
     drain_skip(&tg, 12);
 
+    /* Rust live_success_look_three_deck_size_q36_test.rs:34 asserts
+     *     assert!(deck_after <= deck_before, "LiveSuccess should draw cards")
+     * That bound is weak in BOTH directions and was weak here: an UNCHANGED
+     * deck passes it, and so does catastrophic card loss. It cannot fail on
+     * the defect it names. Rust's own message states the stronger, real claim,
+     * so that is what is asserted, in two halves:
+     *
+     *   (1) the deck really SHRANK, so "nothing happened" is now RED;
+     *   (2) P1's total card count is UNCHANGED, so the smaller deck is the
+     *       look DRAWING and RETURNING, not a run that eats cards. Without
+     *       (2), (1) alone is satisfied by a bug that destroys cards.
+     *
+     * Both numbers are measured from this fixture, not assumed: deck 15 -> 10
+     * with P1 total 17 -> 17 and 3 look prompts.
+     * Rust citation for the staged behaviour: live_success_look_three_deck_size_
+     * q36_test.rs:20-32 (a 15-card deck, the live a 3rd-from-top draw). */
     int deck_after = tg.state.p[0].deck.n;
-    CHECK(deck_after <= deck_before,
-          "q36: ライブ成功時 looks, it does not enlarge the deck (%d -> %d)",
+    CHECK(deck_after < deck_before,
+          "q36: the live-success look really drew cards out of the deck (%d -> %d); "
+          "Rust live_success_look_three_deck_size_q36_test.rs:34",
           deck_before, deck_after);
-    /* VACUITY CONTROL: the "<=" would pass trivially on a board where the turn
-     * never advanced. The phase assertion above proves the run happened, and the
-     * prompt count proves the live actually fired prompts. */
+    CHECK(q36_p1_total(&tg) == q36_total_before,
+          "q36: the look RETURNED what it drew -- P1's total card count is unchanged "
+          "(%d -> %d), so the smaller deck is not card loss; Rust "
+          "live_success_look_three_deck_size_q36_test.rs:34",
+          q36_total_before, q36_p1_total(&tg));
+    /* VACUITY CONTROL: without it neither bound above would prove the live ever
+     * ran. The phase assertion proves the run happened, and the prompt count
+     * proves the live actually fired prompts. */
     CHECK(prompts > mark, "q36 vacuity control: the live run really produced prompts");
 }
 

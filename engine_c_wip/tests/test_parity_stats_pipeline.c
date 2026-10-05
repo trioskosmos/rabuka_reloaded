@@ -68,7 +68,16 @@ static int checks;
 } while (0)
 
 /* Trigger wire tokens (engine/src/ability/enums.rs ability trigger strings). */
-#define TRIG_LIVE_START  "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE8\xB5\xB7\xE5\xA7\x8B\xE6\x99\x82"      /* ライブ開始時 */
+/* U+958B, NOT U+5F37. Both render as a 開 glyph, but they are DIFFERENT
+ * codepoints and strstr is bytewise. The corpus spelling -- cards/cards.json,
+ * src/core/generated/bytecode_blob.c, and all 146 engine/src/*.rs -- is
+ * U+958B = E9 96 8B (1000 occurrences). This literal was U+5F37 = E8 B5 B7,
+ * which occurs NOWHERE in the corpus, so rb_trigger_is / test_ability_index_for_trigger
+ * never found a live-start ability and every 「has a live-start ability」
+ * premise check failed. The 11 sibling suites that spell the same token
+ * correctly (test_parity_cce_gaps.c:71, test_parity_small_clusters.c:51,
+ * test_parity_ability_watch.c, test_parity_blade_under.c, ...) all use E9 96 8B. */
+#define TRIG_LIVE_START  "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE9\x96\x8B\xE5\xA7\x8B\xE6\x99\x82"      /* ライブ開始時 */
 #define TRIG_LIVE_SUCCESS "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE6\x88\x90\xE5\x8A\x9F\xE6\x99\x82"      /* ライブ成功時 */
 
 /* ── fire_trigger shim (engine/tests/helpers/mod.rs:114) ───────────────
@@ -287,27 +296,64 @@ static void a_stage_hearts_pipeline(void) {
 }
 
 /* stats_pipeline.rs:205-254 effective_need_heart + 259-280 need_satisfied. */
+/* stats_pipeline.rs:202-253 effective_need_heart + :255-279 need_satisfied.
+ * Rust layering is exactly the two loops at stats_pipeline.rs:221-232 (per
+ * colour SET replaces the printed count) and :233-251 (additive stacks on top
+ * of the SET value), which is the Q115/Q127 rule.
+ *
+ * FIXTURE: the card number was "PL!S-bp1-002-L", which does NOT exist. There
+ * is no PL!S-bp1-002-* in cards/cards.json at all -- the whole PL!S-bp1 pack
+ * is the single PL!S-bp1-000-LLE -- so rb_find_card_by_no returned -1,
+ * rb_effective_need_heart(-1, ..) produced all zeros, and EVERY assertion
+ * below read `0`:
+ *   - "fixture live card has a printed need" failed on printed_total == 0,
+ *   - both need_heart SET/additive assertions failed with got 0,
+ *   - "a printed need with no hearts provided is not satisfied" failed because
+ *     an all-zero printed need is trivially satisfied.
+ * So this was NOT a SET/additive defect and NOT the stage-hearts pipeline; it
+ * was an unresolvable card id, the CARD-NUMBER TRAP in reverse (here nothing
+ * resolved at all). PL!HS-bp5-022-L is the fixture the Rust twin of this exact
+ * call uses -- engine/tests/test_modules/effects/choice/selection_filter/
+ * optional_energy_edelnote_deploy_or_requirement_test.rs:7 `const LIVE:
+ * &str = "PL!HS-bp5-022-L"` -- and its printed need is heart00..06 =
+ * 1,1,1,5,2,0,0 (verified by decoding, not by reading the text). Colour 2
+ * (heart02) printed count is 1, so a SET of 1 is a coincidence; the
+ * non-vacuity comes from the ADDITIVE assertion, which must reach 3. */
 static void a_effective_need_heart_and_satisfied(void) {
-    TestGame game;
-    test_game_new(&game);
+  static TestGame game;
+  test_game_new(&game);
 
-    int live = test_id(&game, "PL!S-bp1-002-L");
-    int out[8];
-    rb_effective_need_heart(&game.state, live, out);
-    int printed_total = par_hearts_total(out);
-    CHECK(printed_total > 0, "fixture live card has a printed need");
+  int live = test_id(&game, "PL!HS-bp5-022-L");
+  CHECK(live >= 0, "fixture live card PL!HS-bp5-022-L resolves (Rust: optional_energy_edelnote_deploy_or_requirement_test.rs:7)");
+  if (live < 0) return;
+  int out[8];
+  rb_effective_need_heart(&game.state, live, out);
+  int printed_total = par_hearts_total(out);
+  CHECK(printed_total > 0, "fixture live card has a printed need");
 
     /* No modifiers -> printed need is returned unchanged. */
     int printed[8];
     memcpy(printed, out, sizeof(printed));
 
-    /* Q115/Q127: per-colour SET applies first, additive stacks after. */
-    rb_mods_set_need_heart(&game.state.mods, live, 2, 1);
-    rb_effective_need_heart(&game.state, live, out);
-    CHECK_EQ(out[2], 1, "need_heart SET replaces the printed count for that colour");
-    rb_mods_add_need_heart(&game.state.mods, live, 2, 2);
-    rb_effective_need_heart(&game.state, live, out);
-    CHECK_EQ(out[2], 3, "need_heart additive stacks on top of the SET value");
+/* Q115/Q127: per-colour SET applies first, additive stacks after.
+   * Colour 3 (heart03) is used, NOT colour 2: PL!HS-bp5-022-L prints heart02
+   * = 1, so a SET of 1 on colour 2 would be indistinguishable from "the SET was
+   * ignored and the printed value survived" -- a vacuous assertion. heart03
+   * prints 5, so SET 1 proves the SET is applied and SET 1 + additive 2 = 3
+   * proves the additive stacks on the SET. Both are therefore non-vacuous in
+   * both directions.
+   * Rust: stats_pipeline.rs:221-232 (SET replaces) then :233-251 (additive
+   * stacks on top of the SET value). */
+  rb_mods_set_need_heart(&game.state.mods, live, 3, 1);
+  rb_effective_need_heart(&game.state, live, out);
+  CHECK_EQ(out[3], 1, "need_heart SET replaces the printed count for that colour "
+                      "(printed heart03=5; Rust: stats_pipeline.rs:221-232)");
+  CHECK_EQ(out[2], printed[2], "the SET applies PER COLOUR and leaves other colours printed "
+                              "(Rust: stats_pipeline.rs:221, keyed by HeartColor)");
+  rb_mods_add_need_heart(&game.state.mods, live, 3, 2);
+  rb_effective_need_heart(&game.state, live, out);
+  CHECK_EQ(out[3], 3, "need_heart additive stacks on top of the SET value "
+                      "(1 + 2; Rust: stats_pipeline.rs:233-251)");
     rb_mods_clear_card(&game.state.mods, live);
     rb_effective_need_heart(&game.state, live, out);
     CHECK_EQ(memcmp(out, printed, sizeof(out)), 0,
@@ -318,7 +364,8 @@ static void a_effective_need_heart_and_satisfied(void) {
     CHECK(rb_need_satisfied(none, none, live, &game.state.mods),
           "an empty need is always satisfied");
     CHECK(!rb_need_satisfied(printed, none, live, &game.state.mods),
-          "a printed need with no hearts provided is not satisfied");
+          "a printed need with no hearts provided is not satisfied "
+          "(Rust: stats_pipeline.rs:264-272 -> core/card.rs:4496 check_heart_requirement)");
 
     int provided[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     for (int c = 0; c < 8; c++) provided[c] = printed[c];
@@ -331,11 +378,32 @@ static void a_effective_need_heart_and_satisfied(void) {
     CHECK(rb_need_satisfied(printed, wildcard, live, &game.state.mods),
           "a heart00 wildcard pool satisfies an arbitrary printed need");
 
-    /* A need_heart modifier that empties the requirement short-circuits to true. */
-    rb_mods_set_need_heart(&game.state.mods, live, 3, 1);
-    rb_mods_add_need_heart(&game.state.mods, live, 3, -1);
+    /* A need_heart modifier set that empties the requirement short-circuits to
+       true. Rust: need_satisfied matches `Some(eff) if eff.hearts.is_empty() =>
+       true` (stats_pipeline.rs:266), and effective_need_heart REMOVES a colour
+       whose additive drives it to zero (stats_pipeline.rs:239-242). So EVERY
+       printed colour has to be driven to zero -- the previous body only zeroed
+       colour 3, which was the card's ONLY colour under the (unresolvable)
+       fixture it was written for, and so passed vacuously here. */
+    for (int c = 0; c < 8; c++) {
+        if (printed[c] <= 0) continue;
+        rb_mods_set_need_heart(&game.state.mods, live, c, 1);
+        rb_mods_add_need_heart(&game.state.mods, live, c, -1);
+    }
+    rb_effective_need_heart(&game.state, live, out);
+    CHECK_EQ(par_hearts_total(out), 0,
+             "each colour driven to zero is REMOVED from the effective need, "
+             "so the whole requirement is empty (Rust: stats_pipeline.rs:239-242)");
     CHECK(rb_need_satisfied(printed, none, live, &game.state.mods),
-          "a need reduced to nothing by modifiers is satisfied");
+          "a need reduced to nothing by modifiers is satisfied "
+          "(Rust: stats_pipeline.rs:266 `Some(eff) if eff.hearts.is_empty() => true`)");
+
+    /* And it is the EMPTY EFFECTIVE need, not the printed one, that gates it:
+     * put a single heart back on one colour and the same pool must now fail. */
+    rb_mods_add_need_heart(&game.state.mods, live, 0, 1);
+    CHECK(!rb_need_satisfied(printed, none, live, &game.state.mods),
+          "restoring one colour's requirement re-fails the empty pool "
+          "(Rust: stats_pipeline.rs:267-273 falls through to check_heart_requirement)");
     rb_mods_clear_card(&game.state.mods, live);
 }
 
@@ -461,7 +529,18 @@ static void b_bp4_028_l_distinct_waitroom_lives(void) {
     CHECK_EQ(test_get_score_modifier(&three, swc3), 0, "3 distinct < 4 -> nothing");
 }
 
-/* card_score/opponent_energy_gated_score_test.rs */
+/* card_score/opponent_energy_gated_score_test.rs:29-49
+ * `s_bp6_022_live_success_with_equal_energy_gains_no_score` asserts
+ * get_score_modifier == 0 at a tie. The Rust side of that assertion is
+ * engine/src/ability/condition/card.rs:4410-4417 get_count_for_target, whose
+ * FIRST arm is `if resource_type == Some("energy") { return
+ * player.energy_zone.cards.len() }`, reached from
+ * comparison.rs:268-284 comparison_target_count with
+ * comparison_target == Self_ && comparison_type absent.
+ * Wire fields of PL!S-bp6-022-L ab#0 (decoded, not read off the text):
+ * target=opponent / resource_type=energy / operator=">" / comparison_target=self.
+ * Rust counts OPPONENT energy as `count` and SELF energy as the threshold,
+ * so 3 > 1 scores and 2 > 2 does not. */
 static void b_bp6_022_l_opponent_energy_gate(void) {
 static    TestGame game;
     test_game_new(&game);
@@ -481,7 +560,9 @@ static    TestGame tie;
     for (int i = 0; i < 2; i++) test_give_opp_energy(&tie, 1);
     CHECK(par_fire_live_success(&tie, live2), "PL!S-bp6-022-L re-fires on an energy tie");
     CHECK_EQ(test_get_score_modifier(&tie, live2), 0,
-             "opponent 2 vs self 2 is not more -> no score");
+             "opponent 2 vs self 2 is not more -> no score "
+             "(Rust: card.rs:4410-4417 resource_type==energy arm, "
+              "comparison.rs:268-284 comparison_target_count)");
 }
 
 /* card_score/revealed_distinct_liella_score_test.rs */

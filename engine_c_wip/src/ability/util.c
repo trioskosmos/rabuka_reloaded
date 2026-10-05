@@ -857,7 +857,7 @@ static int heart_count_in_range(const Card *c, int hc, int start, int end) {
     return total;
 }
 
-/* Mirror Card::total_hearts (card.rs:4194-4202): base_heart.values_sum() when the
+/* Mirror Card::total_hearts (card.rs:4453-4461): base_heart.values_sum() when the
    card prints base hearts (a member), else need_heart.values_sum() over the need
    slice (a live card's cost hearts). Blade hearts are never counted. */
 static int card_total_hearts(const Card *c) {

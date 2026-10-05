@@ -2072,6 +2072,208 @@ OTHER way, `look_at_fetch` applies `all` to every source; **VERIFIED-NOOP: 0 of 
 
 ---
 
+## ⛔⛔ TOOL HAZARD — `edit` CAN REPORT FAILURE AND STILL WRITE (2026-10-04)
+
+An agent reported: **"the `edit` tool reported write failures but still wrote — twice."**
+Every edit in this project is therefore suspect until **hash-verified**.
+
+**RULE: after any edit, re-read the file and confirm the change landed — by SHA-256
+where it matters, by `gcc -fsyntax-only` where it does not.** An agent that trusts
+`edit`'s success/failure return value can silently believe it reverted a change that is
+still in the tree, or believe it reverted cleanly when it did not.
+
+Second hazard from the same agent: **PowerShell `> nul` is a device, not a file**, so
+`make clean > nul` silently no-ops and the subsequent build reuses stale objects —
+producing a byte-identical "before/after" that is fiction. Use `make clean` with no
+redirection, or `| Out-Null`.
+
+Both of these compound with the standing traps: STALE LINK, `robocopy` preserving
+mtime, and `Get-Content -Raw | Set-Content` destroying UTF-8.
+
+---
+
+## ✅ MIRAI — THE PRESCRIBED FIX WAS WRONG. Do not re-apply it.
+
+A three-part patch was written for the MIRAI missing prompt (`PL!S-bp6-021-L`, 0 prompts
+where Rust raises `SelectCard(revealed_cards, count=1, allow_skip=true)`). **An agent
+implemented it, measured it at every step, and REVERTED it — it is a net regression.**
+
+| state | failed tests | assert `FAIL:` |
+|---|---|---|
+| baseline | 21 | 44 |
+| part 1 only | 26 | 42 |
+| part 1 + 2 | 26 | 51 |
+
+**Part 1's apparent MIRAI fix is a FALSE PASS.** It only works because `has_filter==0`
+makes `rb_matching_ids` accept **every** id, including invalid ones. There is no
+configuration in which part 1 is safe.
+
+**THE REAL ROOT CAUSE IS OUTSIDE THAT PATCH:** at MIRAI's resolve time `g->revealed_cards`
+holds ids **2639/2640** (one of which fails `rb_decode_card_by_index`) while the test's
+cards are **1675/1596**. `live.c:700-703` **resets and repopulates `revealed_cards` from
+`yell_cards`** — and MIRAI's trigger *is* a yell, so the fixture's revealed pool is
+**overwritten before `move_cards` runs.**
+
+**AND PART 3's SECOND HALF IS UNFAITHFUL:** Rust's `negation` guards **only**
+`check_card_property` (`util.rs:1685-1704`). Applying it to `ability_filter` would
+corrupt every genuine ability filter — `rabuka.h:100` says the same. Anyone widening
+`negation` to the whole filter will break filtering everywhere.
+
+### `util.c` matcher inconsistencies found while proving this
+- `local_has_filter` (`util.c:1974`) is **dead code** — never called; and
+  `local_filter_from_public` (`:2104`) always `return 1`, so its "returns 0 when the
+  filter has nothing set" doc comment is **false**.
+- `rb_matching_indices_filter` (`:2112`) **already ignores `has_filter`** — the two
+  matcher entry points disagree today.
+- C `local_has_filter` omits `groups`, `exclude_group_names`, `cost_limit_min/max`,
+  `need_heart_color`, all of which Rust includes.
+- `move_build_standard_zone_filter` (`move.c:806`) and `move_build_stage_filter`
+  (`:954`) both misroute `card_property` → `ability_filter`, which is a **silent
+  no-op** (`util.c:1609` returns 1 for unknown names). `move_build_stage_filter` also
+  sets a `negation` (`move.c:955`) that **nothing consumes**.
+- The twin drain (`move.c:1764-1772`) removes by **position** `revealed_cards[0..take)`;
+  Rust removes `matching[..take]` (`mod.rs:605-613`) — **divergent the moment a filter
+  excludes anything.**
+- Rust passes `Some(matching)` as `filtered_indices` (`mod.rs:600`); the C prompt leaves
+  it 0 for `revealed_cards`, so `pick(i)` is a raw zone position.
+
+---
+
+## 🪤 SIX WAYS A FAILURE COUNT COMES OUT WRONG — ALL PROVED HERE
+
+1. **⛔⛔ A BROKEN BUILD READS AS ZERO FAILURES.** A peer left `move.c` with a compile
+   error; the library stopped linking and **25 suites emitted zero FAIL lines because
+   nothing ran.** A library that does not link is indistinguishable from a perfect one
+   by failure count alone. **Always assert the suite's case count, not just its FAIL
+   count** — a suite that ran 25 tests and a suite that ran 0 both print zero FAILs.
+2. **`\r?` IS MANDATORY in your regex.** The harness writes **CRLF**, so a pattern
+   anchored to `\n` matches nothing and **every count silently reads 0.** This has
+   already produced a false "0" more than once.
+3. **`Out-String` TRUNCATES** long lines. Capture to a **file** and read that. This is
+   the same failure as `*>&1 | Out-File`, which truncates at 119 characters.
+4. **⛔ THE `edit` TOOL HAS REPORTED WRITE FAILURES AND STILL WRITTEN — twice.** After
+   every edit, confirm it landed: hash where it matters, `gcc -fsyntax-only` where it
+   does not. Do not trust the tool's return value.
+5. **PowerShell `> nul` is a DEVICE, not a file.** `make clean > nul` silently no-ops
+   and the next build reuses stale objects, producing a byte-identical "before/after"
+   that is fiction. Use bare `make clean` or `| Out-Null`.
+6. **An EIGHT-AGENT TREE CANNOT BE SNAPSHOT.** Files have changed hash three or four
+   times inside a single session. Measure both arms inside **one frozen snapshot with no
+   rebuild between**; if the tree moved, say the comparison is **invalid** rather than
+   reporting a delta. Several agents have correctly discarded their own first pass for
+   this reason, and that is the expected behaviour.
+
+---
+
+## ⛔ ARCHITECTURAL: THE C PARKS RAW POINTERS INTO TREES IT OWNS AND FREES
+
+Rust stores **owned values** — `effect.target.clone()` (`ability/choice.rs:120`),
+`requeue_remaining_after_choice` copies (`choice.rs:87-105`). `session.current_ability`
+is only cleared at `resolver.rs:1257`, so the ability **survives the prompt round-trip**.
+
+The C parks raw `AbilityEffect *` aliases (`queue.resume_eff`, `resume_after_look`,
+`deferred`, `target_selection_eff`, `resume_parent`, and `look.c`'s file-static
+`g_look_pending_select` / `g_look_reprompt_followup`) into trees it then frees.
+
+**Three deferral fixes closed the corpus (2026-10-04):**
+1. `game_state_abilities.c` `pca_resolve_entry` — free deferred into
+   `g->activation_keepalive` while a prompt is open.
+2. `ability_queue.c` `rb_queue_resume_pending_actions` — was freeing `cmd`
+   unconditionally before testing `has_pending`.
+3. `choice.c:5131` — a `!(was_skip && SELECT_CARD)` exclusion citing a
+   **non-existent `result_handlers.rs`**; contradicted by `mod.rs:1078-1087`
+   (every SelectCard answer → `CardSelected{indices}`, never `Skip`).
+
+**Class audit, with a negative control: 28 alias hits before → 0 after**, across
+`integration` 10, `search_reorder` 8, `wave1b` 5, `full_round` 4, `int_gaps` 1. So the
+defect was **far broader than the one card that exposed it.**
+
+⚠️ **IT WILL RECUR.** Any future producer that frees its own effect tree on a
+prompt-open pass reintroduces it. The permanent guard is an **owning-clone discipline**
+for those alias slots rather than deferring the free — a real change, and it needs a
+`rabuka.h` signature change. Until then, **every new prompt-producing effect path must
+be probed against that alias set before it is trusted.**
+
+⛔ **NO MEMORY TOOL EXISTS HERE.** gcc 15.3.0 cygwin: `cannot find -lasan`,
+`cannot find -lubsan`, no valgrind, no gdb. Do not claim a sanitizer-clean run.
+
+---
+
+## ⛔ ONEDRIVE IS CORRUPTING FILES — THE WORKSPACE IS A SYNC ROOT
+
+Observed 2026-10-04: a restore raised `PermissionError` and **left `src/web_server.c`
+mutated with `web_server.o` stale**, producing a **false baseline** of 28 assertions /
+9 failures. It was caught only because the baseline and the mutant run were *both* red.
+
+The whole tree lives under `C:\Users\trios\OneDrive\...`. A sync conflict can
+therefore:
+- **silently revert or half-apply an edit**,
+- raise `PermissionError` on write, and
+- leave a `.o` newer than its `.c`, so `make` **skips the rebuild** and you measure
+  stale code. `make` will not rebuild an object whose mtime merely looks current —
+  for any mutation test, **delete the object explicitly.**
+
+**RULE: hash-verify every file after editing it, not just before.** Compare against
+the pre-edit hash and confirm the intended diff. A file that differs from *both* your
+before and your after state was touched by something else — most likely the sync.
+
+---
+
+## ⛔ A SUITE THAT PRINTS "ALL PASSED" WITH NO TOTAL IS BROKEN, NOT GREEN
+
+Five suites printed a failure count or `ALL … PASSED` while running **zero** cases:
+`b8_live_timing`, `phase_machine_rules`, `parity_choice_routing`,
+`parity_orphan_producers`, `parity_q68_cannot_live`. If their test bodies stop
+executing, they still **exit 0**.
+
+**RULE: every suite must count every assertion ATTEMPT and fail when `cases == 0`.**
+This is the same property as the broken-build trap above — nothing running and
+everything passing produce the same output. **Assert case counts, never just FAIL
+counts.**
+
+---
+
+## 🧱 OWNING-CLONE CONVERSION IS **NOT** CURRENTLY ACHIEVABLE. THE DEFERRAL SCHEME IS THE ANSWER.
+
+An owning-clone rewrite of the effect-alias slots was attempted and **reverted**, with
+evidence. Do not re-attempt it piecemeal.
+
+**Ownership table (7 slots)** — `queue.resume_eff` (~30 writers across 9 files),
+`queue.resume_after_look`, `look.g_look_pending_select`, `look.g_look_reprompt_followup`,
+`queue.target_selection_eff`, `queue.resume_parent`, `queue.deferred`.
+
+- **Slots #1–#4 MUST MOVE TOGETHER.** They share a single decoded node. Converting one
+  alone is not a partial win — it is a **third state** with neither the safety of the
+  deferrals nor the correctness of ownership. Converting `g_look_pending_select` alone
+  produced **32 alias hits and +10 failing assertions**, because
+  `look_emit_pool_choice` does `resume_eff = sel` (`:795`) then
+  `look_park_select(sel)` (`:797`), and on the multi-prompt path **`sel` IS the value
+  being replaced** — so clone-then-release freed the node `resume_eff` had just
+  published. A use-after-free introduced by the *fix*.
+- **`queue.target_selection_eff` IS WRITTEN — a previous entry here claimed "NO WRITER
+  anywhere in the tree" and that was WRONG.** The writer is
+  `misc.c:573` `g->queue.target_selection_eff = rb_effect_deep_clone(e);` inside
+  `try_create_target_selection_choice` (reachable from `misc.c:882`), and the reader at
+  `choice.c:5068` observes it **non-NULL 6 times in `parity_cce_gaps`**
+  (`[RESUME_CAPTURE] target=0xa001a1080`). `choice.c:5567` even names the producer.
+  **Because the writer is a DEEP CLONE the slot is an owning copy, not an alias** —
+  which is why the probe correctly reports zero hits on it. **Do NOT remove the field**;
+  doing so would delete something read on a live path. (`ALIAS_PROBE.md:156-159` carries
+  the same wrong claim and needs the same correction.)
+- `#1` additionally spans ~30 write sites across 9 files, three of them live-edited.
+  `choice.c` changed hash mid-task.
+
+**The three deferral fixes are load-bearing and must NOT be reverted.** With them the
+class audit is **0**; reverting `pca_resolve_entry` alone takes it to **22**.
+
+**Reusable tooling now in the tree** — do not rebuild these:
+`tools/alias_probe.c` · `tools/alias_probe.sh` (`--negative-control <outdir> <suite>`) ·
+`tests/test_alias_ownership.c` (16 assertions pinning the slot-sharing property that
+blocks the conversion). Negative control: **22 hits** with it set, **0** without.
+**Run the probe after touching any prompt/park/resume path.**
+
+---
+
 ## Definition of done
 
 ### Measured baseline — `BASELINE.md`, two runs agreed EXACTLY (no nondeterminism)
@@ -6538,3 +6740,135 @@ unnecessary**, which is the failure mode the brief warns about. Full detail in
 3. A 14-row random sample of the final actionable set was re-verified by eye
    against raw `grep`: **14/14 correct**.
 * No generator was run. No `.o` or `rb_engine*` was left in the live tree.
+
+# CLUSTER V -- THE MEASUREMENT FIXED FIRST
+
+*Established 2026-10-05. Scope: `tools/verdict_runner.c`,
+`tests/test_coverage_gate.c`, `tests/test_parity_conditions.c`, `.gitignore`,
+plus five new measurement tools. `HARNESS_FIXES.md` 5-8 carries the detail.*
+
+**This cluster deliberately precedes any parity work.** A parity assertion
+written against an unmeasurable corpus produces a number nobody can check, so
+the order is: make every suite report a verdict, make the gate read structured
+verdicts, and only then spend assertions on behaviour.
+
+## V1. Every one of the 166 suites reports a verdict
+
+| state | BASELINE3 | now |
+|---|---|---|
+| verdict present | 146 / 166 (20 unverified + 1 broken emitted none) | **166 / 166** |
+| no verdict (INCONCLUSIVE) | 1 broken, unstated elsewhere | **0** |
+| did not link | 0 | **0** |
+| PASSED / FAILED | 29 / 116 (+ 21 unclassifiable) | **49 / 117** |
+
+Corpus **3 783** result lines, reconciling across two independent enumerations.
+The 29->49 PASSED move is **not** 20 suites becoming green: it is the 20
+previously-invisible suites becoming *measurable at all*, 11 of which turned out
+to hold real work and 1 (`parity_conditions`) of which was asserting nothing.
+
+## V2. The brief's premise about `verdicts/*.json` was FALSE; it is now built
+
+The brief said main "has just wired the verdict runner to write one per suite".
+**It had not** -- there was no `verdicts/` directory in the tree and
+`tools/verdict_runner.c` printed only a text line. Built here, 12 fields per
+suite, with **no Makefile change** (the runner writes its own record, and the
+Makefile already routes all 166 suites through it). Verified live: other agents'
+`run-all-tests` invocations are already producing `verdicts/*.json` from the
+modified runner.
+
+## V3. `audit_conditions` is NOT broken -- BASELINE3's BROKEN was a context artefact
+
+It resolves `../cards/build`, i.e. one level **above** `engine_c_wip`. Any
+snapshot placed elsewhere loses that path, so it printed `cannot load card db`,
+exited 2 and asserted nothing -- exactly the BROKEN signature. From
+`engine_c_wip` it reports **24 result lines (12 assertions + 12 setup-bugs)**, so
+it is an ordinary RED with 12 unresolved fixtures. Promoted to a standing rule in
+G2 so the shape can never again be filed as an ordinary red.
+
+## V4. `parity_conditions`: 0 -> 23 assertions, mutation-proven
+
+Was a pure diagnostic dump that printed numbers and returned 0 -- the corpus's
+only non-meta PASSED suite executing zero assertions. Now asserts every number it
+was printing, each behind the control that makes it non-vacuous: exact fixture
+lookup (CARD-NUMBER TRAP avoided -- all three card numbers occur **exactly once**
+in `cards_gen.rs`, and `PL!SP-pb1-001-P` occurs **0** times, so the substring
+fallback had nowhere to hide), both sides of every group filter, and **all three
+`set_live_card` controls** -- the defect a peer found in the Rust sibling
+`live_start_heart_requirement_reduction_counts_live_slot_cards_only_test.rs`,
+whose nine tests never stage a member in the live slot. Blades are captured
+**mid-scenario (2 each side)** as well as after live end (0 each side), so
+"granted then expired" is assertable; an end-only capture is 0 == 0.
+
+Five perturbed expectations -> **5 failures**, each naming its assertion.
+Corpus effect **+23 assertions that can fail, +0 failures.**
+
+## V5. Cannot-fail assertions in the 5 named files -- settled by reading
+
+All five are under `engine/tests/**` and are **not editable by this task**, so
+each was adjudicated rather than changed.
+
+| file | verdict |
+|---|---|
+| `nahone_live_start_same_name_test.rs` (`blade1 >= 1`) | **DISPROVEN** -- never standalone; always one conjunct of a two-sided exclusivity disjunction that fails when neither *or both* are buffed. 20 tests, `assert_eq!(..., 1)` throughout. |
+| `dive_ab0_does_not_arm_..._test.rs` (`guard <= 20` as sole assertion) | **DISPROVEN, peer UPHELD** -- the guard is a liveness guard inside the prompt loop, followed by `placements == 1`, `placed ^ static_placed`, `!static_placed`. Bound is `<= 10`, not 20. Sibling carries 30 assertions. |
+| `live_success_surplus_score_zero_floor_test.rs:83` | **CONFIRMED** -- `>= -2` under a comment and a message both saying `>= 0`. Weaker than stated; not vacuous. |
+| `live_success_look_three_deck_size_q36_test.rs:34` | **CONFIRMED, worse than stated** -- `deck_after <= deck_before` under "should draw cards" is satisfied by an unchanged deck *and* by card loss. |
+| `live_score_tie_..._test.rs:257` (`turn_number >= 1`) | **CONFIRMED, genuinely dead** -- `turn_number` initialises to **1** (`core/game_state/mod.rs:677`), so `>= 1` cannot fail. Comment says the rollover ran; needs `>= 2`. |
+
+Three need a one-line change each (`>= 0`, `<`, `>= 2`). **None is currently
+reporting a real defect -- each reports a weaker guarantee than it describes.**
+Handed to the engine owner; not edited here.
+
+## V6. `coverage_gate` reads structured verdicts
+
+| context | before (log scraping) | after |
+|---|---|---|
+| corpus-shaped | ~294 checks, failures scaling with its own last output | **1004 checks, 0 failures** |
+| 1 broken record | dominated by self-measurement | **1005 checks, 2 failures** -- both the same real defect, per-suite + aggregate |
+| no / partial evidence | 166-170 failures blaming a runner never asked to fill the manifest | **1 check, 0 failures**, condition and reason printed |
+
+The 170-vs-294 swing is explained and cannot recur: the old walk counted the
+gate's **own previous log** while the per-suite census skipped it, so G3's gap
+equalled the previous run's failure count. A verdict record is written by the
+suite's own run and `run-all-tests` produces one for `coverage_gate` like any
+other suite, so the gate now needs **no self-exemption** and the two sides of G3
+are the same set of files by construction.
+
+G2 was **redefined, not relaxed**: tally-integrity (six counters sum to
+`n_result_lines`), verdict/count agreement, and `FAILED` with
+`n_result_lines == 0` as its own **asserted** state. Unreadable records are
+`UNREADABLE`, never "zero failures".
+
+## V7. Regression check: none
+
+`tools/corpus_diff.py`, all 166 suites, before vs after:
+
+```
+suites: 166   changed: 0   unchanged: 166
+corpus failing assertions: 3783 -> 3783  (+0)
+corpus FAILED case lines:  117 ->  117  (+0)
+before/after verdicts: {'PASSED': 49, 'FAILED': 117}
+```
+
+No suite added, so `test_harness_self.c` §D1/D2 was **not tripped and no cap was
+re-baselined**. `sizeof(GameState)` / `RB_GAMESTATE_BYTES_PINNED` untouched.
+
+## V8. What is deliberately NOT closed here
+
+* **The ~250 recorded parity assertions are untouched.** They are a real work
+  order and they are next, but writing new parity assertions against a corpus
+  whose measurement was still log-scraping would have produced numbers nobody
+  could check. Cluster V is the precondition, not a substitute.
+* **Line endings, measured after the fact** (no whole-file copy was made of any
+  file; every change went through a surgical `edit` on an exact anchor):
+  `tests/test_coverage_gate.c` is **563 CRLF / 0 LF** -- CRLF throughout, as it
+  was, with no line converted and no BOM added. `HARNESS_FIXES.md` is 614 LF / 0
+  CRLF, matching the file. `PARITY_CHECKLIST.md` went **5582 -> 5711 CRLF with
+  its 957 LF lines untouched**: the appended block took CRLF, so this file's
+  pre-existing LF/CRLF mix is neither extended nor reduced.
+* **`make run-all-tests` still needs the `data:` gate removed** (`GATE_DEP=`) to
+  be usable mid-regeneration; `make t-nogate` is the working path. Not a change
+  made here -- the Makefile is not this task's to edit.
+* **The live tree had moved to 168 suites** by the end of this cluster (from the
+  166 measured). The 166-suite numbers are stated against the snapshot that was
+  measured; the gate's partial-set skip covers the gap rather than mis-reading it.

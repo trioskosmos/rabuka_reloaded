@@ -4,6 +4,7 @@ pub mod constant_conditions_exact_counts_and_names_test;
 pub mod constant_energy_and_slot_conditions_test;
 pub mod constant_grant_lifecycle_test;
 pub mod copied_ability_registration_lifecycle_test;
+pub mod influence_ability_live_start_by_debut_revealed_blade_pl_pb2_007_l_test;
 pub mod invalidated_live_start_restores_next_live_test;
 pub mod lifecycle_tail_idempotence_test;
 pub mod live_start_resolved_own_center_group_reposition_q255_test;

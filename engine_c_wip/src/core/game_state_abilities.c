@@ -1378,26 +1378,68 @@ int rb_effective_activation_cost(const GameState *g, int actor, const AbilityEff
 
 /* ── Target resolution ──────────────────────────────────────────────── */
 
-int rb_resolve_target_player(const GameState *g, const char *target) {
-    (void)g;
-    return rb_target_player_index(target, NULL);
+/* Mirror GameState::resolve_master_id (engine/src/core/game_state/
+ * abilities.rs:2910-2916). The master is NOT the turn's active player:
+ *
+ *     fn resolve_master_id(&self) -> Option<&str> {
+ *         self.ability_master_id().or_else(|| {
+ *             self.activating_card
+ *                 .and_then(|cid| self.owner_of_card(cid))
+ *                 .map(|p| p.id.as_str())
+ *         })
+ *     }
+ *
+ * `ability_master_id()` (abilities.rs:2900-2904) is the CURRENT QUEUE ENTRY's
+ * `player_id`. `g->active` is the turn player, which is a different seat
+ * whenever an ability driven by the opponent resolves on this player's turn.
+ *
+ * This was the whole of 「自分と相手はそれぞれ、自身の控え室から…�� for
+ * PL!N-bp4-007-R＋ (Setsuna, 双方のプレイヤー retrieval): the effect carries
+ * target="both", so rb_misc_handle_both_targets (misc.c:2209, Rust
+ * target.rs:81-154) splits it into a "self" arm and an "opponent" arm and each
+ * arm re-resolves its target through here. With master = g->active = 0, BOTH
+ * arms resolved "self" to seat 0 and "opponent" to seat 1 — so the arm that was
+ * supposed to be the MASTER's retrieved the OPPONENT's waitroom card, and the
+ * arm that was supposed to be the OPPONENT's retrieved nothing (its arm found
+ * the wrong zone, and after the first answer the parked arm's prompt was
+ * already gone).
+ *
+ * Rust's line for the order that matters:
+ *   abilities.rs:2900-2904  ability_master_id  -> entry.player_id  (FIRST)
+ *   abilities.rs:2911-2914  owner_of_card(activating_card)       (fallback)
+ */
+static int rb_master_seat(const GameState *g) {
+    if (!g) return -1;
+    int cur = g->queue.cur;
+    if (cur >= 0 && cur < g->queue.n_entries) {
+        const char *pid = g->queue.entries[cur].player_id;
+        if (pid && !strcmp(pid, "p1")) return 0;
+        if (pid && !strcmp(pid, "p2")) return 1;
+    }
+    return rb_owner_of_card(g, g->activating_card);
 }
 
-static int rb_resolve_master_id(const GameState *g);
+int rb_resolve_master_id(const GameState *g) {
+    return rb_master_seat(g);
+}
+
+int rb_resolve_target_player(const GameState *g, const char *target) {
+    /* Mirror resolve_target_player (abilities.rs:2962-2981), which takes the
+     * same master as the mut twin. The old body passed NULL for the master,
+     * which is the "master is never p2" case — true for a p1-driven ability and
+     * false for every p2-driven one. */
+    return rb_target_player_index(target,
+                                 (g && rb_master_seat(g) == 1) ? "p2" : NULL);
+}
 
 RbPlayer *rb_resolve_target_player_mut(GameState *g, const char *target) {
     if (!g) return NULL;
-    int master = rb_resolve_master_id(g);
-    int master_p2 = (master == 1);
+    int master_p2 = (rb_master_seat(g) == 1);
     if (target && !strcmp(target, "self"))
         return master_p2 ? &g->p[1] : &g->p[0];
     if (target && !strcmp(target, "opponent"))
         return master_p2 ? &g->p[0] : &g->p[1];
     return &g->p[0];
-}
-
-int rb_resolve_master_id(const GameState *g) {
-    return g ? g->active : -1;
 }
 
 /* ── Loop detection ─────────────────────────────────────────────────── */
@@ -3334,7 +3376,81 @@ static int pca_resolve_entry(GameState *g, RbQueueEntry *entry, int cid, int aid
             if (ci >= 0 && ci < g->queue.n_entries)
                 g->queue.entries[ci].effect_started = 1;
         }
+        /* ── LIFETIME FIX (use-after-free). THE ABILITY MUST OUTLIVE THE PROMPT
+           IT RAISED. ────────────────────────────────────────────────────────
+        `g->queue.resume_eff` is an ALIAS into `ab->effect`'s tree: every
+        producer (look.c:474/:527/:685/:1105/:1200/:1644, draw.c:541/:704/:730/
+        :783/:974, move.c:730, move_missing.c:357/:419, misc.c:1410,
+        state.c:1637, ability_effects.c:185/:382) parks the AbilityEffect node
+        it is executing. The prompt raised here is answered AFTER this function
+        returns, and every one of those readers dereferences that alias again on
+        the answer path (choice.c:3009/:3045/:3250/:3395/:3615/:4026/:4290/
+        :4481/:4507/:4511/:4535/:4650, look.c:813/:918, ability_queue.c:922-924).
+
+        The bare `rb_free_ability(ab)` that stood here freed that tree on the
+        very pass that opened the prompt, so `saved_eff` in
+        rb_resume_with_choice_indices_internal (choice.c:5027) was a dangling
+        pointer from that moment on.
+
+        MEASURED (RB_UAF_TRACE instrumentation on parity_cce_gaps, cid=2639
+        = PL!N-bp3-028-L, resume_mode=2 / RB_CHOICE_SELECT_CARD, 7 hits in one
+        run), the same node read across this free:
+
+            before: action=select_cards destination=deck_top extra_n=2
+                    text=1枚までをデッキの上に置き、残りを控え室に置く
+                    extra[0] k=discard_remaining v=true
+                    extra[1] k=max v=true
+            after:  action=<garbage>  destination=deck_top (survives BY LUCK)
+                    text=<garbage>
+                    extra[0] k=<garbage> v=<garbage>
+                    extra[1] k=<garbage> v=true
+
+        It survives EXACTLY ONE prompt; there is no second pass.
+
+        RUST'S MODEL, WHICH IS THE FIX. resolve_ability's pending arm
+        (engine/src/ability/resolver.rs:1381-1384) returns Ok(()) WITHOUT
+        reaching finish_ability_resolution (resolver.rs:1391), and
+        `self.session.current_ability = None` lives ONLY inside
+        finish_ability_resolution (resolver.rs:1257). So the `Arc<Ability>` the
+        prompt's answer path still reads — via
+        `gs.current_ability_source_card_id()` (choice.rs:272/:1640/:1670/:1919,
+        cost/handlers.rs:835/:1281, effects/look.rs:376/:1176/:1238) and
+        `session.current_ability` (gates.rs:100/:159, resolver.rs:999/:1006) —
+        SURVIVES the round-trip. Rust can free its local because it is an Arc and
+        the session holds a second reference; C has no refcount, so the C
+        equivalent is to DEFER the free until the prompt closes.
+
+        The deferral slot already exists and already has a drain:
+        `g->activation_keepalive` + `g->activation_keepalive_valid`, populated by
+        engine.c:1240-1252 and by rb_drain_keep_alive (ability_queue.c:1323) and
+        released by choice.c:5641-5648 on the `!rb_has_pending_choice(g)` arm.
+        This block is the SAME protocol, byte for byte, applied to the path
+        rb_drain_ability_queue already had it on (ability_queue.c:1672-1679) —
+        pca_resolve_entry is the sibling that was missing it.
+
+        The transfer must be TOTAL (ability_queue.c:1316-1322): the local is
+        memset before the release, so rb_free_ability frees nothing and full_text
+        / triggers / triggerless_text / cost / effect have exactly one owner.
+        Copying the struct and nulling only cost/effect — the shape that was
+        there before rb_drain_keep_alive was written — double-frees the strings. */
+        /* NEGATIVE CONTROL for tools/alias_probe.c (never defined by the build; the
+           probe's runner passes -DRB_ALIAS_PROBE_NEGATIVE_CONTROL and
+           recompiles this file fresh). It restores the pre-2026-10-04 body --
+           free the ability on the pass that opened the prompt -- so the probe
+           can be shown to go NON-ZERO. See ALIAS_PROBE.md. */
+#ifdef RB_ALIAS_PROBE_NEGATIVE_CONTROL
         rb_free_ability(ab);
+        return 1;
+#endif
+        if (g->activation_keepalive_valid) {
+            ab->cost = NULL;
+            ab->effect = NULL;
+        } else {
+            g->activation_keepalive = *ab;
+            g->activation_keepalive_valid = 1;
+        }
+        memset(ab, 0, sizeof(*ab));
+        rb_free_ability(ab);   /* the transfer above was total: frees nothing */
         return 1;
     }
 

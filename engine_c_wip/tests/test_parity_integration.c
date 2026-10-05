@@ -413,7 +413,27 @@ static void test_no_live_cards_clean_rollover(void)
              "rule 8.4.6.1: no live cards set -> no winner -> no success-zone placement (P1)");
     CHECK_EQ(tg.state.p[1].success.n, 0,
              "rule 8.4.6.1: no live cards set -> no winner -> no success-zone placement (P2)");
-    CHECK(tg.state.turn >= 1, "rule 8.4.6.1: the round still rolled over");
+    /* Rust live_score_tie_live_zone_placement_across_rounds_test.rs:258 asserts
+     *     assert!(turn_number >= 1, "The rollover ran (no live cards at all)");
+     * `turn_number` is initialised to 1 (engine/src/core/game_state/mod.rs:683),
+     * so that bound is DEAD on the Rust side too -- it holds on a board where
+     * nothing ever rolled over. The C twin was worse: `state.turn` also starts
+     * at 1 (src/test_game.c:10), so it could not fail here either.
+     *
+     * The claim the message actually makes is that the ROLLOVER RAN. That is
+     * what is asserted: the counter left the value it was handed, and the board
+     * came back round to the FIRST attacker. Measured on this fixture: turn
+     * 1 -> 2 with active == first_attacker.
+     * Rust citation: live_score_tie_live_zone_placement_across_rounds_test.rs:
+     * 240-258 (no_live_cards_at_all_no_winner_clean_rollover). */
+    CHECK(tg.state.turn >= 2,
+          "rule 8.4.6.1: the round really rolled over -- the turn counter left "
+          "its initial value of 1 (measured turn 2); Rust "
+          "live_score_tie_live_zone_placement_across_rounds_test.rs:258");
+    CHECK_EQ(tg.state.active, tg.state.first_attacker,
+             "rule 8.4.6.1: the new round opens with the first attacker, so the "
+             "loop above exited on a real rollover and not on the guard; Rust "
+             "live_score_tie_live_zone_placement_across_rounds_test.rs:258");
 }
 
 /* ===================================================================== */

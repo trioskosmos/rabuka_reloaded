@@ -128,7 +128,7 @@ fn invalid_live_card_discard_records_turn_movements() {
     assert_eq!(m.moved_card_id, member);
     assert_eq!(m.source_zone, "live_card_zone");
     assert_eq!(m.dest_zone, "waitroom");
-    assert_eq!(m.cause_player_id, game.state.player1.id);
+    assert_eq!(m.cause_player_id, game.state.player1.id.as_str());
 }
 
 /// Rule 10.5.2: a card in the energy zone that is not an energy card is moved
@@ -374,6 +374,6 @@ fn check_invalid_live_cards_distinguishes_players() {
         .collect();
     assert_eq!(p1_moves.len(), 1);
     assert_eq!(p2_moves.len(), 1);
-    assert_eq!(p1_moves[0].cause_player_id, game.state.player1.id);
-    assert_eq!(p2_moves[0].cause_player_id, game.state.player2.id);
+    assert_eq!(p1_moves[0].cause_player_id, game.state.player1.id.as_str());
+    assert_eq!(p2_moves[0].cause_player_id, game.state.player2.id.as_str());
 }

@@ -10,6 +10,27 @@
 > **Gate used throughout:** full suite green (4,072 tests at time of writing)
 > and `total_actions` fixed. See §5 for why the second half of that gate is
 > currently unsound on this repo.
+>
+> ---
+>
+> ## ⚠ STATUS 2026-10-05 — MOST OF THIS AUDIT HAS BEEN ACTED ON
+>
+> **Re-verify a row before spending effort on it.** Six findings below were
+> re-read on 2026-10-05 and found already resolved, in both directions:
+>
+> | row | was | now |
+> | --- | --- | --- |
+> | **F5** | "the tree does not currently compile" | compiles clean; lib + both test targets green |
+> | **F6** | `recently_moved_from_zone` allocates a `String` per movement | both writers compare before assigning; the larger `cause_player_id` allocation it pointed at is now `ArcStr` |
+> | **F4** | `available_areas` rebuilt per action | one `Arc` per hand card, `Arc::clone`d into that card's actions; display strings gated |
+> | **T1** | inverted guard, test cannot fail | `drain_choices_strict(&[], &[])` |
+> | **T2** | assertion restates a precondition | asserts the declined-cost behaviour |
+>
+> Work described as **missing** had landed, and work described as **the
+> remaining lever** was already gated or shared. The header date is the date of
+> the *audit*, not of the tree. Fixed rows are struck through and dated in
+> place rather than appended, so a reader does not act on one — but a fresh
+> reading is still the only way to know.
 
 ---
 
@@ -21,12 +42,14 @@
 | **F2** | `recalculate_constants` allocates **0** per call. It is called twice per action. | High |
 | **F3** | `compute_play_cost` allocates **0**, and is **independent of hand size**. §4.2's "worst quadratic in the generation path" is not a measurable cost. | High |
 | **F4** | `generate_possible_actions` allocates **378 for 5 actions (~75/action)**. This is the only hot path with real allocation volume, and it is where all remaining effort belongs. | High |
-| **F5** | The tree does not currently compile. `ability/queue.rs` is missing `choice_repeats_remaining` in an `AbilityQueueEntry` initializer — **not my change**; it is in-flight work by another session. | **Blocking** |
-| **F6** | `recently_moved_from_zone` allocates a `String` on **every card movement** and, since the `TriggerEvent` deletion, is read only by the display layer and one save/restore. | Medium |
-| **F7** | The original `prepare_sequential_action` deep-cloned a ~1.2 KB filter to set `None` over `None`. Confirmed dead work, now removed. | Low (fixed) |
+| **F4a** | F4 re-checked 2026-10-05 — **and its remaining budget is smaller than F4 implies.** Three things F4 would point at are already handled: (1) `Action.description` goes through `action_desc!`, which yields an empty `String` (no allocation) under `profiling` or when `action_display_enabled()` is false; (2) `card_name` / `card_no` / `stage_area` / `source_ability` are each behind `cfg!(not(feature = "profiling")) && action_display_enabled()` — `source_ability` holds the **full Japanese ability text** and was the obvious suspect; (3) `available_areas` is **already shared**, not rebuilt per action: `generate_main_phase_actions` builds one `Arc<Vec<AreaInfo>>` per hand card (`game_setup.rs:1880`) and `Arc::clone`s it into every action that card produces (`:1990`, `:2070`). Two further passes underneath it hoisted the three `Arc<str>` area names to once per call (`:1728`) instead of once per hand card. What genuinely remains per action is `card_indices: Option<Vec<usize>>` — decision data the caller reads, and the one thing here with no existing sharing. **Do not re-audit the display strings or `available_areas`;** measure the current per-action allocation count before spending effort here. | Medium |
+| **F5** | ~~The tree does not currently compile. `ability/queue.rs` is missing `choice_repeats_remaining` in an `AbilityQueueEntry` initializer.~~ **Resolved — no longer true.** Re-checked 2026-10-05: the lib and both test targets build clean. | ~~Blocking~~ **resolved** |
+| **F6** | ~~`recently_moved_from_zone` allocates a `String` on every card movement.~~ **Already fixed** — both writers (`push_movement_event`, `set_recently_moved_batch`) compare the stored zone before assigning, so the repeated `to_string()` is gone. The larger per-movement allocation it pointed at, `MovementEvent.cause_player_id: String`, **was** real and is now `ArcStr` (2026-10-05) — wall-clock neutral, but it removes 3–4 allocations per movement by the §1 allocation gate. | ~~Medium~~ **fixed** |
+| **F7** | ~~The original `prepare_sequential_action` deep-cloned a ~1.2 KB filter to set `None` over `None`.~~ **Already removed.** | ~~Low~~ **fixed** |
 | **F8** | The repo's stated measurement contract is unsound while other work lands concurrently on the same branch. | **High** (process) |
-| **T1** | Inverted guard in `revealed_hand_aqours_pl_s_sd1_009_sd_test.rs:98` — the failure path returns early, so a missing prompt passes. | **High** |
-| **T2** | `n_pb1_015_shizuku_test.rs:61` — its only assertion restates a precondition the test set up, so it cannot fail; the real intent is unchecked. | **High** |
+| **F9** | **This audit's findings need re-verifying before acting on them.** Four of its rows (F4's premise, F4a, F5, F6) were already out of date when re-read on 2026-10-05, in both directions: work that was described as *missing* had landed (F5's compile break, F6's unconditional `to_string()`, F4's `available_areas` sharing), and work described as *the remaining lever* was gated already (F4's display strings). The date in the header is the date of the audit, not of the tree. | **High** (process) |
+| **T1** | ~~Inverted guard in `revealed_hand_aqours_pl_s_sd1_009_sd_test.rs:98` — the failure path returns early, so a missing prompt passes.~~ **Already fixed.** The guard is gone; the test now calls `drain_choices_strict(&[], &[])`, where an empty `allowed` list makes any prompt a failure, and the file's doc comment records why the old one could not fail. | ~~High~~ **fixed** |
+| **T2** | ~~`n_pb1_015_shizuku_test.rs:61` — its only assertion restates a precondition the test set up.~~ **Already fixed.** It now asserts the declined-cost behaviour (`hand contains shizuku_hand`, plus the energy check), and the doc comment quotes the old discard-both-Results cleanup loop and why it could neither fail nor progress. | ~~High~~ **fixed** |
 | **T3** | 23 sites discard the `Result` of a `try_*` API. 21 are correct and documented; the systematic gap is that no test can tell a correct decline from a silent `Err`. | Medium |
 
 ---

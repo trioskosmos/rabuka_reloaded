@@ -283,7 +283,23 @@ static int load_card_db(void)
  * prolonged sound mark (U+30FC) inside スクール, which would have made the
  * strstr below vacuously false and the whole premise audit silently useless. */
 #define NIJI_SERIES \
-    "\xE8\xB6\x9B\xE3\x83\xB3\xE5\x92\xB2\xE5\xAD\xA6\xE5\x9C\x92\xE3\x82\xB9\xE3\x82\xAF\xE3\x83\xAB\xE3\x82\xA2\xE3\x82\xA4\xE3\x83\x89\xE3\x83\xAB\xE3\x83\xBC\xE5\x90\x8C\xE5\xA5\xBD\xE4\xBC\x9A"
+    "\xE8\x99\xB9\xE3\x83\xB6\xE5\x92\xB2\xE5\xAD\xA6\xE5\x9C\x92\xE3\x82\xB9\xE3\x82\xAF\xE3\x83\xBC\xE3\x83\xAB\xE3\x82\xA2\xE3\x82\xA4\xE3\x83\x89\xE3\x83\xAB\xE5\x90\x8C\xE5\xA5\xBD\xE4\xBC\x9A"
+/* TWO defects were here, and only fixing the first one is not enough -- the
+ * byte-level sweep caught the second, because the literal still had a ZERO
+ * corpus count after the lead was corrected.
+ *
+ *  1. LEAD. Was E8 B6 9B / E3 83 B3, giving "<U+869B>ノ咲学園…".
+ *  2. TRANSPOSED PROLONGED SOUND MARK. The tail read ス ク ル ア イ ド ル ー
+ *     (E3 83 AB in the ー slot and E3 83 BC in the ル slot) instead of
+ *     ス ク ー ル ア イ ド ル, so the ー sat one character late.
+ *
+ * Both are now the exact bytes of src/core/card.c:371 /
+ * engine/src/core/card.rs map_series_to_group:
+ *   E8 99 B9 E3 83 B6 E5 92 B2 E5 AD A6 E5 9C 92 E3 82 B9 E3 82 AF E3 83 BC
+ *   E3 83 AB E3 82 A2 E3 82 A4 E3 83 89 E3 83 AB E5 90 8C E5 A5 BD E4 BC 9A
+ * A wrong pair here is precisely the vacuous-strstr case the comment above
+ * warns about, and it is invisible: the premise audit just reports "no card
+ * matched", which reads like a finding rather than a typo. */
 
 /* ── card resolution + identity ────────────────────────────────────────── */
 

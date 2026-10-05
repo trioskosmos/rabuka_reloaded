@@ -204,12 +204,11 @@ pub struct GameState {
     pub scratch_entry_positions: HashMap<i16, Option<u8>>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub scratch_constant_effect_ids: Vec<(i16, usize)>,
-    /// Set by settle_single_player_state while it is advancing automatic phases, so
-    /// dvance_phase can skip its per-phase check_timing; the settle loop then runs
-    /// ONE validation at the decision point instead. See the record in
-    /// game_setup::settle_single_player_state.
+    /// Abilities resolved within the CURRENT resolution chain, for the runaway-loop guard
+    /// in process_current_ability. Was a process-global static that nothing reset,
+    /// which made it a cumulative budget rather than a per-chain one -- see that function.
     #[cfg_attr(feature = "serde_support", serde(skip))]
-    pub suppress_settle_check_timing: bool,
+    pub pca_calls_in_chain: u32,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub ability_invalidations: SmallVec<[AbilityInvalidation; 4]>,
     pub replacement_effects: SmallVec<[ReplacementEffect; 2]>,
@@ -641,7 +640,7 @@ impl GameState {
             scratch_exp_heart: HashMap::default(),
             scratch_entry_positions: HashMap::default(),
             scratch_constant_effect_ids: Vec::new(),
-        suppress_settle_check_timing: false,
+        pca_calls_in_chain: 0,
         // 常時 actually in play.
             ability_invalidations: SmallVec::new(),
              replacement_effects: SmallVec::new(),
@@ -1005,7 +1004,7 @@ impl GameState {
     pub fn last_area_move_by_player(&self) -> Option<&str> {
         self.turn_area_movements
             .last()
-            .map(|m| m.cause_player_id.as_str())
+            .map(|m| &*m.cause_player_id)
     }
     /// Backward-compat: whether energy was placed by a card effect this batch.
     /// R1 slice 1b test-facing view of the recently-moved batch. Writes go
@@ -1039,7 +1038,7 @@ impl GameState {
                     || m.dest_zone == "under_member")
                     && m.effect_only
             })
-            .map(|m| m.cause_player_id.as_str())
+            .map(|m| &*m.cause_player_id)
     }
 
     pub fn cheer_revealed_cards(&self) -> &SmallVec<[i16; 8]> {

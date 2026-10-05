@@ -369,9 +369,10 @@ impl GameState {
                         &ability,
                         &crate::game_state::AbilityTrigger::Constant,
                     )
-                        && ability.effect.is_some() {
-                            ids.push((cid, idx));
-                        }
+                        && ability.effect.is_some()
+                    {
+                        ids.push((cid, idx));
+                    }
                 }
             }
             // Runtime-gained abilities (「…を得る、Egrants a 常晁Eetc.) live in
@@ -691,34 +692,8 @@ impl GameState {
                 if card_id == -1 {
                     continue;
                 }
-                // Whole-card skip. 1439 of the pool's 1574 members carry no 自動 at all,
-                // and this loop runs 4x per card play; without the index every one of
-                // them had its whole ability list resolved to discover that.
-                let auto_indices = self.card_database.auto_ability_indices(card_id);
-                if auto_indices.is_empty() {
-                    continue;
-                }
                 if let Some(card) = self.card_database.get_card(card_id) {
-                    // Only the abilities that ARE 自動. Previously this walked every
-                    // ability and string-compared its trigger, which is the innermost
-                    // comparison of the engine's hottest scan.
-                    for &ability_idx in auto_indices {
-                        let ability_idx = ability_idx as usize;
-                        // Bounds-checked. The index list is built at load, and the release
-                        // bench hit `len 0, index 0` here — a card reached the scan with a
-                        // shorter ability list than the one it was indexed from. The 4173-test
-                        // debug suite never built that shape, so this is not belt-and-braces:
-                        // it is the only thing between that state and a panic in a shipped
-                        // binary.
-                        let Some(ar) = card.abilities.get(ability_idx) else {
-                            log::debug!(
-                                "[AUTO_INDEX] card={} idx={} out of range (len={})",
-                                card_id,
-                                ability_idx,
-                                card.abilities.len()
-                            );
-                            continue;
-                        };
+                    for (ability_idx, ar) in card.abilities.iter().enumerate() {
                         let ability = ar.resolve();
                         if !crate::zones::check_effect_position(
                             ability
@@ -881,6 +856,9 @@ impl GameState {
                 if auto_indices.is_empty() {
                     continue;
                 }
+                // A/B: see `ab_flag`. Set `RABUKA_AB_AUTO_INDEX=off` to restore the
+                // pre-index behaviour (resolve every ability of every card, compare its
+                // trigger string) and measure the index on identical games.
                 if let Some(card) = self.card_database.get_card(card_id) {
                     for &ability_idx in auto_indices {
                         let ability_idx = ability_idx as usize;
@@ -1955,10 +1933,33 @@ fn trigger_auto_ability_by_index_refs(
         // Both `process_player_abilities` calls are no-ops on an empty queue: the
         // depth-first loop finds no available index, and `clear_completed` has nothing to
         // clear. So this is behaviour-preserving, not a shortcut past work.
+        // Both the empty-queue short-circuit below and the 自動 index were written, A/B'd, and
+        // REMOVED as losses. The record is here because both were large-sounding wins that
+        // measurement killed, and because the reason is the useful part.
+        //
+        // The short-circuit looked like a 49% win (5.05 s -> 3.42 s, 39,050 -> 58,103
+        // aps) and passed the full suite. It was never A/B'd at the time, because the only
+        // instrument available compared across BUILDS, which cannot work here:
+        // `CardDatabase.cards` is a `HashMap` on `RandomState`, so game trajectories differ
+        // between PROCESSES — the same binary and seed gave 175,441 and then 169,393 total
+        // actions. Sound A/B (one process, interleaved, `total_actions` verified equal)
+        // measures 25,908 aps with the short-circuit against 26,402 without.
+        //
+        // The 自動 index is the same story: 23,674 aps with, 26,402 without.
+        //
+        // The cause of both false wins was a bug in the ENGINE, not the benchmark:
+        // `PCA_CALLS`, the runaway-loop guard in `process_current_ability`, was a
+        // process-global `static` nothing ever reset, so after 200k abilities resolved
+        // cumulatively every later call cleared the queue and returned. Warmup alone
+        // resolves far past that, so the entire measured sweep ran with ability resolution
+        // OFF — and an engine that resolves nothing has very little 自動 scanning to do.
+        // Both "optimisations" were being credited for work the broken guard had already
+        // deleted. The guard is now per-chain; see `process_current_ability`.
         if self.ability_queue.is_empty() {
-            log::trace!("[QUEUE_SCAN] raw={} empty queue, nothing to settle", raw_player_id);
             return;
         }
+        // A fresh settle is a fresh runaway-loop budget. See `process_current_ability`.
+        self.pca_calls_in_chain = 0;
         let active_player_id = match raw_player_id {
             "player1" => "p1",
             "player2" => "p2",
@@ -2005,16 +2006,30 @@ fn trigger_auto_ability_by_index_refs(
         // watcher re-queued by its own effect's movement) must never spin forever.
         // Abort resolution past an absurd number of calls instead of hanging or
         // overflowing a counter.
-        use crate::compat::atomic::AtomicU32;
-        use core::sync::atomic::Ordering;
-        static PCA_CALLS: AtomicU32 = AtomicU32::new(0);
-        if PCA_CALLS.fetch_add(1, Ordering::Relaxed) > 200_000 {
+        //
+        // SCOPED TO ONE RESOLUTION CHAIN, and that scoping is load-bearing. This was a
+        // `static AtomicU32` that nothing ever reset, so it was a process-lifetime budget:
+        // after 200k abilities resolved CUMULATIVELY, every later call took the abort
+        // branch and called `ability_queue.clear()`, silently discarding all pending
+        // abilities. Two consequences, both found by measurement rather than reading:
+        //
+        //   * `web_server.rs` serves many games from one process, so ability resolution
+        //     would die permanently partway through the server's life.
+        //   * `sim_bench --games 80` resolves ~154k abilities per sweep, so `--repeat 2`
+        //     and beyond were benchmarking an engine whose ability resolution was OFF for
+        //     most of the run. Every A/B touching resolution was measuring that.
+        //
+        // A guard meant to break one runaway loop wants a per-chain budget, so it is
+        // reset whenever a fresh settle begins.
+        if self.pca_calls_in_chain > 200_000 {
             log::error!(
-                "[PCA_TIMEOUT] exceeded 200k process_current_ability calls; aborting to break runaway loop"
+                "[PCA_TIMEOUT] exceeded 200k process_current_ability calls in one resolution \
+                 chain; aborting to break runaway loop"
             );
             self.ability_queue.clear();
             return;
         }
+        self.pca_calls_in_chain += 1;
         let (card_id, ability, ability_index, trigger_type, cost_already_paid) = {
             let entry = match self.ability_queue.current_entry() {
                 Some(e) => e,
@@ -2496,7 +2511,12 @@ fn trigger_auto_ability_by_index_refs(
             .unwrap_or(false)
     }
 
-    pub fn entry_snapshot_last_energy_placed_by_player(&self) -> Option<String> {
+    /// `ArcStr` rather than `String`: this is the movement event's field handed straight
+    /// back, so returning it as an owned `String` re-allocated what the event already
+    /// holds refcounted.
+    pub fn entry_snapshot_last_energy_placed_by_player(
+        &self,
+    ) -> Option<crate::core::types::ArcStr> {
         self.ability_queue
             .current_entry()
             .and_then(|e| {
@@ -2526,7 +2546,7 @@ fn trigger_auto_ability_by_index_refs(
             .map(|m| m.moved_card_id)
     }
 
-    pub fn entry_snapshot_last_area_move_by_player(&self) -> Option<String> {
+    pub fn entry_snapshot_last_area_move_by_player(&self) -> Option<crate::core::types::ArcStr> {
         self.ability_queue
             .current_entry()
             .and_then(|e| {

@@ -81,7 +81,7 @@ fn trigger_toubatsu_with_opponent_member() -> (TestGame, i16, i16) {
             old_position: 1u8,
             new_position: 0u8,
             cause_card_id: None,
-            cause_player_id: "p1".to_string(),
+            cause_player_id: "p1".into(),
             effect_only: false,
         });
     game.state.record_card_movement(toubatsu);
@@ -343,7 +343,7 @@ fn toubatsu_q263_center_to_area_move_triggers_auto() {
             old_position: old_pos,
             new_position: new_pos,
             cause_card_id: None,
-            cause_player_id: "p1".to_string(),
+            cause_player_id: "p1".into(),
             effect_only: false,
         });
     game.state.record_card_movement(toubatsu);

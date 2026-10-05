@@ -936,8 +936,27 @@ static void r6_revealed_cards_filtered_by_player_ownership(void)
  * place. The label strings are the two Japanese option texts from the
  * Rust source, spelled with \xNN escapes.
  */
-#define OPT_WAIT   "\xE3\x81\x93\xE3\x81\xAE\xE3\x83\xA1\xE3\x83\xB0\xE3\x83\x90\xE3\x83\xBC\xE3\x82\x92\xE3\x82\xA6\xE3\x82\xA7\xE3\x82\xA4\xE3\x83\x88\xE3\x81\xAB\xE3\x81\x99\xE3\x82\x8B" /* このメンバーをウェイトにする */
-#define OPT_DISCARD "\xE6\x89\x8B\xE6\x9D\xAF\xE3\x82\x92\xE6\x95\xB0\xE6\x9D\xAF\xE3\x81\xAB\xE3\x81\x8A\xE3\x81\x8F\xE5\x85\x8B\xE5\xBB\xA3\xE5\xAE\xA4\xE3\x81\xAB\xE3\x81\x86\xE3\x82\x8B" /* 手札を1枚控え室に置く */
+#define OPT_WAIT   "\xE3\x81\x93\xE3\x81\xAE\xE3\x83\xA1\xE3\x83\xB3\xE3\x83\x90\xE3\x83\xBC\xE3\x82\x92\xE3\x82\xA6\xE3\x82\xA7\xE3\x82\xA4\xE3\x83\x88\xE3\x81\xAB\xE3\x81\x99\xE3\x82\x8B" /* このメンバーをウェイトにする */
+#define OPT_DISCARD "\xE6\x89\x8B\xE6\x9C\xAD\xE3\x82\x92\xE6\x95\xB0\xE6\x9E\x9A\xE6\x8E\xA7\xE3\x81\x88\xE5\xAE\xA4\xE3\x81\xAB\xE7\xBD\xAE\xE3\x81\x8F" /* 手札を1枚控え室に置く */
+
+#define OPT_WAIT_SUB   "\xE3\x82\xA6\xE3\x82\xA7\xE3\x82\xA4\xE3\x83\x88\xE3\x81\xAB\xE3\x81\x99\xE3\x82\x8B"
+#define OPT_DISCARD_SUB "\xE6\x8E\xA7\xE3\x81\x88\xE5\xAE\xA4\xE3\x81\xAB\xE7\xBD\xAE\xE3\x81\x8F"
+
+/* Both labels above are taken VERBATIM from the Rust source's own bytes -- the
+ * `description:` string literal at
+ * engine/tests/test_modules/integration/full_round/
+ * real_card_phase_walkthrough_and_ability_suite_test.rs:3383 and its
+ * `options:` vec at :3389 / :3390 -- escaped by reading those bytes rather than
+ * retyping the Japanese, which is exactly what the previous literals got wrong.
+ * They decoded to
+ *   "kono-me-<U+30F0>-baru-wo-weito-ni-suru"    (a KATAKANA-BAR where ウ belongs)
+ *   "tehai-wo-suu-hai-tefuda-ni-oku-<...>-ni-uru" (U+676F CUP for 札, a 数
+ *                                                    KANJI for the ASCII "1")
+ * Both are 0 occurrences in the corpus, and both are used as strstr() needles
+ * against a description the SAME test builds out of those same macros, so
+ * neither label assertion could ever fail.
+ * OPT_*_SUB are the two suffixes Rust's own assertions actually test:
+ * :3404 `.contains("<W-sub>")` and :3408 `.contains("<D-sub>")`. */
 
 static void r7_choice_condition_shows_proper_labels(void)
 {
@@ -967,9 +986,20 @@ static void r7_choice_condition_shows_proper_labels(void)
     CHECK(live && !live->allow_skip,
           "R7: the prompt is non-skippable (allow_skip = false)");
     CHECK(live && strstr(live->description, OPT_WAIT) != NULL,
-          "R7: the description carries the first option label 「このメンバーをウェイトにする」");
+          "R7: the description carries option 1 (Rust :3389, "
+          "real_card_phase_walkthrough_and_ability_suite_test.rs:3383)");
     CHECK(live && strstr(live->description, OPT_DISCARD) != NULL,
-          "R7: the description carries the second option label 「手札を1枚控え室に置く」");
+          "R7: the description carries option 2 (Rust :3390, same file :3383)");
+    /* Rust's assertions proper are `.contains()` on the two SUFFIXES, not on the
+     * whole label (:3404 / :3408). Pinning the suffixes here means the escape
+     * decoding above is checked against the same text Rust checks. A whole-label
+     * strstr against a description built from the same macro can never fail, so
+     * these two are what make the decoding verifiable: a single wrong \xNN byte
+     * anywhere in either label is caught (fault-verified). */
+    CHECK(live && strstr(live->description, OPT_WAIT_SUB) != NULL,
+          "R7: description contains <W-sub> (Rust :3404 `.contains(\"<W-sub>\")`)");
+    CHECK(live && strstr(live->description, OPT_DISCARD_SUB) != NULL,
+          "R7: description contains <D-sub> (Rust :3408 `.contains(\"<D-sub>\")`)");
 
     /* The Rust assertions proper: two ChoiceOption actions whose
      * descriptions contain the labels. Unrepresentable in C -- RbChoice has

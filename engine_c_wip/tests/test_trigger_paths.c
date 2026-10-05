@@ -58,10 +58,19 @@ static int checks;
    TRIG_AUTO       = U+81EA U+52FA           \350\207\252\345\213\225
    TRIG_ACTIVATION = U+8D77 U+52FA           \350\265\267\345\213\225
                                                   (U+8D77 "?" is E8 B5 B7) */
-#define TRIG_DEBUT      "\347\232\273\347\243\276"
-#define TRIG_LIVE_START "\343\203\251\343\202\244\343\203\226\346\225\255\345\216\237\346\231\202"
+#define TRIG_DEBUT      "\347\231\273\345\240\264"
+#define TRIG_LIVE_START "\343\203\251\343\202\244\343\203\226\351\226\213\345\247\213\346\231\202"
 #define TRIG_AUTO       "\350\207\252\345\213\225"
 #define TRIG_ACTIVATION "\350\265\267\345\213\225"
+/* TRIG_DEBUT was \347\232\273\347\243\276 -> E7 9A B3 E7 A3 BE (U+76B3 U+78BE),
+ * and TRIG_LIVE_START ended \346\225\255\345\216\237\346\231\202 -> E6 95 AD
+ * E5 90 9F E6 99 82 (U+6167 U+542F ?). Both are non-canonical variants that
+ * occur NOWHERE in cards/cards.json or in engine/src/*.rs, so rb_trigger_is
+ * (a plain strstr) matched no printed ability and every trigger premise check
+ * in this suite failed. The canonical tokens are ?? = U+767B U+5834 =
+ * E7 99 BB E5 A0 B4 and ?????? = U+30E9 U+30A4 U+30D6 U+958B U+59CB
+ * U+6642 = E3 83 A9 E3 82 A4 E3 83 96 E9 96 8B E5 A7 8B E6 99 82, which is what
+ * the two macros above now carry. */
 
 /* „Ÿ„Ÿ shared helpers „Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ„Ÿ */
 

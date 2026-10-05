@@ -52,7 +52,7 @@ fn position_change_places_waited_energy() {
                 old_position: 0,
                 new_position: 2,
                 cause_card_id: None,
-                cause_player_id: "p1".to_string(),
+                cause_player_id: "p1".into(),
                 effect_only: false,
             });
     }
@@ -64,7 +64,7 @@ fn position_change_places_waited_energy() {
                 old_position: 2,
                 new_position: 0,
                 cause_card_id: None,
-                cause_player_id: "p1".to_string(),
+                cause_player_id: "p1".into(),
                 effect_only: false,
             });
     }

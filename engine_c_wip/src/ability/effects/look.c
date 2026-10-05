@@ -262,7 +262,27 @@ static int look_select_matches(GameState *g, const AbilityEffect *select, int ci
 /* The select effect behind the currently-offered looked_at pool, and the
    look_and_select follow-up that has to outlive a multi-pick re-prompt. Both
    are parked at OFFER time because choice.c clears queue.resume_eff and
-   consumes queue.resume_after_look on the first resume. */
+   consumes queue.resume_after_look on the first resume.
+
+   ── OWNERSHIP: STILL AN ALIAS, AND MEASURED TO BE ────────────────────────
+   Both slots park the node they were handed (`e`, `sel`, `select_action`,
+   `e->followup_action`) -- a pointer INTO a tree some other owner frees. That
+   is the alias-defect shape, and it is why the three landed fixes were
+   deferrals rather than ownership: a producer that frees its own tree on a
+   prompt-open pass leaves these slots dangling, and the answer path, which runs
+   after that free, reads them again (rb_look_resume_indices, the
+   per_group_count / placement_order / re-prompt lookups).
+
+   Converting them to OWNING `rb_effect_deep_clone` copies -- Rust's model, where
+   `effect.target.clone()` (choice.rs:120) is an owned String and the parked tail
+   is COPIED back by requeue_remaining_after_choice (choice.rs:87-105) -- was
+   ATTEMPTED on 2026-10-05, MEASURED, and REVERTED. The reason is not the clone;
+   it is that these slots are NOT INDEPENDENT OWNERS. See the note on
+   look_park_select below for the measurement and the mechanism.
+
+   What did land is that the slots are now MEASURABLE (rb_look_slot_* below) and
+   that the property blocking the conversion is pinned by
+   tests/test_alias_ownership.c, so the attempt is not repeated from scratch. */
 static AbilityEffect *g_look_pending_select;
 static AbilityEffect *g_look_reprompt_followup;
 /* Set only by the looked-at SELECT offers. rb_effect_select / _select_cards
@@ -271,6 +291,77 @@ static AbilityEffect *g_look_reprompt_followup;
 static int g_look_pool_select_offered;
 static void look_discard_unmatched(GameState *g, int owner, AbilityEffect *parent);
 static const char *look_filter_card_type(const AbilityEffect *effect);
+
+/* ── the two parked slots: OWNED, not aliased (see the note at the decls) ── */
+
+/* Park an OWNED DEEP CLONE of `alias`, releasing whatever the slot held.
+   The caller keeps ownership of `alias` and may free its tree at any time --
+   including on the pass that opens the prompt, which is the case the alias
+   form could not survive. A failed clone parks NULL rather than the alias:
+   degrading to "no re-prompt state" is correct, degrading back to the alias
+   would reintroduce the defect exactly when memory is short. */
+/* Park the select effect behind the currently-offered looked_at pool.
+ *
+ * ⛔ THIS SLOT CANNOT BE CONVERTED TO AN OWNING CLONE ON ITS OWN. The attempt
+ * was measured and reverted on 2026-10-05, and the reason is ownership, not the
+ * clone: `g_look_pending_select` and `g->queue.resume_eff` hold THE SAME NODE on
+ * the multi-pick re-prompt path.
+ *
+ * rb_look_resume_indices reads the parked value into `sel` and hands it to
+ * look_emit_pool_choice, whose body is, in this order:
+ *
+ *     795:  g->queue.resume_eff = (AbilityEffect *)sel;
+ *     797:  look_park_select((AbilityEffect *)sel);
+ *
+ * So on that path `sel` IS the previously parked value. A park that clones and
+ * then RELEASES the old value releases the node `resume_eff` published one line
+ * earlier. That is not a subtle degradation:
+ *
+ *   MEASURED (same-snapshot A/B -- tools/alias_probe.sh --prechange versus the
+ *   converted arm, ONE tree state, three suites, no rebuild between):
+ *     pre-change  alias        : 0 alias hits; FAIL 37 / 65 / 44
+ *     converted   own+release  : 32 alias hits, ALL on queue.resume_eff with
+ *                                 slot_value == freed_root; FAIL 41 / 73 / 44
+ *
+ *   The owning clone did not merely fail to help. It REMOVED the node that
+ *   `resume_eff` was aliasing, i.e. it turned a two-slot alias into a live
+ *   use-after-free, and it cost 10 previously-passing assertions.
+ *
+ * The correct conversion is therefore a JOINT one: `resume_eff`,
+ * `resume_after_look` and this file-static become owning copies IN THE SAME
+ * PASS, with `resume_eff` taking ownership of a clone that the other slots then
+ * either share or clone from. Converting any one of them alone produces the
+ * numbers above. That is the concrete demonstration of why a half-converted
+ * ownership scheme is worse than either end state -- it is a third state with
+ * the alias's fragility and none of the target's safety.
+ *
+ * The slot therefore stays an alias, exactly as before 2026-10-05. What changed
+ * is that it is now MEASURABLE and its blocking property is pinned:
+ * rb_look_slot_pending_select below, and tests/test_alias_ownership.c asserts
+ * the sharing, so the conversion cannot be rediscovered by accident. */
+static void look_park_select(AbilityEffect *alias)
+{
+    g_look_pending_select = alias;
+}
+
+/* The consumer's half. Clears the pointer; it must NOT free, because the value
+   is still reachable from g->queue.resume_eff (see above) and from the ability
+   tree that produced it. */
+static void look_clear_select(void)
+{
+    g_look_pending_select = NULL;
+}
+
+/* ── READ-ONLY parked-slot diagnostics ─────────────────────────────────────
+   Two accessors and nothing else. They exist so the alias-class probe
+   (tools/alias_probe.c, linked with -Wl,--wrap) and the ownership regression
+   test (tests/test_alias_ownership.c) can ASSERT on what is parked instead of
+   inferring it. Before these, `static` meant no linker could name either slot,
+   which is part of why the class went unmeasured for as long as it did.
+   Read-only by contract: writing through the returned pointer would make it
+   an alias again, which is the defect. */
+const AbilityEffect *rb_look_slot_pending_select(void)    { return g_look_pending_select; }
+const AbilityEffect *rb_look_slot_reprompt_followup(void) { return g_look_reprompt_followup; }
 
 static int look_target_player(const GameState *g, int actor, const AbilityEffect *effect)
 {
@@ -414,7 +505,7 @@ void rb_effect_look_at(GameState *g, int actor, AbilityEffect *e)
     if (count <= 0) return;
     look_push_look_log(g, count);
     g->queue.resume_look_owner = who;
-    g_look_pending_select = NULL;
+    look_clear_select();
     g_look_pool_select_offered = 0;
 }
 
@@ -472,7 +563,7 @@ void rb_effect_select_cards(GameState *g, int actor, AbilityEffect *e){
                 sizeof(g->queue.resume_filter_group)-1);
         g->queue.resume_filter_heart = g->queue.pending.filter_heart;
         g->queue.resume_mode = 2; g->queue.resume_eff = e; g->queue.resume_is_select = 1;
-        g_look_pending_select = e;
+        look_park_select(e);
         g_look_pool_select_offered = 0;
         g->queue.resume_actor = actor;
         g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
@@ -684,7 +775,7 @@ static void look_emit_pool_choice(GameState *g, int owner, const AbilityEffect *
     g->queue.resume_mode = 2;
     g->queue.resume_eff = (AbilityEffect *)sel;
     g->queue.resume_is_select = 1;
-    g_look_pending_select = (AbilityEffect *)sel;
+    look_park_select((AbilityEffect *)sel);
     g_look_pool_select_offered = 1;
 }
 
@@ -760,10 +851,10 @@ void rb_look_resume_indices(GameState *g, int owner, const int *indices, int n_i
         } else {
             look_append_cards(&player->discard, remainder, n_remainder);
         }
-        pool->n = 0;
-        g_look_pending_select = NULL;
-        g_look_pool_select_offered = 0;
-        return;
+pool->n = 0;
+           look_clear_select();
+           g_look_pool_select_offered = 0;
+           return;
     }
     /* move/mod.rs:3120-3157 -- the SECOND deck-order producer, and the only
      * consumer of `placement_order: any_order` in the `look_and_select` arm.
@@ -827,9 +918,9 @@ void rb_look_resume_indices(GameState *g, int owner, const int *indices, int n_i
                 else
                     look_append_cards(&player->deck, &remainder[i], 1);
             }
-            g_look_pending_select = NULL;
-            g_look_pool_select_offered = 0;
-            rb_order_prompt_begin(g, owner, selected, n_selected, 0);
+look_clear_select();
+           g_look_pool_select_offered = 0;
+           rb_order_prompt_begin(g, owner, selected, n_selected, 0);
             return;
         }
     }
@@ -902,9 +993,9 @@ const char *remainder_zone = remainder_destination && *remainder_destination
     for (int i = 0; i < n_remainder; i++)
         if (g->n_recently_moved < RB_MAX_RECENTLY_MOVED)
             g->recently_moved[g->n_recently_moved++] = remainder[i];
-    pool->n = 0;
-    g_look_pending_select = NULL;
-    g_look_pool_select_offered = 0;
+pool->n = 0;
+   look_clear_select();
+   g_look_pool_select_offered = 0;
 }
 
 void rb_look_resume(GameState *g, int actor, int selected_idx, const char *destination, int is_select)
@@ -1199,7 +1290,7 @@ void rb_effect_select(GameState *g, int actor, AbilityEffect *e) {
     g->queue.resume_filter_heart = g->queue.pending.filter_heart;
     g->queue.resume_mode = 2; g->queue.resume_eff = e;
     g->queue.resume_is_select = 1;
-    g_look_pending_select = e;
+    look_park_select(e);
     g_look_pool_select_offered = 0;
     g->queue.resume_actor = actor; g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
 }
@@ -1643,7 +1734,7 @@ void rb_effect_look_and_select(GameState *g, int actor, AbilityEffect *e) {
     g->queue.resume_mode = 2;
     g->queue.resume_eff = select_action;
     g->queue.resume_is_select = 1;
-    g_look_pending_select = select_action;
+    look_park_select(select_action);
     g_look_pool_select_offered = 1;
     g->queue.resume_actor = actor;
     g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : -1;

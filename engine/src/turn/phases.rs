@@ -253,6 +253,14 @@ impl super::TurnEngine {
                     // still be a no-op and the member would keep reducing. Constants are
                     // re-derived only if a card actually moved, since live-zone membership
                     // is exactly what they read.
+                    //
+                    // The SECOND `check_timing` below looks redundant — the first has just
+                    // run, and this only fires because the eviction invalidated it. It is
+                    // NOT: collapsing the pair into one (evict first, validate once) was
+                    // tried behind `ab_flag("liveset_single_check")` and the A/B came back
+                    // VOID — identical games failed, 169,561 actions against 169,462. So
+                    // something depends on the state being validated on BOTH sides of the
+                    // eviction, and it was not worth +1.1% to find out what.
                     let evicted = [
                         game_state.seat_index_by_id(&first_attacker_id),
                         game_state.seat_index_by_id(&second_attacker_id),
@@ -270,6 +278,14 @@ impl super::TurnEngine {
                     }
                     game_state.process_pending_auto_abilities(&second_attacker_id);
                     if game_state.has_pending_choice() {
+                        // The `return` this needs was MISSING and the body was left empty, so a
+                        // choice raised while the second attacker's abilities settled was
+                        // ignored and the phase arm fell through to the next phase. The
+                        // first-attacker call two lines up has always returned. Same rule,
+                        // both seats: a prompt raised here stops the phase, because the
+                        // performance phase that follows would otherwise run while an
+                        // ability still owed the player a decision.
+                        return;
                     }
                 }
                 Phase::FirstAttackerPerformance => {

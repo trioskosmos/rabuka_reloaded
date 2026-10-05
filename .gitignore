@@ -285,3 +285,5 @@ tools/decklog/.chrome-profile/
 # analysis_smoke/ is the same set from a reduced-input smoke run.
 tools/decklog/analysis/
 tools/decklog/analysis_smoke/
+# engine_c_wip: one structured verdict per suite, written by tools/verdict_runner.c on every run. Regenerated evidence, never source.
+engine_c_wip/verdicts/

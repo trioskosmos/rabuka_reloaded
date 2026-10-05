@@ -981,6 +981,98 @@ void rb_remove_revealed_card(GameState *g, int card_id) {
     }
 }
 
+/* -- remove_revealed_cost_card -- E5
+   Mirror modifiers.rs:2121-2132 (GameState::remove_revealed_cost_card):
+
+       if let Some(index) = self.revealed_cost_cards.iter().position(|id| *id == card_id) {
+           self.revealed_cost_cards.remove(index);
+           if index < self.revealed_cost_card_meta.len() {
+               self.revealed_cost_card_meta.remove(index);
+           }
+       }
+
+   FIRST match only, same as rb_remove_revealed_card above: a card id revealed
+   twice as a cost (two copies of the same print paid in one action) must lose
+   one provenance entry, not both.
+
+   `revealed_cost_card_meta` is a PARALLEL Vec<String> that Rust also drops at
+   the same index. RbGameState has no member for it (rabuka.h:1606-1609 records
+   this for the producer); it is display-only in Rust, so dropping it is exact.
+
+   UNBLOCKED. rabuka.h:1591-1605 recorded this function as blocked on the
+   producer `push_revealed_cost_card`, which has since landed at
+   src/ability/cost.c:1913-1914 (revealed_cost_cards[] now has a real writer),
+   so the reader is reachable and is ported here. */
+void rb_remove_revealed_cost_card(GameState *g, int card_id) {
+    if (!g) return;
+    for (int i = 0; i < g->n_revealed_cost_cards; i++) {
+        if (g->revealed_cost_cards[i] != card_id) continue;
+        for (int j = i; j + 1 < g->n_revealed_cost_cards; j++)
+            g->revealed_cost_cards[j] = g->revealed_cost_cards[j + 1];
+        g->n_revealed_cost_cards--;
+        return;
+    }
+}
+
+/* -- remove_from_source_hands -- E6
+   Mirror modifiers.rs:2139-2158 (GameState::remove_from_source_hands):
+
+       let mut seen = HashSet::<i16>::default();
+       for &cid in card_ids {
+           if !seen.insert(cid) { continue; }
+           // Only remove from hand if the card was from a cost reveal
+           // (tracked in revealed_cost_cards). Non-cost reveals (deck peek, etc.)
+           // should NOT remove from hand.
+           if !self.revealed_cost_cards.contains(&cid) { continue; }
+           for player in [&mut self.player1, &mut self.player2] {
+               if let Some(pos) = player.hand.cards.iter().position(|&c| c == cid) {
+                   player.hand.remove_card(pos);
+                   break;
+               }
+           }
+       }
+
+   Three behaviours are load-bearing and all are preserved:
+     * the `seen` set -- a DUPLICATE id in `card_ids` is removed once, and Rust's
+       `seen.insert` also means the second pass never re-scans the hands;
+     * the `revealed_cost_cards.contains` gate -- a deck-peek reveal is NOT a
+       cost reveal, so the card must stay in hand. Removing it unconditionally is
+       the difference between "peeked at it" and "paid with it";
+     * the `break` -- at most ONE hand slot is cleared across BOTH seats, which is
+       what Rust's `break` after `remove_card` does.
+
+   Player::hand is RbHand == RbBag (rabuka.h:787-793) and
+   `Hand::remove_card(pos)` is rb_hand_remove_card(player, index) (zones.c:653),
+   which already shifts the tail down and decrements the count. */
+void rb_remove_from_source_hands(GameState *g, const int *card_ids, int n_ids) {
+    if (!g || !card_ids || n_ids <= 0) return;
+    for (int i = 0; i < n_ids; i++) {
+        int cid = card_ids[i];
+        /* seen.insert -- skip an id already handled in this call. */
+        int dup = 0;
+        for (int k = 0; k < i; k++) if (card_ids[k] == cid) { dup = 1; break; }
+        if (dup) continue;
+        /* Only cost reveals leave the hand. */
+        int is_cost_reveal = 0;
+        for (int k = 0; k < g->n_revealed_cost_cards; k++)
+            if (g->revealed_cost_cards[k] == cid) { is_cost_reveal = 1; break; }
+        if (!is_cost_reveal) continue;
+        /* Rust's `break` leaves the PLAYER loop, so the inner `break` below is
+         * not enough on its own -- without the flag both seats would be
+         * swept for one id. */
+        int removed = 0;
+        for (int pl = 0; pl < 2 && !removed; pl++) {
+            RbPlayer *P = &g->p[pl];
+            for (int pos = 0; pos < P->hand.n; pos++) {
+                if (P->hand.cards[pos] != cid) continue;
+                rb_hand_remove_card(P, pos);
+                removed = 1;
+                break;
+            }
+        }
+    }
+}
+
 /* -- record_stage_position_swap -- E9
    Mirror modifiers.rs:1799-1857 (GameState::record_stage_position_swap). This is
    the SINGLE choke point Rust's three position-change branches each wrote out in

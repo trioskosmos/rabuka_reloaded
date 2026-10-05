@@ -62,12 +62,100 @@ mid-run and moved `total_actions` from 29,648 to 29,341.
 
 Threads are a free multiplier for the benchmark and are result-neutral:
 `--jobs 1/2/4/6` gives 371/664/750/1559 gps with an identical
-`total_actions` at every setting. Do not read that as an engine speedup — a
-single game is a strictly sequential turn loop, and there is no intra-game
+`total_actions` at every setting. Do not read that as an engine speedup —
+a single game is a strictly sequential turn loop, and there is no intra-game
 parallelism to exploit without redesigning for speculative action
 evaluation.
 
+### 1.2 Two additions to the contract, and one retraction (2026-10-05)
+
+**RETRACTION — the bench IS deterministic across processes.** This section
+previously implied otherwise was a risk worth designing around, and a
+session's worth of A/B work was built on that belief. It is wrong. Two runs
+of the same binary with the same arguments produced byte-identical
+`total_actions` (167,655 both), and the `HashMap` worry in §6 does not reach
+the rules path: the only iterations of `card_database.cards` are in the bot
+(`encoding.rs`, `v8_model.rs`, `bot_arena.rs`) and `web_server.rs`, none of
+which the random-policy engine sweep executes. So a plain two-process
+before/after is *sound* provided `total_actions` matches. The
+cross-process caveat that does survive is the one already in §1: other
+commits landing mid-run.
+**Arm-order bias is real and is not in the contract.** Whichever arm runs
+FIRST in a pair pays cold-cache and first-touch costs. A single on/off pair
+reported +25%, +42% and +21% for one unchanged build. Interleaving the arms
+— `sim_bench --ab <flag>` plays off, on, off, on inside one process and means
+the two arms, so each gets one cold and one warm run — collapsed that to
++3.0% and +1.0%, i.e. noise. `total_actions` is still the trajectory gate;
+the interleaving is what makes the *timing* trustworthy.
+
+### Where `check_timing`'s own frame goes
+
+Not stated anywhere else, and it contradicts the assumption that this pass is
+just `recalculate_constants` in a wrapper. Per call, from one profiled sweep:
+
+| part | µs/call |
+|---|---|
+| `check_timing` own frame (the eight repair steps) | **6.01** |
+| `recalculate_constants` | 3.52 |
+| `process_pending_auto_abilities` | 0.50 |
+| `check_invalid_live_cards` | 0.07 |
+| `check_victory_condition` | 0.03 |
+
+So the repair steps cost **more than** the recalculation they wrap, and most
+of that is un-instrumented: `check_duplicate_members` ×2, `refresh` ×2,
+`check_invalid_energy_cards` ×2, `check_orphaned_under_cards` ×2,
+`check_invalid_resolution_zone`.
+
+### …and those repair steps are NOT a rarely-taken safety net
+
+Worth knowing, because it invalidates a whole family of plausible
+optimisations. Skipping all five behind `ab_flag("repair_steps")` was measured
+expecting `identical_games=true` — on a legal board none of them should move a
+card. It came back **VOID at 168,347 actions against 141,807**, so they fire
+constantly under random-policy play. The suite agrees in kind: with them off, 5
+tests fail.
+
+So `check_invalid_energy_cards`, `check_invalid_live_cards` and
+`check_orphaned_under_cards` do real work on most calls, and every
+empty-input short-circuit aimed at them — the `SmallVec`, the empty-queue skip,
+the derivability gate — has nothing to skip. The `CardDatabase` type bitset
+landed on this path is worth its ~0.5% precisely BECAUSE the path is hot.
+
+**Allocation counts are a reproducibility gate, not a ranking signal.** §1 is
+right that allocations are stable and gps is not; it should not be read as
+"fewer allocations ⇒ faster". `ENGINE_AUDIT_FINDINGS.md` **F1** already
+established this — three "provable allocation removals" were removing
+allocations from paths that make zero, and F2/F3 that
+`recalculate_constants` allocates nothing at all once the display
+accumulators are gated. A later session re-derived the same lesson
+independently, which is the strongest evidence it needs restating where the
+optimisation work happens: `Vec::new()` and `HashMap::default()` do not
+allocate until first push, and these accumulators are empty on almost every
+call. Rank candidates with the `--features profiling` timers instead.
+
+One trap in those timers, since it invalidates a phase breakdown: a
+`let _t = Timer::start(..)` guard **nests**, so three of them report as
+`a > b > c` with every row inclusive of the rest. Drop each with `Option` +
+explicit `take()` at its boundary, or the numbers are unreadable.
+
+**A fourth trap, and it invalidates more than the first three: each
+`Timer::start` costs ~0.44 µs.** Measured by adding two timers to
+`recalculate_constants` and watching the pass go from 5.53 µs to 6.40 µs —
++0.87 µs for two timers. A pass that takes ~5–6 µs is therefore *roughly one
+timer*, so per-phase figures are each inflated by about that much, and a
+residual "unaccounted" gap is usually the instrumentation rather than the code.
+
+This is worth knowing before instrumenting anything small. It is the likely
+reason eleven micro-optimisations of `recalculate_constants` all measured
+between −5% and +5% — nothing — while the profile kept showing it as a 20%
+hotspot: they were being read through an instrument costing ~0.44 µs per
+sample, on a function with ~0.5 µs of real work between the samples. If a
+function's total is near the instrument's own cost, per-phase timing cannot
+resolve it; measure the skip rate or end-to-end `mean_aps` instead, both of
+which are read outside the function.
+
 ## 2. Baseline as of 2026-09-28
+
 
 200 games, `--seed 1`, random policy, single job. The determinism check is
 that `total_actions` reads 29,341 and has not moved between comparison runs.
@@ -118,6 +206,20 @@ than one hot allocation site.
 Each of these removes a copy. None of them changes a game outcome, and each
 was gated on the allocation count with `total_actions` held fixed.
 
+0. **`check_timing` batching removed — it was a 36% regression (2026-10-05).**
+   Listed first because it is the largest and because it **shipped**: commit
+   `c9da256e` captured the experiment, so the engine ran with the per-phase
+   validations suppressed and one compensating validation per settle. The
+   argument for it was that `advance_phase` runs ~1.3×/action and each of its
+   five arms ends with a full `check_timing`, so the board was re-derived
+   several times per action. That argument is inverted:
+   `settle_single_player_state` is called **more** often than `advance_phase`,
+   so "one validation per settle" costs more than "one per phase arm". In-process
+   interleaved A/B: 4.337 s batched against 3.190 s unbatched, `total_actions`
+   0.04% apart. It was written off originally on a 34% trajectory shift that
+   was arm-order bias (§1.2). A lesson worth more than the fix: **a reverted
+   change that leaves its scaffolding behind is worse than the change** — an
+   intermediate state here ran an *extra* full validation per settle.
 1. **Gate tables as const fn-pointer arrays.** `pre_cost_gates()`,
    `post_cost_gates()` and `effect_gates()` each returned
    `CompositeGate::new(vec![Box::new(..), ..])`, so every ability
@@ -230,6 +332,15 @@ reopening one means re-measuring, not re-arguing.
 | State hashing to short-circuit repeats | Dead. Ablation showed repeats are already cheap. |
 | 4× trigger scan cost | Measured at 2.7%, not the lever. (Undercounted: the live phase issues more scans than this model assumed.) |
 | `recalculate_constants` dominates | No. 4.1% total, and the plan's sequencing advice stands — do not start with the dirty flag. |
+| Skip `recalculate_constants` when no 常時 is derivable | **Closed 2026-10-05, built sound over five attempts and lost.** The gate must be built from the pass's *own* discovery — a `CardDatabase` index over printed abilities failed 68 tests, because `gain_ability` grants 常時 that never appear in `card.abilities`. Correct version needs five sources (stage slots + *gained*, hand, live zone, success zone, under-member slots); it measured **1.8% slower**, because a full pass is only ~4.7 us and just 16% of calls skip. Break-even needs a >60% skip rate and a live game almost always has a 常時 source. Later, a *sound and free* all-five-sources gate was built and measured at **+0.2% — noise**: the pass is already cheap when there is nothing to derive, so a gate can only skip clearing and bookkeeping, which are cheap. |
+| 自動 ability index over printed 常時 | Closed. Skipping the 1439 of 1574 members with no 自動 at all measured **23,674 vs 26,402 aps — a loss**. A `HashMap` probe per card plus a bounds check costs more than iterating `card.abilities` directly once the card turns out to *have* a 自動, and by then the loop is committed. |
+| Empty-queue short-circuit in `process_pending_auto_abilities` | Closed. Same shape, same answer: **25,908 vs 26,402 aps**. |
+| Enable `fast_alloc` (`PoolAllocator`) as a default feature | **Closed 2026-10-05 — measured, and it is 2.8% SLOWER.** `default` does not include it, which turns out to be right. Identical games both arms (`total_actions` 168,347): system 2.927 s / 57,517 aps against pool 3.011 s / 55,907 aps. Consistent with the workload — the engine's allocations are large and variably sized (effect trees, `Ability` clones, decoded blobs), which is exactly the shape a thread-local free-list pool handles worse than the system allocator while adding bookkeeping to every alloc and free. **Do not "optimise" by turning this on**; the default is already the measured-best. |
+
+A theme worth keeping: the three above are all *"avoid work that turns out not to be
+needed"*, and all three lose, because the work they avoid is real and the test costs
+about as much as the thing tested. The wins in this codebase have all come from
+**removing work outright** (§4.0) rather than from deciding not to do it.
 | Memory pressure | Dead. No growth while games run. |
 | Logging args | Dead, already. The args are not the cost. |
 | Faster allocator | Dead. |

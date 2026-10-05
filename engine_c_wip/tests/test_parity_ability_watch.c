@@ -138,7 +138,11 @@ static const char *current_test = "(none)";
 
 /* ── trigger bytes (escapes, so the source encoding cannot corrupt them) ── */
 /* 登場         U+767B U+767A = E7 99 BB E7 8D B2 */
-#define TRIG_DEBUT        "\xE7\x99\xBB\xE7\x8D\xB2"
+#define TRIG_DEBUT        "\xE7\x99\xBB\xE5\xA0\xB4"
+/* The second escape above was E7 8D B2 (U+7372), which occurs NOWHERE in
+ * cards/cards.json or in engine/src/*.rs; 登場 is E7 99 BB E5 A0 B4
+ * (U+767B U+5834). rb_trigger_is is strstr, so the debut premise checks
+ * were matching a token no printed ability carries. */
 /* ライブ開始時  U+30E9 U+30A4 U+30D6 U+958B U+59CB U+6642
  *                   = E3 83 A9 E3 82 A4 E3 83 96 E9 96 8B E5 A7 8B E6 99 82 */
 #define TRIG_LIVE_START   "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE9\x96\x8B\xE5\xA7\x8B\xE6\x99\x82"

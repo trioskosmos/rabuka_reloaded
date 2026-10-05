@@ -67,7 +67,13 @@ int rb_stage_position_change(int stage[RB_STAGE_SIZE], int from_area, int to_are
 /* Japanese trigger keywords scanned by zones.rs::check_trigger_position. */
 #define TRIG_LEFT   "\xE5\xB7\xA6\xE3\x82\xB5\xE3\x82\xA4\xE3\x83\x89"                    /* left side   */
 #define TRIG_RIGHT  "\xE5\x8F\xB3\xE3\x82\xB5\xE3\x82\xA4\xE3\x83\x89"                    /* right side  */
-#define TRIG_CENTER "\xE3\x83\x9B\xE3\x83\xB3\xE3\x82\xBF\xE3\x83\xBC"                    /* center      */
+/* U+30BB SE, NOT U+30DB HO. Rust core/zones.rs:169 scans for
+ * `trig.contains("センター")`, and every engine/src/*.rs occurrence of that
+ * token is E3 82 BB. This literal was E3 83 9B (U+30DB ホ), which occurs
+ * NOWHERE in cards/cards.json or in engine/src/*.rs, so the center arm of
+ * check_trigger_position was compared against a token no printed ability
+ * could ever contain -- the gate silently never fired. */
+#define TRIG_CENTER "\xE3\x82\xBB\xE3\x83\xB3\xE3\x82\xBF\xE3\x83\xBC"                    /* center      */
 #define TRIG_BOTH   TRIG_LEFT "\xE3\x81\xA8" TRIG_RIGHT                                   /* left and right */
 #define TRIG_LIVE   "live_success"
 

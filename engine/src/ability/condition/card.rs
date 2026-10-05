@@ -1707,7 +1707,7 @@ impl<'a> ConditionContext<'a> {
                 return self.game_state.turn_area_movements.iter().any(|m| {
                     m.moved_card_id == activating_card_id
                         && m.effect_only
-                        && m.cause_player_id == player.id
+                        && m.cause_player_id == player.id.as_str()
                         && m.cause_card_id.is_some_and(|cause_cid| {
                             groups.iter().any(|g| {
                                 crate::ability::util::card_matches_group_str(

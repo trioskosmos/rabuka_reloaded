@@ -2491,6 +2491,30 @@ static void k_riko_condition_met_increases_opponent_hearts(void)
 static void k_riko_condition_not_met_does_nothing(void)
 {
     static TestGame tg;
+    /* THIS CASE USED TO OMIT test_game_new(&tg), and that omission is the whole
+     * "the pipeline is dropping hearts" bug -- not a pipeline defect at all.
+     *
+     * The stage-heart fold's FIRST layer is a set-type heart override whose
+     * ABSENCE is the int8_t sentinel -1: rb_mods_init writes
+     * heart_color_override[i] = -1 (modifiers.c:27), rb_mods_clear_card
+     * restores it (modifiers.c:52), and rb_member_original_hearts tests
+     * `override_color >= 0` (stats_pipeline.c:159) before taking the override
+     * arm at :161. `static TestGame tg` is BSS-zero, so with no init the array
+     * read 0 -- indistinguishable from a LIVE "these printed hearts are all
+     * heart00, count 0" override -- for every card on the board. The fold then
+     * returned ZERO for all eight colours instead of the printed base, which is
+     * why the tally read [0,0,0,0,0,0,0,0] against a printed
+     * [0,0,0,0,0,5,0,0]: the brief read that as "colour 5 lost 5 hearts" when in
+     * fact colour 5 lost nothing in particular and EVERY colour was zeroed.
+     *
+     * Rust cannot express the broken state at all. heart_override is a HashMap
+     * and stats_pipeline.rs:30 reads `if let Some(&(override_color,
+     * override_count)) = heart_override.get(&card_id)` -- an absent key is None
+     * and the function falls through to the printed base (stats_pipeline.rs:36-48).
+     * The C array's zero default is a VALUE, not that absence, so the two only
+     * agree once rb_mods_init has run. Both production entry points do call it
+     * (engine.c:1719, test_game.c:9); only this fixture skipped it. */
+    test_game_new(&tg);
     int riko_sd = mid(&tg, "PL!S-sd1-011-SD");
     int riko_bp5 = mid(&tg, K_RIKO);
     int opp = mid(&tg, K_OPP_LIVE_A);
@@ -2535,6 +2559,91 @@ static void k_riko_condition_not_met_does_nothing(void)
     CHECK_EQ(need_of(&tg, opp, H00), 1,
              "CONTROL: with the PRINTED gate satisfied the opponent's live "
              "card does get +1, so the zero above is a gate verdict");
+}
+
+/* ========================================================================
+ * N. REGRESSION for the "stage pipeline is dropping hearts" false lead.
+ *
+ * The tally the cluster reported --
+ *   C tally   [0,0,0,0,0,0,0,0]
+ *   printed   [0,0,0,0,0,5,0,0]
+ * -- was NOT colour 5 losing 5 hearts. EVERY colour was zero, because the
+ * board's members each took the heart-OVERRIDE arm of the fold with an
+ * override of (colour 0, count 0). Rust asserts the opposite and says so in
+ * the type: stats_pipeline.rs:30 reads
+ *     if let Some(&(override_color, override_count)) = heart_override.get(&card_id)
+ * and an ABSENT HashMap key falls through to the printed base at :36-48. The
+ * C array default of 0 is a VALUE that the override arm cannot distinguish
+ * from "set to zero heart00", so the two agree only after rb_mods_init
+ * (modifiers.c:27) has written the -1 sentinel.
+ *
+ * This case pins the invariant that the -1 sentinel is what a plain board
+ * carries, and that a stage of untouched members therefore folds to exactly
+ * its printed base. It is deliberately built WITHOUT any override, any
+ * additive modifier and any gain_resource: if the fold ever starts inventing
+ * a set layer out of a zero default again, this goes red on the base hearts
+ * rather than on some card's condition.
+ * ===================================================================== */
+
+static void n_zeroed_mods_would_zero_a_stage_fold(void)
+{
+    static TestGame tg;
+    test_game_new(&tg);
+
+    /* DERIVE the members from cards.json rather than pinning ids or counts:
+     * the printed figure must come from the same decode the engine uses. */
+    int m1 = mid(&tg, "PL!S-sd1-011-SD");   /* heart05=2 */
+    int m2 = mid(&tg, "PL!S-sd1-011-SD");   /* heart05=2 */
+    int riko = mid(&tg, K_RIKO);            /* heart05=1 */
+    if (!ident(&tg, m1, "PL!S-sd1-011-SD")) return;
+    if (!ident(&tg, m2, "PL!S-sd1-011-SD")) return;
+    if (!ident(&tg, riko, K_RIKO)) return;
+
+    /* The sentinels themselves. These are the values rb_mods_init publishes
+     * (modifiers.c:27); asserting them names the defect directly, so a
+     * regression reads "the absence sentinel is gone" instead of an
+     * unattributable heart delta somewhere downstream. */
+    CHECK_EQ((int)tg.state.mods.heart_color_override[m1], -1,
+             "rb_mods_init leaves heart_color_override at the -1 ABSENCE "
+             "sentinel (modifiers.c:27); Rust's absent HashMap key is None "
+             "(stats_pipeline.rs:30), and 0 would read as a LIVE set-to-0 "
+             "override that discards the printed base");
+    CHECK_EQ((int)tg.state.mods.heart_copy[m1], -1,
+             "rb_mods_init leaves heart_copy at -1 (modifiers.c:27); 0 would "
+             "make the fold read card 0's hearts (stats_pipeline.rs:37-43)");
+    CHECK_EQ((int)tg.state.mods.heart_multiplier[m1], -1,
+             "rb_mods_init leaves heart_multiplier at -1 (modifiers.c:27); 0 "
+             "would collapse the member into heart00 (stats_pipeline.rs:51-55)");
+
+    rh_set_stage3(&tg, 0, m1, m2, riko);
+
+    int printed[8], engine[8];
+    rh_stage_printed(&tg, 0, printed);
+    rb_calc_stage_hearts(&tg.state, 0, engine);
+    /* The figure is DERIVED from the decoded records, not a literal, so a
+     * card-generation change moves this assertion with the data. */
+    CHECK(printed[H05] >= 5,
+          "the three-member stage prints >= 5 heart05 (2 + 2 + 1)");
+    for (int c = 0; c < 8; c++)
+        CHECK_EQ(engine[c], printed[c],
+                 "with every sentinel at -1 and no override and no additive "
+                 "modifier applied, stage_hearts (stats_pipeline.rs:93-136) "
+                 "must equal the printed base for this colour");
+
+    /* And the inverse: an explicit override of count 0 IS honoured, because
+     * that is the same value Rust reaches through Some((_, 0)) and must not
+     * be silently dropped. This is what makes the -1 check above a two-sided
+     * pin rather than "zero always means absent". */
+    rb_mods_set_heart_override(&tg.state.mods, m1, H05, 0);
+    rb_calc_stage_hearts(&tg.state, 0, engine);
+    CHECK_EQ(engine[H05], printed[H05] - 2,
+             "an EXPLICIT set-to-0 heart05 override replaces that member's "
+             "printed hearts outright (stats_pipeline.rs:30-33) -- 2 hearts "
+             "gone, the other two members untouched");
+    rb_mods_remove_heart_override(&tg.state.mods, m1);
+    rb_calc_stage_hearts(&tg.state, 0, engine);
+    CHECK_EQ(engine[H05], printed[H05],
+             "clearing the override restores the printed fold exactly");
 }
 
 /* ========================================================================
@@ -2998,6 +3107,8 @@ int main(void)
     run("k_two_wien_stack", k_two_wien_instances_stack);
     run("k_riko_condition_met", k_riko_condition_met_increases_opponent_hearts);
     run("k_riko_condition_not_met", k_riko_condition_not_met_does_nothing);
+printf("--- N. stage-fold ABSENCE-sentinel regression (rb_mods_init) ---\n");
+    run("n_zeroed_mods_zeroes_fold", n_zeroed_mods_would_zero_a_stage_fold);
 
     printf("--- L. rina_debut_opponent_live_card_heart_increase_test.rs (PL!S-bp5-010-N) ---\n");
     run("l_heart02_ge5_increase", l_heart02_ge5_increases_opponent_need_heart00);

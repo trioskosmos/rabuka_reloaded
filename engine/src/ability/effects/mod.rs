@@ -199,7 +199,8 @@ impl AbilityResolver {
         }
         if self.gate_incomplete_placement(gs, effect) {
             return Ok(());
-        }        // Drain condition verdicts from the can_activate_effect pre-check;
+        }
+        // Drain condition verdicts from the can_activate_effect pre-check;
         // the effect execution will produce its own items and we don't want duplicates.
         #[cfg(not(feature = "no_std"))]
         {

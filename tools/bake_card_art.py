@@ -192,11 +192,22 @@ def lz77_compress_bios(data: bytes) -> bytes:
             hash_table[h] = i
         
         if best_len >= 3:
-            # Match: flag bit 1 (MSB-first), then the 2-byte token with
+            # Match: set the flag bit for this slot, then the 2-byte token with
             # length in the HIGH nibble: ((len-3) << 4) | ((dist-1) >> 8),
-            # ((dist-1) & 0xFF). (A previous revision had the nibbles
-            # swapped AND the polarity inverted — BIOS decoded garbage.)
-            flag_byte |= (1 << (7 - flag_bit))
+            # ((dist-1) & 0xFF).
+            #
+            # Flag bits run LSB-FIRST: bit 0 describes the FIRST item after the
+            # flag byte, bit 7 the eighth. This had `1 << (7 - flag_bit)` --
+            # MSB-first -- which is the single defect that made every baked
+            # front unreadable. A decoder reading LSB-first then saw the eight
+            # item kinds in reverse: it treated the encoder's first literal as
+            # a 2-byte back-reference whose offset pointed far outside the
+            # handful of bytes emitted so far. On the GBA that reached the BIOS
+            # SWI, which faulted (`Bad BIOS Load16` in mGBA); with a bounds-
+            # checked decoder it silently truncated, which left every UI tile
+            # transparent and the screen black. The reference decoder used to
+            # validate these blobs is tools/check_lz77.py.
+            flag_byte |= (1 << flag_bit)
             dist_minus1 = best_dist - 1
             len_minus3 = best_len - 3
             output[output_len] = ((len_minus3 & 0xF) << 4) | ((dist_minus1 >> 8) & 0xF)
@@ -240,6 +251,45 @@ def lz77_compress_bios(data: bytes) -> bytes:
     return header + bytes(output)
 
 
+def lz77_decompress_bios(data: bytes) -> bytes:
+    """Reference decoder for BIOS LZ77, mirroring
+    platforms/gba/src/card_art_gen.rs::lz77_decompress_wram.
+
+    Used to self-check the encoder below. Flag bits are LSB-first: bit 0
+    describes the first item after the flag byte.
+    """
+    assert data[0] == 0x10, "bad LZ77 type byte 0x%02x" % data[0]
+    declared = data[1] | (data[2] << 8) | (data[3] << 16)
+    out = bytearray()
+    si, di = 4, 0
+    while di < declared:
+        flags = data[si]
+        si += 1
+        for bit in range(8):
+            if di >= declared:
+                break
+            if not (flags >> bit) & 1:
+                out.append(data[si])
+                si += 1
+                di += 1
+            else:
+                b0, b1 = data[si], data[si + 1]
+                si += 2
+                length = (b0 >> 4) + 3
+                offset = (((b0 & 0x0F) << 8) | b1) + 1
+                # A valid stream never points before the start of the output.
+                # This assert is what caught the MSB-first flag polarity.
+                assert offset <= di, (
+                    "invalid LZ77: offset %d exceeds %d bytes emitted" % (offset, di))
+                for _ in range(length):
+                    if di >= declared:
+                        break
+                    out.append(out[di - offset])
+                    di += 1
+    assert len(out) == declared, "LZ77 produced %d of %d bytes" % (len(out), declared)
+    return bytes(out)
+
+
 def lz77_compress_bios_if_smaller(data: bytes) -> bytes:
     """Compress with LZ77, ALWAYS returning a standard BIOS stream.
 
@@ -255,7 +305,16 @@ def lz77_compress_bios_if_smaller(data: bytes) -> bytes:
     """
     if len(data) == 0:
         return b'\x10\x00\x00\x00'
-    return lz77_compress_bios(data)
+    blob = lz77_compress_bios(data)
+    # Self-check every single blob. A malformed stream is invisible here and
+    # catastrophic on the GBA: the BIOS SWI faults on it, and the runtime's
+    # bounds-checked decoder just truncates, leaving tiles transparent and the
+    # screen black. That happened because the encoder set flag bits MSB-first
+    # while every decoder reads them LSB-first. One assert per blob, at the
+    # point of encoding, is the cheapest possible guard against a repeat.
+    assert lz77_decompress_bios(blob) == data, (
+        "LZ77 round-trip failed for a %d-byte blob" % len(data))
+    return blob
 
 ART_W = 96
 ART_H = 144

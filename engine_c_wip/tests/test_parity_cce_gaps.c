@@ -2947,8 +2947,12 @@ static void i4_energy_under_vacated_area(void)
  * PL!N-bp1-017-PR 宮下 愛 (unit DiverDiva).
  */
 #define NAGI_CARD "PL!N-bp1-001-R"   /* 上原歩夢, unit A・ZU・NA, cost 9  */
-/* 「ラブライブ！虹ヶ咲」 as bytes, for the series premise. */
-#define NIJI_SERIES "\xe3\x83\xa9\xe3\x83\x96\xe3\x83\xa9\xe3\x82\xa4\xe3\x83\x96\xef\xbc\x81\xe8\x99\xb9\xe3\x83\xb6\xe3\x82\xb5"
+/* 「ラブライブ！虹ヶ咲」 as bytes, for the series premise. The last escape was
+ * E3 82 B5 (U+30B5 サ); the corpus series is
+ * 「ラブライブ！虹ヶ咲学園スクールアイドル同好会」 with U+54B2 咲, so the
+ * strstr at :2967 never matched and card_unit_is reported every Nijigasaki card
+ * as non-Nijigasaki. */
+#define NIJI_SERIES "\xe3\x83\xa9\xe3\x83\x96\xe3\x83\xa9\xe3\x82\xa4\xe3\x83\x96\xef\xbc\x81\xe8\x99\xb9\xe3\x83\xb6\xe5\x92\xb2"
 
 /* Does the decoded card carry 虹ヶ咲 in its SERIES? */
 static int card_series_has_niji(int cid)
