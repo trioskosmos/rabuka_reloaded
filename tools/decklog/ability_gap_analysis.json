@@ -1,0 +1,146 @@
+[
+ {
+  "card_no": "PL!-PR-022-PR",
+  "ability": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：自分のステージに「星空 凛」か「小泉花陽」がいる場合、カードを2枚引き、手札を1枚控え室に置く。2人ともいる場合、さらにこのメンバーをアクティブにする。",
+  "triggers": "起動",
+  "use_limit": 1,
+  "closest_tested": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：自分のステージにいるほかのメンバー1人をアクティブにする。",
+  "closest_cards": [
+   "PL!-bp6-008-P",
+   "PL!-bp6-008-R"
+  ],
+  "similarity": 0.593,
+  "risk": "med"
+ },
+ {
+  "card_no": "PL!-PR-023-PR",
+  "ability": "{{jidou.png|自動}}[ターン3回]自分か相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
+  "triggers": "自動",
+  "use_limit": null,
+  "closest_tested": "{{jyouji.png|常時}}相手のステージにいるウェイト状態のメンバー1人につき、{{icon_blade.png|ブレード}}を得る。",
+  "closest_cards": [
+   "PL!-bp3-002-P",
+   "PL!-bp3-002-R"
+  ],
+  "similarity": 0.709,
+  "risk": "med"
+ },
+ {
+  "card_no": "PL!-PR-023-PR",
+  "ability": "{{kidou.png|起動}}{{turn1.png|ターン1回}}メンバー1人をウェイトにし、手札を1枚控え室に置く：カードを1枚引く。",
+  "triggers": "起動",
+  "use_limit": 1,
+  "closest_tested": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：カードを1枚引く。",
+  "closest_cards": [
+   "PL!-PR-012-PR",
+   "PL!S-PR-038-PR",
+   "PL!SP-PR-017-PR"
+  ],
+  "similarity": 0.943,
+  "risk": "low"
+ },
+ {
+  "card_no": "PL!-PR-024-PR",
+  "ability": "{{jyouji.png|常時}}自分と相手の成功ライブカード置き場にあるすべてのライブカードのスコアの合計が10以上であるかぎり、{{heart_01.png|heart01}}を得る。",
+  "triggers": "常時",
+  "use_limit": null,
+  "closest_tested": "{{jyouji.png|常時}}自分の成功ライブカード置き場にあるカードのスコアの合計が９以上であるかぎり、{{heart_01.png|heart01}}{{heart_03.png|heart03}}を得る。",
+  "closest_cards": [
+   "PL!-pb2-020-N"
+  ],
+  "similarity": 0.778,
+  "risk": "med"
+ },
+ {
+  "card_no": "PL!-PR-025-PR",
+  "ability": "{{jidou.png|自動}}このメンバーがステージから控え室に置かれたとき、このメンバーがコスト9以上のメンバーとバトンタッチしていた場合、ライブ終了時まで、そのバトンタッチで登場したメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+  "triggers": "自動",
+  "use_limit": null,
+  "closest_tested": "{{toujyou.png|登場}}このメンバーよりコストが低い『DOLLCHESTRA』のメンバーからバトンタッチして登場した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+  "closest_cards": [
+   "PL!HS-bp2-008-P",
+   "PL!HS-bp2-008-R"
+  ],
+  "similarity": 0.689,
+  "risk": "med"
+ },
+ {
+  "card_no": "PL!HS-PR-038-PR",
+  "ability": "{{toujyou.png|登場}}手札以外から登場したとき、ライブ終了時まで、{{heart_06.png|heart06}}を得る。",
+  "triggers": "登場",
+  "use_limit": null,
+  "closest_tested": "{{toujyou.png|登場}}ライブ終了時まで、{{heart_05.png|heart05}}を得る。",
+  "closest_cards": [
+   "PL!N-sd2-019-SD2"
+  ],
+  "similarity": 0.805,
+  "risk": "low"
+ },
+ {
+  "card_no": "PL!HS-PR-038-PR",
+  "ability": "{{live_success.png|ライブ成功時}}相手のステージにいるコスト4以下のメンバー1人をウェイトにする。それは次のターンのアクティブフェイズにアクティブにならない。",
+  "triggers": "ライブ成功時",
+  "use_limit": null,
+  "closest_tested": "{{live_success.png|ライブ成功時}}以下から1つを選ぶ。\n・相手のステージにいるコスト4以下のメンバーを2人までウェイトにする。そのメンバーは次のターンのアクティブフェイズにアクティブしない。\n・カードを1枚引く。",
+  "closest_cards": [
+   "PL!S-bp7-025-L"
+  ],
+  "similarity": 0.742,
+  "risk": "med"
+ },
+ {
+  "card_no": "PL!HS-PR-039-PR",
+  "ability": "{{toujyou.png|登場}}自分のデッキの上から、10から自分の手札の枚数を引いた数に等しい枚数のカードを見る。その中から2枚まで手札に加える。残りを控え室に置く。",
+  "triggers": "登場",
+  "use_limit": null,
+  "closest_tested": "{{live_success.png|ライブ成功時}}手札を1枚控え室に置いてもよい：自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。その中からカードを1枚手札に加える。残りを控え室に置く。",
+  "closest_cards": [
+   "PL!-bp5-001-AR",
+   "PL!-bp5-001-P",
+   "PL!-bp5-001-R＋",
+   "PL!-bp5-001-SEC"
+  ],
+  "similarity": 0.662,
+  "risk": "med"
+ },
+ {
+  "card_no": "PL!N-PR-033-PR",
+  "ability": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分の控え室からメンバーが登場したとき、カードを1枚引く。",
+  "triggers": "自動",
+  "use_limit": 1,
+  "closest_tested": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージにコスト10のメンバーが登場したとき、カードを1枚引く。",
+  "closest_cards": [
+   "PL!N-pb1-005-P＋",
+   "PL!N-pb1-005-R"
+  ],
+  "similarity": 0.75,
+  "risk": "med"
+ },
+ {
+  "card_no": "PL!S-PR-046-PR",
+  "ability": "{{live_success.png|ライブ成功時}}エールにより公開された相手のカードの中にライブカードがある場合、カードを1枚引く。",
+  "triggers": "ライブ成功時",
+  "use_limit": null,
+  "closest_tested": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードがある場合、このカードのスコアを＋１する。",
+  "closest_cards": [
+   "PL!S-bp6-023-L"
+  ],
+  "similarity": 0.795,
+  "risk": "med"
+ },
+ {
+  "card_no": "PL!S-PR-048-PR",
+  "ability": "{{live_start.png|ライブ開始時}}自分の控え室にあるカードが9枚以下の場合、自分の控え室にあるライブカードを3枚まで選び、自分のデッキの上に好きな順番で置く。",
+  "triggers": "ライブ開始時",
+  "use_limit": null,
+  "closest_tested": "{{toujyou.png|登場}}自分の控え室からライブカードを1枚までデッキの一番下に置く。",
+  "closest_cards": [
+   "PL!S-bp2-008-P",
+   "PL!S-bp2-008-P＋",
+   "PL!S-bp2-008-R＋",
+   "PL!S-bp2-008-SEC"
+  ],
+  "similarity": 0.522,
+  "risk": "med"
+ }
+]

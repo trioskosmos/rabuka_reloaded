@@ -190,6 +190,38 @@ def extract_trigger(text: str) -> tuple[list, int | None, str]:
     return triggers, use_limit, effect
 
 
+# Icons that can OPEN an ability — the line-start triggers seen in the corpus.
+ABILITY_TRIGGER_ICONS = (
+    "toujyou",
+    "live_start",
+    "kidou",
+    "jyouji",
+    "live_success",
+    "jidou",
+)
+
+
+def _split_concatenated_abilities(text: str) -> str:
+    """Put an ability that follows a sentence end onto its own line.
+
+    Most cards separate abilities with a newline, but a couple were scraped as one
+    continuous line (e.g. PL!S-PR-013-PR: 登場 then ライブ開始時). Splitting on
+    "\\n" alone then produced ONE ability whose trigger was read from the first
+    icon, so the second trigger vanished and the card looked like it had no such
+    ability at all.
+
+    The boundary is deliberately `。<trigger icon>`: a mid-line trigger icon is
+    almost always a quoted reference (「{{jyouji.png|常時}}…」を得る) or the slash
+    form `{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}`, neither of which
+    starts a new ability. Requiring the sentence end keeps those intact.
+    """
+    for icon in ABILITY_TRIGGER_ICONS:
+        marker = "\u3002{{" + icon + ".png|"
+        while marker in text:
+            text = text.replace(marker, "\u3002\n{{" + icon + ".png|", 1)
+    return text
+
+
 def extract_abilities_from_card(card_id: str, card: dict) -> list:
     """Extract all abilities from a single card."""
     abilities = []
@@ -197,6 +229,9 @@ def extract_abilities_from_card(card_id: str, card: dict) -> list:
     ability_text = card.get("ability", "")
     if not ability_text:
         return abilities
+
+    # Break apart abilities that were scraped onto a single line (see helper).
+    ability_text = _split_concatenated_abilities(ability_text)
 
     # Split by newline for multiple abilities
     ability_lines = ability_text.split("\n")

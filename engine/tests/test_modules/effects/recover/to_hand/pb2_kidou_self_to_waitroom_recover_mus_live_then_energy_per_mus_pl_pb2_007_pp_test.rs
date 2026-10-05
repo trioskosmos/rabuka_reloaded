@@ -23,8 +23,10 @@ const FILLER: &str = "PL!-sd1-010-SD";
 /// μ's lives for the waitroom and the success zone.
 const MUS_LIVE: &str = "PL!-pb1-029-SRL"; // 知らないLove, lily white
 const MUS_LIVE2: &str = "PL!-bp4-025-SRL"; // 微熱からMystery, lily white
-/// A μ's LIVE that is not a μ's-group live — must not be recovered or counted.
-const NON_MUS_LIVE: &str = "LL-PR-004-PR"; // 愛♡スクリ～ム！, AiScReam — a live that is NOT 『μ's』
+/// An Aqours live — `series=ラブライブ！サンシャイン!!` carries a qualifier, so
+/// `card_series_matches_group` excludes it from 『μ's』. `LL-PR-004-PR` cannot be
+/// this control: its `series` is the bare `ラブライブ！`, which IS μ's.
+const NON_MUS_LIVE: &str = "PL!S-bp2-019-L"; // WATER BLUE NEW WORLD
 
 /// Stand HANAYOME with `waitroom` and `success` seeded; pay the cost by activating.
 /// Returns (energy activated, whether she reached the waitroom, hand size).

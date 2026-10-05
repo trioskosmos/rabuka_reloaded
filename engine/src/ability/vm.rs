@@ -183,7 +183,7 @@ fn strip_bytecode_header(data: Vec<u8>) -> Vec<u8> {
 }
 
 #[cfg(feature = "gba")]
-fn get_decompressed_bytecode() -> &'static [u8] {
+pub fn get_decompressed_bytecode() -> &'static [u8] {
     // GBA: 92KB decompressed bytecode lives in ROM via include_bytes!("abilities.bin"),
     // zero heap allocation. Mirrors ps1 external_card_data pattern where large blobs
     // are XIP. Avoids lazy Vec::with_capacity(92000) after mulligan fragments heap.
@@ -197,7 +197,7 @@ fn get_decompressed_bytecode() -> &'static [u8] {
 }
 
 #[cfg(all(not(feature = "snes"), not(feature = "gba"), not(feature = "no_std")))]
-fn get_decompressed_bytecode() -> &'static [u8] {
+pub fn get_decompressed_bytecode() -> &'static [u8] {
     use std::sync::OnceLock;
     static CACHE: OnceLock<Vec<u8>> = OnceLock::new();
     CACHE.get_or_init(|| {
@@ -207,7 +207,7 @@ fn get_decompressed_bytecode() -> &'static [u8] {
 }
 
 #[cfg(all(not(feature = "snes"), feature = "no_std", not(feature = "gba")))]
-fn get_decompressed_bytecode() -> &'static [u8] {
+pub fn get_decompressed_bytecode() -> &'static [u8] {
     use core::cell::UnsafeCell;
     use crate::compat::atomic::AtomicU8;
     use core::sync::atomic::Ordering;

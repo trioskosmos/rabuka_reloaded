@@ -1827,21 +1827,17 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
         {
             return None;
         }
+        // Fragments must be in `name_key` form: `card_matches_name_fragments`
+        // compares them against the candidate's `name_key`, which is whitespace-
+        // free. A raw `card.name` keeps its spaces ("Dream Believers"), so it was
+        // never a substring of "DreamBelievers（104期Ver.）" and Q236 recovery
+        // silently matched nothing. `get_card_names` is exactly `name_key` split
+        // on '&', i.e. the canonical needle the matcher already expects.
         let fragments: Vec<String> = gs
             .revealed_cost_cards
             .iter()
             .chain(gs.revealed_cards.iter())
-            .filter_map(|&id| {
-                let card = gs.card_database.get_card(id)?;
-                Some(
-                    card.name
-                        .replace("\u{FF06}", "&")
-                        .split('&')
-                        .map(|s| s.to_string())
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .flatten()
+            .flat_map(|&id| gs.card_database.get_card_names(id))
             .collect();
         if fragments.is_empty() {
             None

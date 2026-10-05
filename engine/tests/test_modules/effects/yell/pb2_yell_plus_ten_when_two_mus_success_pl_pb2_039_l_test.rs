@@ -21,8 +21,10 @@
 //!     the requirement should fall. It should rise.
 //!   * my "non-μ's" control, `PL!-sd1-019-SD`, has `unit = None` but
 //!     `series = ラブライブ！`, and `card_series_matches_group` therefore makes it a
-//!     μ's card. A card with no series (`LL-PR-004-PR`, AiScReam) is the real
-//!     non-μ's control.
+//!     μ's card. So is my second attempt, `LL-PR-004-PR` (愛♡スクリ～ム！) — same bare
+//!     `series`. 『μ's』 is read as "a series line containing ラブライブ！ with no
+//!     qualifier", so only a card whose series carries one (サンシャイン!! / 虹ヶ咲 /
+//!     スーパースター / 蓮ノ空) can serve as the control.
 //!
 //! The convention is confirmed against the existing precedent
 //! `PL!SP-bp2-010-R＋` Wien: 「8枚減る」 lowers the requirement by 8, so 「N枚増える」
@@ -38,9 +40,8 @@ const HIKARI: &str = "PL!-pb2-039-L";
 /// μ's lives — both the spaced `lily white` spelling.
 const MUS_A: &str = "PL!-pb1-029-SRL"; // 知らないLove
 const MUS_B: &str = "PL!-bp4-025-SRL"; // 微熱からMystery
-/// Not μ's: AiScReam, and crucially with NO `series`, so it cannot match μ's
-/// through `card_series_matches_group` the way `PL!-sd1-019-SD` does.
-const NON_MUS: &str = "LL-PR-004-PR";
+/// Not μ's: an Aqours live, `series=ラブライブ！サンシャイン!!`.
+const NON_MUS: &str = "PL!S-bp2-019-L"; // WATER BLUE NEW WORLD
 const FILLER: &str = "PL!-sd1-010-SD";
 /// Blade high enough that the +10 is visible.
 const BASE_BLADE: u8 = 30;

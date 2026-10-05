@@ -790,7 +790,7 @@ impl super::TurnEngine {
         Ok(())
     }
 
-    pub(crate) fn handle_mulligan_confirmation(
+    pub fn handle_mulligan_confirmation(
         game_state: &mut GameState,
         card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {

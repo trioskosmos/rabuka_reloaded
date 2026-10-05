@@ -1,15 +1,15 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-06T00:46:29.716189",
+  "generated_at": "2026-10-06T03:02:20.538534",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "3e7ff389",
+  "engine_commit": "341a31b5",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
     "total_cards": 2674,
     "cards_with_abilities": 1664,
-    "total_abilities": 2130,
+    "total_abilities": 2132,
     "unique_abilities": 996
   },
   "unique_abilities": [
@@ -137,7 +137,7 @@
     {
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
       "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
-      "card_count": 20,
+      "card_count": 22,
       "cards": [
         "PL!-sd1-011-PR | 絢瀬絵里 (ab#0)",
         "PL!-sd1-011-SD | 絢瀬 絵里 (ab#0)",
@@ -158,7 +158,9 @@
         "PL!N-bp1-010-P | 三船栞子 (ab#0)",
         "PL!N-bp1-010-R | 三船栞子 (ab#0)",
         "PL!N-sd1-002-SD | 中須かすみ (ab#0)",
-        "PL!N-sd1-003-SD | 桜坂しずく (ab#0)"
+        "PL!N-sd1-003-SD | 桜坂しずく (ab#0)",
+        "PL!S-PR-013-PR | 高海千歌 (ab#0)",
+        "PL!S-PR-019-PR | 国木田花丸 (ab#0)"
       ],
       "triggers": "登場",
       "use_limit": null,
@@ -19742,44 +19744,30 @@
       }
     },
     {
-      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "card_count": 2,
       "cards": [
-        "PL!S-PR-013-PR | 高海千歌 (ab#0)",
-        "PL!S-PR-019-PR | 国木田花丸 (ab#0)"
+        "PL!S-PR-013-PR | 高海千歌 (ab#1)",
+        "PL!S-PR-019-PR | 国木田花丸 (ab#1)"
       ],
-      "triggers": "登場",
+      "triggers": "ライブ開始時",
       "use_limit": null,
       "is_null": false,
       "cost": {
-        "text": "手札を1枚控え室に置いてもよい",
-        "source": "hand",
-        "zone": "hand",
-        "destination": "discard",
-        "count": 1,
+        "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい",
         "optional": true,
-        "type": "move_cards"
+        "type": "pay_energy",
+        "energy": 2,
+        "zone": "energy_zone",
+        "count": 2
       },
       "effect": {
-        "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-        "action": "look_and_select",
-        "look_action": {
-          "text": "自分のデッキの上からカードを3枚見る。",
-          "source": "deck_top",
-          "count": 3,
-          "target": "self",
-          "action": "look_at"
-        },
-        "select_action": {
-          "action": "select_cards",
-          "discard_remaining": true,
-          "text": "1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-          "destination": "hand",
-          "count": 1,
-          "optional": true
-        },
-        "optional": true
+        "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "duration": "live_end",
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": 2
       }
     },
     {
