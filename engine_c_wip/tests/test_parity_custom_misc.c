@@ -211,7 +211,7 @@ static    TestGame tg;
 
 static void test_blade_position_filter(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -281,7 +281,7 @@ static    TestGame tg;
 
 static void test_heart_fixed_color(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -390,7 +390,7 @@ static    TestGame tg;
 static void test_heart_all_type(void)
 {
     /* Rust misc.rs:635-639 routes heart_type=all into gain_heart_all_type. */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -521,7 +521,7 @@ static    TestGame tg;
 
 static void test_pay_energy_spends_active(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     test_give_energy(&tg, 5);
     int before = rb_energy_active_count(&tg.state.p[0]);
@@ -536,7 +536,7 @@ static void test_pay_energy_spends_active(void)
 
 static void test_discard_until_count_prompts(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     tg.state.p[0].hand.n = 0;
     int a, b, c;
@@ -609,7 +609,7 @@ static    TestGame tg;
 
 static void test_re_yell_resets_reveal(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -625,7 +625,7 @@ static void test_re_yell_resets_reveal(void)
 
 static void test_perform_yell_collects_blades(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int live = find_card(WANT_BLADES, NULL, NULL);
     CHECK(live >= 0, "perform_yell: the live fixture resolves");
@@ -773,7 +773,7 @@ static    TestGame tg;
 
 static void test_rotation_cycles_stage(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -793,7 +793,7 @@ static void test_rotation_cycles_stage(void)
 
 static void test_position_change_swaps_area(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -859,7 +859,7 @@ static    TestGame tg;
 
 static void test_choose_required_hearts_prompts(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;
@@ -875,7 +875,7 @@ static void test_choose_required_hearts_prompts(void)
 
 static void test_choose_target_player_prompts(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int a, b, c;
     if (!member_triple(&tg, &a, &b, &c)) return;

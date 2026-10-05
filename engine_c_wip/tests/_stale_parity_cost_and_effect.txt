@@ -1,0 +1,437 @@
+make t-nogate: running T=parity_cost_and_effect WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_cost_and_effect src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_cost_and_effect.c
+./rb_verdict ./rb_engine_t_parity_cost_and_effect parity_cost_and_effect
+ok: A: the Q196 fixtures resolve with the exact printed card numbers
+ok: A: the mandatory 2E leg is charged (15-2=13)
+ok: A: the self-discard cost moved the activating card out of hand
+ok: A: the self-discarded card lands in the waitroom
+ok: A: after the cost, the effect draws 1 card from the deck
+FAIL:  test_q196_mandatory_cost_then_draw
+ok: A2: a hand-only 起動 refuses to spend energy when fired from the stage
+ok: A2: a refused 起動 leaves her on stage
+ok: A2: 「カードを1枚引く must not run when the hand-only gate refuses
+ok: B: the Q214 fixtures (桜坂しずく + a score-2 and a score-0 live) resolve
+ok: B: the Q214 member is the printed 桜坂しずく print
+ok: B1: the hand-discard cost prompt appears
+ok: B1: the cost selects out of the hand
+ok: B1: the live-card pick follows the paid cost
+FAIL:  test_q214_optional_score_energy_pay_and_decline
+ok: B1: the optional payment gate does not loop after an accepted answer
+ok: B2: a score-0 live costs 0 energy, so 1 energy is untouched
+ok: B3: an unaffordable optional energy cost charges nothing
+ok: B3: an unaffordable optional cost must NOT recover the live card
+ok: B3: the live card stays in the waitroom when the cost is skipped
+ok: B4: declining the optional cost leaves the energy untouched
+ok: B4: declining the cost must NOT move the live card to the hand
+ok: B4: the live card stays in the waitroom when the cost is declined
+ok: C0: 絢瀬絵里 deploys to the centre stage
+ok: C0: below the 成功数6 gate the recovery offers no cost prompt
+ok: C0: the 起動 is refused outright below the 成功数6 gate
+FAIL:  test_success_score_gate_offers_no_cost
+ok: C1: 絢瀬絵里 deploys to the centre stage
+ok: C1: the hand-discard cost prompts (1/2)
+FAIL:  test_success_score_sequential_discard_two
+ok: C1: the cost RE-PROMPTS for the second discard
+ok: C1: after both cost cards, the live-card pick appears
+ok: C1: the chosen live card is MOVED from the waitroom into the hand
+ok: C2a: the hand-discard cost prompts
+ok: C2a: 0 success live card(s) scale 手札を3枚 to a cost of 3 (got 3)
+ok: C2b: after the scaled cost is paid, the μ's live card reaches the hand
+ok: C2a: the hand-discard cost prompts
+ok: C2a: 1 success live card(s) scale 手札を3枚 to a cost of 2 (got 2)
+ok: C2b: after the scaled cost is paid, the μ's live card reaches the hand
+ok: C2a: the hand-discard cost prompts
+ok: C2a: 2 success live card(s) scale 手札を3枚 to a cost of 1 (got 1)
+ok: C2b: after the scaled cost is paid, the μ's live card reaches the hand
+ok: C3: with 2 hand cards against a cost of 3 the live card is not retrieved
+ok: C4: a Liella! live card is not retrieved — the recovery is filtered to μ's
+ok: D1: setup gave the cost 2 hand cards
+ok: D1: the printed cost prompt appears
+ok: D1: 手札を2枚控え室に置く — the cost is a SelectCard over the HAND
+ok: D1: …2枚 — the printed cost count is exactly 2
+ok: D1: the two cost cards must LAND in the waitroom
+ok: D1: the two cost cards must actually LEAVE the hand
+ok: D1: the このメンバーと…を選ぶ stage select follows the PAID cost
+ok: D1: the stage select targets 2 members (this member + 1 other)
+ok: D1: 渡辺 曜 herself (このメンバー) must stay selectable — G19 excluded her
+ok: D2: the two-card cost prompts
+ok: D2: a single select_indices(&[0,1]) answer must pay the WHOLE two-card cost
+ok: D2: a single two-index answer must remove both cards from the hand
+FAIL:  test_reveal_cost_cost20_places_under_and_draws
+ok: E2: no valid reveal → no draw
+ok: E2: no valid reveal → hand unchanged
+ok: E2: nothing is placed under 嵐 千砂都
+FAIL:  test_reveal_cost_cost10_placed_under
+ok: F1: the waitroom member is offered
+ok: F1: the recovery select is sourced from the waitroom
+ok: F1: the recovery is optional — skip must be offered
+ok: F1: the recovered member is MOVED to the deck TOP
+ok: F1: the recovered member is no longer in the waitroom
+ok: F1: そうした場合 — the staged member gains 1 blade
+ok: F2: the optional recovery prompt is expected (a waitroom member is present)
+ok: F2: the optional recovery prompt is a SelectCard
+ok: F2: declined — the member stays in the waitroom
+ok: F2: declined — the member is not placed on the deck
+ok: F2: declined — no blade is granted
+ok: F3: no member in the waitroom → no prompt
+ok: F3: no prompt → no blade
+ok: G: HOT PASSION!! resolves to the printed card
+FAIL:  test_optional_energy_placement_accept_and_decline
+ok: G1: the placed energy arrives WAITED
+ok: G2: declined → no energy placed
+ok: G2: declined → the opponent draws nothing
+FAIL:  test_optional_member_cost_accept_and_decline
+ok: H2: cost declined → no score
+ok: H2: cost declined → no retrieval
+ok: H2: cost declined → member 1 stays on stage
+ok: H2: cost declined → member 2 stays on stage
+ok: I1: the opponent is prompted to discard
+ok: I1: opponent discarded → そうでない場合は no blade
+ok: I2: the opponent is prompted
+FAIL:  test_opponent_forced_discard_comply_and_decline
+ok: J1: 百生吟子 deploys to the centre stage
+ok: J1: the top 3 deck cards are milled
+ok: J1: the 『スリーズブーケ』 live is recovered to hand
+ok: J2: 百生吟子 deploys to the centre stage
+ok: J2: the optional hand-discard cost is offered
+ok: J2: the optional cost prompt is a skippable SelectCard
+ok: J2: declined → no mill
+ok: J2: declined → the live card stays in the waitroom
+ok: K1: no draw happens because the mandatory wait cost has no candidate
+ok: K1: the deck is untouched by a refused cost
+ok: K2: Q163 — an opponent's 虹ヶ咲 member must remain unchanged
+ok: K2: Q163 — no target prompt, so nothing is drawn
+ok: K3: the only 虹ヶ咲 candidate is auto-waited as the cost
+ok: K3: exclude_self — Helen herself is NOT waited
+ok: K3: a non-虹ヶ咲 filler is NOT waited
+ok: K3: the draw follows the paid cost
+ok: L1: 日下あすか deploys to the centre stage
+ok: L1: the optional EE cost is offered
+ok: L1: after paying, the waitroom live card is MOVED to the live zone
+ok: L1: the live card is removed from the waitroom
+ok: L1: the live-card-set limit is reduced by 1 after the ability resolves
+ok: L2: 日下あすか deploys to the centre stage
+ok: L2: the optional EE cost is offered
+FAIL:  test_optional_debut_ee_pay_skip_and_multi
+ok: L3: 日下あすか deploys to the centre stage
+ok: L3: exactly 1 live card is in the live zone out of 2 candidates
+ok: L3: the limit reduction is exactly 1
+ok: M: 桂城 泉 resolves to the printed card
+ok: M1: the optional cost prompts
+ok: M1: the printed cost is 2 hand cards
+ok: M1: the two-card cost is optional
+FAIL:  test_optional_two_card_cost_pay_and_skip
+ok: M1: 桂城 泉 (self) gains no heart01
+ok: M1: the un-targeted ally gains no heart01
+ok: M2: declining the optional cost grants no hearts at all
+ok: N1: cost clause 1 — 津島善子 must be put to WAIT
+ok: N1: 津島善子 stays on stage, in the wait state
+ok: N1: cost clause 2 — the hand card left the hand
+ok: N1: cost clause 2 — the hand card is in the waitroom as payment
+FAIL:  test_center_compound_cost_paid_before_effect
+ok: N1: the stage count is unchanged (1 replaced)
+ok: N2: activating off-centre opens no prompt
+ok: N2: the stage is unchanged off-centre
+ok: N3: an unpayable hand cost is refused BEFORE any prompt is opened
+ok: N3: the hand is still empty
+ok: N3: nothing entered the waitroom
+ok: N3: no cost clause runs at all when the compound cost is refused
+ok: O1: the printed cost discards exactly 1 hand card
+ok: O1: the discard cost charges no energy
+ok: O2: all 5 revealed cards match heart02 → ブレード×3
+FAIL:  test_maki_cost_discard_and_all_match_blade
+ok: O3: 4 of 5 matching heart02 is not enough → blade 0
+ok: Q+: the fixture really holds 8 deck cards (util.rs:2218 counts them)
+ok: Q+: a `count: 3` mill against an 8-card deck moves exactly 3 (cost/handlers.rs:846 + util.rs:2218)
+ok: Q+: the 3 milled cards are in the waitroom (cost/handlers.rs:846 + util.rs:2218)
+ok: Q-: the fixture really holds only 2 deck cards
+ok: Q-: a 2-card deck against `count: 3` REFUSES the cost — nothing is milled (handlers.rs:763-772)
+ok: Q-: the refused cost leaves the deck untouched (handlers.rs:763-772)
+ok: P: the Q196 cost root really is a sequential_cost (the case the bridge drops)
+FAIL:  test_gap_sequential_cost_root_dropped_by_bridge
+
+173 checks, 39 failures
+FAILED: parity_cost_and_effect  [exit=1, 53 result line(s): assert=53 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=14]
+
+FAIL: A: net hand change is -1 cost card +1 drawn card (got 2 expected 1)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00186900 target=0x0 eff=0xa00186900 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa00186900 action=sequential is_cost=0 host=1191
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=discard target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00188ab0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: B1: the optional score-energy payment is a SelectTarget gate
+FAIL: B1: accepting pays the live card's score in energy (5 -> 3) (got 5 expected 3)
+FAIL: B1: after paying, the recovered live card is MOVED into the hand
+FAIL: B1: the paid live card is no longer in the waitroom
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00186900 target=0x0 eff=0xa00186900 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa00186900 action=sequential is_cost=0 host=1191
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=discard target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00188ab0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: B2: a score-0 live is still recovered to the hand when the cost is accepted
+FAIL: B2: the score-0 live leaves the waitroom
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00186900 target=0x0 eff=0xa00186900 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa00186900 action=sequential is_cost=0 host=1191
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=discard target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00188ab0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00186900 target=0x0 eff=0xa00186900 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa00186900 action=sequential is_cost=0 host=1191
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=discard target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00188ab0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: B4: declining still goes through the optional payment gate
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00186900 target=0x0 eff=0xa00186900 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00186900 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa00186900 action=move_cards is_cost=0 host=128
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00186900 cur=0 n=0 state=3 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='μ's' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=5 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=5 p1_discard=0
+[DISCARD_MOVE] selected=108 of 1 available=5 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: C0: the refused 起動 discards no cost card (got 1 expected 3)
+FAIL: C1: a pending choice is outstanding (got 2 expected 1)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00186900 target=0x0 eff=0xa00186900 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00186900 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa00186900 action=move_cards is_cost=0 host=128
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00186900 cur=0 n=0 state=3 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='μ's' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=4 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=4 p1_discard=0
+[DISCARD_MOVE] selected=108 of 1 available=4 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0xa001869e0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa001869e0 action=sequential is_cost=0 host=317
+DEBUG [MOD_COST_ENTRY] op=subtract value=0 target=self
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0xa001869e0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa001869e0 action=sequential is_cost=0 host=317
+DEBUG [MOD_COST_ENTRY] op=subtract value=0 target=self
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0xa001869e0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa001869e0 action=sequential is_cost=0 host=317
+DEBUG [MOD_COST_ENTRY] op=subtract value=0 target=self
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0xa001869e0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001869e0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa001869e0 action=sequential is_cost=0 host=317
+DEBUG [MOD_COST_ENTRY] op=subtract value=0 target=self
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00186900 target=0x0 eff=0xa00186900 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00186900 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa00186900 action=sequential is_cost=0 host=1826
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00189510 target=0x0 eff=0xa00189510 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[RESUME_EXEC] def=0xa00189510 action=sequential is_cost=0 host=1826
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+FAIL: E1: exactly one member is placed under 嵐 千砂都 (got 0 expected 1)
+FAIL: E1: the revealed cost-20 member is the one placed under (got 0 expected 2472)
+FAIL: E1: reveal 1 from hand, draw 2 (got 5 expected 4)
+FAIL: E3: a cost-10 member is placed under 嵐 千砂都 (got 0 expected 1)
+FAIL: E3: the cost-10 member is the card placed under (got 0 expected 977)
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1687 ab=0 queued=1
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0018c590 cur=0 n=1 state=3 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=1 cl=0 clo='' ctot=0 ctoto='' grp='' ct='member_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=1 count=1 mapped=1 sub_choice=0 dst='deck_top' state_change='-' p0_discard=1 p1_discard=0
+[DISCARD_MOVE] selected=1060 of 1 available=1 moved=1 destination=deck_top state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1687 ab=0 queued=1
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0018c590 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1687 ab=0 queued=1
+FAIL: G1: the optional energy placement prompts
+FAIL: G1: one energy card is placed into the energy zone (got 0 expected 1)
+FAIL: G1: placement accepted → the opponent draws 1 (got 0 expected 1)
+FAIL: G2: the optional energy placement prompts
+FAIL: H1: the optional μ's-member cost gate is offered even with one candidate
+FAIL: H1: the optional cost gate is a SelectTarget
+FAIL: H1: cost accepted → score +1 (got 0 expected 1)
+FAIL: H1: cost accepted → the μ's live is retrieved to hand
+FAIL: H1: the retrieved live card left the waitroom
+FAIL: H1: cost accepted → the sacrificed μ's member left the stage (got 498 expected -1)
+FAIL: H1: cost accepted → the sacrificed member went to the waitroom
+FAIL: H2: two candidates → a prompt is expected
+[RESUME_ANY] kind=2 zone= target=conditional_optional route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=2 zone= target=conditional_optional route=0 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: I2: opponent declined → ブレード×4 (got 0 expected 4)
+[DEBUT_COST_PENDING] card=825 deferred=0xa0018c810 eff=0xa0018c810 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa0018c810 target=0x0 eff=0xa0018c810 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa0018c810 action=sequential is_cost=0 host=825
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=825 deferred=0xa0018f8b0 eff=0xa0018f8b0 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0xa0018f8b0 target=0x0 eff=0xa0018f8b0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=663 deferred=0xa00191e10 eff=0xa00191e10 cur=0 n=0 state=3
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0xa00191e10 target=0x0 eff=0xa00191e10 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=663 deferred=0xa001960a0 eff=0xa001960a0 cur=0 n=0 state=3
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001960a0 target=0x0 eff=0xa001960a0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: L2: skipping the cost leaves the live card in the waitroom
+FAIL: L2: skipping the cost places nothing in the live zone
+FAIL: L2: skipping the cost must not reduce the live-card-set limit (got 1 expected 0)
+[DEBUT_COST_PENDING] card=663 deferred=0xa0019a370 eff=0xa0019a370 cur=0 n=0 state=3
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0xa0019a370 target=0x0 eff=0xa0019a370 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019ddc0 cur=0 n=0 state=3 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=2 count=1 mapped=1 sub_choice=0 dst='live_card_zone' state_change='-' p0_discard=2 p1_discard=0
+[DISCARD_MOVE] selected=509 of 1 available=2 moved=1 destination=live_card_zone state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: L3: the unchosen live card stays in the waitroom (got 0 expected 1)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa0019edc0 target=0x0 eff=0xa0019edc0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[RESUME_EXEC] def=0xa0019edc0 action=sequential is_cost=0 host=910
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[TEST_HEART_READ] cid=600 color=0 value=4
+FAIL: M1: the chosen ally gains +2 heart01 (got 4 expected 2)
+[TEST_HEART_READ] cid=910 color=0 value=0
+[TEST_HEART_READ] cid=530 color=0 value=0
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0xa001a0910 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=0 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa0019f7c0 target=0x0 eff=0xa0019f7c0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa0019f7c0 action=sequential is_cost=0 host=1668
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=stage target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001a01e0 cur=0 n=0 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=0 slot=0 cid=1594 target=self
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: N1: the effect sacrificed the selected Aqours member
+FAIL: N1: ダイヤ (cost 11 = 9+2) is summoned to the vacated area (got 1594 expected 1600)
+FAIL: N1: the summoned member is no longer in the waitroom
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa0019e9e0 target=0x0 eff=0xa0019e9e0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa0019e9e0 action=sequential is_cost=0 host=269
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[CHOICE_RESUME_END] pending=1 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa0019e9e0 target=0x0 eff=0xa0019e9e0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa0019e9e0 action=sequential is_cost=0 host=269
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[CHOICE_RESUME_END] pending=1 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: O2: the selected μ's card is MOVED from the revealed set into the hand
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa0019e9e0 target=0x0 eff=0xa0019e9e0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[RESUME_EXEC] def=0xa0019e9e0 action=sequential is_cost=0 host=269
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[CHOICE_RESUME_END] pending=1 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: P: the rb_activate_card bridge must charge the 2E leg of a sequential_cost cost (got 15 expected 13)
+FAIL: P: the bridge must pay the このカードを手札から控え室に置く leg
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

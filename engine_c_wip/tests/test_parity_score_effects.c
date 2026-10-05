@@ -246,7 +246,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
                  "operation=set is idempotent: a second set leaves 4 (an add would give 8)");
     }
     {   /* set coexists with the additive component (ModifierEntry::total = set+add) */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, live);
         tg.state.activating_card = live;
         rb_execute_modify_score(&tg.state, 0, e);
@@ -273,7 +273,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
                  "self_target with operation=set SETS both times (4, not 8)");
     }
     {   /* remove subtracts */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, live);
         tg.state.activating_card = live;
         rb_execute_modify_score(&tg.state, 0, e);
@@ -316,7 +316,7 @@ static void test_per_unit_stage_group_and_heart_threshold(void)
     if (!e) { CHECK(0, "LOVER effect decodes"); return; }
 
     {   /* one qualifying member -> +1 */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, lover);
         tg.state.activating_card = lover;
         tg.state.p[0].stage[0] = keke;
@@ -334,7 +334,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         CHECK_EQ(score_of(&tg, lover), 0, "LOVER: only a 3-heart Liella! member -> +0");
     }
     {   /* non-Liella outsider is not counted */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, lover);
         tg.state.activating_card = lover;
         tg.state.p[0].stage[0] = kanon;
@@ -354,7 +354,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
                  "LOVER: 2 qualifying Liella! members -> +2 (per-unit count, not recipient count)");
     }
     {   /* three qualifying members */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, lover);
         tg.state.activating_card = lover;
         tg.state.p[0].stage[0] = kanon;
@@ -387,7 +387,7 @@ static void test_per_unit_distinct_group_member(void)
     if (!e) { CHECK(0, "Link to the FUTURE ab#1 decodes"); return; }
 
     {   /* three distinct 蓮ノ空 members -> +6 */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, link);
         tg.state.activating_card = link;
         tg.state.p[0].stage[0] = test_id(&tg, "PL!HS-sd1-001-SD");
@@ -406,7 +406,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         CHECK_EQ(score_of(&tg, link), 2, "Link to the FUTURE: 1 蓮ノ空 member -> +2");
     }
     {   /* no members -> 0 */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, link);
         tg.state.activating_card = link;
         rb_execute_modify_score(&tg.state, 0, e);
@@ -424,7 +424,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
                  "Link to the FUTURE: three copies of one name collapse to a single unit -> +2");
     }
     {   /* a non-蓮ノ空 member is not counted */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, link);
         tg.state.activating_card = link;
         tg.state.p[0].stage[0] = test_id(&tg, "PL!HS-sd1-001-SD");
@@ -458,7 +458,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
                  "Solitude Rain: one 虹ヶ咲 member with heart01/02/04 -> +3");
     }
     {   /* a second member adds only its NEW colour (03) */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, rain);
         tg.state.activating_card = rain;
         tg.state.p[0].stage[0] = ayumu;
@@ -478,7 +478,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
                  "Solitude Rain: a member sharing heart01/04 and adding heart05 -> +4");
     }
     {   /* a non-虹ヶ咲 member contributes nothing */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, rain);
         tg.state.activating_card = rain;
         tg.state.p[0].stage[0] = test_id(&tg, "PL!-sd1-010-SD");
@@ -520,7 +520,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         CHECK_EQ(score_of(&tg, awake), 1, "AWOKE: self-target in the live zone gets +1");
     }
     {   /* still in hand during LiveStart setup -> the pool must not miss it */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_hand(&tg, awake);
         tg.state.activating_card = awake;
         rb_execute_modify_score(&tg.state, 0, e);
@@ -544,7 +544,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
 
     /* A non-self-target add reaches every live + success + stage card. */
     {
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         int l1 = test_id(&tg, "PL!-sd1-020-SD");
         int l2 = test_new_id(&tg, "PL!-sd1-020-SD");
         int m1 = test_id(&tg, "PL!SP-sd1-001-SD");
@@ -580,7 +580,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
 
 static void test_card_type_member_filter(void)
 {
-    TestGame tg; test_game_new(&tg); bare_board(&tg);
+    static TestGame tg; test_game_new(&tg); bare_board(&tg);
     int member = test_id(&tg, "PL!SP-sd1-001-SD");
     int live = test_id(&tg, "PL!-sd1-020-SD");
     test_add_to_live(&tg, live);
@@ -616,7 +616,7 @@ static void test_live_total_bonus(void)
     CHECK(e->target && !strcmp(e->target, "live_total"), "可可's constant targets live_total");
 
     {
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, test_id(&tg, "PL!-sd1-020-SD"));
         rb_execute_modify_score(&tg.state, 0, e);
         CHECK_EQ(live_total_bonus(&tg, 0), 1, "live_total add credits p1_constant_total_score_bonus");
@@ -625,7 +625,7 @@ static void test_live_total_bonus(void)
         CHECK_EQ(live_total_bonus(&tg, 0), 2, "live_total add accumulates");
     }
     {
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, test_id(&tg, "PL!-sd1-020-SD"));
         rb_execute_modify_score(&tg.state, 1, e);
         CHECK_EQ(live_total_bonus(&tg, 1), 1,
@@ -645,7 +645,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
                  "live_total operation=set adds 4 onto the existing +1 (score.rs:142-146)");
     }
     {   /* a live_total add never writes a per-card score modifier */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         int l = test_id(&tg, "PL!-sd1-020-SD");
         test_add_to_live(&tg, l);
         rb_execute_modify_score(&tg.state, 0, e);
@@ -678,7 +678,7 @@ static void test_live_total_floor_min_zero(void)
     if (!add_e || !rem_e) { rb_free_ability(&ab); return; }
 
     {   /* the +1 / -1 pair nets back to 0 */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, test_id(&tg, "PL!S-pb1-021-L"));
         rb_execute_modify_score(&tg.state, 0, add_e);
         CHECK_EQ(live_total_bonus(&tg, 0), 1, "三船栞子 no-surplus branch: +1");
@@ -697,7 +697,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
                  "score_floor min:0 blocks a further -1 that would go below zero");
     }
     {   /* without the floor the same removes go negative */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         SynthEffect s; synth(&s, "live_total", 0);
         synth_set(&s, 0, "operation", "remove");
         synth_set(&s, 1, "value", "1");
@@ -749,7 +749,7 @@ static    TestGame tg; test_game_new(&tg); bare_board(&tg);
     CHECK_EQ(score_of(&tg, l1), 2, "min:0 allows a remove that still lands at 2");
 
     {   /* score_floor is an equally valid spelling of the same floor */
-        TestGame tg2; test_game_new(&tg2); bare_board(&tg2);
+        static TestGame tg2; test_game_new(&tg2); bare_board(&tg2);
         int x = test_id(&tg2, "PL!-sd1-020-SD");
         test_add_to_live(&tg2, x);
         tg2.state.activating_card = x;
@@ -796,7 +796,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         CHECK_EQ(score_of(&tg, p1l), 0, "target=opponent leaves P1's own live card alone");
     }
     {   /* P2 acts, P1's live card is the recipient */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         int p1l = test_id(&tg, "PL!-sd1-020-SD");
         int p2l = test_new_id(&tg, "PL!-sd1-020-SD");
         test_add_to_live(&tg, p1l);
@@ -819,7 +819,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
         CHECK_EQ(score_of(&tg, p1l), 0, "target=self does not reach the opponent's board");
     }
     {   /* a NULL target defaults to self (card.rs:2336 target_name) */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         int p1l = test_id(&tg, "PL!-sd1-020-SD");
         int p2l = test_new_id(&tg, "PL!-sd1-020-SD");
         test_add_to_live(&tg, p1l);
@@ -838,7 +838,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
 
 static void test_per_unit_count_and_cap(void)
 {
-    TestGame tg; test_game_new(&tg); bare_board(&tg);
+    static TestGame tg; test_game_new(&tg); bare_board(&tg);
     int live = test_id(&tg, "PL!-sd1-020-SD");
     int m1 = test_id(&tg, "PL!SP-sd1-001-SD");
     int m2 = test_new_id(&tg, "PL!SP-sd1-001-SD");
@@ -871,7 +871,7 @@ static void test_per_unit_count_and_cap(void)
 
     /* per_unit_count=1 scales one-for-one. */
     {
-        TestGame tg2; test_game_new(&tg2); bare_board(&tg2);
+        static TestGame tg2; test_game_new(&tg2); bare_board(&tg2);
         int lv = test_id(&tg2, "PL!-sd1-020-SD");
         test_add_to_live(&tg2, lv);
         tg2.state.activating_card = lv;
@@ -932,7 +932,7 @@ static void test_conditional_activation(void)
           "ノンフィクション's condition is position=center");
 
     {   /* P1 cost 11 > P2 cost 4 -> the condition holds */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, nonfic);
         test_add_to_hand(&tg, filler);
         tg.state.activating_card = nonfic;
@@ -952,7 +952,7 @@ static        TestGame tg; test_game_new(&tg); bare_board(&tg);
                  "center cost 4 < opponent center cost 11 -> condition fails");
     }
     {   /* P1 center is not Liella! (Rust: nonfiction_cost_p1_non_liella_center_no_score) */
-        TestGame tg; test_game_new(&tg); bare_board(&tg);
+        static TestGame tg; test_game_new(&tg); bare_board(&tg);
         test_add_to_live(&tg, nonfic);
         test_add_to_hand(&tg, filler);
         tg.state.activating_card = nonfic;

@@ -1,0 +1,40 @@
+make t-nogate: running T=parity_sequential WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -c -o src/ability/effects/misc.o src/ability/effects/misc.c
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -c -o src/ability/effects/draw.o src/ability/effects/draw.c
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -c -o src/turn/phase.o src/turn/phase.c
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -c -o src/test_game.o src/test_game.c
+src/ability/effects/misc.c:2715:20: warning: 'card_name' defined but not used [-Wunused-function]
+ 2715 | static const char *card_name(int card_id, char *buf, size_t cap){
+      |                    ^~~~~~~~~
+In function 'try_create_target_selection_choice',
+    inlined from 'h_gain_resource' at src/ability/effects/misc.c:946:8:
+src/ability/effects/misc.c:634:15: warning: 'strncpy' output may be truncated copying 31 bytes from a string of length 127 [-Wstringop-truncation]
+  634 |     if(group) strncpy(g->queue.pending.filter_group, group, sizeof(g->queue.pending.filter_group)-1);
+      |               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/ability/effects/draw.c: In function 'rb_effect_select_effect':
+src/ability/effects/draw.c:715:5: warning: 'strncpy' output may be truncated copying 31 bytes from a string of length 31 [-Wstringop-truncation]
+  715 |     strncpy(g->queue.resume_filter_group, g->queue.pending.filter_group,
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  716 |             sizeof(g->queue.resume_filter_group) - 1);
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/ability/effects/draw.c:715:5: warning: 'strncpy' output may be truncated copying 31 bytes from a string of length 31 [-Wstringop-truncation]
+In file included from src/test_game.c:1:
+include/test_game.h:71:52: error: expected declaration specifiers or '...' before '(' token
+   71 | #define test_id(tg, card_no) test_id_TEMPLATE_ONLY((tg), (card_no))
+      |                                                    ^
+src/test_game.c:150:5: note: in expansion of macro 'test_id'
+  150 | int test_id(TestGame *tg, const char *card_no){
+      |     ^~~~~~~
+include/test_game.h:71:58: error: expected declaration specifiers or '...' before '(' token
+   71 | #define test_id(tg, card_no) test_id_TEMPLATE_ONLY((tg), (card_no))
+      |                                                          ^
+src/test_game.c:150:5: note: in expansion of macro 'test_id'
+  150 | int test_id(TestGame *tg, const char *card_no){
+      |     ^~~~~~~
+make[2]: *** [Makefile:591: src/test_game.o] Error 1
+make[1]: *** [Makefile:363: t] Error 2
+make: *** [Makefile:545: t-nogate] Error 2

@@ -2,6 +2,127 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef RB_HARNESS_WIN32
+#include <windows.h>
+#include <io.h>
+#include <fcntl.h>
+#endif
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * UTF-8 OUTPUT, DECLARED BY THE WRITER RATHER THAN ASSUMED BY THE READER.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * WHY THIS EXISTS. Every suite in this corpus prints Japanese: card names,
+ * ability text, trigger tokens (ライブ開始時, 登場, ライブ成功時). Two bugs in
+ * this project were found ONLY by reading that Japanese --
+ *
+ *   * TRIG_LIVE_START written as U+8177 (茅) instead of U+958B (開), i.e. the
+ *     trigger never matched and 33 tests failed for a reason no ASCII
+ *     inspection could see;
+ *   * a corrupted 「Aqours」 surfacing as 「Auクール！」 in a golden string.
+ *
+ * A reader cannot find those. They are only findable if the bytes that leave
+ * this process are UTF-8 and NOTHING ELSE, which is a property of the WRITER.
+ *
+ * WHAT WAS ACTUALLY WRONG, MEASURED 2026-10-05 rather than assumed:
+ *   * Redirected output (a pipe or a file) was ALREADY byte-exact UTF-8.
+ *     rb_engine_t_harness_self.exe stdout was captured raw and decodes as UTF-8
+ *     with ライブ開始時 / 登場 intact -- so for a redirected stream the writer
+ *     was never the problem, and the "mojibake" was introduced downstream.
+ *   * A CONSOLE stream was the real writer-side hazard: on Windows the CRT
+ *     renders a byte stream through the console output code page, which is
+ *     437/1252 by default here, so the same valid UTF-8 bytes display as
+ *     mojibake in the terminal and look like a writer bug.
+ *
+ * So the fix is to make the writer state its encoding instead of inheriting
+ * one: on Windows the console code page is set to UTF-8 and the streams are
+ * put in BINARY mode, which leaves a redirected stream byte-for-byte
+ * unchanged (the case that was already right) and makes the console case
+ * render the same bytes as the same characters. Nothing here re-encodes a
+ * single byte, so this cannot corrupt output that was correct before.
+ *
+ * test_write_utf8() is the explicit-spending path for a caller that wants the
+ * guarantee at the call site rather than by side effect: it fwrites the bytes
+ * and never goes through a wide-character or locale-dependent conversion.
+ */
+void test_output_utf8_init(void)
+{
+#ifdef RB_HARNESS_WIN32
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+    /* _O_BINARY keeps the CRT from translating CRLF on a redirected stream.
+     * It is a no-op for the bytes themselves on POSIX. */
+    _setmode(_fileno(stdout), _O_BINARY);
+    _setmode(_fileno(stderr), _O_BINARY);
+#endif
+}
+
+/* Write a UTF-8 string as BYTES. No conversion, no locale, no code page. */
+void test_write_utf8(FILE *f, const char *s)
+{
+    if (!f || !s) return;
+    fwrite(s, 1, strlen(s), f);
+}
+
+/* UTF-8 VALIDITY, byte-exact, no locale and no codec: enough to answer "did
+ * the writer emit UTF-8", which is the question a wrong-byte-literal bug
+ * actually turns on. Rejects overlong forms, surrogates (U+D800..U+DFFF, which
+ * cannot appear in UTF-8 at all) and anything above U+10FFFF -- the three ways
+ * a byte string can LOOK like UTF-8 without being it. Returns 1 for valid,
+ * 0 for invalid, -1 for a NULL argument. */
+int test_utf8_valid(const char *s)
+{
+    if (!s) return -1;
+    const unsigned char *p = (const unsigned char *)s;
+    while (*p) {
+        unsigned c = *p;
+        int extra;
+        unsigned cp;
+        if (c < 0x80) { p++; continue; }
+        else if ((c & 0xE0) == 0xC0) { extra = 1; cp = c & 0x1Fu; }
+        else if ((c & 0xF0) == 0xE0) { extra = 2; cp = c & 0x0Fu; }
+        else if ((c & 0xF8) == 0xF0) { extra = 3; cp = c & 0x07u; }
+        else return 0;
+        for (int i = 0; i < extra; i++) {
+            unsigned n = p[1 + i];
+            if ((n & 0xC0) != 0x80) return 0;
+            cp = (cp << 6) | (n & 0x3Fu);
+        }
+        if (extra == 1 && cp < 0x80) return 0;                       /* overlong */
+        if (extra == 2 && cp < 0x800) return 0;                      /* overlong */
+        if (extra == 3 && cp < 0x10000) return 0;                    /* overlong */
+        if (cp >= 0xD800 && cp <= 0xDFFF) return 0;                  /* surrogate */
+        if (cp > 0x10FFFF) return 0;                                 /* out of range */
+        p += 1 + extra;
+    }
+    return 1;
+}
+
+/* ROUND TRIP. Writes `s` with the explicit byte path to `path`, reads the file
+ * back and compares byte-for-byte. Returns 1 only if the bytes that reached the
+ * filesystem are the bytes handed in. This is the assertion that makes "the
+ * logs are reviewable" a fact rather than a hope: a wrong byte literal cannot
+ * survive it. Returns 0 on any I/O failure, and 0 for a NULL argument, so a
+ * caller that passes nothing cannot see a green. */
+int test_utf8_roundtrip(const char *path, const char *s)
+{
+    if (!path || !s) return 0;
+    FILE *w = fopen(path, "wb");
+    if (!w) return 0;
+    test_write_utf8(w, s);
+    int flushed = fflush(w) == 0;
+    fclose(w);
+    if (!flushed) return 0;
+    FILE *r = fopen(path, "rb");
+    if (!r) return 0;
+    static char buf[4096];
+    size_t n = fread(buf, 1, sizeof buf - 1, r);
+    fclose(r);
+    buf[n] = '\0';
+    size_t want = strlen(s);
+    remove(path);
+    return n == want && memcmp(buf, s, want) == 0;
+}
 
 void test_game_new(TestGame *tg){
     memset(tg,0,sizeof(*tg));
@@ -21,7 +142,12 @@ void test_game_new(TestGame *tg){
 }
 
 
-int test_id(TestGame *tg, const char *card_no){
+/* The TEMPLATE half of the identity trap, under the name that says so.
+ * include/test_game.h `#define test_id(tg, no) test_id_TEMPLATE_ONLY(tg, no)`,
+ * so all 3019 existing call sites keep compiling and every diagnostic now
+ * names the true contract. Do NOT add a second entry point here: two symbols
+ * for one behaviour is how the contract and the name drift apart again. */
+int test_id_TEMPLATE_ONLY(TestGame *tg, const char *card_no){
     (void)tg;
     return rb_find_card_by_no(card_no);
 }

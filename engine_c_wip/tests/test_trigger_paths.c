@@ -345,7 +345,7 @@ static void expect_trigger(int cid, const char *trig, int min_abilities) {
 #define KASUMI_NIJI "PL!N-bp7-017-N"
 
 static void q159_debut_from_discard_self_cost_wait_not_payable(void) {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int sayaka = test_id(&game, SAYAKA);
@@ -379,7 +379,7 @@ static void q159_debut_from_discard_self_cost_wait_not_payable(void) {
 }
 
 static void q159_positive_select_prompt_appears(void) {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int sayaka = test_id(&game, SAYAKA);
@@ -512,7 +512,7 @@ static    TestGame game;
 #define MUSE_LIVE "PL!-sd1-019-SD"         /* wrong-group negative */
 
 static void riko_aqours_live_leaving_live_zone_offers_deck_placement(void) {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int riko = test_id(&game, RIKO);
@@ -547,7 +547,7 @@ static void riko_aqours_live_leaving_live_zone_offers_deck_placement(void) {
 }
 
 static void riko_ignores_non_aqours_live_leaving_live_zone(void) {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int riko = test_id(&game, RIKO);
@@ -574,7 +574,7 @@ static void riko_ignores_non_aqours_live_leaving_live_zone(void) {
 }
 
 static void riko_responds_only_to_own_side_live_zone(void) {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int riko_p1 = test_id(&game, RIKO);
@@ -746,7 +746,7 @@ static    TestGame game;
 #define COST10_MEMBER "PL!-bp5-005-R"
 
 static void cost11_baton_replacement_does_not_arm_debut_watcher(void) {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int ranju = test_id(&game, RANJU);
@@ -993,7 +993,7 @@ static    TestGame game;
 #define KASUMI "PL!N-bp5-014-N"
 
 static void kasumi_turn1_ability_used_only_once_per_turn(void) {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int kasumi = test_id(&game, KASUMI);
@@ -1058,7 +1058,7 @@ static void kasumi_turn1_ability_used_only_once_per_turn(void) {
 }
 
 static void kasumi_turn1_ability_available_again_next_turn(void) {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int kasumi = test_id(&game, KASUMI);

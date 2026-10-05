@@ -267,7 +267,7 @@ static    TestGame g;
 }
 
 static void test_same_area_without_free_slot_goes_to_hand(void) {
-    TestGame g;
+    static TestGame g;
     test_game_new(&g);
     int a = test_new_id(&g, "PL!-sd1-010-SD");
     int b = test_new_id(&g, "PL!-sd1-002-SD");
@@ -332,7 +332,7 @@ static    TestGame g;
 
 /* ── 10. zone-to-zone movement shapes ─────────────────────────────────── */
 static void test_move_hand_to_discard(void) {
-    TestGame g;
+    static TestGame g;
     test_game_new(&g);
     int a = test_new_id(&g, "PL!-sd1-010-SD");
     int b = test_new_id(&g, "PL!SP-sd1-006-SD");
@@ -349,7 +349,7 @@ static void test_move_hand_to_discard(void) {
 }
 
 static void test_move_discard_to_hand(void) {
-    TestGame g;
+    static TestGame g;
     test_game_new(&g);
     int a = test_new_id(&g, "PL!-sd1-010-SD");
     int b = test_new_id(&g, "PL!SP-sd1-006-SD");
@@ -442,7 +442,7 @@ static    TestGame g;
 }
 
 static void test_move_those_cards_relay(void) {
-    TestGame g;
+    static TestGame g;
     test_game_new(&g);
     int t = test_new_id(&g, "PL!SP-sd1-006-SD");
     g.state.those_cards[g.state.n_those_cards++] = t;
@@ -456,7 +456,7 @@ static void test_move_those_cards_relay(void) {
 }
 
 static void test_move_selected_cards_relay(void) {
-    TestGame g;
+    static TestGame g;
     test_game_new(&g);
     int s = test_new_id(&g, "PL!SP-sd1-006-SD");
     g.state.selected_cards[g.state.n_selected_cards++] = s;
@@ -515,7 +515,7 @@ static    TestGame g;
 
 /* ── 14. same_area is not a zone transition for the debut counter ─────── */
 static void test_same_area_does_not_fire_debut_twice(void) {
-    TestGame g;
+    static TestGame g;
     test_game_new(&g);
     int m = test_new_id(&g, "PL!-sd1-010-SD");
     test_add_to_hand(&g, m);

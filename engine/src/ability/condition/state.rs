@@ -787,9 +787,9 @@ impl<'a> ConditionContext<'a> {
                 .or_else(|| te.and_then(|t| t.source_character.as_deref()));
             if let Some(source_name) = bt_source {
                 if let Some(card) = self.game_state.card_database.get_card(replaced_id) {
-                    let norm_name = crate::card::CardDatabase::normalize_name(&card.name);
-                    let norm_source = crate::card::CardDatabase::normalize_name(source_name);
-                    if !norm_name.contains(&norm_source) {
+                    // `source_name` (`baton_touch_source` / `source_character`) is
+                    // squashed by the parser; `name_key` is the card side.
+                    if !card.name_key.contains(source_name) {
                         return false;
                     }
                 } else {

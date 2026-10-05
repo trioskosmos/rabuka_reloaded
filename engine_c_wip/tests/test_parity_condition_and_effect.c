@@ -479,7 +479,7 @@ static void test_umi_opponent_success_score_threshold(void)
 {
     /* rejecting arm: total 2 < 6 */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int umi = test_id(&tg, UMI);
         int s1 = test_id(&tg, SCORE1);
@@ -609,7 +609,7 @@ static void test_pr045_baton_over_other_costs_does_not_draw(void)
     };
     static const int costs[] = { 8, 11, 13 };
     for (unsigned k = 0; k < sizeof rejected / sizeof rejected[0]; k++) {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int replaced = test_id(&tg, rejected[k]);
         int had = 0;
@@ -626,7 +626,7 @@ static void test_pr045_baton_over_other_costs_does_not_draw(void)
 
 static void test_pr045_non_baton_does_not_draw(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int replaced = test_id(&tg, "PL!-sd1-007-SD");
     int filler   = test_id(&tg, FILLER);
@@ -1121,7 +1121,7 @@ static    TestGame tg;
 
 static void test_live_start_bottom_three_all_aqours_gives_heart04(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int yoshiko = test_id(&tg, "PL!S-bp7-006-R");
     int filler  = test_id(&tg, FILLER);
@@ -1569,7 +1569,7 @@ static    TestGame tg;
 
 static void test_karin_topdeck_with_no_waited_opponents_places_nothing(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int karin = test_id(&tg, KARIN_BP4);
     int niji = test_id(&tg, NIJIGASAKI);
@@ -1595,7 +1595,7 @@ static void test_karin_topdeck_with_no_waited_opponents_places_nothing(void)
 
 static void test_karin_topdeck_loses_at_most_the_draw(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int karin = test_id(&tg, KARIN_BP4);
     int niji = test_id(&tg, NIJIGASAKI);
@@ -1951,7 +1951,7 @@ static void test_karin_non_member_goes_to_discard(void)
 static void test_karin_expensive_member_goes_to_discard(void)
 {
     /* PL!N-pb1-004-R itself prints cost 11 (> the 9 limit). */
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int karin     = test_id(&tg, KARIN_N_PB1);
     int filler    = test_id(&tg, FILLER);

@@ -457,7 +457,7 @@ static        TestGame tg;
 
     current_row = "A2.debut_position_left_positive";
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int cid = test_new_id(&tg, "PL!SP-bp4-003-P");
         test_add_to_stage(&tg, 0, cid);          /* area 0 == left side */
@@ -527,7 +527,7 @@ static        TestGame tg;
 
     current_row = "A3.debut_plain_positive";
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int cid = test_new_id(&tg, "PL!S-bp3-003-P");
         Ability ab;
@@ -628,7 +628,7 @@ static    TestGame tg;
 static void test_a4_live_success_seen_dedupe(void)
 {
     current_row = "A4b.live_success_seen";
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
 
     /* ONE card in BOTH zones. Rust's seen set collapses the double visit into
@@ -712,7 +712,7 @@ static void test_a5_stage_gate_exclude_characters(void)
     /* --- negative: only the excluded member on stage --- */
     current_row = "A5.stage_gate_exclude_negative";
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int fuyu = test_new_id(&tg, FUYU_CARD);
         Ability ab;
@@ -936,7 +936,7 @@ static        TestGame tg;
     /* --- paired positive: a plain optional hand cost DOES prompt --- */
     current_row = "A6.plain_hand_prompt_positive";
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int live1 = test_new_id(&tg, "PL!S-bp7-003-P");
         int live2 = test_new_id(&tg, OTHER_UNIT_CARD);
@@ -989,7 +989,7 @@ static        TestGame tg;
 static void test_a7_reveal_cost_values(void)
 {
     current_row = "A7.reveal_cost_values";
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
 
     Ability ab;

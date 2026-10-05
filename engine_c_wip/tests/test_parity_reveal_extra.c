@@ -333,7 +333,7 @@ static int is_wait(TestGame *tg, int cid)
 /* Rust debut_group_look(target): deck = [a, b, c, d], p2 deck = 1 filler. */
 static TestGame debut_group_look(const char *target_no, int *out4)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -474,7 +474,7 @@ static int choice_filtered_count(TestGame *tg)
 
 static void test_kanon_select_liella_cost4_keep_in_hand(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int liella = test_id(&tg, "PL!SP-PR-003-PR");
     int filler = test_id(&tg, FILLER_MUS);
@@ -498,7 +498,7 @@ static void test_kanon_select_liella_cost4_keep_in_hand(void)
 
 static void test_kanon_select_liella_debut_to_stage(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int liella = test_id(&tg, "PL!SP-PR-003-PR");
     int filler = test_id(&tg, FILLER_MUS);
@@ -523,7 +523,7 @@ static void test_kanon_select_liella_debut_to_stage(void)
 
 static void test_kanon_skip_cost_effect_not_executed(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int liella = test_id(&tg, "PL!SP-PR-003-PR");
     int filler = test_id(&tg, FILLER_MUS);
@@ -540,7 +540,7 @@ static void test_kanon_skip_cost_effect_not_executed(void)
 
 static void test_kanon_no_matching_cards_discard_all(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, FILLER_MUS);
     int non_mus = test_id(&tg, "PL!HS-sd1-010-SD");   /* Hasunosora cost 4, not Liella! */
@@ -559,7 +559,7 @@ static void test_kanon_no_matching_cards_discard_all(void)
 
 static void test_kanon_cost_above_4_rejected(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int kanon_self = test_id(&tg, "PL!SP-pb2-001-R");
     int filler = test_id(&tg, FILLER_MUS);
@@ -580,7 +580,7 @@ static void test_kanon_cost_above_4_rejected(void)
 
 static void test_kanon_non_liella_cost4_rejected(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int non_liella = test_id(&tg, "PL!-sd1-008-SD");   /* μ's cost 4 */
     int filler = test_id(&tg, FILLER_MUS);
@@ -600,7 +600,7 @@ static void test_kanon_non_liella_cost4_rejected(void)
 
 static void test_kanon_max_1_enforced(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int liella_a = test_id(&tg, "PL!SP-PR-003-PR");
     int liella_b = test_id(&tg, "PL!SP-PR-004-PR");
@@ -624,7 +624,7 @@ static void test_kanon_max_1_enforced(void)
 
 static void test_kanon_stage_full_falls_back_to_hand(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int liella = test_id(&tg, "PL!SP-PR-003-PR");
     int filler = test_id(&tg, FILLER_MUS);
@@ -749,7 +749,7 @@ static    TestGame tg;
 
 static void test_live_success_blade_heart_member_scores_nothing(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -789,7 +789,7 @@ static void test_live_success_blade_heart_member_scores_nothing(void)
 
 static void test_live_success_live_card_scores_nothing(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -994,7 +994,7 @@ static void cost9_no_eligible_branch(const char *me_no)
 
 static void cost9_declined_cost_branch(const char *me_no)
 {
-    TestGame tg2;
+    static TestGame tg2;
     test_game_new(&tg2);
     clear_p1(&tg2);
     clear_p2(&tg2);
@@ -1069,7 +1069,7 @@ static void dia_fire_debut_accept(TestGame *tg, int me)
 
 static void test_dia_look_four_takes_live_requiring_two_heart04(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1089,7 +1089,7 @@ static void test_dia_look_four_takes_live_requiring_two_heart04(void)
 
 static void test_dia_look_four_excludes_plain_member(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1109,7 +1109,7 @@ static void test_dia_look_four_excludes_plain_member(void)
 
 static void test_dia014_look_four_takes_live_requiring_heart02(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1133,7 +1133,7 @@ static void test_dia014_look_four_takes_live_requiring_heart02(void)
 
 static void test_eli_cost_look_three_takes_one_to_hand(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1190,7 +1190,7 @@ static void test_eli_cost_look_three_takes_one_to_hand(void)
 
 static void test_eli_declined_cost_skips_look_entirely(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1233,7 +1233,7 @@ static void test_eli_declined_cost_skips_look_entirely(void)
 
 static void test_mei_paid_live_discard_looks_five_and_takes_one(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1261,7 +1261,7 @@ static void test_mei_paid_live_discard_looks_five_and_takes_one(void)
 
 static void test_mei_declined_live_discard_preserves_cost_card(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1304,7 +1304,7 @@ typedef struct {
 
 static void paid_discard_filtered_look(const PaidLookCase *c)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1372,7 +1372,7 @@ static void test_paid_discard_filtered_looks(void)
 
 static void test_eli_bp5_sequential_wait_then_discard(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1408,7 +1408,7 @@ static void test_eli_bp5_sequential_wait_then_discard(void)
 
 static void test_eli_bp5_skip_costs_skips_look_entirely(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1443,7 +1443,7 @@ static void test_eli_bp5_skip_costs_skips_look_entirely(void)
 
 static void test_eli_bp5_no_eligible_look_discards_all(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1471,7 +1471,7 @@ static void test_eli_bp5_no_eligible_look_discards_all(void)
 
 static void test_eli_bp5_look_select_optional_skip_keeps_hand(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);
@@ -1655,7 +1655,7 @@ static    TestGame tg;
 
 static void test_sbp6_016_hand_debut_no_look(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     clear_p2(&tg);

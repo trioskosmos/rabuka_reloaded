@@ -1,6 +1,13 @@
 CC      ?= gcc
 CFLAGS  ?= -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated
-# sizeof(GameState) is 1090528 bytes -- MEASURED 2026-10-04 with
+# RB_HARNESS_WIN32 gates ONE thing and one thing only: the Windows console
+# code-page fix in src/test_game.c's test_output_utf8_init(). A redirected
+# stream was already byte-exact UTF-8 (measured 2026-10-05), so this changes
+# nothing about the bytes a log file receives -- it stops the CONSOLE from
+# rendering those bytes through code page 437/1252 as mojibake, which is what
+# made the C logs unreadable. Undefine it and you get the old console
+# behaviour back; no gate, no assertion and no other target is touched.
+# sizeof(GameState) is 1091816 bytes -- MEASURED 2026-10-05 with
 # sizeof() in a throwaway TU against the current header, not estimated.
 #
 # HISTORY, because this number has been wrong repeatedly and a wrong number here
@@ -8,7 +15,7 @@ CFLAGS  ?= -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated
 # 415656 B), then 885912, then 1113736 after fields were APPENDED to GameState
 # (rule_log, resolution_owners, live_face_up, constant_need_heart_global), then
 # 1195656 after the three success_zone_* bonus ledgers joined them, then
-# 1195720. It is now 1090264 -- DOWN 105456 B -- because 13 dead fields were
+# 1195720. It was 1090264 -- DOWN 105456 B -- because 13 dead fields were
 # DELETED (field census 2026-10-04: 0 writers AND 0 readers, all tombstoned in
 # place in include/rabuka.h). `constant_need_heart_global[4096][8]` +
 # `_set[4096][8]` alone were 98304 B and were the largest dead allocation in the
@@ -17,6 +24,15 @@ CFLAGS  ?= -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated
 # areas_placed_this_turn (64 B), auto_ability_trigger_counts (128 B),
 # energy_placed_this_turn (8 B), n_gained_cards (4 B) and pending_energy_payment
 # (4 B); the balance against that arithmetic is re-packing and trailing alignment.
+# That took it to 1090528, and it is now 1091816 -- UP 1288 B -- because
+# Rule 9.5.3 added two APPENDED fields to RbChoice
+# (`auto_option_queue_index[16]` + `n_auto_options`, 68 B), and RbChoice is
+# embedded in GameState SEVENTEEN times: once as `queue.pending` and once per
+# `RB_QUEUE_DEPTH`(16) queue entry's `pending_choice`. 17 * 68 = 1156 B, plus
+# 132 B of re-packing and trailing alignment. `AutoAbilityOption` itself
+# (252 B) is deliberately NOT embedded in RbChoice -- a full copy at
+# RB_MAX_AUTO_ABILITY_OPTIONS would have cost 17 * ~3.4 KB -- so see the comment
+# on those two fields in include/rabuka.h.
 # The pin in tests/test_harness_self.c section A4 moved in the same change.
 #
 # APPENDED, never inserted: insertion shifts every later offset and silently
@@ -302,19 +318,19 @@ SUITE_GAPS := \
 # choice_renderer.rs, three fields: card_no, name, ability_text) which exists
 # ONLY inside `render_card_choice_grid`, the 3DS card-choice-grid renderer, and
 # from `card_ability_text` (engine/src/game/platform_ui.rs), a platform-UI
-# helper.  Neither has a C counterpart to be divergent from: the C's nearest
-# file, src/ability/choice_renderer.c, is an ORPHAN -- zero references in
-# OBJ_LIB, platforms/cdi/build_cdi.sh, platforms/genesis/build_genesis.sh or
-# platforms/Makefile -- so a suite could not link against it.  The C's ACTUAL
-# card-text surface is src/ability/describe.c, and tests/test_describe_golden.c
-# already owns it byte-for-byte over 983 of 985 abilities.  So this is a
-# DISPLAY-LAYER NAME with no C parity surface, not a coverage hole, and
-# aliasing it to describe_golden would be exactly the "aliasing them to
-# something unrelated is worse than recording them" this file warns about.
+# helper.  Neither has a separate C module to be divergent from, so the naming is
+# about SURFACE OWNERSHIP, not a missing implementation.
+# CORRECTED 2026-10-05: this block previously claimed `choice_renderer.c` was an
+# ORPHAN with "zero references in OBJ_LIB" -- which contradicted line 61 (SRC)
+# and line 64 (OBJ_LIB) in this same file.  It is BUILT, compiles with zero
+# diagnostics, and the `choice_renderer` suite runs 65 cases GREEN against it.
+# It is deliberately absent from platforms/*/build_*.sh, which ship their own UI.
+# The C's card-text surface proper remains src/ability/describe.c, owned
+# byte-for-byte over 983 of 985 abilities by tests/test_describe_golden.c.
 
 # name=CLASS: what it actually is
 SUITE_ABSENT := \
-  card_info_show=NOT-A-SUITE:Rust_struct_CardInfo_in_choice_renderer.rs_3DS_grid_only_C_choice_renderer.c_is_an_ORPHAN \
+  card_info_show=NOT-A-SUITE:Rust_struct_CardInfo_in_choice_renderer.rs_3DS_grid_only_C_choice_renderer.c_is_built_but_has_no_PlatformUi_consumer \
   card_info_parity=NOT-A-SUITE:same_CardInfo_name_actual_C_card_text_surface_is_describe_golden \
   parity_dynamic_count=VERIFIED-NOOP:X=dynamic_count_is_0_nodes_across_all_2116_pairs \
   parity_card_text=VERIFIED-NOOP:0_of_985_there_is_no_display_layer_in_C \
@@ -477,7 +493,7 @@ VERDICT := rb_verdict
 VERDICT_SRC := tools/verdict_runner.c
 
 $(VERDICT): $(VERDICT_SRC)
-	$(CC) $(CFLAGS) -o $@ $(VERDICT_SRC)
+	$(CC) $(CFLAGS) -DRB_HARNESS_WIN32=1 -o $@ $(VERDICT_SRC)
 
 .PHONY: verdict
 verdict: $(VERDICT)
@@ -950,10 +966,13 @@ $(TARGET)_t7zero: $(OBJ_LIB) $(T7ZERO)
 
 clean:
 	rm -f $(OBJ) $(TARGET) $(VERDICT) $(TARGET)_test $(TARGET)_audit $(TARGET)_replay $(TARGET)_generated $(TARGET)_mechanics $(TARGET)_live_rules $(TARGET)_t_*
-	@# src/web_server.o is deliberately NOT in SRC or OBJ_LIB: adding it would
-	@# duplicate-symbol the web target, which links it explicitly at line 101-102,
-	@# and would drag -mwindows units into every one of the 160+ suite links. But
-	@# that also means $(OBJ) never names it, so `make clean` silently left it
-	@# behind -- and a stale web_server.o gets linked into the next web build.
-	@# Named explicitly here for exactly that reason.
+	@# CORRECTED 2026-10-05: this block previously claimed "src/web_server.o is
+	@# deliberately NOT in SRC or OBJ_LIB ... $(OBJ) never names it, so make
+	@# clean silently left it behind". Both halves were FALSE and contradicted
+	@# lines 61/64 of this same file: SRC ends with src/web_server.c and OBJ_LIB
+	@# ends with src/web_server.o, so $(OBJ) = $(SRC:.c=.o) DOES name it, the
+	@# line above already removes it, and the web target links it via $(OBJ_LIB)
+	@# rather than "explicitly at line 101-102". The only thing this rule was
+	@# really reaching for is $(WEB_TARGET), which $(OBJ) does not cover; that
+	@# part is true and is kept below.
 	rm -f src/web_server.o $(WEB_TARGET)

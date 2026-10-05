@@ -28,7 +28,7 @@ static void ensure_cards_loaded(void)
 
 static void t_game_new(void)
 {
-    TestGame tg;
+    static TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     CHECK(tg.state.winner == -1, "test_game_new starts with no winner");
@@ -606,7 +606,7 @@ static    TestGame tg;
 /* Deck top insertion is positional; the deck itself appends. */
 static void t_deck_placement(void)
 {
-    TestGame tg;
+    static TestGame tg;
     ensure_cards_loaded();
     test_game_new(&tg);
     int a = test_new_id(&tg, "PL!-sd1-019-SD");

@@ -110,6 +110,76 @@ def count_icons(text, icons):
     return sum(text.count(icon) for icon in icons)
 
 
+def needle_key(text):
+    """Canonical comparison form of a NAME NEEDLE parsed out of printed text.
+
+    Byte-for-byte twin of `name_key()` in `cards/scrape_expansion.py` — the two
+    must never drift, because the engine compares this against `Card::name_key`
+    directly. Strip every whitespace character, then fold full-width '＆' to '&',
+    so that a needle and the card name it refers to land on the same string.
+
+    Why it exists: the card side is canonicalised once at scrape time and the
+    engine reads `Card::name_key` off the loaded card. The needle side used to
+    be canonicalised at every comparison with `CardDatabase::normalize_name`,
+    which allocates a `String` per call. Squashing needles HERE — at generation
+    time, once — lets the engine drop that call entirely.
+
+    This is a no-op on the current corpus: no name needle in `abilities.json`
+    carries whitespace or '＆'. That is the point of running it as a final pass:
+    a future expansion whose printed text says "南 ことり" or "嵐 千砂都＆鬼塚夏美"
+    gets canonicalised on the way in instead of silently failing every match.
+
+    NOT applied to group needles (`group_names`, `exclude_group_names`,
+    `counted_by`): those are matched by `card_matches_group_str` /
+    `eq_ignoring_whitespace`, which compare against the card's `unit`/`group`
+    fields as printed, and squashing them would change 『lily white』 in describe
+    output. NOT applied to `answers`: that is user-facing answer text, not a
+    card name.
+    """
+    if not text:
+        return text
+    return re.sub(r"\s+", "", text).replace("＆", "&")
+
+
+# Name needles the engine compares against `Card::name_key`. Scalar fields are
+# rewritten in place; list fields have each element rewritten. Keep this list in
+# sync with the `normalize_name` call sites it retires in `engine/src`.
+NAME_NEEDLE_FIELDS = (
+    "baton_touch_source",
+    "card_names",
+    "characters",
+    "cost_reference_character",
+    "character",
+    "exclude_characters",
+    "source_character",
+)
+
+
+def squash_name_needles(value):
+    """Apply `needle_key` to every name needle in a parsed cost/effect tree.
+
+    Walks all nested dicts, so conditions buried in `actions[].condition` and
+    in cost nodes are reached too. Only string values are touched; a field
+    holding a mode token (e.g. `name_constraint: "contains_all"`) is not in
+    `NAME_NEEDLE_FIELDS` and is left alone.
+    """
+    if isinstance(value, dict):
+        for key in NAME_NEEDLE_FIELDS:
+            current = value.get(key)
+            if isinstance(current, str):
+                value[key] = needle_key(current)
+            elif isinstance(current, list):
+                value[key] = [
+                    needle_key(item) if isinstance(item, str) else item
+                    for item in current
+                ]
+        for child in value.values():
+            squash_name_needles(child)
+    elif isinstance(value, list):
+        for child in value:
+            squash_name_needles(child)
+
+
 def strip_suffix_period(text):
     """Remove trailing period from text."""
     return text.rstrip("。")

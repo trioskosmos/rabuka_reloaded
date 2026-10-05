@@ -1,0 +1,40 @@
+make t-nogate: running T=tp_turn_limited_activation WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_tp_turn_limited_activation src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_tp_turn_limited_activation.c
+./rb_verdict ./rb_engine_t_tp_turn_limited_activation tp_turn_limited_activation
+DBG kasumi ability[0] triggers=起動 use_limit=1 keywords=0 has_cost=1 has_effect=1 full_text={{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+ok: first activation resolved through the public pipeline
+ok: use_limit must be recorded after a successful activation
+ok: attempt 0: ターン1回 ability offered again after being consumed
+DBG kasumi ability[0] triggers=起動 use_limit=1 keywords=0 has_cost=1 has_effect=1 full_text={{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+ok: first activation resolved
+ok: use recorded
+DBG kasumi ability[0] triggers=起動 use_limit=1 keywords=0 has_cost=1 has_effect=1 full_text={{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+ok: activation looped more than once in a single turn — ターン1回 enforcement leaked
+info: no-valid-target activations in one turn = 0
+DBG kasumi ability[0] triggers=起動 use_limit=1 keywords=0 has_cost=1 has_effect=1 full_text={{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+ok: energy is exactly the 2E activation cost
+ok: activation with exact cost resolved
+ok: use recorded after exact-cost activation
+ok: k1 activation resolved
+FAILED: tp_turn_limited_activation  [exit=1, 5 result line(s): assert=5 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=0]
+
+FAIL: fresh turn should offer the ターン1回 ability exactly once (got 0 expected 1)
+FAIL: ターン1回 limit must reset on the next turn (got 0 expected 1)
+FAIL: affordable ability must be offered (got 0 expected 1)
+FAIL: each instance gets its own ターン1回 budget (got 0 expected 2)
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198790 cur=0 n=0 state=0 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='虹ヶ咲' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=2 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=2 p1_discard=0
+[DISCARD_MOVE] selected=1157 of 1 available=2 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: k2 must still be offered after k1 used its own activation (got 0 expected 1)
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

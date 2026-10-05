@@ -1,0 +1,73 @@
+=== SUITE parity_card_score (exit 2)
+zzs/BASE/parity_card_score.out:0
+zzs/BASE/parity_card_score.err:0
+zzs/BASE/parity_card_score.out:FAILED: parity_card_score  [exit=1, 26 result line(s): assert=26 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=6]
+=== SUITE parity_group_names (exit 0)
+zzs/BASE/parity_group_names.out:0
+zzs/BASE/parity_group_names.err:0
+zzs/BASE/parity_group_names.out:PASSED: parity_group_names  [exit=0, 0 result line(s), renormalised=0]
+=== SUITE decode_skew (exit 0)
+zzs/BASE/decode_skew.out:0
+zzs/BASE/decode_skew.err:0
+zzs/BASE/decode_skew.out:PASSED: decode_skew  [exit=0, 0 result line(s), renormalised=0]
+=== SUITE decode_fallback (exit 0)
+zzs/BASE/decode_fallback.out:0
+zzs/BASE/decode_fallback.err:0
+zzs/BASE/decode_fallback.out:PASSED: decode_fallback  [exit=0, 0 result line(s), renormalised=0]
+=== SUITE artifacts_consistent (exit 2)
+zzs/BASE/artifacts_consistent.out:0
+zzs/BASE/artifacts_consistent.err:0
+zzs/BASE/artifacts_consistent.out:FAILED: artifacts_consistent  [exit=1, 3 result line(s): assert=3 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=0]
+=== SUITE describe_golden (exit 2)
+zzs/BASE/describe_golden.out:RED: 1394 checks, 1 failures
+zzs/BASE/describe_golden.out:0
+zzs/BASE/describe_golden.err:0
+zzs/BASE/describe_golden.out:FAILED: describe_golden  [exit=1, 1 result line(s): assert=1 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=0]
+=== SUITE parity_enums (exit 2)
+zzs/BASE/parity_enums.out:0
+zzs/BASE/parity_enums.err:0
+zzs/BASE/parity_enums.out:FAILED: parity_enums  [exit=1, 2 result line(s): assert=2 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=0]
+=== SUITE vm_decode (exit 2)
+zzs/BASE/vm_decode.out:0
+zzs/BASE/vm_decode.err:0
+zzs/BASE/vm_decode.out:FAILED: vm_decode  [exit=1, 1 result line(s): assert=1 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=0]
+=== SUITE parity_x_class (exit 0)
+zzs/BASE/parity_x_class.out:0
+zzs/BASE/parity_x_class.err:0
+zzs/BASE/parity_x_class.out:PASSED: parity_x_class  [exit=0, 0 result line(s), renormalised=0]
+=== SUITE parity_fw_effects (exit 0)
+zzs/BASE/parity_fw_effects.out:0
+zzs/BASE/parity_fw_effects.err:0
+zzs/BASE/parity_fw_effects.out:FAILED: parity_fw_effects  [exit=0, 2 result line(s): assert=2 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=1]
+=== SUITE parity_condition_and_effect (exit 2)
+zzs/BASE/parity_condition_and_effect.out:0
+zzs/BASE/parity_condition_and_effect.err:0
+zzs/BASE/parity_condition_and_effect.out:FAILED: parity_condition_and_effect  [exit=1, 60 result line(s): assert=60 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=19]
+=== SUITE parity_card_identity (exit 0)
+zzs/BASE/parity_card_identity.out:0
+zzs/BASE/parity_card_identity.err:0
+zzs/BASE/parity_card_identity.out:PASSED: parity_card_identity  [exit=0, 0 result line(s), renormalised=0]
+=== SUITE parity_sequential (exit 2)
+zzs/BASE/parity_sequential.out:0
+zzs/BASE/parity_sequential.err:0
+zzs/BASE/parity_sequential.out:FAILED: parity_sequential  [exit=1, 135 result line(s): assert=135 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=29]
+=== SUITE parity_small_clusters (exit 0)
+zzs/BASE/parity_small_clusters.out:0
+zzs/BASE/parity_small_clusters.err:0
+zzs/BASE/parity_small_clusters.out:FAILED: parity_small_clusters  [exit=0, 100 result line(s): assert=100 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=39]
+=== SUITE mechanics (exit 0)
+zzs/BASE/mechanics.out:0
+zzs/BASE/mechanics.err:0
+zzs/BASE/mechanics.out:PASSED: mechanics  [exit=0, 0 result line(s), renormalised=0]
+=== SUITE harness_self (exit 2)
+zzs/BASE/harness_self.out:0
+zzs/BASE/harness_self.err:0
+zzs/BASE/harness_self.out:FAILED: harness_self  [exit=1, 3 result line(s): assert=3 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=1]
+=== SUITE decode_bytecode_shape (exit 2)
+zzs/BASE/decode_bytecode_shape.out:0
+zzs/BASE/decode_bytecode_shape.err:0
+zzs/BASE/decode_bytecode_shape.out:FAILED: decode_bytecode_shape  [exit=1, 2 result line(s): assert=2 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=0]
+=== SUITE null_effect_guard (exit 0)
+zzs/BASE/null_effect_guard.out:0
+zzs/BASE/null_effect_guard.err:0
+zzs/BASE/null_effect_guard.out:PASSED: null_effect_guard  [exit=0, 0 result line(s), renormalised=0]

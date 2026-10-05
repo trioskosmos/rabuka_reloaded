@@ -251,7 +251,7 @@ static Condition temporal_condition(int have_turn, int turn_number,
 
 static void test_turn_number_1_on_turn_1_true(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     game.state.turn = 1;
     game.state.phase = RB_PHASE_LIVE_SET;
@@ -263,7 +263,7 @@ static void test_turn_number_1_on_turn_1_true(void)
 
 static void test_turn_number_1_on_turn_2_false(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     game.state.turn = 2;
     game.state.phase = RB_PHASE_LIVE_SET;
@@ -275,7 +275,7 @@ static void test_turn_number_1_on_turn_2_false(void)
 
 static void test_turn_number_1_on_turn_1_not_live_phase(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     game.state.turn = 1;
     game.state.phase = RB_PHASE_MAIN;
@@ -287,7 +287,7 @@ static void test_turn_number_1_on_turn_1_not_live_phase(void)
 
 static void test_turn_number_none_ignored(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     game.state.turn = 5;
     game.state.phase = RB_PHASE_LIVE_SET;
@@ -395,7 +395,7 @@ static void add_success_lives(TestGame *tg, int pl, int n)
 static void test_three_success_cards_wins_and_names_the_winning_seat(void)
 {
     for (int p1_first = 0; p1_first <= 1; p1_first++) {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         game.state.first_attacker = p1_first;
         game.state.second_attacker = 1 - p1_first;
@@ -415,7 +415,7 @@ static void test_three_success_cards_wins_and_names_the_winning_seat(void)
 
 static void test_three_versus_two_success_cards_is_a_win_not_a_draw(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     game.state.first_attacker = 1;
     game.state.second_attacker = 0;
@@ -429,7 +429,7 @@ static void test_three_versus_two_success_cards_is_a_win_not_a_draw(void)
 
 static void test_three_success_cards_for_p2_attributes_the_win_to_p2(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     game.state.first_attacker = 1;
     game.state.second_attacker = 0;
@@ -443,7 +443,7 @@ static void test_three_success_cards_for_p2_attributes_the_win_to_p2(void)
 static void test_both_players_at_three_success_cards_is_a_draw(void)
 {
     for (int p1_first = 0; p1_first <= 1; p1_first++) {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         game.state.first_attacker = p1_first;
         game.state.second_attacker = 1 - p1_first;
@@ -459,7 +459,7 @@ static void test_both_players_at_three_success_cards_is_a_draw(void)
 
 static void test_two_versus_two_success_cards_does_not_end_the_game(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     add_success_lives(&game, 0, 2);
     add_success_lives(&game, 1, 2);
@@ -478,7 +478,7 @@ static void test_two_versus_two_success_cards_does_not_end_the_game(void)
 
 static void test_rule_10_4_keeps_newest_member_and_routes_older_stacks(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int filler = test_new_id(&game, FILLER);
@@ -515,7 +515,7 @@ static void test_rule_10_4_keeps_newest_member_and_routes_older_stacks(void)
 
 static void test_empty_energy_deck_continues_game_p1(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int filler = test_id(&game, FILLER);
@@ -550,7 +550,7 @@ static void test_empty_energy_deck_continues_game_p1(void)
 
 static void test_empty_energy_deck_continues_game_p2(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int filler = test_id(&game, FILLER);
@@ -593,7 +593,7 @@ static void test_empty_energy_deck_continues_game_p2(void)
 static void ability_filter_case(int stage_null, int stage_livestart, int expect_heart,
                                 const char *desc)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int eli = test_id(&game, ELI);
@@ -628,7 +628,7 @@ static void test_ability_filter_edges(void)
 
 static void test_ability_filter_success_zone_does_not_count(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int eli = test_id(&game, ELI);
@@ -645,7 +645,7 @@ static void test_ability_filter_success_zone_does_not_count(void)
 
 static void test_ability_filter_removing_null_loses_heart(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int eli = test_id(&game, ELI);
@@ -694,7 +694,7 @@ static int card_name_contains(TestGame *tg, int cid, const char *frag)
 
 static void test_group_membership_aqours_card_matches_unit_but_not_group(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int bibi = test_id(&game, BIBI);
@@ -710,7 +710,7 @@ static void test_group_membership_aqours_card_matches_unit_but_not_group(void)
 
 static void test_group_membership_muren_card_invisible_to_mus_filter(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int muren = test_id(&game, MUREN);
@@ -732,7 +732,7 @@ static void test_group_membership_muren_card_invisible_to_mus_filter(void)
 
 static void test_group_membership_sunny_passion_filter_is_unsatisfiable(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int ai_scream = test_id(&game, AI_SCREAM);
@@ -753,7 +753,7 @@ static void test_group_membership_works_for_the_three_covered_groups(void)
         { "PL!N-sd1-001-SD", "虹ヶ咲" },   /* A・ZU・NA member, 虹ヶ咲 series   */
         { "PL!SP-pb2-025-P", "Liella!" }   /* Liella! live, スーパースター series */
     };
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     for (unsigned i = 0; i < sizeof cases / sizeof cases[0]; i++) {
@@ -832,7 +832,7 @@ static    TestGame game;
 
 static void test_group_member_filter_excludes_activating_member(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int yoshiko = test_id(&game, YOSHIKO);
@@ -876,7 +876,7 @@ static void test_group_member_filter_excludes_activating_member(void)
 
 static void test_q139_under_energy_moves_with_member(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int mover = test_id(&game, SAINT_SNOW_MV);
@@ -931,7 +931,7 @@ static void test_q139_under_energy_moves_with_member(void)
 
 static void test_q138_under_energy_cannot_pay_costs(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int holder = test_new_id(&game, FILLER);      /* cost 4 */
@@ -959,7 +959,7 @@ static void test_q138_under_energy_cannot_pay_costs(void)
 
 static void test_draw_phase_no_unwanted_discards(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int filler = test_id(&game, FILLER);
@@ -1007,7 +1007,7 @@ static int drive_until_phase(TestGame *tg, int target, int max_steps)
 
 static void test_q36_live_success_timing(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int live = test_id(&game, SUCCESS_LIVE);
@@ -1045,7 +1045,7 @@ static void test_q36_live_success_timing(void)
 
 static void test_baton_own_name_fires_draw_two_discard_one(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int old_me = test_id(&game, KASUMI_BATON);
@@ -1083,7 +1083,7 @@ static void test_baton_own_name_fires_draw_two_discard_one(void)
 
 static void test_baton_other_name_no_fire_no_draw(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int other = test_id(&game, FILLER);
@@ -1102,7 +1102,7 @@ static void test_baton_other_name_no_fire_no_draw(void)
 
 static void test_baton_cheaper_dollchestra_fires_two_blades(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int cheap = test_id(&game, DOLLY_CHEAP);
@@ -1122,7 +1122,7 @@ static void test_baton_cheaper_dollchestra_fires_two_blades(void)
 
 static void test_baton_expensive_dollchestra_no_blades(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int pricey = test_id(&game, DOLL_EXPENSIVE);
@@ -1154,7 +1154,7 @@ static void test_baton_expensive_dollchestra_no_blades(void)
 
 static void test_baton_no_ability_replaced_draws_one(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int chika = test_id(&game, CHIKA_BATON);
@@ -1181,7 +1181,7 @@ static void test_baton_no_ability_replaced_draws_one(void)
 
 static void test_baton_ability_member_replaced_no_draw(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int chika = test_id(&game, CHIKA_BATON);
@@ -1208,7 +1208,7 @@ static void test_baton_ability_member_replaced_no_draw(void)
 
 static void test_normal_debut_no_draw(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int chika = test_id(&game, CHIKA_BATON);
@@ -1239,7 +1239,7 @@ static void test_normal_debut_no_draw(void)
 
 static void test_baton_touch_blocked_on_arrival_turn(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int first = test_id(&game, FILLER);        /* cost 4, no abilities */
@@ -1278,7 +1278,7 @@ static void test_baton_touch_blocked_on_arrival_turn(void)
 
 static void test_mia_baton_fires_on_shioriko_not_kasumi(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     /* 「PL!N-sd1-010-SD」 is 三船栞子 (the SAME character the name gate names) —
@@ -1313,7 +1313,7 @@ static void test_mia_baton_fires_on_shioriko_not_kasumi(void)
                  "(rb_play_member drains it; Rust's play_to_stage leaves it open)");
 
     /* Second pass: the same arrival replaces a DIFFERENT named member. */
-    TestGame game2;
+    static TestGame game2;
     test_game_new(&game2);
     int mia2 = test_id(&game2, MIA);
     int kasumi2 = test_id(&game2, KASUMI);
@@ -1339,7 +1339,7 @@ static void test_mia_baton_fires_on_shioriko_not_kasumi(void)
 
 static void test_baton_replacement_records_arrival_area(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int replaced = test_id(&game, FILLER);

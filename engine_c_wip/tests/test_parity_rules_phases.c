@@ -1163,11 +1163,11 @@ static void d2_cheer_pipeline_score_icon(void)
     CHECK_EQ(s->success, 1, "D2: the stage hearts satisfy START:DASH!!");
     /* Non-vacuity control for the cheer assertion: the same icon demonstrably
        reaches the live total, so it WAS resolved by the yell — only the
-       GameState cheer mirror is never written. */
+       static GameState cheer mirror is never written. */
     CHECK_EQ(s->total_score, 2, "D2: card score 1 + one revealed score icon = 2");
     /* Non-vacuity control for the cheer assertion: the same icon demonstrably
        reaches the live total, so it WAS resolved by the yell — only the
-       GameState cheer mirror is never written. */
+       static GameState cheer mirror is never written. */
     CHECK(tg.state.n_revealed > 0, "D2: PREMISE — the yell revealed the milled card");
     CHECK(bag_has(&tg.state.p[0].discard, revealed),
           "D2: the yell-revealed START:DASH!! ends up in the waitroom");

@@ -890,8 +890,41 @@ static const Case CASES[] = {
 
 int main(void) {
     setvbuf(stdout, NULL, _IOLBF, 0);
-    if (rb_load("../cards/build") < 0 && rb_load("cards/build") < 0) {
-        fprintf(stderr, "cannot load card db\n");
+    /* CARD DB RESOLUTION -- FIVE CANDIDATES, AND WHY THE ORDER IS THIS ONE.
+     *
+     * This suite ran ZERO assertions in every measurement taken before
+     * 2026-10-05. The old pair was `rb_load("../cards/build")` and
+     * `rb_load("cards/build")`, and NEITHER resolves from a snapshot of
+     * engine_c_wip on its own:
+     *
+     *   "src"               in-tree. engine_c_wip/src/cards.bin is the copy the
+     *                       `make data` gate installs and that every object in
+     *                       OBJ_LIB was compiled against, so this is the
+     *                       authoritative one and it travels with the tree.
+     *   "cards/build"       a full checkout: rabuka_reloaded/cards/build, when
+     *                       cwd is the REPO ROOT.
+     *   "../cards/build"    a full checkout with cwd = engine_c_wip.
+     *   "../../cards/build" cwd = engine_c_wip/tests, or a snapshot nested one
+     *                       level deeper than the repo root.
+     *   "../../../cards/build" a snapshot at src/<...>/engine_c_wip.
+     *
+     * The failure was SILENT in the worst way: rb_load returned <0, the suite
+     * printed "cannot load card db" to stderr and exited 2, so it contributed
+     * zero checks and zero failures -- indistinguishable from a suite with no
+     * cases. Exit 2 is now accompanied by the candidates that were tried, so
+     * the next occurrence names the paths instead of shrugging. */
+    static const char *const CARD_DB_CANDIDATES[] = {
+        "src", "cards/build", "../cards/build", "../../cards/build",
+        "../../../cards/build"
+    };
+    int loaded = 0;
+    for (size_t i = 0; i < sizeof CARD_DB_CANDIDATES / sizeof *CARD_DB_CANDIDATES; i++)
+        if (rb_load(CARD_DB_CANDIDATES[i]) == 0) { loaded = 1; break; }
+    if (!loaded) {
+        fprintf(stderr, "cannot load card db; tried, in order:");
+        for (size_t i = 0; i < sizeof CARD_DB_CANDIDATES / sizeof *CARD_DB_CANDIDATES; i++)
+            fprintf(stderr, " %s", CARD_DB_CANDIDATES[i]);
+        fprintf(stderr, "\n");
         return 2;
     }
     /* Debug escape hatch: RB_AUDIT_NO_FORK=1 runs the cases in-process so a

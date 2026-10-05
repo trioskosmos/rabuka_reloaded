@@ -319,15 +319,88 @@ void rb_queue_set_entry_trigger(GameState *g, int entry_index, const char *trigg
     queue_set_entry_trigger(&g->queue, entry_index, trigger, moved_cards, n_moved);
 }
 
-int rb_queue_push_with_trigger(RbAbilityQueue *q, int card_id, int ability_idx,
-                               const char *trigger, const int *moved_cards, int n_moved)
-{
-    if (!q || q->n_entries >= RB_QUEUE_DEPTH) return 0;
-    int index = q->n_entries;
-    if (!rb_queue_push(q, card_id, ability_idx)) return 0;
-    queue_set_entry_trigger(q, index, trigger, moved_cards, n_moved);
-    return 1;
-}
+/* ── rb_queue_push_with_trigger — DELETED 2026-10-05 (zero callers, Rust proof)
+ *
+ * It was `rb_queue_push(RbAbilityQueue*, ...)` followed by
+ * `queue_set_entry_trigger` on the index it had just appended, and it had ZERO C
+ * callers anywhere under src/ or tests/. Zero C callers does NOT prove deadness,
+ * so the Rust side was searched before deleting, and the search is what decides
+ * this:
+ *
+ *   Rust has NO free function with this shape. There is no
+ *   `push_with_trigger` / `enqueue_with_trigger` anywhere in engine/src -- the
+ *   whole grep over ability/queue.rs and core/game_state/abilities.rs returns the
+ *   two constructor helpers AbilityQueueEntry::new (queue.rs:45) and
+ *   ::from_parts (queue.rs:50), and those BUILD an entry; they do not enqueue one.
+ *
+ *   Every Rust enqueue goes through trigger_auto_ability (abilities.rs:1239-1293)
+ *   into enqueue_printed_ability (:1282-1326) or enqueue_gained_ability
+ *   (:1331-1376), and BOTH take `player_id: String` and BOTH write it into the
+ *   entry's `player_id` field. So the capability this C function appeared to
+ *   offer -- "push an entry and stamp a trigger on it" -- is not a thing Rust
+ *   has, because in Rust the two are not separable: an entry with a trigger_type
+ *   and an entry with an owner are the same object, built by the same call.
+ *
+ *   The C function was therefore not a port with a missing caller. It was a
+ *   HALF of one: it could stamp a trigger and could not stamp an owner, which is
+ *   why src/turn/triggers.c:87 records that an entry pushed this way "leaves
+ *   player_id empty" and why the production scans all go through
+ *   rb_push_owned_entry (triggers.c:122) instead. Wiring this one in would
+ *   reintroduce exactly the unowned entry the owner-scoped drain cannot see
+ *   (rb_process_player_abilities_depth_full scans on
+ *   `player_id[0] == '\0' || !strcmp(.., player_id)`, game_state_abilities.c:3958
+ *   -3962), so there is no call site it could be wired into CORRECTLY.
+ *
+ * The surviving spelling of "push an entry with its trigger AND its owner" is
+ * rb_queue_enqueue + rb_queue_set_entry_trigger, which is what
+ * rb_push_owned_entry (triggers.c:122-132) does and what all four Rust enqueue
+ * paths map onto.
+ *
+ * The declaration in include/rabuka.h is another agent's file and is deliberately
+ * left in place: no translation unit references it, so it links, and removing it
+ * would mean editing a header this change does not own. */
+
+/* ── rb_queue_save_pending_actions — DELETED 2026-10-05 (count-only C form)
+ *
+ * Its Rust twin is LIVE, and the C site that mirrors it is LIVE, but the two are
+ * not the same function and this one is not the port:
+ *
+ *   engine/src/ability/queue.rs:544  save_pending_actions(&mut self, actions: Vec<AbilityEffect>)
+ *   the only production caller in all of engine/src:
+ *   engine/src/ability/compound/conditional_on.rs:43
+ *       let mut finish = effect.clone();
+ *       finish.compound.primary_effect = None;
+ *       finish.condition = None;
+ *       gs.ability_queue.save_pending_actions(vec![finish]);
+ *
+ *   That caller is `if resolver.awaiting.choice.is_some()` immediately after
+ *   `resolver.execute_effect(gs, primary)` -- i.e. the PRIMARY action stopped on
+ *   a prompt, so the tail of the conditional is parked to be re-entered when the
+ *   answer arrives.
+ *
+ *   The C counterpart of that exact site is src/ability/compound.c:693-699
+ *   (rb_compound_conditional_on_result), and it is already wired:
+ *       AbilityEffect finish = clone_effect(eff);
+ *       finish.primary_effect = NULL;
+ *       ...
+ *       rb_queue_extend_pending_actions(g, rest, 1);
+ *   rb_queue_extend_pending_actions IS save_pending_actions's body -- Rust's
+ *   `pending_actions.extend(actions)` at queue.rs:546. So the Rust capability is
+ *   present, present at the right site, and exercised.
+ *
+ * Why the count-only form cannot be it: `rb_queue_save_pending_actions(GameState*,
+ * int count)` cannot name WHICH effects to append. It re-derives them from the
+ * entry's own continuation list (queue_resolve_continuation_effects,
+ * ability_queue.c:924), which is a different mechanism from Rust's, where the
+ * caller hands over the effect it just built. The one file that documents that
+ * limitation is this one, at ability_queue.c:68. A caller holding a freshly built
+ * `finish` -- which is exactly what conditional_on.rs:43 holds -- has no way to
+ * express it through a count, so there is no site where this signature is the
+ * faithful spelling. Keeping it was keeping a second, weaker way to say the same
+ * thing, with the weaker one untested.
+ *
+ * The declaration in include/rabuka.h is left in place for the same reason as
+ * above: no translation unit references it, and rabuka.h is not this change's. */
 
 int rb_queue_make_entry(GameState *g, int card_id, int ability_idx) {
     if (!g || g->queue.n_entries >= RB_QUEUE_DEPTH) return -1;
@@ -972,23 +1045,9 @@ void rb_queue_set_pending_actions(GameState *g, int count) {
     rb_queue_store_pending_actions(g, src, n);
 }
 
-/* queue.rs:539-546 `save_pending_actions(actions)` — APPEND to the current
-    entry's pending list, and return early when there is nothing to append.
-
-    The early return is Rust's `if actions.is_empty() { return; }` and it is
-    load-bearing, not a micro-optimisation: save must never CLEAR a batch that is
-    already parked. The count-only C form keeps that shape, and — unlike the
-    previous body — appends real deep clones rather than NULL markers. */
-void rb_queue_save_pending_actions(GameState *g, int count) {
-    if (!g || count <= 0) return;            /* Rust: actions.is_empty() -> return */
-    int cur = g->queue.cur;
-    if (cur < 0 || cur >= g->queue.n_entries) return;
-    if (count > RB_ENTRY_PENDING_CAP) count = RB_ENTRY_PENDING_CAP;
-    AbilityEffect *src[RB_ENTRY_PENDING_CAP];
-    int n = queue_resolve_continuation_effects(g, src, count);
-    if (n <= 0) return;                      /* nothing real to append; keep the batch */
-    rb_queue_extend_pending_actions(g, src, n);
-}
+/* ── rb_queue_save_pending_actions — DELETED. See the tombstone above; the Rust
+    capability it duplicated is rb_queue_extend_pending_actions, which compound.c:698
+    already calls at the one site Rust calls it (conditional_on.rs:43). */
 
 /* Take the pending list out (Rust take_pending_actions returns Vec). Returns
     the count; the caller takes ownership of the popped effect pointers.

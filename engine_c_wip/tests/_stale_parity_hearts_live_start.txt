@@ -1,0 +1,507 @@
+make t-nogate: running T=parity_hearts_live_start WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_hearts_live_start src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_hearts_live_start.c
+./rb_verdict ./rb_engine_t_parity_hearts_live_start parity_hearts_live_start
+ok: MIRACLE NEW STORY occupies the live-card zone
+ok: MIRACLE NEW STORY carries a ライブ開始時 ability
+FAIL:  a_area_moved_member_pl_sp_bp5_024_l
+ok: member that did not move areas gains nothing
+ok: opponent movement does not qualify the opponent's own member
+ok: required-heart02 total 4 >= 4 -> gain one heart02 until live end
+ok: aggregate heart02 total 0 < 4 -> no gain
+ok: empty live zone -> no heart04
+ok: aggregate == 4 satisfies >=4 -> heart04 granted
+ok: aggregate 3 < 4 -> no grant
+ok: empty live zone -> no heart05
+ok: aggregate == 4 satisfies >=4
+ok: aggregate 2 < 4 -> no grant
+ok: single MIRACLE WAVE (12) -> exactly +2 all-heart
+ok: Riko: heart02 slot stays 0
+ok: Riko: heart04 slot stays 0
+ok: Riko: heart05 slot stays 0
+ok: 2x MIRACLE WAVE (24) -> +2 all-heart
+ok: Riko: heart02 slot stays 0
+ok: Riko: heart04 slot stays 0
+ok: Riko: heart05 slot stays 0
+ok: a non-Aqours live card in the zone -> all_members check fails
+ok: Riko: heart02 slot stays 0
+ok: Riko: heart04 slot stays 0
+ok: Riko: heart05 slot stays 0
+ok: 3x SD live (3 each = 9 < 12) -> condition fails, no hearts
+ok: Riko: heart02 slot stays 0
+ok: Riko: heart04 slot stays 0
+ok: Riko: heart05 slot stays 0
+ok: MIRACLE WAVE + 2x SD (18 >= 12) -> +2 all-heart
+ok: Riko: heart02 slot stays 0
+ok: Riko: heart04 slot stays 0
+ok: Riko: heart05 slot stays 0
+ok: empty live zone -> no hearts
+ok: Riko: heart02 slot stays 0
+ok: Riko: heart04 slot stays 0
+ok: Riko: heart05 slot stays 0
+ok: 2x MIRACLE WAVE + SD (27 >= 12) -> +2 all-heart
+ok: Riko: heart02 slot stays 0
+ok: Riko: heart04 slot stays 0
+ok: Riko: heart05 slot stays 0
+ok: 3x SD (9) stays below the 12 threshold
+ok: Riko: heart02 slot stays 0
+ok: Riko: heart04 slot stays 0
+ok: Riko: heart05 slot stays 0
+ok: 4x SD (exactly 12) -> +2 all-heart
+ok: the lone Aqours member's hearts become heart04
+ok: non-Aqours member untouched
+ok: no Aqours member -> nothing transformed
+ok: optional discard gate must be offered
+ok: the OTHER stage member gains heart01 until live end
+ok: exclude_self: the ability holder gains nothing
+ok: declined -> no heart gain
+ok: optional energy cost prompted
+FAIL:  a_hs_pr_029_pr_paid_energy
+ok: energy was consumed
+ok: declined energy -> no heart01
+FAIL:  a_cooking_bp7_028_l_condition_branches
+ok: a member WITH a blade heart does not satisfy the no-blade-heart prong
+ok: a LIVE card alone must not satisfy the AND condition
+ok: a blade-less member alone must not satisfy the AND condition
+ok: a member with a blade heart alone must not satisfy the condition
+ok: non-虹ヶ咲 discard cards must not satisfy the condition
+ok: setup: the discard starts empty
+ok: cards on stage (not in discard) must not satisfy the discard condition
+FAIL:  a_cooking_bp7_028_l_accept_and_decline
+ok: a non-虹ヶ咲 member must NOT gain heart01
+ok: declining must leave the discard untouched
+ok: declining must not touch the deck
+ok: declining must not grant heart01
+ok: the discarded member should remain in the discard after declining
+ok: a 5-blade 虹ヶ咲 member gains exactly +2 heart02
+ok: no other heart colour should be gained
+ok: Fire Bird must NOT grant blades (defect D19 granted +4 blade)
+ok: exactly-4-blade member is eligible
+ok: and still gains no blade
+FAIL:  a_fire_bird_four_blade_group_heart02
+ok: and gains no blade
+ok: a non-虹ヶ咲 4-blade member must be excluded by the group filter
+ok: current blade total (3 printed + 1 modifier = 4) satisfies >= 4
+ok: waited members are still on the stage and eligible
+ok: multiple eligible members should require a selection prompt
+ok: exactly one of the two eligible members gains +2 heart02
+ok: no blade gain regardless of selection
+FAIL:  b_himeno_bp5_006_same_group_pair
+ok: 1 蓮ノ空 + 1 Printemps = no matching pair -> auto-skip
+ok: himeno heart01 after the cost is paid or skipped
+ok: only 1 same-group card in hand -> need 2 -> auto-skip
+ok: himeno heart01 after the cost is paid or skipped
+ok: two no-group cards share no group name -> auto-skip
+ok: himeno heart01 after the cost is paid or skipped
+FAIL:  b_himeno_bp5_006_skip_cost
+ok: declining the cost grants no heart01
+ok: both cost cards stay in hand after declining
+FAIL:  b_himeno_bp5_006_cost_moves_cards_to_waitroom
+FAIL:  b_himeno_bp5_006_stage_area_irrelevant
+ok: 1 蓮ノ空 + 1 Printemps = no matching pair -> no cost prompt
+ok: no heart01 should be granted when the cost is auto-skipped
+ok: only no-group cards in hand -> no cost prompt
+ok: no heart01 should be granted when the cost is auto-skipped
+ok: empty hand -> no cost prompt
+ok: no heart01 without the cost
+FAIL:  b_himeno_bp5_006_rarity_variants
+ok: the optional hand-discard cost prompts for a card
+ok: the target prompt is a stage SelectCard
+FAIL:  b_rurino_bp5_003_discard_group_filter
+ok: rurino (みらくらぱーく!) gets +1 heart01
+ok: μ's Printemps member gets no heart01
+ok: the OTHER matching member is unselected and gets nothing
+ok: the cost prompt appears
+FAIL:  b_rurino_bp5_003_cross_unit_same_group
+ok: rurino gets +1 heart01
+ok: trois (スリーズブーケ) was not selected and gets nothing
+ok: no pending choices after setup
+FAIL:  b_himeno_bp5_006_hand_pair_filter
+ok: the lone-group card stays in hand
+ok: bp6 should prompt for an any-number discard
+FAIL:  b_bp6_001_r_discard_distinct_heart_colors
+ok: H01 was not present on either card
+ok: H03 was not present on either card
+ok: bp6 prompts for the any-number discard
+ok: H01 must NOT come from the unselected kotori
+ok: H03 must NOT come from the unselected kotori
+ok: bp6 prompts even with one eligible card
+FAIL:  b_umi_bp3_013_n_per_success_card
+ok: the per-unit heart gain must resolve without a further prompt
+ok: the live-start heart01 modifier reaches the stage-heart aggregate
+ok: setup: P1 success zone starts empty
+ok: setup: P2 success zone starts empty
+FAIL:  b_setsuna_bp5_007_equal_success_counts
+ok: the member's hearts are converted to heart01
+ok: the live card must NOT be given a heart colour multiplier
+ok: at least 2 heart01 after the conversion
+ok: the conversion preserves the total heart count at 2
+ok: all 3 hearts become heart01 after the transform
+ok: the original heart04 slot is 0 after the transform
+ok: the total heart count is unchanged at 3
+ok: two eligible members must raise a stage selection prompt
+FAIL:  b_hs_bp5_021_l_convert_selected_member
+ok: the live card is NOT converted
+ok: three eligible members raise a stage SelectCard
+ok: the left member is NOT converted
+ok: the right member is NOT converted
+ok: no 蓮ノ空 member on stage -> no conversion at all
+ok: with only 1 eligible member the target is auto-selected (no stage prompt)
+ok: the 蓮ノ空 member is converted
+ok: the non-蓮ノ空 member is NOT converted
+ok: during the live: +2 all-heart (MIRACLE WAVE total 12 >= 12)
+ok: the all-heart must be cleared after LiveVictoryDetermination (duration = live_end)
+
+196 assertions, 64 failures
+FAILED: parity_hearts_live_start  [exit=1, 81 result line(s): assert=81 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=17]
+
+FAIL: area-moved member gains the chosen heart until live end (got 3 expected 1)
+DEBUG [SET_HEART_APPLIED] heart_type=heart04 duration=live_end host_cid=2710
+DEBUG [SET_HEART_APPLIED] applied cid=2711 col=4 ht=heart04
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2716 ab=0 actor=0 action=gain_resource
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: paid -> heart01 until live end (got 0 expected 1)
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: LIVE card + blade-less member in discard -> the may-shuffle offer appears (got 0 expected 1)
+FAIL: the may-shuffle option is offered
+FAIL: all discard cards should be shuffled to the deck bottom (got 3 expected 0)
+FAIL: 3 discard cards go back to deck (got 0 expected 3)
+FAIL: every shuffled card landed in the deck
+FAIL: 虹ヶ咲 member A gains heart01 (got 0 expected 1)
+FAIL: 虹ヶ咲 member B gains heart01 (got 0 expected 1)
+FAIL: the may-shuffle option is offered
+FAIL: blade-3 member must NOT receive heart02 (got 2 expected 0)
+FAIL: no gain with a 2-blade member (got 2 expected 0)
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0xa0018e010 eff=0x0 cur=0 n=1 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=0 slot=0 cid=2791 target=
+[CHOICE_RESUME_END] pending=0 state=0 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2794 ab=0 queued=1
+FAIL: a 蓮ノ空 pair in hand triggers the cost prompt (got 0 expected 1)
+FAIL: second selection prompt should appear
+FAIL: himeno heart01 after the cost is paid or skipped (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2799 ab=0 queued=1
+FAIL: a pair whose group differs from the holder's still qualifies (got 0 expected 1)
+FAIL: second selection prompt should appear
+FAIL: himeno heart01 after the cost is paid or skipped (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2804 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2809 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2814 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2819 ab=0 queued=1
+FAIL: cross-unit same-group pair (みらくらぱーく! + スリーズブーケ) (got 0 expected 1)
+FAIL: second selection prompt should appear
+FAIL: himeno heart01 after the cost is paid or skipped (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2824 ab=0 queued=1
+FAIL: the payable cost prompts
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2829 ab=0 queued=1
+FAIL: the cost prompt appears
+FAIL: the second selection prompt appears
+FAIL: both paid cost cards land in the waitroom
+FAIL: paying the pair costs 2 heart01 (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2834 ab=0 queued=1
+FAIL: himeno in the left area still pays the pair cost (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2839 ab=0 queued=1
+FAIL: himeno in the center area still pays the pair cost (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2844 ab=0 queued=1
+FAIL: himeno in the right area still pays the pair cost (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2849 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2854 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2859 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2862 ab=0 queued=1
+FAIL: the variant's cost prompt appears
+FAIL: PL!HS-bp5-006-P: paying the pair grants heart01 x2 (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2867 ab=0 queued=1
+FAIL: the variant's cost prompt appears
+FAIL: PL!HS-bp5-006-AR: paying the pair grants heart01 x2 (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2872 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2872 ab=1 actor=0 action=gain_resource
+FAIL: only みらくらぱーく! members (hs@0, rurino@1) are selectable, not Printemps@2
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0xa00190820 eff=0x0 cur=0 n=1 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=1 slot=1 cid=2872 target=
+[CHOICE_RESUME_END] pending=0 state=0 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2878 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2878 ab=1 actor=0 action=gain_resource
+FAIL: all three 蓮ノ空 members are selectable across different units
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0xa00192f20 eff=0x0 cur=0 n=1 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=1 slot=1 cid=2878 target=
+[CHOICE_RESUME_END] pending=0 state=0 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=3 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2884 ab=0 queued=1
+FAIL: the cost prompt should appear as a hand SelectCard
+FAIL: the same-group pair cost is a card selection prompt
+FAIL: only the 蓮ノ空 pair (indices 0,1) is selectable, not the lone Printemps card
+FAIL: second selection prompt should appear
+FAIL: both same-group cards go to the waitroom
+FAIL: the activating card gains 2 heart01 (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=3 hand_after=4
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2890 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=0 zone=hand target=
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: H02 from dia (got 0 expected 1)
+FAIL: H04 from kosuzu (got 0 expected 1)
+FAIL: H05 is shared and is counted ONCE (got 0 expected 1)
+FAIL: H06 from kosuzu (got 0 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=4 hand_after=5
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2895 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=0 zone=hand target=
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: H02 from dia (subset case) (got 0 expected 1)
+FAIL: H04 from kosuzu (subset case) (got 0 expected 1)
+FAIL: H05 shared (subset case) (got 0 expected 1)
+FAIL: H06 from kosuzu (subset case) (got 0 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2901 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: H04 from the single kosuzu (got 0 expected 1)
+FAIL: H05 from the single kosuzu (got 0 expected 1)
+FAIL: H06 from the single kosuzu (got 0 expected 1)
+FAIL: 3 distinct hearts from the single kosuzu card (got 0 expected 3)
+FAIL: Umi's ability should create a heart-colour choice at live start
+FAIL: gained 3 heart01 (1 per 3 success-zone cards) (got 0 expected 3)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2907 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2908 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2907 ab=0 actor=0 action=gain_resource
+[QUEUE_EXEC] idx=1 n=2 cid=2908 ab=1 actor=0 action=gain_resource
+FAIL: Q230: both success counts are 0 -> heart02 x2 gained (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2910 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2911 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2910 ab=0 actor=0 action=gain_resource
+[QUEUE_EXEC] idx=1 n=2 cid=2911 ab=1 actor=0 action=gain_resource
+FAIL: unequal success counts (P1=2, P2=1) -> condition fails -> no heart02 (got 2 expected 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2913 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2914 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2913 ab=0 actor=0 action=gain_resource
+[QUEUE_EXEC] idx=1 n=2 cid=2914 ab=1 actor=0 action=gain_resource
+FAIL: PL!N-bp5-007-AR: equal zero success counts should grant heart02 twice (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2916 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2917 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2916 ab=0 actor=0 action=gain_resource
+[QUEUE_EXEC] idx=1 n=2 cid=2917 ab=1 actor=0 action=gain_resource
+FAIL: PL!N-bp5-007-P: equal zero success counts should grant heart02 twice (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2919 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2920 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2919 ab=0 actor=0 action=gain_resource
+[QUEUE_EXEC] idx=1 n=2 cid=2920 ab=1 actor=0 action=gain_resource
+FAIL: PL!N-bp5-007-SEC: equal zero success counts should grant heart02 twice (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2922 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2922 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2923 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=3 cid=2922 ab=0 actor=0 action=set_heart_type
+DEBUG [SET_HEART_APPLIED] heart_type=heart01 duration=live_end host_cid=2922
+DEBUG [SET_HEART_APPLIED] applied cid=2923 col=1 ht=heart01
+[QUEUE_EXEC] idx=1 n=3 cid=2922 ab=1 actor=0 action=modify_score
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=2 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2925 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2925 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2925 ab=0 actor=0 action=set_heart_type
+DEBUG [SET_HEART_APPLIED] heart_type=heart01 duration=live_end host_cid=2925
+DEBUG [SET_HEART_APPLIED] applied cid=2926 col=1 ht=heart01
+[QUEUE_EXEC] idx=1 n=2 cid=2925 ab=1 actor=0 action=modify_score
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2928 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2928 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2930 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=3 cid=2928 ab=0 actor=0 action=set_heart_type
+[RESUME_ANY] kind=1 zone=stage target=heart_type route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00198e20 target=0x0 eff=0xa00198e20 cur=1 n=3 state=3 pending=1
+[RESUME_EXEC] def=0xa00198e20 action=set_heart_type is_cost=0 host=2928
+DEBUG [SET_HEART_APPLIED] heart_type=heart01 duration=live_end host_cid=2928
+DEBUG [SET_HEART_APPLIED] applied cid=2930 col=1 ht=heart01
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=1 n=3 cid=2928 ab=1 actor=0 action=modify_score
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=2 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the FIRST selectable member is the one converted (got -1 expected 1)
+FAIL: the unselected member is NOT converted (got 1 expected -1)
+FAIL: the converted member is the first filtered index offered (got 0 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2932 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2932 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2933 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2934 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2935 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=5 cid=2932 ab=0 actor=0 action=set_heart_type
+[RESUME_ANY] kind=1 zone=stage target=heart_type route=0 mode=0 idx=1
+[RESUME_CAPTURE] def=0xa0019f320 target=0x0 eff=0xa0019f320 cur=1 n=5 state=3 pending=1
+[RESUME_EXEC] def=0xa0019f320 action=set_heart_type is_cost=0 host=2932
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=stage target=heart_type route=0 mode=0 idx=-1
+[RESUME_CAPTURE] def=0xa001a4030 target=0x0 eff=0xa001a4030 cur=1 n=5 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=1 n=5 cid=2932 ab=1 actor=0 action=modify_score
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=2 n=5 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=3 n=5 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=4 n=5 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the CENTRE member (picked index 1) is converted (got -1 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2937 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2937 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2937 ab=0 actor=0 action=set_heart_type
+[QUEUE_EXEC] idx=1 n=2 cid=2937 ab=1 actor=0 action=modify_score
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001ad320 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2940 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2940 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2942 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2941 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=4 cid=2940 ab=0 actor=0 action=set_heart_type
+DEBUG [SET_HEART_APPLIED] heart_type=heart01 duration=live_end host_cid=2940
+DEBUG [SET_HEART_APPLIED] applied cid=2941 col=1 ht=heart01
+[QUEUE_EXEC] idx=1 n=4 cid=2940 ab=1 actor=0 action=modify_score
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=2 n=4 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=3 n=4 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2944 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2944 ab=1 actor=0 action=gain_resource
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=6
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,2,0,2,2,0,2]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,4,0,4,4,0,0] filled=[0,0,4,0,2,2,0,0]
+[EARLY_SEAT] pl=0 won=0 no_excess=0 surplus=-1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,2,0,2,2,0,2]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,4,0,4,4,0,0] filled=[0,0,4,0,2,2,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[CAN_PLACE_DECODE] cid=2946 ability=0 constant=0 trigger=ライブ成功時 action=modify_score dest=-
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=2946 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_WAITROOM_BATCH] n=1
+[QUEUE_PID_NORMALIZE] entry=0 card=2944 ab=0 'player1' -> 'p1'
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

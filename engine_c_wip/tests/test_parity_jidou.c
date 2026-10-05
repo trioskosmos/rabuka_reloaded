@@ -339,7 +339,7 @@ static    TestGame game;
 
 static void test_baton_displaced_self_placed_under_liella_arriver_grants_host_blade(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int kanon = test_id(&game, KANON);
@@ -367,7 +367,7 @@ static void test_baton_displaced_self_placed_under_liella_arriver_grants_host_bl
 
 static void test_self_stage_to_waitroom_recovers_group_live(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int kasumi = test_id(&game, KASUMI);
@@ -387,7 +387,7 @@ static void test_self_stage_to_waitroom_recovers_group_live(void)
 
 static void test_other_member_stage_to_waitroom_does_not_trigger_self_live_recovery(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int kasumi = test_id(&game, KASUMI);
@@ -408,7 +408,7 @@ static void test_other_member_stage_to_waitroom_does_not_trigger_self_live_recov
 
 static void test_self_stage_to_waitroom_draw_two_discard_one(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int toko = test_id(&game, TOKO);
@@ -426,7 +426,7 @@ static void test_self_stage_to_waitroom_draw_two_discard_one(void)
 
 static void test_self_stage_to_waitroom_draws_then_discards_exact_two(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int rurino = test_id(&game, RURINO);
@@ -464,7 +464,7 @@ static void test_self_stage_to_waitroom_draws_then_discards_exact_two(void)
 
 static void test_self_stage_to_waitroom_look_five_adds_live_to_hand(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int yuiguri = test_id(&game, YUIGURI);
@@ -485,7 +485,7 @@ static void test_self_stage_to_waitroom_look_five_adds_live_to_hand(void)
 
 static void test_self_stage_to_waitroom_optional_discard_grants_heart05_and_blade(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int sayaka = test_id(&game, SAYAKA);
@@ -509,7 +509,7 @@ static void test_self_stage_to_waitroom_optional_discard_grants_heart05_and_blad
 
 static void test_group_baton_replacement_places_energy_under_arriving_member(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int setsuna = test_id(&game, SETSUNA);
@@ -792,7 +792,7 @@ static void trigger_stage_to_waitroom_auto(TestGame *tg, int rino)
 
 static void test_leaves_stage_repositions_opponent_member_q238(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int rino = test_id(&game, OSAWA_RINO);
@@ -819,7 +819,7 @@ static void test_leaves_stage_repositions_opponent_member_q238(void)
 
 static void test_leaves_stage_position_change_without_other_members_skips_q238(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int rino = test_id(&game, OSAWA_RINO);
@@ -838,7 +838,7 @@ static void test_leaves_stage_position_change_without_other_members_skips_q238(v
 
 static void test_leaves_stage_position_change_offers_both_players_members_q238(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int rino = test_id(&game, OSAWA_RINO);
@@ -864,7 +864,7 @@ static void test_leaves_stage_position_change_offers_both_players_members_q238(v
 
 static void test_leaves_stage_declined_position_change_preserves_opponent_position(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int rino = test_id(&game, OSAWA_RINO);
@@ -895,7 +895,7 @@ static void test_leaves_stage_declined_position_change_preserves_opponent_positi
 
 static void test_stage_to_discard_ability_triggers_only_on_baton_touch(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int honoka = test_id(&game, HONOKA);
@@ -933,7 +933,7 @@ static void test_stage_to_discard_ability_triggers_only_on_baton_touch(void)
 
 static void test_kohaku_stage_to_discard_triggers_ability(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int kohaku = test_id(&game, KOHAKU);
@@ -957,7 +957,7 @@ static void test_kohaku_stage_to_discard_triggers_ability(void)
 
 static void test_kohaku_baton_touch_triggers_ability(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int kohaku = test_id(&game, KOHAKU);
@@ -984,7 +984,7 @@ static void test_kohaku_baton_touch_triggers_ability(void)
 
 static void test_kohaku_baton_touch_selects_member_from_deck(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int kohaku = test_id(&game, KOHAKU);
@@ -1019,7 +1019,7 @@ static void test_kohaku_baton_touch_selects_member_from_deck(void)
 
 static void test_hanabiko_stage_to_discard_triggers_ability(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int hanabiko = test_id(&game, HANABIKO);
@@ -1055,7 +1055,7 @@ static void test_hanabiko_stage_to_discard_triggers_ability(void)
 
 static void test_hanabiko_static_stage_no_trigger(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int hanabiko = test_id(&game, HANABIKO);
@@ -1078,7 +1078,7 @@ static void test_hanabiko_static_stage_no_trigger(void)
 
 static void test_hanabiko_static_discard_no_trigger(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int hanabiko = test_id(&game, HANABIKO);
@@ -1098,7 +1098,7 @@ static void test_hanabiko_static_discard_no_trigger(void)
 
 static void test_hanabiko_hand_to_discard_no_trigger(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int hanabiko = test_id(&game, HANABIKO);
@@ -1120,7 +1120,7 @@ static void test_hanabiko_hand_to_discard_no_trigger(void)
 
 static void test_hanabiko_stage_to_deck_no_trigger(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int hanabiko = test_id(&game, HANABIKO);
@@ -1145,7 +1145,7 @@ static void test_hanabiko_stage_to_deck_no_trigger(void)
 
 static void test_hanabiko_decline_discard_no_retrieval(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int hanabiko = test_id(&game, HANABIKO);
@@ -1168,7 +1168,7 @@ static void test_hanabiko_decline_discard_no_retrieval(void)
 
 static void test_hanabiko_baton_touch_replaced_triggers(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int hanabiko = test_id(&game, HANABIKO);

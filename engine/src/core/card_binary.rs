@@ -148,6 +148,9 @@ fn decode_card_from_record(rec: &[u8], strtab: &[u8]) -> Option<Card> {
 
     let card_no: ArcStr = get_str(card_no_idx).into();
     let name: ArcStr = get_str(name_idx).into();
+    // The blob has no name_key field yet, so derive it exactly as the JSON path
+    // does. Computed before `name` is moved into the Card below.
+    let name_key: ArcStr = super::card::CardDatabase::normalize_name(name.as_ref()).into();
 
     let series: Box<str> = get_str(series_idx).into();
     let group: Box<str> = {
@@ -207,6 +210,7 @@ fn decode_card_from_record(rec: &[u8], strtab: &[u8]) -> Option<Card> {
     Some(Card {
         card_no,
         name,
+        name_key,
         #[cfg(not(feature = "compact_cards"))]
         img: if img_idx != 0 {
             Some(get_str(img_idx).into())

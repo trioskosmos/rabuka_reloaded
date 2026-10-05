@@ -1,0 +1,254 @@
+[
+ {
+  "suite": "parity_required_hearts",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 52,
+  "verdict": "FAILED: parity_required_hearts  [exit=1, 51 result line(s): assert=25 vacuous=26 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=37]"
+ },
+ {
+  "suite": "parity_hearts_constants",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 24,
+  "verdict": "FAILED: parity_hearts_constants  [exit=1, 23 result line(s): assert=23 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=6]"
+ },
+ {
+  "suite": "parity_hearts_live_start",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 82,
+  "verdict": "FAILED: parity_hearts_live_start  [exit=1, 81 result line(s): assert=81 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=17]"
+ },
+ {
+  "suite": "parity_condition_and_effect",
+  "rc": 1,
+  "shape": "checks_failures",
+  "cases": 391,
+  "cfail": 41,
+  "FAIL": 61,
+  "verdict": "FAILED: parity_condition_and_effect  [exit=1, 60 result line(s): assert=60 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=19]"
+ },
+ {
+  "suite": "parity_conditional_gated",
+  "rc": 0,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 70,
+  "verdict": "FAILED: parity_conditional_gated  [exit=0, 69 result line(s): assert=69 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=25]"
+ },
+ {
+  "suite": "parity_sequential",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 136,
+  "verdict": "FAILED: parity_sequential  [exit=1, 135 result line(s): assert=135 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=29]"
+ },
+ {
+  "suite": "parity_integration",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 40,
+  "verdict": "FAILED: parity_integration  [exit=1, 39 result line(s): assert=39 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=11]"
+ },
+ {
+  "suite": "parity_small_clusters",
+  "rc": 0,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 101,
+  "verdict": "FAILED: parity_small_clusters  [exit=0, 100 result line(s): assert=100 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=39]"
+ },
+ {
+  "suite": "parity_cce_gaps",
+  "rc": 32,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 81,
+  "verdict": "FAILED: parity_cce_gaps  [exit=32, 80 result line(s): assert=80 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=32]"
+ },
+ {
+  "suite": "parity_under_member",
+  "rc": 0,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 82,
+  "verdict": "FAILED: parity_under_member  [exit=0, 81 result line(s): assert=81 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=27]"
+ },
+ {
+  "suite": "parity_zones_position",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 30,
+  "verdict": "FAILED: parity_zones_position  [exit=1, 29 result line(s): assert=29 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=8]"
+ },
+ {
+  "suite": "parity_zone_source",
+  "rc": 0,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 50,
+  "verdict": "FAILED: parity_zone_source  [exit=0, 49 result line(s): assert=49 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=21]"
+ },
+ {
+  "suite": "parity_jidou_watch",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 74,
+  "verdict": "FAILED: parity_jidou_watch  [exit=1, 73 result line(s): assert=73 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=21]"
+ },
+ {
+  "suite": "parity_jidou_watch_clusters",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 76,
+  "verdict": "FAILED: parity_jidou_watch_clusters  [exit=1, 75 result line(s): assert=75 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=16]"
+ },
+ {
+  "suite": "parity_jidou_move_yell",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 67,
+  "verdict": "FAILED: parity_jidou_move_yell  [exit=1, 66 result line(s): assert=66 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=28]"
+ },
+ {
+  "suite": "parity_live_total",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 51,
+  "verdict": "FAILED: parity_live_total  [exit=1, 50 result line(s): assert=50 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=18]"
+ },
+ {
+  "suite": "parity_live_total2",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 13,
+  "verdict": "FAILED: parity_live_total2  [exit=1, 12 result line(s): assert=12 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=5]"
+ },
+ {
+  "suite": "parity_recover_live",
+  "rc": 19,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 53,
+  "verdict": "FAILED: parity_recover_live  [exit=19, 52 result line(s): assert=52 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=19]"
+ },
+ {
+  "suite": "parity_int_gaps",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 42,
+  "verdict": "FAILED: parity_int_gaps  [exit=1, 41 result line(s): assert=41 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=11]"
+ },
+ {
+  "suite": "parity_wave1a",
+  "rc": 1,
+  "shape": "cases_only",
+  "cases": 8,
+  "cfail": null,
+  "FAIL": 39,
+  "verdict": "FAILED: parity_wave1a  [exit=1, 38 result line(s): assert=38 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=13]"
+ },
+ {
+  "suite": "parity_wave1b",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 28,
+  "verdict": "FAILED: parity_wave1b  [exit=1, 27 result line(s): assert=27 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=9]"
+ },
+ {
+  "suite": "parity_wave1c",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 56,
+  "verdict": "FAILED: parity_wave1c  [exit=1, 55 result line(s): assert=55 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=13]"
+ },
+ {
+  "suite": "parity_full_round",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 45,
+  "verdict": "FAILED: parity_full_round  [exit=1, 44 result line(s): assert=44 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=44]"
+ },
+ {
+  "suite": "parity_full_round2",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 69,
+  "verdict": "FAILED: parity_full_round2  [exit=1, 68 result line(s): assert=68 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=68]"
+ },
+ {
+  "suite": "parity_full_round3",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 18,
+  "verdict": "FAILED: parity_full_round3  [exit=1, 17 result line(s): assert=17 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=17]"
+ },
+ {
+  "suite": "parity_cluster_d",
+  "rc": 0,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 0,
+  "verdict": "PASSED: parity_cluster_d  [exit=0, 0 result line(s), renormalised=0]"
+ },
+ {
+  "suite": "mechanics",
+  "rc": 0,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 0,
+  "verdict": "PASSED: mechanics  [exit=0, 0 result line(s), renormalised=0]"
+ },
+ {
+  "suite": "harness_self",
+  "rc": 1,
+  "shape": null,
+  "cases": null,
+  "cfail": null,
+  "FAIL": 4,
+  "verdict": "FAILED: harness_self  [exit=1, 3 result line(s): assert=3 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=1]"
+ }
+]

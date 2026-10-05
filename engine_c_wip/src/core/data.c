@@ -370,16 +370,129 @@ const char *rb_card_unit_name(int card_id) {
     return rb_card_string(unit_idx);
 }
 
-/* ability slice access for vm.c */
+/* ability slice access for vm.c
+   ── MEASURED 2026-10-05, all 985 slices ──────────────────────────────────────
+   The LENGTH axis IS checked, and it is the same check Rust makes: Rust's
+   get_ability (vm.rs:285-294) refuses to decode when `end > decompressed.len()`
+   and returns DecodeError::DecodeFailed; line 380 below is that same predicate
+   against `g_bc_len`. Census over idx 0..RBKA_NUM_ABILITIES:
+     RBKA_OFFSET_DELTAS sums to 98782 == RBKA_BYTECODE_LEN  (no drift)
+     ok=985  overrun=0  zero_delta=0  off_table_mismatch=0
+   So the 2026-09-30 byte-splice signature (one bad delta silently defaulting
+   every slice after it) is not reachable through this path today.
+
+   WHAT IS STILL WRONG, and is fixed here: `*out_len` was left UNWRITTEN on
+   both NULL returns. Measured before the fix: 0 of 8 out-of-range indices had
+   it written. rb_decode_ability (vm.c:1307-1311) and the empty-slice census
+   (vm.c:3191-3192) both declare `uint32_t len;` uninitialised and get away with
+   reading it only because `!slice || len == 0` short-circuits on the NULL — one
+   call site that tested `len` first would read a stack register. A function
+   with an out-parameter must define it on EVERY path.
+
+   `idx >= OFFSET_DELTAS.len()`, which Rust checks separately at vm.rs:262-267
+   because nothing forces the two generated constants to agree, has NO C
+   counterpart and needs none: there is no second length to disagree with.
+   RBKA_NUM_ABILITIES_C and RBKA_OFFSET_DELTAS[] are emitted by the SAME
+   tools/gen_from_rs.py run (gen_data.h), and gen_data_rom.c:36 declares the
+   array with `[RBKA_NUM_ABILITIES_C]`, so a stale count is a COMPILE error
+   rather than a runtime one. Both variants agree: gen_data_rom.c:52 aliases the
+   embedded array and gen_data_cdi.c:74-77 streams exactly RBKA_NUM_ABILITIES_C
+   entries into its own copy.
+
+   The one divergence that REMAINS, and is NOT in this file: Rust distinguishes
+   an empty slice (`start >= end` -> Ok(Ability::default()), vm.rs:272-274) from
+   an overrun (`Err`, vm.rs:290-293). Both arrive here as the same NULL, and
+   rb_decode_ability turns NULL into a default Ability with `return 1` and no
+   diagnostic (vm.c:1311). Collapsing the two is what makes an overrun silent.
+   That is one line in a translation unit this batch does not own. */
 const unsigned char *rb_bc_slice(uint32_t idx, uint32_t *out_len) {
+    if (out_len) *out_len = 0;
+    if (!g_bc || !g_offset_deltas) return NULL;
     if (idx >= RBKA_NUM_ABILITIES) return NULL;
     uint32_t start = 0;
     for (uint32_t i = 0; i < idx; i++) start += g_offset_deltas[i];
     uint32_t len = g_offset_deltas[idx];
-    *out_len = len;
-    if (start + len > g_bc_len) return NULL;
+    if (start + len > g_bc_len) return NULL;   /* vm.rs:285 — overrun */
+    if (out_len) *out_len = len;
     return g_bc + start;
 }
+
+/* ── THE EXTRAS WRITE PATH: WHICH KEYS CAN EVER BE READ BACK ────────────────
+ *
+ * Measured 2026-10-05 by decoding all 985 abilities and walking every effect
+ * (including primary / alternative / followup / optional / conditional /
+ * opponent / resource_on_select / gained_effect) at every nesting depth:
+ *
+ *   abilities=985  decode_fail=0  empty_slice=2  effects_with_tree=983
+ *   distinct extras keys populated = 128   total extras rows = 3070
+ *
+ * vm.c's generic scalar tail (vm.c:1190-1206) DOES store extras — it is not a
+ * dropped-extras tree, and nothing here should "fix" it. But the tail is only
+ * reached by keys no earlier branch `continue`d on, and the earlier branches
+ * are numerous. The consequence is the thing this note exists to record:
+ *
+ *   SIX KEYS ARE STORED IN A STRUCT FIELD AND NEVER AS AN EXTRA, because their
+ *   branch assigns the field and continues:
+ *
+ *     key              corpus occurrences   field vm.c        extra
+ *     source                    997             e->source       NEVER
+ *     destination               824             e->destination  NEVER
+ *     target                   1181             e->target       NEVER
+ *     count                    1779             e->count        NEVER
+ *     zone                        ?             e->source       NEVER
+ *     condition                  ?             e->condition    NEVER
+ *     action / type / cost_type  ?             e->action       NEVER
+ *     card_type                1226             e->card_type_field  NEVER
+ *     per_unit_count             76             e->per_unit_count   NEVER
+ *
+ *   Every `*_extra(e, "source"|"destination"|"target"|"count"|"card_type"|
+ *   "per_unit_count")` read in the tree is therefore PERMANENTLY NULL. There
+ *   are 30 `card_type` read sites and 6 each for `source` and `target`; all 42
+ *   return NULL every time.
+ *
+ *   ⛔ BUT `card_type` IS NOT THE EXCEPTION THE 2026-10-05 BRIEFING ASSUMED. It
+ *   is NOT "genuinely written to extras" — it is measured at 0 of 983 effects,
+ *   which is what vm.c:1115-1118 already said ("today the extras table never
+ *   holds a `card_type` at all -- 0 of 2230 effects"). The fallback reads
+ *   `card_type_field[0] ? card_type_field : fx_extra(e, "card_type")` are dead
+ *   in their SECOND arm only, and the field arm is authoritative and correct.
+ *
+ *   ⛔ ALSO NOTE THAT `card_type` must STAY unpopulated. vm.c:1120-1134 admits
+ *   only member_card / live_card / energy_card into the field and drops
+ *   everything else (Rust's `CardType::from_card_str` miss arm is `_ => None`,
+ *   core/card.rs:50-56); the corpus also spells it `card` 166 times and
+ *   `member` 1, which Rust cannot represent either. Populating the extra with
+ *   the RAW spelling would put `card` into RbCardFilter.card_type, where
+ *   `card_type == "card"` matches no card and empties the candidate set.
+ *
+ *   WHY NO SUITE COUNT IS WRONG DESPITE 42 DEAD READ SITES: each of these nine
+ *   read sites tests the STRUCT FIELD FIRST and the extra is only the fallback.
+ *   A dead fallback cannot change a result. The one that was NOT written that
+ *   way was `draw.c` reading `source` with no field arm, and that is the bug
+ *   that cost ~10 prompts. The rule this encodes: a `*_extra` read on one of
+ *   these nine keys is CORRECT only if the struct field is consulted first; a
+ *   sole read is a wrong-value bug.
+ *
+ *   TWENTY-THREE MORE KEYS REACH THE WIRE, ARE NEVER STORED, AND HAVE NO STRUCT
+ *   TWIN -- those are real losses and the arms belong in vm.c:
+ *     operator 403, discard_remaining 76, dynamic_count 46, choice 8, delayed 6,
+ *     answers 5, ability_filter_triggers 5, remainder_destination 3,
+ *     cost_offset 3, card_names 3, lose_blade_hearts 2,
+ *     require_all_heart_colors 2, keep_shuffle_under 1, per_group_count 1,
+ *     or_ability_filters 1, heart_colors_from_selected_card 1, ref_value 1.
+ *   The read sites for those that sit in the six files this batch owns --
+ *   `card_names` and `or_ability_filters` and `ability_filter_triggers` and
+ *   `require_all_heart_colors` at core/card.c, `lose_blade_hearts` at
+ *   describe.c -- CANNOT be fixed read-side, because there is nothing left to
+ *   read. They are reported, not patched.
+ *
+ *   A separate, harmless class: 28 keys are read but neither populated NOR
+ *   present in cards/abilities.json (`group`, `resource_icon_count`,
+ *   `cost_operator`, `name_fragments`, `original_blade_limit`, …). Dead reads
+ *   with no data behind them; they cost nothing and lose nothing.
+ *
+ *   The census is reproducible: tools/zz_extras_census.c links against OBJ_LIB,
+ *   walks the same tree, and prints one ZZKEY line per populated key. */
 
 /* ── CardDatabase::get_card_id (card.rs:576-629) ──────────────────────────────
    The lookup is a five-step chain, reproduced here in Rust's order:

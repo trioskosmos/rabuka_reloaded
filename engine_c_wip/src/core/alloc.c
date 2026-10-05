@@ -197,6 +197,11 @@ static Condition *rb_condition_clone(const Condition *c) {
     if (!out) return NULL;
     out->variant = c->variant;
     for (uint32_t i = 0; i < c->n_fields; i++) {
+        /* Clamp at RB_MAX_COND_FIELD like every sibling loop below. Rust's
+           Condition::conditions is a Vec and cannot overflow, but the C's
+           `fields[]` is a fixed 64 array; a decoded source carrying more than
+           64 fields wrote straight past the end of the clone. */
+        if (out->n_fields >= RB_MAX_COND_FIELD) break;
         CondField *dst = &out->fields[out->n_fields];
         dst->key = rb_strdup_heap(c->fields[i].key);
         CondValue *value = rb_cond_value_clone(&c->fields[i].v);

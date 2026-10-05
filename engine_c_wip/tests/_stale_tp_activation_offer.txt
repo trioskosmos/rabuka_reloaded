@@ -1,0 +1,32 @@
+make t-nogate: running T=tp_activation_offer WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_tp_activation_offer src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_tp_activation_offer.c
+./rb_verdict ./rb_engine_t_tp_activation_offer tp_activation_offer
+DBG sayaka id=573 name='村野さやか' n_abilities=1
+DBG   ability[0] triggers=起動 use_limit=-1 has_cost=1 has_effect=1
+DBG     cost:   sequential_cost
+DBG     effect: move_cards
+DBG     text:   {{kidou.png|起動}}{{icon_energy.png|E}}{{icon_energy.png|E}}、このメンバーをステージから控え室に置く：自分の控え室からコスト15以下の『蓮ノ空』のメンバーカードを1枚、このメンバーがいたエリアに登場させる。
+note: card no 'PL!S-bp1-002-R＋' not in database, skipped
+dbg sayaka id=573 member=1 n_abilities=1
+step 0: no longer offered (en=9)
+FAIL:  sayaka_activation_charges_energy_and_terminates
+note: no accepted activation, so the 2-energy charge was never exercised
+info: offered activation count = 0 (Rust asserts <= 5)
+info: generated rows=2 of which USE_ABILITY=0 (phase=5 active=0 energy_active=9)
+info: total OFFERED activations = 0
+ok: RUST (:111): cost 2 with 1 active energy must NOT be offered -- game_setup::generate_possible_actions withholds it; C: rb_generate_action_candidates
+FAIL:  sayaka_unaffordable_not_offered_and_press_rejected
+ok: a refused activation charges no energy (no partial resolution)
+ok: nothing may be left pending after a refused press
+FAILED: tp_activation_offer  [exit=1, 5 result line(s): assert=5 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=2]
+
+FAIL: sayaka's {{E}}{{E}} activation is OFFERED at least once with 9 energy (RUST: count_sayaka_offers > 0, activation_offer_bounded_and_terminates_test.rs:44-49)
+FAIL: RUST (:75-79) bound is UNEVALUABLE: rb_generate_action_candidates emitted no RB_SETUP_ACT_USE_ABILITY row for PL!HS-bp1-002-R at all, with the card on p1's centre and 9 active energy, so 'activations <= 5' would hold at 0 for free. Rust's count_sayaka_offers (game_setup.rs:2078 activation scan) is non-zero here. This is a C GENERATOR gap, not a bound that was met.
+FAIL: RUST (:113-119): a direct press of an unpayable {{E}}{{E}} activation is rejected by the affordability pre-check (got 1 expected 0)
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

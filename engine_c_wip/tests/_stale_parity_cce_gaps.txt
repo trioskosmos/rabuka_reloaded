@@ -1,0 +1,822 @@
+make t-nogate: running T=parity_cce_gaps WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_cce_gaps src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_cce_gaps.c
+./rb_verdict ./rb_engine_t_parity_cce_gaps parity_cce_gaps
+heart index map (from rb_heart_color_as_str): 0->heart00 1->heart01 2->heart02 3->heart03 4->heart04 5->heart05 6->heart06
+heart04 index = 4, heart02 index = 2, heart05 index = 5
+--- A nahone_live_start_same_name_test.rs (PL!HS-bp2-007-R+/P/P+/SEC) ---
+        a1_discard_member_buffs: 16 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a1_discard_member_buffs
+        a2_skip_cost_no_effect: 15 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 4 prompt(s)
+FAIL:   a2_skip_cost_no_effect
+        a3_discard_non_member: 10 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       a3_discard_non_member
+        a4_empty_hand_skips: 6 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 0 prompt(s)
+ok       a4_empty_hand_skips
+        a5_same_print_as_activating: 10 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a5_same_print_as_activating
+        a6_self_is_target: 7 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a6_self_is_target
+        a7_q30_only_one_buffed: 9 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 4 prompt(s)
+ok       a7_q30_only_one_buffed
+        a8_filter_shape_and_scope: 31 assertion(s), 6 failure(s), 0 setup bug(s), 0 gap(s), 3 prompt(s)
+FAIL:   a8_filter_shape_and_scope
+        a9_goes_to_waitroom: 7 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       a9_goes_to_waitroom
+        a10_heart04_only: 12 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a10_heart04_only
+        a11_p_variant: 8 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a11_p_variant
+        a12_p_plus_variant: 8 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a12_p_plus_variant
+        a13_sec_variant: 8 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a13_sec_variant
+        a14_non_contiguous_hand: 11 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a14_non_contiguous_hand
+        a15_only_live_skips: 6 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 0 prompt(s)
+ok       a15_only_live_skips
+        a16_left_position: 8 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a16_left_position
+        a17_right_position: 8 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a17_right_position
+        a18_mixed_hand: 11 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a18_mixed_hand
+        a19_diff_name_no_target: 10 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a19_diff_name_no_target
+        a20_other_same_name: 11 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 4 prompt(s)
+ok       a20_other_same_name
+        a21_temporary_live_end: 9 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a21_temporary_live_end
+        a22a_queue_path_skips_cost: 8 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       a22a_queue_path_skips_cost
+        a22b_resolver_path_pays: 10 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   a22b_resolver_path_pays
+--- B live_start_optional_live_discard_chosen_heart_q190_test.rs (PL!N-bp4-011-R＋) ---
+        b1_q190_excludes_all: 26 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 3 prompt(s)
+ok       b1_q190_excludes_all
+        b2_q190_skip: 10 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       b2_q190_skip
+        b3_q190_choose_heart05: 7 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 3 prompt(s)
+ok       b3_q190_choose_heart05
+        b4_q190_no_live_in_hand: 8 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 0 prompt(s)
+ok       b4_q190_no_live_in_hand
+--- C live_start_optional_unit_discard_draw_unit_cost_gain_test.rs (PL!HS-bp6-010-R) ---
+        c1_unit_gain_only_doll: 14 assertion(s), 2 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   c1_unit_gain_only_doll
+        c2_unit_gain_skipped: 10 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       c2_unit_gain_skipped
+--- D live_start_optional_bottom_mill_named_recovery_source_test.rs (PL!S-bp7-008-R) ---
+        d1_mari_bottom_mill: 13 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 0 prompt(s)
+FAIL:   d1_mari_bottom_mill
+--- E discard_score_energy_live_recovery_edges_test.rs (PL!N-bp5-003-R/P/AR) ---
+        e1_q214_no_live_in_waitroom: 17 assertion(s), 2 failure(s), 0 setup bug(s), 0 gap(s), 3 prompt(s)
+FAIL:   e1_q214_no_live_in_waitroom
+        e2_q214_turn1_blocks: 12 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   e2_q214_turn1_blocks
+        e3_q214_p_variant: 8 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   e3_q214_p_variant
+        e3_q214_ar_variant: 8 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   e3_q214_ar_variant
+--- F live_start_optional_unit_position_change_heart_blade_test.rs (PL!HS-pb1-006-R) ---
+        f1_two_mirakura_one_change: 13 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   f1_two_mirakura_one_change
+        f2_one_mirakura_one_change: 11 assertion(s), 2 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   f2_one_mirakura_one_change
+        f3_skip_no_resources: 10 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       f3_skip_no_resources
+        f4_no_destinations_skips: 9 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 0 prompt(s)
+ok       f4_no_destinations_skips
+--- G live_start_discard_reactivate_other_member_both_heart04_test.rs (PL!N-bp3-008-R＋) ---
+        g1_one_wait_member: 10 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       g1_one_wait_member
+        g2_three_only_activated: 15 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 3 prompt(s)
+ok       g2_three_only_activated
+        g3_no_wait_members: 8 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       g3_no_wait_members
+        g4_alone_no_members: 6 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       g4_alone_no_members
+        g5_active_not_affected: 10 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       g5_active_not_affected
+--- H live_start_energy_under_member_draw_all_blades_... (PL!N-bp3-001-R＋) ---
+        h1_q158_all_members: 15 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       h1_q158_all_members
+        h2_q158_single_member: 5 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       h2_q158_single_member
+        h3_q158_skip_no_blade: 8 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       h3_q158_skip_no_blade
+        h4_q157_wait_energy: 7 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       h4_q157_wait_energy
+        h5_q184_not_counted: 7 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       h5_q184_not_counted
+--- I self_discard_same_name_same_area_deploy_energy_under_... (PL!N-bp3-007-R) ---
+        i1_q157_wait_energy_placed: 12 assertion(s), 4 failure(s), 0 setup bug(s), 0 gap(s), 0 prompt(s)
+FAIL:   i1_q157_wait_energy_placed
+        i2_q184_not_counted: 8 assertion(s), 3 failure(s), 0 setup bug(s), 0 gap(s), 0 prompt(s)
+FAIL:   i2_q184_not_counted
+        i3_debut_to_vacated_area: 8 assertion(s), 3 failure(s), 0 setup bug(s), 0 gap(s), 0 prompt(s)
+FAIL:   i3_debut_to_vacated_area
+        i4_energy_under_vacated: 9 assertion(s), 2 failure(s), 0 setup bug(s), 0 gap(s), 0 prompt(s)
+FAIL:   i4_energy_under_vacated
+--- J live_start_keep_or_discard_live_then_reveal_... (PL!N-bp3-028-L) ---
+        j1_one_member_keep: 15 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       j1_one_member_keep
+        j2_one_member_discard: 7 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       j2_one_member_discard
+        j3_three_keep_one: 11 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   j3_three_keep_one
+        j4_three_skip_all: 9 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       j4_three_skip_all
+        j5_reveal_live_scores: 9 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   j5_reveal_live_scores
+        j6_reveal_non_live_no_boost: 7 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       j6_reveal_non_live_no_boost
+GAP: j7: EXPECTED GAP - Card.series_idx is not populated by rb_decode_card_by_index, so the 虹ヶ咲-series premise cannot be asserted from C (see the j1 note)
+        j7_no_niji_no_peek: 9 assertion(s), 0 failure(s), 0 setup bug(s), 1 gap(s), 0 prompt(s)
+ok       j7_no_niji_no_peek
+        j8_three_skip_reveal_live: 12 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+FAIL:   j8_three_skip_reveal_live
+--- K live_success_success_count_scales_cost_... (PL!-pb1-007-R) ---
+        k1_cost3_zero_success: 10 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 1 prompt(s)
+ok       k1_cost3_zero_success
+        k2_cost2_one_success: 10 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 1 prompt(s)
+ok       k2_cost2_one_success
+        k3_cost1_two_success: 10 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 1 prompt(s)
+ok       k3_cost1_two_success
+        k4_cost0_unreachable: 10 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 7 prompt(s)
+ok       k4_cost0_unreachable
+        k5_insufficient_hand: 8 assertion(s), 1 failure(s), 0 setup bug(s), 0 gap(s), 0 prompt(s)
+FAIL:   k5_insufficient_hand
+        k6_non_muse_live: 12 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 1 prompt(s)
+ok       k6_non_muse_live
+        k7_turn1_blocks_second: 10 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 2 prompt(s)
+ok       k7_turn1_blocks_second
+        k8_lilywhite_gate_required: 5 assertion(s), 0 failure(s), 0 setup bug(s), 0 gap(s), 6 prompt(s)
+ok       k8_lilywhite_gate_required
+
+==== parity_cce_gaps ====
+tests run              : 68
+tests passed           : 36
+tests failed (parity)  : 32
+tests crashed (engine) : 0
+expected gaps          : 0
+fixture setup bugs     : 0
+assertions             : 0
+FAILED: parity_cce_gaps  [exit=32, 80 result line(s): assert=80 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=32]
+
+tests/test_parity_cce_gaps.c: In function 'j8_three_skip_reveal_live':
+tests/test_parity_cce_gaps.c:3254:15: warning: unused variable 'niji' [-Wunused-variable]
+ 3254 |     const int niji[3] = { n1, n2, n3 };
+      |               ^~~~
+tests/test_parity_cce_gaps.c: At top level:
+tests/test_parity_cce_gaps.c:583:13: warning: 'note_prompt' defined but not used [-Wunused-function]
+  583 | static void note_prompt(TestGame *tg) { if (pending(tg)) prompts++; }
+      |             ^~~~~~~~~~~
+tests/test_parity_cce_gaps.c:471:13: warning: 'bare_board' defined but not used [-Wunused-function]
+  471 | static void bare_board(TestGame *tg)
+      |             ^~~~~~~~~~
+tests/test_parity_cce_gaps.c:447:13: warning: 'add_live' defined but not used [-Wunused-function]
+  447 | static void add_live(TestGame *tg, int cid)
+      |             ^~~~~~~~
+tests/test_parity_cce_gaps.c:412:12: warning: 'p2_stage_at' defined but not used [-Wunused-function]
+  412 | static int p2_stage_at(TestGame *tg, int area) { return tg->state.p[1].stage[area]; }
+      |            ^~~~~~~~~~~
+tests/test_parity_cce_gaps.c:408:12: warning: 'under_has' defined but not used [-Wunused-function]
+  408 | static int under_has(TestGame *tg, int area, int cid)
+      |            ^~~~~~~~~
+tests/test_parity_cce_gaps.c:401:12: warning: 'energy_has' defined but not used [-Wunused-function]
+  401 | static int energy_has(TestGame *tg, int cid) { return bag_has(&tg->state.p[0].energy, cid); }
+      |            ^~~~~~~~~~
+tests/test_parity_cce_gaps.c:400:12: warning: 'live_has' defined but not used [-Wunused-function]
+  400 | static int live_has(TestGame *tg, int cid)   { return bag_has(&tg->state.p[0].live, cid); }
+      |            ^~~~~~~~
+tests/test_parity_cce_gaps.c:350:12: warning: 'mh' defined but not used [-Wunused-function]
+  350 | static int mh(TestGame *tg, int cid, int color)
+      |            ^~
+tests/test_parity_cce_gaps.c:156:45: warning: 't_e6' defined but not used [-Wunused-variable]
+  156 |               t_e1, t_e2, t_e3, t_e4, t_e5, t_e6,
+      |                                             ^~~~
+tests/test_parity_cce_gaps.c:151:20: warning: 't_z' defined but not used [-Wunused-variable]
+  151 |               t_y, t_z,
+      |                    ^~~
+tests/test_parity_cce_gaps.c: In function 'prompt_shape':
+tests/test_parity_cce_gaps.c:525:14: warning: '%s' directive output may be truncated writing up to 511 bytes into a region of size between 57 and 191 [-Wformat-truncation=]
+  525 |              "kind=%d zone=\"%s\" target=\"%s\" count=%d allow_skip=%d "
+      |              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/test_parity_cce_gaps.c:526:36: note: format string is defined here
+  526 |              "n_filtered=%d desc=\"%s\"",
+      |                                    ^~
+tests/test_parity_cce_gaps.c:524:5: note: 'snprintf' output between 67 and 712 bytes into a destination of size 256
+  524 |     snprintf(buf, sizeof buf,
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~
+  525 |              "kind=%d zone=\"%s\" target=\"%s\" count=%d allow_skip=%d "
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  526 |              "n_filtered=%d desc=\"%s\"",
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  527 |              (int)c->kind, c->zone, c->target, c->count, c->allow_skip,
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  528 |              c->n_filtered_indices, c->description);
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a1: the same-name member gains +1 heart04 until live end (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a2c: POSITIVE CONTROL - paying the same cost grants heart04 (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a5: the activating member is the only same-name member and is buffed (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a6: the activating card is itself a same-name member, so it is buffed (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2640 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=2 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=2 cid=2639 ab=1 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0xa001a10a0 eff=0x0 cur=1 n=2 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=0 slot=0 cid=2639 target=
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0xa001a10a0 eff=0x0 cur=2 n=2 state=4 pending=1
+[STAGE_TARGET_RESULT] pick=0 slot=0 cid=2639 target=
+[CHOICE_RESUME_END] pending=0 state=0 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2640 ab=1 queued=1
+[LIVE_START_SCAN] pl=1 trigger=live_start zone=stage label=ステージ cid=2642 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=3 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a8: exactly 2 filtered stage candidates (the two own same-name members; got 0) (expected 2, actual 0)
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0xa001a4950 eff=0x0 cur=1 n=3 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=1 slot=1 cid=2641 target=
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+FAIL: a8: exactly 2 filtered stage candidates (the two own same-name members; got 0) (expected 2, actual 0)
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0xa001a4950 eff=0x0 cur=2 n=3 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=1 slot=1 rejected
+[CHOICE_RESUME_END] pending=0 state=0 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: a8: the UNselected member gets no heart04 (expected 0, actual 1)
+FAIL: a8: the selected member gets +1 heart04 (expected 1, actual 0)
+FAIL: a8: selected member gets +1 blade (expected 1, actual 0)
+FAIL: a8: different name gets no blade (expected 0, actual 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a10: +1 heart04 is granted (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a11/p: the variant grants heart04 (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a11/pp: the variant grants heart04 (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a11/sec: the variant grants heart04 (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a14: heart04 is granted (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a16/left: heart04 is granted at area 0 (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a16/right: heart04 is granted at area 2 (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a18: heart04 is granted (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a19: ... and no blade (expected 0, actual 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2640 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=2 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=2 cid=2639 ab=1 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0xa001a10a0 eff=0x0 cur=1 n=2 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=0 slot=0 cid=2639 target=
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0xa001a10a0 eff=0x0 cur=2 n=2 state=4 pending=1
+[STAGE_TARGET_RESULT] pick=0 slot=0 cid=2639 target=
+[CHOICE_RESUME_END] pending=0 state=0 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a21: heart04 is granted (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=1 n=2 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=2 cid=2639 ab=1 actor=0 action=sequential
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa0019db50 target=0x0 eff=0xa0019db50 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: a22b: with the cost paid, the same_name gain_resource grants +1 heart04 - the parser and the same_name filter are CORRECT and the whole of section A reduces to the missing rb_pay_cost in rb_drain_ability_queue (expected 1, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=4
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=6
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,1,0,6,2,4,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,1,0,4,0,0,0,0]
+FAIL: c1: a DOLLCHESTRA member gets +5 cost (expected 5, actual 0)
+FAIL: c1: the ACTIVATING DOLLCHESTRA member also gets +5 cost (the unit filter is not exclude_self) (expected 5, actual 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=0 hand_after=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+FAIL: d1: the TOP marker must still be in the deck - if it left too, the engine milled from the wrong end
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+FAIL: e1: no live in the waitroom -> no recovery selection prompt (got kind=1 zone="discard" target="" count=1 allow_skip=0 n_filtered=0 desc="")
+FAIL: e1: the cost card reached the waitroom (expected 0, actual 1)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=discard target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019b6e0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: e2: the first activation recovered the live card to the hand (energy 10)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=discard target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019b6e0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: e3/p: the PL!N-bp5-003-P print also recovers the live card to the hand
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=discard target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019b6e0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: e3/ar: the PL!N-bp5-003-AR print also recovers the live card to the hand
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2641 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=1 n=2 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=1 n=2 cid=2641 ab=0 actor=0 action=gain_resource
+FAIL: f1: Himeno ended in a mirakura area (stage = 2639/2640/2641)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: f2: mk ended at Left (expected 2640, actual 2639)
+FAIL: f2: Himeno ended at Center (expected 2639, actual 2640)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=2 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=2 cid=2639 ab=1 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=self count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=1 max=0 state_change=active is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=active cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2640 state=active before_ori=wait
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2640 ori=active
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=2640 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=1 last_wait_to_active=1
+DEBUG [STATE_CHANGE] detected: card=2640 wait->active
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=active)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=self count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=1 max=0 state_change=active is_member=1
+[RESUME_ANY] kind=1 zone=stage target=change_state route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00198d20 target=0x0 eff=0xa00198d20 cur=0 n=1 state=4 pending=1
+[STAGE_TARGET_RESULT] pick=0 slot=0 cid=2640 target=change_state
+[RESUME_EXEC] def=0xa00198d20 action=change_state is_cost=0 host=2639
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=self count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=1 max=0 state_change=active is_member=1
+DEBUG [EXEC_CHANGE_STATE] prior selection filtered nc=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=active cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2640 state=active before_ori=wait
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2640 ori=active
+DEBUG [EXEC_CHANGE_STATE] wait_before=1 last_wait_to_active=1
+DEBUG [STATE_CHANGE] detected: card=2640 wait->active
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=active)
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=self count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=1 max=0 state_change=active is_member=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=self count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=1 max=0 state_change=active is_member=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=1 actor=0 action=sequential
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=self count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=1 max=0 state_change=active is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=active cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2641 state=active before_ori=wait
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2641 ori=active
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=2641 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=1 last_wait_to_active=1
+DEBUG [STATE_CHANGE] detected: card=2641 wait->active
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=active)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=energy target=under_member route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: [VACUOUS]  i1: the energy-under-member SelectCard must appear - only 0 prompt(s) were offered, need 1
+FAIL: i1: the prompt is a SelectCard over zone=energy (got (no pending choice))
+FAIL: i1: 2 active consumed for the cost (expected 0, actual 2)
+FAIL: i1: 1 card popped for the under-member placement (3 -> 3) (expected 2, actual 3)
+FAIL: [VACUOUS]  i2: the energy-under-member prompt must appear - only 0 prompt(s) were offered, need 1
+FAIL: i2: Q184 - 1 card removed for the placement, 2 remain (got 3) (expected 2, actual 3)
+FAIL: i2: Q184 - 2 active consumed for the cost, 1 removed for the placement -> 0 remaining (got 3) (expected 0, actual 3)
+FAIL: i3: THE REGRESSION - the new card debuts to the VACATED RightSide area, not to Center (stage = 2640/-1/2639) (expected 2640, actual 2639)
+FAIL: i3: the original Setsuna is off the stage
+FAIL: i3: the original Setsuna is in the waitroom
+FAIL: i4: the new card is on RightSide (expected 2640, actual 2639)
+FAIL: i4: THE REGRESSION - the energy is under the member on the RIGHT side, not under Center (under = 0/0/0) (expected 1, actual 0)
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198360 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198360 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: j3: three 虹ヶ咲 members -> look at exactly 3 cards (expected 3, actual 1)
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198360 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198360 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198360 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: j5: revealing a LIVE card grants +1 score (expected 1, actual 0)
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198360 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198360 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: j8: revealing that live card grants +1 score (expected 1, actual 0)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=3 count=3 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+DEBUG [MOD_COST_ENTRY] op=subtract value=0 target=self
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+DEBUG [MOD_COST_ENTRY] op=subtract value=0 target=self
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+DEBUG [MOD_COST_ENTRY] op=subtract value=0 target=self
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+DEBUG [MOD_COST_ENTRY] op=subtract value=0 target=self
+FAIL: k5: with 0 successes and 2 hand cards the activation is refused outright (fired=1, no prompt opened) or the full cost is asked; neither happened
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+DEBUG [MOD_COST_ENTRY] op=subtract value=0 target=self
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00199840 cur=0 n=1 state=4 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='μ's' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=4 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=4 p1_discard=0
+[DISCARD_MOVE] selected=2641 of 1 available=4 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+DEBUG [MOD_COST_ENTRY] op=subtract value=0 target=self
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+PARITY CCE GAPS: 32 failing test(s) - every FAIL line is a
+strict Rust expectation the C engine does not meet, a Rust
+fixture bug, or a SETUP BUG naming a print the engine cannot
+resolve. Not a bug in this file.
+make[2]: *** [Makefile:515: t-run] Error 32
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

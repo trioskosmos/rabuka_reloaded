@@ -1456,7 +1456,16 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
     let mut cost_reduction_per_group: Option<u8> = None;
     let mut watches_ability_resolution: Option<bool> = None;
     let mut fires_on_opponent_effects: Option<bool> = None;
-    let mut ek = EffectKindLocals::default();
+    // Boxed, not a local. EffectKindLocals has ~166 Option/Vec fields, so
+    // ::default() materialises roughly 2 KB of zeroes. The GBA gives a program
+    // the ~2 KB of IWRAM below `__sp` -- the whole usable stack is comparable
+    // to one of these -- so building one on the stack ran `sp` off the bottom
+    // of IWRAM at 0x03000038 and `__agbabi_lwordset4` then zero-filled upward
+    // through the BIOS vector table and off into address 0. That is the
+    // 8.4M-out-of-range Store32 storm and the "exploding pixels": the fault is
+    // an overflow, not a graphics problem. The heap is EWRAM, where 2 KB is
+    // unremarkable.
+    let mut ek = Box::new(EffectKindLocals::default());
 
     for _ in 0..count {
         let key = bc.key()?;

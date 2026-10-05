@@ -64,14 +64,21 @@ fi
 OUT="$1"; shift
 [ -n "$OUT" ] || { echo "usage: alias_probe.sh [--negative-control|--prechange] <outdir> <suite>..."; exit 2; }
 
-# ── the object library, minus the two that cannot be in a suite link ────────
-# src/main.o defines its own main; src/web_server.o is not in OBJ_LIB's suite
-# set per corpus_measure.py's note.
+# ── the object library, minus main ─────────────────────────────────────────
+# src/main.o defines its own main and a test TU defines a second, so it can
+# never be in a suite link.
+# CORRECTED 2026-10-05: the comment here used to read "src/web_server.o is not
+# in OBJ_LIB's suite set per corpus_measure.py's note", citing Makefile:49-61,
+# which contradicted Makefile:61/64 in the same tree -- src/web_server.o IS in
+# OBJ_LIB, and rb_engine and rb_web_server both link it. It is still skipped
+# here, but for the real reason and not as a claim about OBJ_LIB: it is dropped
+# because it is the WEBSERVER TU, not because OBJ_LIB lacks it. Leaving it in
+# would not cause a duplicate symbol (no other TU defines web_* symbols); it is
+# excluded only to keep the probe's link set equal to what `make t` links.
+# corpus_measure.py drops it too, which is where the false claim came from.
 OBJ=""
 for o in $(find src -name '*.o' | sort); do
   case "$(basename "$o")" in
-    # main.o defines its own main; web_server.o is not in a suite link
-    # (corpus_measure.py drops both for the same reasons).
     main.o|web_server.o) continue ;;
   esac
   OBJ="$OBJ $o"

@@ -279,7 +279,7 @@ static    TestGame tg;
 static void test_sequential_cost_atomicity(void) {
     /* Unpayable second leg: 1E first, then discard 5 hand cards. */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         clear_zones(&tg, 0);
         clear_zones(&tg, 1);

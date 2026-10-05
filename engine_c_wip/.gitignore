@@ -5,3 +5,15 @@ platforms/*/output/
 *.bin
 *.elf
 *.map
+
+# Agent audit/scratch output — NOT tracked. These were 44 markdown reports plus
+# per-run logs; they were drowning the diff and none of it is build input.
+*.md
+*.out
+*.err
+NUL
+zz_*
+*_manifest_sha256.txt
+*_top25.txt
+*_BASELINE*.txt
+*_SUM.txt

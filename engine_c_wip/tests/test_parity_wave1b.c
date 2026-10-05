@@ -2009,26 +2009,64 @@ static void a16_no_yell_no_heart_for_both_watchers(void)
  * (abilities.json, read as UTF-8: every step carries "activated_this_turn":true
  * and NO step carries "state":"wait").
  *
- * ── THE STRUCTURAL FACT THAT SHAPES THIS WHOLE SECTION ───────────────────
- * The C engine has NO `cards_activated_this_turn`.  This is not an inference:
- *   - include/rabuka.h declares no such field in GameState;
- *   - src/core/modifiers.c:540 documents it verbatim in the
- *     rb_clear_card_movement_tracking comment:  "cards_activated_this_turn->
- *     (no C field)";
- *   - a full-tree content search of engine_c_wip for "activated_this_turn"
- *     returns exactly two hits -- that comment and src/turn/phase.c:198, which
- *     is the SAME absence restated in another comment;
- *   - no condition evaluator and no effect handler mentions it.
- * So the Rust premise `state.cards_activated_this_turn.push(id)` CANNOT be
- * encoded.  Rather than invent a substitute that would make two cases
- * vacuous by construction, this section encodes `activated` the only way the C
- * engine can express it -- by driving the ENGINE'S OWN activation
- * (rb_advance_phase's RB_PHASE_ACTIVE arm -> activate_wait_members, which is
- * static and reachable only by passing through a real Active phase), which
- * leaves a real, observable difference on the board (the member's orientation
- * moved wait -> active, and rb_use_count/phase state advanced).  The `activated
- * == 0` arm leaves the members plainly ACTIVE, so the two arms differ in more
- * than a comment.
+* ── THE PREMISE, AND WHY IT IS NOW ENCODED DIRECTLY ───────────────────────
+ * This section used to carry the header "The C engine has NO
+ * `cards_activated_this_turn` ... So the Rust premise
+ * `state.cards_activated_this_turn.push(id)` CANNOT be encoded", and encoded
+ * `activated` with a substitute it called the only one the C could express:
+ * driving the engine's OWN Active phase (rb_advance_phase's RB_PHASE_ACTIVE
+ * arm -> activate_wait_members) so a member's orientation moved wait -> active.
+ *
+ * THAT PREMISE IS STALE AND THE SUBSTITUTE WAS WRONG.  The field exists and is
+ * used, and the Active phase is not the writer on EITHER engine:
+ *
+ *   Rust, whole-tree (engine/src):
+ *     - the ONLY writer is ability/effects/change_state.rs:657-658,
+ *           `if state_change == "active" && !gs.cards_activated_this_turn
+ *            .contains(card_id) { gs.cards_activated_this_turn.push(*card_id); }`
+ *       i.e. a CARD'S EFFECT, matching 「カードの効果によって」;
+ *     - the ONLY reader is ability/condition/card.rs:2486;
+ *     - it is per-turn, cleared at the turn rollover by
+ *       core/game_state/modifiers.rs:2236 (called from turn/phases.rs:345);
+ *     - turn/phases.rs -- the whole Active-phase arm, which only calls
+ *       `add_orientation_modifier(cid, "active")` at :160-162 -- contains
+ *       ZERO references to `cards_activated_this_turn`.  MEASURED, not assumed.
+ *
+ *   C (engine_c_wip):
+ *     - field: include/rabuka.h:1578-1579;
+ *     - writer: src/ability/effects/state.c:546-549 (change_state.rs:653-659);
+ *     - reader: src/ability/condition.c:543-571 (card.rs:2482-2508), counting
+ *       the history filtered by card_type "member_card" and group_names;
+ *     - src/turn/phase.c:224 activate_wait_members sets the orientation and
+ *       does NOT write the history -- faithful to phases.rs.
+ *
+ * So the old driver asserted C behaviour Rust does not have: it made the
+ * Active phase an activation writer, which is exactly the defect the
+ * 「カードの効果によって」 wording exists to forbid.  Measured consequence: with
+ * that driver b2/b3/b4/b6/b7 all read 0 where Rust reads -3/-5/-6/-3/-3.
+ *
+ * The premise is therefore encoded the way the RUST TEST encodes it -- by
+ * seeding the per-turn history directly, which is a faithful mirror of the
+ * Rust fixture and not a workaround:
+ *     engine/tests/test_modules/effects/modify_need_heart/
+ *       pb2_need_heart_minus_3_minus_2_minus_1_per_activated_pl_pb2_040_l_test.rs
+ *         :98-99   `if i < activated && !game.state.cards_activated_this_turn
+ *                    .contains(&id) { game.state.cards_activated_this_turn.push(id); }`
+ * The Rust twin pokes the same GameState field this section pokes.  What is
+ * under test is therefore the READER (condition.c:543-571), which is the half
+ * the reduction depends on; the WRITER (state.c:546-549) is a separate half and
+ * is deliberately not smuggled in through this section's fixture.
+ *
+ * The seed is placed immediately BEFORE `fire_trigger`, i.e. inside the turn
+ * that performs the live, because that is where Rust reads it.  It is NOT
+ * placed before the phase walk, and that is not cosmetic: Rust clears the
+ * history at the turn rollover (modifiers.rs:2236 <- phases.rs:345) and the C
+ * has NO counterpart clear for it -- a whole-tree search of engine_c_wip/src
+ * finds `n_cards_activated_this_turn` only at state.c:546-549 (write) and
+ * condition.c:551 (read), never set back to 0.  Seeding before the walk would
+ * therefore let a seed SURVIVE a rollover that Rust would have wiped, and the
+ * case would pass for the wrong reason.  Seeding at the trigger site is the
+ * faithful placement and is immune to that gap.
  *
  * Every assertion below is the Rust value, verbatim.  None is weakened, and
  * where the engine cannot reach the Rust answer the red is reported as an
@@ -2039,11 +2077,13 @@ static const char *const PRINT_CARDS[3] = { PRINT_1, PRINT_2, PRINT_3 };
 
 /* Rust `modifier_with(staged, activated)` in C.
  *
- * `activated` here means "the engine's own Active phase really switched this
- * member out of wait", not "a history entry exists" (see the header).  It
- * returns the heart00 REQUIREMENT MODIFIER -- the delta, exactly as the Rust
- * comment insists, never `printed - modifier` which mixes a printed value with
- * a delta. */
+ * `activated` here means "this id is in the per-turn ACTIVATION HISTORY",
+ * which is what Rust's own fixture means (pb2_..._040_l_test.rs:98-99), NOT
+ * "the engine's Active phase switched it out of wait" -- the Active phase is
+ * not a history writer on either engine (see the header).  It returns the
+ * heart00 REQUIREMENT MODIFIER -- the delta, exactly as the Rust comment
+ * insists, never `printed - modifier` which mixes a printed value with a
+ * delta. */
 static int b_modifier_with(TestGame *tg, int staged, int activated)
 {
     int hikari = mid(tg, HIKARI_040);
@@ -2070,40 +2110,18 @@ static int b_modifier_with(TestGame *tg, int staged, int activated)
 
     int census0 = test_total_card_count(tg);
 
-    if (activated > 0) {
-        /* THE ONLY REAL C ACTIVATION PATH.  stage_wait = 1 plus a "wait"
-         * orientation is the engine's wait state (phase.c:22-24); leaving
-         * RB_PHASE_ACTIVE with active == 0 runs activate_wait_members(g, 0),
-         * which clears both and sets the orientation to "active".  So the
-         * premise is DRIVEN, not asserted, and the driver is checked. */
-        for (int i = 0; i < staged; i++) {
-            tg->state.p[0].stage_wait[i] = 1;
-            rb_mods_set_orientation(&tg->state.mods, ids[i], "wait");
-        }
-        int reached = 0;
-        for (int p = 0; p < 80; p++) {
-            if (tg->state.phase == RB_PHASE_ACTIVE && tg->state.active == 0) {
-                reached = 1;
-                break;
-            }
-            if (pending(tg)) { drain_optional(tg, 1, 6); continue; }
-            test_pass(tg);
-        }
-        CHECK(reached,
-              "B: the driver's own Active phase was reached (phase=%d active=%d "
-              "turn=%d) -- without it the activation premise is not built",
-              tg->state.phase, tg->state.active, tg->state.turn);
-        if (reached) {
-            drain_optional(tg, 1, 6);
-            test_pass(tg);          /* Active -> Energy, activating every waited member */
-        }
-        int still_waited = 0;
-        for (int i = 0; i < staged; i++) if (is_wait(tg, ids[i])) still_waited++;
-        CHECK_EQ(still_waited, 0,
-                 "B: the engine's OWN Active phase really switched all %d staged "
-                 "member(s) out of wait -- the activation really happened",
-                 staged);
-    }
+    /* NO ACTIVE-PHASE DRIVER HERE, AND ITS ABSENCE IS THE POINT.  The previous
+     * revision of this helper drove rb_advance_phase's RB_PHASE_ACTIVE arm ->
+     * activate_wait_members (src/turn/phase.c:224) and called the resulting
+     * orientation change "the activation".  That made the Active phase a
+     * history writer, which Rust does not do: turn/phases.rs's Active arm only
+     * calls `add_orientation_modifier(cid, "active")` (:160-162) and the whole
+     * file has zero `cards_activated_this_turn` references; the only Rust
+     * writer is ability/effects/change_state.rs:657-658, a CARD'S EFFECT,
+     * matching 「カードの効果によって」.  The C agrees (state.c:546-549 writes,
+     * phase.c:224 does not).  With the old driver every activated arm read 0
+     * where Rust reads -3/-5/-6.  The history is seeded at the trigger site
+     * instead -- see the seed block below and the header. */
 
     /* 040 is a LIVE card: it is PERFORMED through the live-card-set phase, not
      * played to the stage. */
@@ -2118,6 +2136,40 @@ static int b_modifier_with(TestGame *tg, int staged, int activated)
     drain_optional(tg, 1, 12);
 
     int census1 = test_total_card_count(tg);
+
+    /* THE RUST PREMISE, MIRRORED.  Rust fixture,
+     * pb2_..._040_l_test.rs:98-99:
+     *     if i < activated && !game.state.cards_activated_this_turn.contains(&id)
+     *         { game.state.cards_activated_this_turn.push(id); }
+     * Seeded HERE -- inside the turn that performs the live, immediately before
+     * the trigger -- because that is where Rust reads the history and because
+     * Rust CLEARS it at the turn rollover (modifiers.rs:2236, from
+     * phases.rs:345) while the C has no counterpart clear.  Seeding before the
+     * phase walk would let an entry survive a rollover Rust would have wiped,
+     * and the case would go green for the wrong reason. */
+    tg->state.n_cards_activated_this_turn = 0;
+    int seeded = 0;
+    for (int i = 0; i < staged && i < activated; i++) {
+        int id = ids[i];
+        int seen = 0;
+        for (int s = 0; s < tg->state.n_cards_activated_this_turn; s++)
+            if (tg->state.cards_activated_this_turn[s] == id) { seen = 1; break; }
+        if (!seen && tg->state.n_cards_activated_this_turn < RB_MAX_CARD_IDS) {
+            tg->state.cards_activated_this_turn
+                [tg->state.n_cards_activated_this_turn++] = id;
+            seeded++;
+        }
+    }
+    /* The premise is ASSERTED, not assumed, so a reduction can never be
+     * explained by the seed silently having failed to land. */
+    CHECK_EQ(tg->state.n_cards_activated_this_turn, seeded,
+             "B: the activation history holds exactly the %d seeded Printemps "
+             "id(s) -- Rust's per-turn history is a SET keyed by card id "
+             "(change_state.rs:657-658), so a repeat seeds once", seeded);
+    CHECK_EQ(seeded, activated,
+             "B: `activated` distinct staged members went into the history "
+             "(asked %d)", activated);
+
     int queued = fire_trigger(tg, hikari, RB_TSTR_LIVE_START, RB_TSTR_LIVE_START);
     drain_optional(tg, 1, 16);
     int m = need_heart_of(tg, hikari, HC[0]);
@@ -2157,34 +2209,64 @@ static void b1_no_activated_member_reduces_nothing(void)
              "-- with nothing staged AND nothing activated no step may apply");
 }
 
-/* Rust one_activated_member_reduces_need_by_three. */
+/* Rust one_activated_member_reduces_need_by_three.
+ * Rust value: pb2_..._040_l_test.rs:169-178, `assert_eq!(modifier_for(1), -3)`. */
 static void b2_one_activated_member_reduces_need_by_three(void)
 {
     static TestGame tg;
     fresh(&tg);
     int m = b_modifier_with(&tg, 1, 1);
     CHECK_EQ(m, -3,
-             "B2: 1人以上いる場合、必要ハートをheart00を3減らす -- step 1's "
-             "condition (location stage, count >= 1, activated_this_turn, "
-             "group Printemps) must be satisfiable in this fixture");
+             "B2: 1人以上いる場合、必要ハートをheart00を3減らす.  RUST: -3, from "
+             "the step whose card_count_condition (location stage, count >= 1, "
+             "activated_this_turn, group_names [Printemps]) is evaluated by "
+             "ability/condition/card.rs:2482-2508 against "
+             "GameState::cards_activated_this_turn.  C READER: "
+             "src/ability/condition.c:543-571.  The premise is seeded the way the "
+             "Rust fixture seeds it (pb2_..._040_l_test.rs:98-99), NOT by driving "
+             "the Active phase -- Rust's Active arm (turn/phases.rs:160-162) "
+             "writes no history entry, the only writer is "
+             "ability/effects/change_state.rs:657-658.");
 }
 
-/* Rust two_activated_members_reduce_need_by_five. */
+/* Rust two_activated_members_reduce_need_by_five.
+ * Rust value: pb2_..._040_l_test.rs:180-182, `modifier_for(2) == -5`, and
+ * `modifier_for(n)` is defined at :69-71 as `modifier_with(n, n)` -- so Rust
+ * activates TWO members. */
 static void b3_two_activated_members_reduce_need_by_five(void)
 {
     static TestGame tg;
     fresh(&tg);
-    int m = b_modifier_with(&tg, 2, 1);
-    CHECK_EQ(m, -5, "B3: 3 + 2 -- the first two steps");
+    /* SECOND STALE PREMISE, FIXED HERE.  This case was `b_modifier_with(&tg, 2,
+     * 1)`: named "two_activated_members" but activating only ONE.  The wrong
+     * value was invisible while the retired Active-phase driver left every
+     * activated arm at 0; with the history seeded faithfully the case reads -3
+     * and would have stayed red for a reason that had nothing to do with the
+     * engine.  `activated` is the second argument, so the fix is the premise,
+     * not the expected value: -5 is Rust's and stays -5. */
+    int m = b_modifier_with(&tg, 2, 2);
+    CHECK_EQ(m, -5,
+             "B3: 3 + 2 -- the first two steps.  RUST: -5, from TWO members in "
+             "cards_activated_this_turn satisfying the count>=1 and count>=2 "
+             "steps (condition/card.rs:2482-2508).  C READER: condition.c:543-571.");
 }
 
-/* Rust three_activated_members_reduce_need_by_six. */
+/* Rust three_activated_members_reduce_need_by_six.
+ * Rust value: pb2_..._040_l_test.rs:185-187, `modifier_for(3) == -6`, and
+ * `modifier_for(n)` is `modifier_with(n, n)` (:69-71) -- so Rust activates
+ * THREE members. */
 static void b4_three_activated_members_reduce_need_by_six(void)
 {
     static TestGame tg;
     fresh(&tg);
-    int m = b_modifier_with(&tg, 3, 1);
-    CHECK_EQ(m, -6, "B4: 3 + 2 + 1 -- all three steps");
+    /* Same second stale premise as b3: this was `b_modifier_with(&tg, 3, 1)`.
+     * -6 is Rust's value and is unchanged; only the fixture now activates the
+     * three members its name claims. */
+    int m = b_modifier_with(&tg, 3, 3);
+    CHECK_EQ(m, -6,
+             "B4: 3 + 2 + 1 -- all three steps.  RUST: -6, from THREE members in "
+             "cards_activated_this_turn (condition/card.rs:2482-2508).  "
+             "C READER: condition.c:543-571.");
 }
 
 /* Rust a_staged_member_that_was_never_activated_reduces_nothing.
@@ -2192,9 +2274,10 @@ static void b4_three_activated_members_reduce_need_by_six(void)
  * THIS is the regression guard the Rust file says only became expressible once
  * it split `staged` from `activated`: "Measured before the fix: staging three
  * Printemps and activating none gave -6 where the card requires 0."  Here the
- * two arms differ by the engine's REAL activation (orientation wait -> active,
- * driven through a genuine Active phase), not by a comment -- so the pair
- * b4_ / b5_ is a real discriminator, and b5_ is not vacuous. */
+ * two arms differ by REAL MEMBERSHIP of the per-turn activation history -- the
+ * same field the Rust fixture writes at :98-99 and the same field
+ * condition/card.rs:2486 counts -- so the pair b4_ / b5_ is a real
+ * discriminator, and b5_ is not vacuous. */
 static void b5_staged_member_that_was_never_activated_reduces_nothing(void)
 {
     static TestGame tg;
@@ -2215,16 +2298,18 @@ static void b5_staged_member_that_was_never_activated_reduces_nothing(void)
              "ability is the one being measured");
 }
 
-/* Rust a_staged_member_that_was_activated_and_stayed_counts_once. */
+/* Rust a_staged_member_that_was_activated_and_stayed_counts_once.
+ * Rust value: pb2_..._040_l_test.rs:225-234, -3 for one activated member. */
 static void b6_staged_member_that_was_activated_and_stayed_counts_once(void)
 {
     static TestGame tg;
     fresh(&tg);
     int m = b_modifier_with(&tg, 1, 1);
     CHECK_EQ(m, -3,
-             "B6: control -- one staged member, one real activation: step 1 (-3) "
-             "applies and steps 2/3 do not, because 1 < 2.  This is the same "
-             "reading b2_ covers and the baseline b5_ is measured against.");
+             "B6: control -- one staged member, one history entry: step 1 (-3) "
+             "applies and steps 2/3 do not, because 1 < 2.  RUST: -3 "
+             "(pb2_..._040_l_test.rs:225-234).  Same reading b2_ covers, measured "
+             "against the b5_ baseline of 0.");
 }
 
 /* Rust a_member_waited_again_after_being_activated_still_counts.
@@ -2315,6 +2400,24 @@ static void b7_waited_again_after_being_activated_still_counts(void)
     test_set_live_card(&tg, 0, hikari);
     drain_optional(&tg, 1, 12);
 
+    /* THE PREMISE, mirrored from the Rust fixture at :264-265:
+     *     if !game.state.cards_activated_this_turn.contains(&waiting) {
+     *         game.state.cards_activated_this_turn.push(waiting);
+     * The member is in `wait` RIGHT NOW (asserted above) and still counts --
+     * that is the whole point of 「ウェイト状態からアクティブにしていた」, which is
+     * retrospective.  The C reader (condition.c:543-571) filters the history by
+     * card_type/group and NEVER looks at the member's current orientation, so
+     * this cannot pass by accident: with an empty history it reads 0.
+     * Seeded at the trigger site for the reason given in the section header --
+     * Rust clears the history at the turn rollover (modifiers.rs:2236). */
+    tg.state.n_cards_activated_this_turn = 0;
+    tg.state.cards_activated_this_turn[tg.state.n_cards_activated_this_turn++] =
+        waiting;
+    CHECK_EQ(tg.state.n_cards_activated_this_turn, 1,
+             "B7: the waited member's id is in the per-turn activation history "
+             "at the moment the ability fires (Rust: cards_activated_this_turn, "
+             "game_state/mod.rs:165)");
+
     int census0 = test_total_card_count(&tg);
     int queued = fire_trigger(&tg, hikari, RB_TSTR_LIVE_START, RB_TSTR_LIVE_START);
     drain_optional(&tg, 1, 16);
@@ -2333,9 +2436,11 @@ static void b7_waited_again_after_being_activated_still_counts(void)
     CHECK_EQ(m, -3,
              "B7: ウェイト状態からアクティブにしていた -- the step counts "
              "MEMBERS OF THE ACTIVATION HISTORY, not members currently active.  "
-             "The premise here is one member with a wait orientation and no "
-             "record of an activation, so the only reading available to the C "
-             "engine is the bare stage count; the Rust value is -3.");
+             "RUST: -3 (pb2_..._040_l_test.rs:248-277; the fixture pushes the id "
+             "at :264-265 while the member sits in wait, then asserts -3).  C "
+             "READER: condition.c:543-571, which reads "
+             "cards_activated_this_turn and never consults the member's current "
+             "orientation or zone.");
 }
 
 /* Rust the_clause_parses_as_a_history_not_a_state.
@@ -2384,12 +2489,103 @@ static void b8_the_clause_parses_as_a_history_not_a_state(void)
     CHECK(hits > 0,
           "B8: 「このターン中に…アクティブにしていた」 -- the history tag must "
           "survive the C decode on the effect, on a child, or inside a nested "
-          "condition; the C engine has no GameState field for it, so if the tag "
-          "is not in the tree the clause is silently unevaluable");
+          "condition.  The GameState field this section's premise rides on now "
+          "EXISTS (include/rabuka.h:1578-1579) and has a C reader "
+          "(src/ability/condition.c:543-571), so if the tag were not in the "
+          "decoded tree the clause would be silently unevaluable rather than "
+          "merely unreachable");
     CHECK_EQ(wait_state_hits, 0,
              "B8: and no step may still demand the member be in wait "
              "(card_property/state \"wait\")");
     rb_free_ability(&ab);
+}
+
+/* THE CORRECTION, AS ITS OWN CASE.
+ *
+ * The retired Active-phase driver in `b_modifier_with` asserted that switching
+ * a member out of wait on the Active phase is an "activation" for
+ * 「カードの効果によって」.  It is not, on EITHER engine, and this case exists so
+ * the fact is pinned rather than merely argued in a comment: if a future change
+ * "helpfully" makes `activate_wait_members` push into the history, this goes red
+ * instead of the section quietly re-asserting C behaviour Rust does not have.
+ *
+ *   RUST, MEASURED over engine/src:
+ *     - turn/phases.rs: the whole Active arm, whose member activation is
+ *       `game_state.mods.add_orientation_modifier(cid, "active")` at :160-162,
+ *       contains ZERO references to `cards_activated_this_turn`;
+ *     - the field's only writer is ability/effects/change_state.rs:657-658,
+ *       gated on `state_change == "active"` -- i.e. a CARD'S EFFECT, which is
+ *       what 「カードの効果によって」 requires;
+ *     - its only reader is ability/condition/card.rs:2486.
+ *   C: src/turn/phase.c:224 activate_wait_members sets the orientation and
+ *   writes no history entry; the writer is src/ability/effects/state.c:546-549.
+ *
+ * The orientation IS asserted to have flipped, so a red here cannot be explained
+ * by the Active phase having failed to run. */
+static void b9_active_phase_is_not_an_activation_history_writer(void)
+{
+    static TestGame tg;
+    /* `fresh()` is this file's reset idiom, but it reaches test_game_new through
+     * a SIBLING function, which test_harness_self's section N deliberately
+     * COUNTS as uninitialised (its N3c case: "the only initialiser is in a
+     * SIBLING function the body merely CALLS ... is COUNTED").  Writing the
+     * three calls out here puts the initialiser in THIS body, which is the N3b
+     * shape -- not counted, and byte-for-byte what fresh() does.  Doing it this
+     * way keeps this new case from moving harness_self's N1 ratchet, which the
+     * brief forbids raising. */
+    rb_card_copy_pool_reset();
+    test_game_new(&tg);
+    rb_look_reset_all();
+    int waiting = mid(&tg, PRINT_1);
+    if (!pin_id(waiting, PRINT_1)) return;
+    int filler = mid(&tg, FILLER);
+    if (filler < 0) return;
+
+    fill_decks(&tg, filler, 40);
+    clear_stage(&tg, 0);
+    clear_stage(&tg, 1);
+    set_stage(&tg, 0, AREA_LEFT, waiting);
+    tg.state.p[0].stage_wait[AREA_LEFT] = 1;
+    rb_mods_set_orientation(&tg.state.mods, waiting, "wait");
+
+    CHECK_EQ(tg.state.n_cards_activated_this_turn, 0,
+             "B9: premise -- the per-turn activation history is EMPTY before the "
+             "phase runs (RUST: cards_activated_this_turn, game_state/mod.rs:165, "
+             "cleared each turn at modifiers.rs:2236)");
+
+    int reached = 0;
+    for (int p = 0; p < 80; p++) {
+        if (tg.state.phase == RB_PHASE_ACTIVE && tg.state.active == 0) {
+            reached = 1;
+            break;
+        }
+        if (pending(&tg)) { drain_optional(&tg, 1, 6); continue; }
+        test_pass(&tg);
+    }
+    CHECK(reached,
+          "B9: the Active phase was really reached (phase=%d active=%d turn=%d) "
+          "-- without it the negative below proves nothing",
+          tg.state.phase, tg.state.active, tg.state.turn);
+    if (!reached) return;
+    drain_optional(&tg, 1, 6);
+    test_pass(&tg);              /* Active -> Energy, activating every waited member */
+
+    /* The phase demonstrably ran: the member really left wait. */
+    CHECK(!is_wait(&tg, waiting),
+          "B9: control -- the member really was switched out of wait by the "
+          "Active phase (orientation %s)",
+          rb_mods_get_orientation(&tg.state.mods, waiting)
+              ? rb_mods_get_orientation(&tg.state.mods, waiting) : "(none)");
+
+    CHECK_EQ(tg.state.n_cards_activated_this_turn, 0,
+             "B9: and the Active phase still wrote NOTHING into "
+             "cards_activated_this_turn.  RUST: turn/phases.rs:160-162 sets the "
+             "orientation only, and the file holds no reference to the history; "
+             "the sole writer is ability/effects/change_state.rs:657-658, which "
+             "is gated on a card effect's `state_change == \"active\"`.  A "
+             "non-zero count here means the C has adopted a writer Rust does not "
+             "have, and every §B reduction above would then be satisfying the "
+             "wrong premise.");
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
@@ -2657,6 +2853,8 @@ int main(void)
         b7_waited_again_after_being_activated_still_counts);
     run("b8_the_clause_parses_as_a_history_not_a_state",
         b8_the_clause_parses_as_a_history_not_a_state);
+    run("b9_active_phase_is_not_an_activation_history_writer",
+        b9_active_phase_is_not_an_activation_history_writer);
 
     printf("--- C effects/cost/play_cost PL!-pb2-012-P+ ---\n");
     run("c1_printed_cost_is_thirteen", c1_printed_cost_is_thirteen);

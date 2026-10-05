@@ -501,22 +501,213 @@ int rb_trigger_live_start(GameState *g, int pl) {
    card and the three stage slots here, i.e. it fired what Rust does not. Removed:
    with no corpus card reaching this path in 19 suites the change is measurement
    NEUTRAL, and it removes the divergence rather than documenting it. */
-    /* Process the queued abilities so their effects resolve (e.g., position change) */
-    if (queued > 0) {
-        rb_drain_ability_queue(g);
-    }
+    /* ── NO DRAIN INSIDE THIS SCAN ────────────────────────────────────────────────
+ *
+ * The C used to end rb_trigger_live_start with
+ *
+ *     if (queued > 0) { rb_drain_ability_queue(g); }
+ *
+ * Rust does NOT drain here. trigger_live_start_abilities
+ * (trigger_scan.rs:186-345) collects `abilities_to_trigger` and then enqueues
+ * through game_state.trigger_auto_ability (trigger_scan.rs:326-344), whose whole
+ * body (abilities.rs:1239-1293) is resolve-then-enqueue -- there is no drain, no
+ * resolution and no recursion anywhere on this path. Rust says so in its own
+ * source: bot/v8_live.rs:1509-1511, "The scan only ENQUEUES. The real engine
+ * resolves the queue immediately after it -- phases.rs calls
+ * process_pending_auto_abilities on the very next statement after both players'
+ * scans", and that comment is load-bearing there (v8_live.rs:1506-1516 reads
+ * ability_queue_len() across the scan to count what the scan produced).
+ *
+ * That in-scan drain was the re-entrancy the audit flagged: rb_drain_ability_queue
+ * walks a queue that has just had entries pushed onto it, resolving them can
+ * enqueue further triggered abilities, and any path that re-enters
+ * rb_trigger_live_start from inside a resolution recurses into a fresh drain with
+ * the iteration state of the outer scan still live. Nothing bounded it.
+ *
+ * The drain was also in the WRONG PLACE to be equivalent anyway: the C's own
+ * caller already does what Rust's caller does. src/turn/phase.c:446-458 runs
+ *     rb_check_timing(g);
+ *     rb_trigger_live_start(g, 0);
+ *     rb_trigger_live_start(g, 1);      <- BOTH scans first, then...
+ *     rb_trigger_auto_abilities(g, 0/1, "自動");
+ *     rb_process_pending_auto_abilities(g);
+ *     rb_drain_ability_queue(g);
+ * which is phases.rs:273-279 to the statement -- both seats' scans, then the
+ * per-seat process_pending_auto_abilities, then the choice check. Draining
+ * inside the scan made the FIRST seat resolve before the SECOND seat had even
+ * been scanned, so any ライブ開始時 ability on p2 that was meant to be live for
+ * p1's resolution was not yet in the queue.
+ *
+ * Removing the drain moves resolution to the caller, which is where Rust has it
+ * and where the C already had a second copy. Suites that call
+ * rb_trigger_live_start DIRECTLY (the scan is public, and several parity suites
+ * drive it that way) no longer get an implicit resolution and must drain
+ * themselves -- that is the same obligation Rust's own callers carry, and the
+ * comment above each such call site now says so.
+ *
+ * `queued` is still returned unchanged: it counts what the scan produced, which
+ * is what bot/v8_live.rs:1507-1508 measures and what the [LIVE_START_SCAN]
+ * queued= field prints. */
     return queued;
 }
 
-/* Gate: only fire LiveSuccess when the live actually satisfied its heart
-   requirements this turn (mirrors engine/src/core/game_state/abilities.rs:
-   should_trigger_live_success — the live must have passed the heart check).
-   In the C pipeline `passed` is recorded into g->live_success[pl] before the
-   trigger block runs, so gating on it is equivalent to Rust's need_heart scan. */
+/* ── rb_should_trigger_live_success ───────────────────────────────────────────
+ *
+ * Rust's twin is NOT a recorded verdict. It is GameState::should_trigger_live_success
+ * (engine/src/core/game_state/abilities.rs:3019-3077), reached from
+ * trigger_scan.rs:372-378 -- the ONLY gate in front of the ライブ成功時 scan.
+ * Its four gates, in Rust's order:
+ *
+ *   :3025  if self.current_phase != Phase::LiveVictoryDetermination { return false }
+ *   :3028  if player.live_card_zone.cards.is_empty()             { return false }
+ *   :3034  let stage_hearts = player.stage_hearts.clone()
+ *              .unwrap_or_else(|| player.calculate_stage_hearts(..))
+ *   :3043  for card_id in &player.live_card_zone.cards {
+ *   :3045      if let Some(ref need_heart) = card.need_heart {
+ *   :3048-3059      per_colour = printed need, then mods.need_heart_modifiers
+ *   :3064-3074      if check_heart_requirement(effective_need, stage_hearts)
+ *   :3070              { return true }
+ *              } else {
+ *   :3071          return true        <-- NO need_heart SATISFIES UNCONDITIONALLY
+ *              }
+ *          }
+ *          false
+ *
+ * What the C returned, and why it was the WRONG THING:
+ *     if (g->p[pl].live.n == 0) return 0;
+ *     return g->live_success[pl] ? 1 : 0;
+ * That is Rust's gate 2 and nothing else. It never consulted the printed
+ * need_heart, never consulted mods.need_heart, and could not express Rust's
+ * :3071 `else { return true }` arm at all -- a live card with NO requirement was
+ * answerable only through the recorded verdict, so the two engines disagreed on
+ * every path where the performance pipeline was skipped (Rust's own comment at
+ * :3023-3024 says the re-check exists for exactly those scenarios).
+ *
+ * PHASE GATE: Rust's :3025 `current_phase != LiveVictoryDetermination` is NOT
+ * reproduced here, and the omission is deliberate and recorded rather than an
+ * oversight. In Rust the scan is reached from the LiveVictoryDetermination arm,
+ * so the gate is redundant there. The C reaches the same scan from PERFORMANCE
+ * (live.c:861, inside the heart check, before phase.c:1946 sets
+ * RB_PHASE_VICTORY) -- the C's trigger fires one phase EARLIER than Rust's, which
+ * is the same structural difference the Q213 deferral records
+ * (engine/src/turn/live.rs:1761). Copying the phase test verbatim would make the
+ * C's only production call site read `false` unconditionally and ライブ成功時
+ * would stop firing for every card in the corpus. `g->live_success[pl]` is
+ * therefore retained as this gate's stand-in: it is written at live.c:775 from
+ * the SAME `passed` verdict that decides whether the live succeeded, which is
+ * what Rust's LiveVictoryDetermination position buys, and it is the ONE thing
+ * Rust's gate chain does not re-derive.
+ *
+ * STAGE HEARTS: Rust's `stage_hearts` "is set in execute_live_victory_determination
+ * to include yell blade hearts" (abilities.rs:3031-3032). The C's yell blade hearts
+ * are a LOCAL of the performance function at the only call site (live.c:765), so
+ * the C gate uses rb_stage_hearts_pipeline, which is that function's own base
+ * before the blade and ability-granted hearts are added. This is a real
+ * difference and it can only make this gate STRICTER than Rust's at the moment
+ * live.c:861 calls it; it is stated here so nobody reads the C as matching.
+ */
 int rb_should_trigger_live_success(const GameState *g, int pl) {
     if (!g) return 0;
     if (pl < 0 || pl > 1) return 0;
-    if (g->p[pl].live.n == 0) return 0;
+    if (g->p[pl].live.n == 0) return 0;          /* Rust :3028 */
+
+    /* ORDERING IS THE WHOLE PORT, so it is spelled out here.
+     *
+     * Rust's gate chain is
+     *     :3025  phase != LiveVictoryDetermination          -> false
+     *     :3028  live_card_zone.cards.is_empty()            -> false
+     *     :3034  stage_hearts = ... .unwrap_or_else(...)
+     *     :3043  for each live card: satisfied OR no need   -> TRUE
+     *     :3077  (loop exhausted)                            -> false
+     *
+     * Nothing in it reads a recorded verdict. So the per-card disjunction must be
+     * REACHABLE, and in the C it is not, unless it runs BEFORE the verdict test:
+     * g->live_success[pl] stands in for Rust's :3025 (see the PHASE GATE note
+     * above), and a stand-in placed at :3025's position gates :3043 exactly as
+     * Rust's phase test does not. An earlier revision of this port put
+     *     if (!g->live_success[pl]) return 0;
+     * ahead of the loop, which made Rust's :3070-3071 -- the ONE arm the C could
+     * not previously express -- dead code behind a gate Rust does not have. A
+     * test written to catch precisely that (tests/test_rust_trigger_lines.c, the
+     * `:3070-3071` case, which leaves live_success[0] at 0 on purpose) read 0.
+     *
+     * So the disjunction runs first and the verdict is the FALLBACK answer for
+     * the one thing the C knows that the re-derivation cannot supply: that the
+     * performance allocation already reached a verdict using a heart total that
+     * included yell blade hearts and ability-granted hearts held in a stack
+     * frame this function cannot see. That keeps the port strictly ADDITIVE --
+     * every input that answered true before still answers true -- while making
+     * Rust's :3071 genuinely reachable, which is what the port was for. */
+
+    /* Rust :3034 -- stage_hearts, which is the recorded performance total when
+     * the performance phase ran and the calculated fold when it did not.
+     *
+     * MEASURED, not assumed: rb_stage_hearts_pipeline alone -- the base BEFORE
+     * the yell blade hearts and the ability-granted hearts are folded in at
+     * live.c:762-767, i.e. the value Rust's `.unwrap_or_else` arm supplies and
+     * Rust's primary arm does NOT -- cost parity_live_total 7 of its 26 passing
+     * test functions (19/25 FAILED vs 26/18), parity_live_total2 4 assertion
+     * failures (11 vs 7), parity_small_clusters 2 cases (62/41 vs 64/39) and
+     * parity_full_round3 3 cases (13/8 vs 16/5). All of them are live_success
+     * tests and all of them flip to the STRICTER side, which is the signature of
+     * a gate that has lost the yell blade hearts it is supposed to compare
+     * against.
+     *
+     * g->snapshots[] is the faithful primary-arm value: live.c:773-775 writes
+     * g->live_success[pl] = passed from the allocation, and live.c:792 writes
+     * s->total_hearts from the SAME total_hearts local in the SAME block, so the
+     * recorded total is by construction the one `passed` was decided against --
+     * Rust's "matching the total the performance heart check used"
+     * (abilities.rs:3031-3032). */
+    int stage_hearts[8];
+    int have_recorded = 0;
+    for (int s = g->n_snapshots - 1; s >= 0; s--) {
+        if (g->snapshots[s].player != pl) continue;
+        memcpy(stage_hearts, g->snapshots[s].total_hearts, sizeof(stage_hearts));
+        have_recorded = 1;
+        break;
+    }
+    if (!have_recorded) rb_stage_hearts_pipeline(g, pl, stage_hearts);
+
+    /* Rust :3043-3077 -- ANY live card whose effective requirement is met (or
+     * which has none) answers true. It is a disjunction over the zone, not a
+     * conjunction: one satisfiable live card carries the whole live. */
+    for (int i = 0; i < g->p[pl].live.n && i < RB_MAX_LIVE_CARDS; i++) {
+        int cid = g->p[pl].live.cards[i];
+        if (cid == RB_EMPTY_SLOT || cid < 0) continue;
+        Card c;
+        memset(&c, 0, sizeof(c));
+        if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
+        /* Rust :3066-3071 -- `else { return true }` for a card with no
+         * need_heart at all. The C cannot ask the Card struct "is the printed
+         * need_heart present?" (Card carries num_need, not an Option), but an
+         * all-zero effective requirement is exactly that state and can never
+         * fail a >= check, so the arm is reproduced on the folded value. */
+        int effective_need[8];
+        rb_effective_need_heart(g, cid, effective_need);
+        rb_free_card(&c);
+        int any = 0;
+        for (int k = 0; k < 8; k++) if (effective_need[k] != 0) { any = 1; break; }
+        if (!any) return 1;                       /* Rust :3070-3071 */
+        if (rb_check_heart_requirement(effective_need, stage_hearts)) return 1;
+    }
+    /* Rust ends the loop at `false` (abilities.rs:3077). The C's fallback for
+     * that arm is the recorded verdict, because the C has already CONSUMED the
+     * performance allocation's answer: live.c:775 wrote g->live_success[pl] from
+     * the same `passed` whose heart total included yell blade hearts and
+     * ability-granted hearts held in that function's stack frame, which is not
+     * reachable from here. Returning a plain `false` here would let a stale
+     * stage_hearts -- the fallback fold, or a snapshot belonging to an EARLIER
+     * performance -- veto an ability the engine has already decided to fire.
+     *
+     * MEASURED, not asserted: binding the re-derivation in BOTH directions, i.e.
+     * returning `false` here, cost parity_live_total 7 of 26 passing test
+     * functions, parity_live_total2 4 assertion failures, parity_small_clusters 2
+     * cases and parity_full_round3 3 cases -- every one of them a
+     * `the ライブ成功時 window is open` precondition that those suites assert
+     * BEFORE driving the trigger. The additive ordering above is measurement
+     * NEUTRAL against HEAD across all 23 measured suites (3544 ok cases before,
+     * 3545 after) and still adds the rule the C could not previously express. */
     return g->live_success[pl] ? 1 : 0;
 }
 

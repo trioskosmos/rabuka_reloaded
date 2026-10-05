@@ -207,7 +207,7 @@ static    TestGame game;
 /* Discarding 2 matching cards should grant 2 blades. */
 static void test_bp2_live_start_discard_any_number_gains_blade_per_card(void)
 {
-    TestGame game;
+    static TestGame game;
     int joint, you, natsumi, live, filler;
     int idxs[2];
 
@@ -249,7 +249,7 @@ static void test_bp2_live_start_discard_any_number_gains_blade_per_card(void)
 /* Skipping the optional cost (0 cards) grants 0 blades. */
 static void test_bp2_live_start_skip_cost_gains_no_blade(void)
 {
-    TestGame game;
+    static TestGame game;
     int joint, you, live, filler;
 
     test_game_new(&game);
@@ -287,7 +287,7 @@ static void test_bp2_live_start_skip_cost_gains_no_blade(void)
 /* Paying 6 energy grants 3 blades. */
 static void test_bp3_live_start_pay_6e_gains_3_blade(void)
 {
-    TestGame game;
+    static TestGame game;
     int joint, live, filler;
 
     test_game_new(&game);
@@ -322,7 +322,7 @@ static void test_bp3_live_start_pay_6e_gains_3_blade(void)
 /* Skipping the 6E cost gives 0 blades. */
 static void test_bp3_live_start_skip_gains_no_blade(void)
 {
-    TestGame game;
+    static TestGame game;
     int joint, live, filler;
 
     test_game_new(&game);
@@ -402,7 +402,7 @@ static    TestGame game;
 /* bp4 debut trigger still works independently. */
 static void test_bp4_debut_trigger_fires_independently(void)
 {
-    TestGame game;
+    static TestGame game;
     int joint, ayumu, filler, i, zero[1];
 
     test_game_new(&game);
@@ -492,7 +492,7 @@ static    TestGame game;
 /* bp4 debut: skip selection → no card to hand, all cards to waitroom. */
 static void test_bp4_debut_skip_select_discards_all(void)
 {
-    TestGame game;
+    static TestGame game;
     int joint, ayumu, f1, f2, f3, f4, i;
     int hand_after_play, hand_after;
 
@@ -613,7 +613,7 @@ static int heart_of(TestGame *game, int joint, int color)
 /* Discarding 2 cards of 2 different colors → gain 1 of each distinct color. */
 static void test_bp6_live_start_two_distinct_colors_gain_two_hearts(void)
 {
-    TestGame game;
+    static TestGame game;
     int joint, kotori, dia, live, filler;
     int idxs[2];
 
@@ -660,7 +660,7 @@ static void test_bp6_live_start_two_distinct_colors_gain_two_hearts(void)
 /* Discarding 2 cards of the SAME color → only 1 heart gained (deduplication). */
 static void test_bp6_live_start_same_color_deduplicates(void)
 {
-    TestGame game;
+    static TestGame game;
     Card kotori_card;
     int joint, live, filler;
     int kotori1, kotori2;
@@ -785,7 +785,7 @@ static    TestGame game;
 /* The characters filter on a cost matches a multi-name card for ALL constituent names. */
 static void test_multi_name_card_matches_any_constituent_in_characters_filter(void)
 {
-    TestGame game;
+    static TestGame game;
     int joint_id;
     /* Rust: util::filter_from_parts(..., Some(&["上原歩夢"]), ...)
              .matches(&db, joint_id, false)

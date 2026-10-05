@@ -2440,7 +2440,30 @@ int rb_move_from_revealed(GameState *g, int actor, const int *indices, int n_ind
     return nm;
 }
 
-/* ── move_from_under_member ── */
+/* ── move_from_under_member ──
+   Rust: engine/src/ability/effects/move/transport.rs:132-197.
+
+   FAITHFUL, AND THE ORDER IS LOAD-BEARING. Rust is two-phase: it first maps
+   EVERY index of the answer to a (stage area, card id) pair, and only then
+   removes and re-places them (transport.rs:143-173). The C body did all of it in
+   one pass, so the removal at :2467-2469 ran BETWEEN index resolutions: answer
+   [0, 1] over three under-cards removed the card at flat position 0, which
+   compacted the bag, and index 1 then named what used to be position 2. The
+   second pick was therefore a card the player was never shown.
+
+   The removal is also by VALUE, not by position (transport.rs:166-169):
+   `under_cards[si].iter().position(|&c| c == card_id)` takes the FIRST copy of
+   that id in that area, which matters as soon as two copies of one member sit
+   under the same host — 「UNDER」 copies are legal, and the
+   awakening / 「好きな枚数」 paths both reach here with duplicates.
+
+   And `last_under_move_host_ids` ACCUMULATES (transport.rs:177-191). The C
+   zeroed it on entry, so an any_number re-prompt — which calls this once per
+   answered prompt, all inside one ability — lost the host recorded by the first
+   prompt, and the following 「そうした場合、そのメンバーは…」 gain
+   (effects/resource.rs:1658-1666) targeted nobody. Rust clears the list in
+   clear_effect_tracking (game_state/mod.rs:990), once per ABILITY, which is what
+   game_state_core.c:466 already does; this function must only append. */
 int rb_move_from_under_member(GameState *g, int actor, const int *indices, int n_indices,
                                int (*validate)(int), const char *dst, const char *target) {
     if (!g) return -1;
@@ -2448,8 +2471,11 @@ int rb_move_from_under_member(GameState *g, int actor, const int *indices, int n
     if (target && *target) { int t = rb_resolve_target_player(g, target); if (t >= 0) pl = t; }
     RbPlayer *P = &g->p[pl];
 
-    int host_ids[4]; int nh = 0;
-    for (int k = 0; k < n_indices; k++) {
+    /* PHASE 1 — resolve every index against the UNMODIFIED bags. */
+    int slot[RB_MAX_RECENTLY_MOVED];
+    int pick[RB_MAX_RECENTLY_MOVED];
+    int npick = 0;
+    for (int k = 0; k < n_indices && npick < RB_MAX_RECENTLY_MOVED; k++) {
         int idx = indices ? indices[k] : -1;
         if (idx < 0) return -1;
         int global = 0, found = 0, si = -1, cid = -1;
@@ -2457,16 +2483,32 @@ int rb_move_from_under_member(GameState *g, int actor, const int *indices, int n
             int len = P->under_cards[si].n;
             if (idx < global + len) {
                 cid = P->under_cards[si].cards[idx - global];
+                /* transport.rs:149-153 — a card that fails the filter is a hard
+                   error, not a silent skip, and nothing has been removed yet. */
                 if (validate && !validate(cid)) return -1;
                 found = 1;
                 break;
             }
             global += len;
         }
-        if (!found) return -1;
-        for (int j = idx - global; j < P->under_cards[si].n - 1; j++)
-            P->under_cards[si].cards[j] = P->under_cards[si].cards[j + 1];
-        P->under_cards[si].n--;
+        if (!found) return -1;   /* transport.rs:161-163 */
+        slot[npick] = si;
+        pick[npick] = cid;
+        npick++;
+    }
+
+    /* PHASE 2 — remove by value, then place. */
+    int host_ids[4]; int nh = 0;
+    for (int k = 0; k < npick; k++) {
+        int si = slot[k], cid = pick[k];
+        RbBag *under = &P->under_cards[si];
+        int pos = -1;
+        for (int j = 0; j < under->n; j++)
+            if (under->cards[j] == cid) { pos = j; break; }
+        if (pos < 0) continue;             /* transport.rs:166 — no-op if absent */
+        for (int j = pos; j < under->n - 1; j++)
+            under->cards[j] = under->cards[j + 1];
+        under->n--;
         rb_place_card_in_zone(g, pl, cid, dst ? dst : "discard", -1);
         int host = P->stage[si];
         if (host >= 0) {
@@ -2476,7 +2518,9 @@ int rb_move_from_under_member(GameState *g, int actor, const int *indices, int n
         }
     }
 
-    g->mods.n_last_under_move_host_ids = 0;
+    /* transport.rs:177-191 — ACCUMULATE. No reset here: the per-ability reset
+       is rb_clear_effect_tracking (game_state_core.c:466), matching Rust's
+       clear_effect_tracking at mod.rs:990. */
     for (int h = 0; h < nh; h++) {
         int dup = 0;
         for (int i = 0; i < g->mods.n_last_under_move_host_ids; i++)
@@ -2485,7 +2529,7 @@ int rb_move_from_under_member(GameState *g, int actor, const int *indices, int n
             g->mods.last_under_move_host_ids[g->mods.n_last_under_move_host_ids++] = (int16_t)host_ids[h];
     }
     rb_recalc_constants(g);
-    return n_indices;
+    return npick;
 }
 
 /* ── place_energy_under_member_selected ────────────────────────────────────

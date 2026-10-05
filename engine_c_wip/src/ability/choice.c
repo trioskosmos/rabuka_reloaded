@@ -334,8 +334,36 @@ int rb_resolver_look_select_finalize_dest(GameState *g, int idx)
     return 1;
 }
 
-int rb_resolver_spawn_target(RbAbilityResolver *self, GameState *g, int target)
-{
+/* ── B4 tombstone: rb_resolver_spawn_target is LIVE, not dead. ──────────────
+ *
+ * Reported as "ZERO callers"; MEASURED it has ONE, and the call is load-bearing,
+ * so it was neither wired nor deleted:
+ *     choice.c:604   if (self->spawn_target_set)
+ *                        rb_resolver_spawn_target(self, gs, self->spawn_target);
+ * which sits at the TOP of rb_resolver_resume_pending_actions, immediately
+ * before the parked batch runs. It is the C's spelling of Rust
+ * choice.rs:117-121, where resume_pending_actions republishes the seat for each
+ * parked effect BEFORE executing it:
+ *     for (idx, effect) in pending.iter().enumerate() {
+ *         self.in_flight.spawn_context.target = effect.target.clone();
+ *         self.execute_effect(gs, effect)?;
+ *
+ * Both flag setters are live producers, so the guard at :603 is genuinely taken:
+ *   - choice.c:4224-4225, the `self_or_opponent` SelectTarget answer, which then
+ *     falls straight into rb_resolver_resume_pending_actions at :4230;
+ *   - choice.c:2664, the C6 keep-N-shuffle-under phase-1 prompt (phase 2 clears
+ *     the flag at :2692).
+ *
+ * Its Rust reader is choice.rs:3049-3057, the deck-order target fallback:
+ *     let target = self.in_flight.spawn_context.target.clone()
+ *         .or_else(|| gs.entry_effect().and_then(|e| e.target.clone()))
+ *         .unwrap_or_else(|| "self".to_string());
+ * so losing the field would hand `[ORDER_DONE]` the wrong seat.
+ *
+ * Kept, deliberately: "zero C callers does not prove deadness" was right about
+ * this one and would have been wrong to delete. bash tools/zz_refs.sh
+ * rb_resolver_spawn_target is the check to re-run before any future deletion. */
+int rb_resolver_spawn_target(RbAbilityResolver *self, GameState *g, int target){
     if (!self || !g || target < 0 || target > 1) return -1;
     self->spawn_target = target;
     self->spawn_target_set = 1;
@@ -2106,7 +2134,21 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
        Validates against filtered pool, handles same_unit_name, fixed-count commitment (Rule 9.4.2.3),
        and any_number re-prompt. See choice.rs:476-744. log::debug! kept as comments for parity. */
     if (!effect_started && has_cost && !strcmp(zone, "hand")) {
-        int cost_count = pending_count;
+        /* B2 / choice.rs:772 and :855 — both arms below read `count`, which is
+           ctx.count, the PROMPT count, and it is NOT floored to 1. The C took
+           `pending_count`, which the line above floors (`count > 0 ? count : 1`),
+           so `cost_count` could never be 0 and `is_any_number` was DEAD: the
+           any_number re-prompt arm (choice.rs:855, the C's `if (is_any_number)`)
+           was unreachable, and an any_number hand cost fell through to the
+           fixed-count arm with a count of 1, which it satisfied after the first
+           pick and finalised. cost.c:1442-1443 is what makes the raw 0
+           reachable at all: an any_number non-activation cost publishes
+           count = 0 and allow_skip = 1.
+           NOTE this is deliberately NOT `cost->count`. The fixed-count arm is
+           Rust's `if count > 0 && new_card_ids.len() < count` (choice.rs:772),
+           i.e. the PROMPT count; cost.count is only the same-unit TOTAL
+           (choice.rs:820, taken from rb_entry_cost at choice.c:2191 below). */
+        int cost_count = g->queue.pending.count;
         /* allow_skip indicates any_number (count==0) in Rust */
         int is_any_number = (cost_count == 0 && allow_skip);
         int moved_before = self->n_moved_cards;
@@ -2280,7 +2322,37 @@ int rb_resolver_handle_select_card(RbAbilityResolver *self, GameState *g, const 
             char en[64]; char ja[64];
             snprintf(en,sizeof(en),"Select %d more card(s) from hand for cost", remaining);
             snprintf(ja,sizeof(ja),"コストとして手札からさらに%d枚選択", remaining);
-            choice_build_reprompt(g, actor, "hand", remaining, en, ja, 0, NULL, 0);
+            /* B2 / choice.rs:775-806 — this arm is NOT unfiltered when the cost
+             * carries same_unit_name. Rust derives `same_unit_filter` from the
+             * FIRST already-paid card's unit and intersects it with
+             * hand_matching_indices(.., require_unit=false), i.e. the re-prompt
+             * offers only the remainder of the CHOSEN unit:
+             *     let same_unit_filter = if same_unit_name { moved_cards.first()..unit }
+             *                              else { None };
+             *     let available_idxs = Self::hand_matching_indices(&hand_now, card_db,
+             *                                       validate_card, same_unit_filter.as_ref(), false);
+             *     let fi = if available_idxs.is_empty() { None } else { Some(available_idxs) };
+             *     self.reprompt_hand_cost(.., false, fi, ..);
+             * The C passed `(NULL, 0)` here, so every later round re-offered the
+             * WHOLE hand: a different-unit card was selectable and, on the empty
+             * pool Rust's `fi = None` collapses to, the C still opened a prompt.
+             * When the pool is empty Rust's `fi` is None and the re-prompt is
+             * UNFILTERED, so that case passes NULL too — see below. */
+            const AbilityEffect *fcost = rb_entry_cost(g);
+            int fc_same_unit = choice_cost_flag(fcost, "same_unit_name", 0);
+            int fc_idxs[RB_MAX_ZONE];
+            int fc_n = 0;
+            if (fc_same_unit && self->n_moved_cards > 0) {
+                const char *fu = rb_card_unit_name(self->moved_cards[0]);
+                int hand_ids[RB_MAX_ZONE];
+                int nh = rb_zone_cards(g, actor, "hand", hand_ids, RB_MAX_ZONE);
+                for (int i = 0; i < nh && fc_n < RB_MAX_ZONE; i++) {
+                    const char *u = rb_card_unit_name(hand_ids[i]);
+                    if (fu && u && !strcmp(u, fu)) fc_idxs[fc_n++] = i;
+                }
+            }
+            choice_build_reprompt(g, actor, "hand", remaining, en, ja, 0,
+                                  fc_n > 0 ? fc_idxs : NULL, fc_n);
             return 0;
         }
         /* committed fixed count satisfied -> finalize (choice.rs:730-743) */
@@ -3249,11 +3321,83 @@ void rb_resolver_handle_stage_selection(RbAbilityResolver *self, GameState *g,
        it. For is_select_action we record the selection (no immediate zone move); the
        effect moves/consumes it later. Otherwise we move stage cards to dst. */
     if (!self || !g) return;
+    /* C6 / choice.rs:2174 — `match self.awaiting.stage_select_intent.take()`.
+     * Rust DISPATCHES on the prompt's declared intent before anything else, and
+     * takes it, so the value is consumed by this answer alone. The C had no
+     * reader at all (MEASURED 0: `bash tools/zz_refs.sh s_stage_select_intent`
+     * found the declaration and two writers only), so the ChangeStateWait
+     * producer in cost.c -- which is Rust's handlers.rs:965-966 -- reached
+     * this function with nothing to say what the prompt WAS, and both of its
+     * prompt sites leave `pending.target` EMPTY (cost.c:1623-1636 and
+     * :2300-2322), so the only intent test available here, the
+     * `!strcmp(ch->target, "change_state")` guess at choice.c:1938, could never
+     * fire for them: the members the player picked to be put to WAIT were moved
+     * to `dst` below instead.
+     *
+     * choice.rs:2175-2189, verbatim:
+     *     Some(StageSelectIntent::ChangeStateWait) => {
+     *         if !cards.is_empty() && entry.is_some_and(|e| !e.effect_started) {
+     *             for &cid in &cards {
+     *                 gs.mods.add_orientation_modifier(cid, "wait");
+     *                 gs.last_cost_waited_members.push(cid);
+     *             }
+     *         }
+     *         // Effect phase: the stored ChangeState pending-action re-applies.
+     *     }
+     * The effect_started guard is load-bearing: after the effect has started
+     * Rust deliberately does NOT wait here, leaving it to the re-driven
+     * ChangeState (this port's state.c "Honour prior selected_cards relay").
+     *
+     * Take it ONCE per call and consume it on BOTH the is_select and the plain
+     * arm, since which of the two runs is a property of the ANSWER path and not
+     * of the intent: Rust takes at :2174 before the `is_select_action` test. */
+    int stage_intent = rb_cost_take_stage_select_intent();
     int pl = rb_resolve_target_player(g, g->queue.pending.target_player_id[0] ?
-                                     g->queue.pending.target_player_id : "self");
+                                      g->queue.pending.target_player_id : "self");
     if (pl < 0 || pl > 1) pl = g->queue.actor;
     int is_select = (g->queue.pending.card_type[0] != '\0'); /* proxy for is_select_action */
     int idx = selected ? atoi(selected) : -1;
+    if (stage_intent) {
+        /* the ChangeStateWait card set, collected first so the wait is applied
+         * to exactly the validated cards and not to the raw answer */
+        int waited[RB_STAGE_SIZE];
+        int n_waited = 0;
+        if (idx >= 0) {
+            stage_build_filtered_slots(g, pl);
+            int slot = map_choice_index(&g->queue.pending, idx);
+            if (slot >= 0 && slot < RB_STAGE_SIZE) {
+                int cid = g->p[pl].stage[slot];
+                if (cid != RB_EMPTY_SLOT && cid >= 0 && stage_choice_accepts(g, cid)) {
+                    /* choice.rs:2160 — dedup against selection.cards. The C's
+                     * single-answer path holds at most one card here, so this is
+                     * the same test with a one-element vec. */
+                    int dup = 0;
+                    for (int k = 0; k < self->n_selected_cards; k++)
+                        if (self->selected_cards[k] == cid) dup = 1;
+                    if (!dup) waited[n_waited++] = cid;
+                }
+            }
+        }
+        int cur_i = g->queue.cur;
+        int eff_started = (cur_i >= 0 && cur_i < g->queue.n_entries)
+                          ? g->queue.entries[cur_i].effect_started : 0;
+        if (n_waited > 0 && !eff_started) {
+            for (int i = 0; i < n_waited; i++) {
+                rb_mods_set_orientation(&g->mods, waited[i], "wait");
+                if (g->n_last_cost_waited_members < RB_STAGE_SIZE)
+                    g->last_cost_waited_members[g->n_last_cost_waited_members++] =
+                        (int16_t)waited[i];
+            }
+        }
+        /* choice.rs:2189 — "Effect phase: the stored ChangeState pending-action
+         * re-applies with wait-immunity filtering", then the arm falls out of
+         * the match and the enclosing function returns Ok(()) at :2319. The C's
+         * spelling of "return Ok(())" is the same
+         * clear_choice_state_and_resume every other arm below uses. No card is
+         * moved to `dst`: on this intent the prompt IS the state change. */
+        rb_resolver_clear_choice_state_and_resume(self);
+        return;
+    }
     if (is_select) {
         stage_build_filtered_slots(g, pl);
         if (idx < 0) {

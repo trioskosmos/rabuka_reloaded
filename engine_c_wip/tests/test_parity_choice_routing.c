@@ -787,25 +787,109 @@ static void t_reader_answers_the_routed_seat(void)
  * never leak opponent choices". This is pinned as a KNOWN DIVERGENCE so it
  * cannot be rediscovered as a surprise.
  * ------------------------------------------------------------------------- */
-static void t_second_json_producer_is_a_known_divergence(void)
+/* ---------------------------------------------------------------------------
+ * 7. THE SECOND `choice_player_id` PRODUCER — Rust abilities.rs:2828-2846.
+ *
+ * `inject_choice_ability_context` has TWO producers of the key, not one:
+ *
+ *     if let Some(entry) = entry_ref { ... }                      // :2641-2717
+ *         obj.insert("choice_player_id", normalize(entry.choice_player_id
+ *                             .as_ref().unwrap_or(&entry.player_id)));
+ *     } else if let Some(choice) = self.ability_queue.is_waiting_for_choice() {
+ *         if let Choice::SelectAutoAbility { ref player_id, .. }
+ *         | Choice::SelectLiveSuccess { ref player_id, .. } = choice {
+ *             obj.insert("choice_player_id", normalize(player_id));
+ *         }
+ *     }
+ *
+ * The `else` arm is reached when `current_entry()` yields nothing, which in
+ * Rust (ability/queue.rs:234-242) is exactly Idle and
+ * WaitingForAutoAbilityChoice. The C returned early on both, emitting nothing,
+ * and this section used to PIN that as a known divergence. game_state_abilities.c
+ * now implements the arm, so the assertion below is the Rust behaviour and the
+ * old "MEASURED DIVERGENCE ... not fixed" text is gone: the gap is closed, not
+ * documented.
+ *
+ * THE CHOICE'S OWNER IN THE C. Rust reads
+ * `Choice::SelectAutoAbility::player_id: Option<String>`. The C has no such
+ * field: RbFullChoice (rabuka.h:1156) carries none and
+ * `rb_full_choice_to_header` (types.c:515-541) copies none into RbChoice, whose
+ * seat member is `actor` (rabuka.h:1001, "0=p1, 1=p2 - which player made the
+ * choice"). That is the same datum — the seat the Choice answers to — and
+ * `rb_queue_pause_for_auto_ability_choice` (ability_queue.c:714-722) stamps
+ * `queue.actor = g->active` for precisely this prompt. types.c:525 folds
+ * `RB_CC_SELECT_LIVE_SUCCESS` into `RB_CHOICE_SELECT_AUTO_ABILITY`, so one kind
+ * test covers both Rust variants.
+ *
+ * WHY IT MATTERED: web_server.rs:1243 DROPS the whole `pending_choice` object
+ * when the key is missing, so on this path the prompt was invisible to BOTH
+ * seats and the game waited for an answer that could never arrive.
+ * ------------------------------------------------------------------------- */
+static void t_second_json_producer_names_the_choices_own_seat(void)
 {
     static TestGame tg;
     ensure_cards_loaded();
     char buf[2048];
 
-    /* The premise: with no current entry, the C emits the empty token. */
+    /* (a) THE ELSE ARM: no current entry, a SelectAutoAbility prompt waiting.
+       Rust takes :2828-2846 and names the Choice's own seat. */
     test_game_new(&tg);
     tg.state.queue.cur = -1;
     tg.state.queue.n_entries = 0;
-    CHECK(strcmp(rb_wire_pending_choice_player_id(&tg.state), "") == 0,
-          "MEASURED DIVERGENCE: abilities.rs:2679-2697 would emit the "
-          "SelectAutoAbility picker's own player_id here; the C has no entry "
-          "to read and emits \"\". Safe (the choice is hidden, not leaked), "
-          "and NOT FIXED because src/core/game_state_abilities.c is not this "
-          "file's to edit");
+    tg.state.queue.pending.kind   = RB_CHOICE_SELECT_AUTO_ABILITY;
+    tg.state.queue.pending.actor  = 1;              /* p2 answers */
+    tg.state.queue.has_pending    = 1;
+    tg.state.queue.auto_ability   = 1;
+    tg.state.queue.state          = RB_QUEUE_AWAITING_CHOICE;
+    tg.state.queue.actor          = 1;
+    CHECK(strcmp(rb_wire_pending_choice_player_id(&tg.state), "p2") == 0,
+          "abilities.rs:2836-2844 — with NO current entry the `else` arm names "
+          "the SelectAutoAbility Choice's own player_id (p2), which the "
+          "pre-port C could not do and answered \"\"");
+    buf[0] = 'S'; buf[1] = '\0';
+    rb_inject_choice_ability_context(&tg.state, buf, sizeof(buf));
+    CHECK(strstr(buf, "\"choice_player_id\":\"p2\"") != NULL,
+          "abilities.rs:2841-2844 — the same arm inserts the key into the JSON "
+          "object, so the prompt is no longer dropped by web_server.rs:1243");
 
-    /* And when there IS an entry, the first producer wins, so the C is right
-     * and this is the whole of the gap. */
+    /* (b) THE NEGATIVE CONTROL: same state, but the waiting Choice is NOT one
+       of the two variants that carry a player_id. Rust inserts nothing, so the
+       C must not invent a seat. */
+    test_game_new(&tg);
+    tg.state.queue.cur = -1;
+    tg.state.queue.n_entries = 0;
+    tg.state.queue.pending.kind   = RB_CHOICE_SELECT_CARD;
+    tg.state.queue.pending.actor  = 1;
+    tg.state.queue.has_pending    = 1;
+    tg.state.queue.state          = RB_QUEUE_AWAITING_CHOICE;
+    tg.state.queue.actor          = 1;
+    CHECK(strcmp(rb_wire_pending_choice_player_id(&tg.state), "") == 0,
+          "abilities.rs:2833-2834 — only SelectAutoAbility and "
+          "SelectLiveSuccess carry a player_id; a SelectCard with no entry "
+          "inserts nothing");
+    buf[0] = 'S'; buf[1] = '\0';
+    rb_inject_choice_ability_context(&tg.state, buf, sizeof(buf));
+    CHECK(buf[0] == '\0',
+          "and the JSON producer writes nothing for it, rather than guessing");
+
+    /* (c) THE PREMISE GATE: `is_waiting_for_choice()` must actually hold. A
+       pending SelectAutoAbility with the queue NOT in AwaitingChoice is not a
+       waiting choice (queue.rs:200-205), so neither Rust nor the C answers. */
+    test_game_new(&tg);
+    tg.state.queue.cur = -1;
+    tg.state.queue.n_entries = 0;
+    tg.state.queue.pending.kind   = RB_CHOICE_SELECT_AUTO_ABILITY;
+    tg.state.queue.pending.actor  = 1;
+    tg.state.queue.has_pending    = 1;
+    tg.state.queue.state          = RB_QUEUE_RESOLVING;
+    tg.state.queue.actor          = 1;
+    CHECK(strcmp(rb_wire_pending_choice_player_id(&tg.state), "") == 0,
+          "queue.rs:208-214 — has_pending outside AwaitingChoice is not a "
+          "waiting choice, so the else arm does not run");
+
+    /* (d) PRECEDENCE: when an entry IS present the first producer runs and the
+       `else` is unreachable, so the entry's stamp wins even over the Choice's
+       own seat. This is what keeps the existing routing assertions honest. */
     test_game_new(&tg);
     seed_entry(&tg, "p2");
     RbChoice ch;
@@ -816,7 +900,10 @@ static void t_second_json_producer_is_a_known_divergence(void)
     rb_inject_choice_ability_context(&tg.state, buf, sizeof(buf));
     CHECK(strstr(buf, "\"choice_player_id\":\"p2\"") != NULL,
           "abilities.rs:2559 — with an entry present the STAMP producer runs "
-          "and the `else` at :2679 does not, so the C matches Rust exactly");
+          "and the `else` at :2828 does not, so the C matches Rust exactly");
+    CHECK(strcmp(rb_wire_pending_choice_player_id(&tg.state), "p2") == 0,
+          "and the web surface agrees: the entry arm still wins, which is why "
+          "no routed assertion moved when the else arm was added");
 }
 
 int main(void)
@@ -830,7 +917,7 @@ int main(void)
     t_select_source_carrier_is_the_decoded_field();
     t_q214_empty_waitroom_opens_no_prompt();
     t_reader_answers_the_routed_seat();
-    t_second_json_producer_is_a_known_divergence();
+    t_second_json_producer_names_the_choices_own_seat();
     if (cases == 0) {
         fprintf(stderr, "FAIL: parity_choice_routing ran ZERO cases -- every test body stopped "
                         "before its first assertion; this is a broken suite, "

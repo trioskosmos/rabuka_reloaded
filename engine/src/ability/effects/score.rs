@@ -107,7 +107,10 @@ impl PerUnitFilter<'_> {
         };
         let names = card_db.get_card_names(card_id);
         let key = if names.is_empty() {
-            CardDatabase::normalize_name(&card.name)
+            // Unreachable for a card that exists — `get_card_names` always
+            // yields at least one part of `name_key` — kept as a fallback that
+            // reads the same canonical string the branch below joins.
+            card.name_key.to_string()
         } else {
             names.to_vec().join("|")
         };

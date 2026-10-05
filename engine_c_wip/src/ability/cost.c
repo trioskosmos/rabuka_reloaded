@@ -26,6 +26,46 @@ static int s_pending_energy_payment;
 static int s_stage_select_intent;
 static int s_conditional_choice;
 
+/* ── C6: the reader `s_stage_select_intent` never had ──────────────────────
+ *
+ * MEASURED before this change (bash tools/zz_refs.sh s_stage_select_intent):
+ * 3 occurrences, all of them a WRITE or the declaration -- 0 readers. The two
+ * writers are the two `pay_cost_change_state` / gated-change_state producers
+ * that open a stage prompt, cost.c:1636 and cost.c:2321, and they are Rust's
+ * handlers.rs:965-966 and :1571-1572:
+ *     self.awaiting.stage_select_intent =
+ *         Some(crate::ability::types::StageSelectIntent::ChangeStateWait);
+ *
+ * Rust READS it at exactly one place, choice.rs:2174, and TAKES it there
+ * (`.take()`), inside handle_stage_selection's `is_select_action` branch:
+ *     match self.awaiting.stage_select_intent.take() {
+ *         Some(StageSelectIntent::ChangeStateWait) => { if !cards.is_empty()
+ *             && entry.effect_started == false { wait each card; push
+ *             last_cost_waited_members } }
+ *         ...
+ *         None => {}
+ *     }
+ *
+ * Until now the C answered such a prompt by GUESSING the intent from the
+ * prompt's own mark -- choice.c:1938 `!strcmp(ch->target, "change_state")` --
+ * and neither cost.c producer writes `pending.target` at all, so both prompts
+ * reached handle_stage_selection with an EMPTY target, failed that test, and
+ * fell into the move-to-destination arm: the members the player picked to be
+ * put to WAIT were moved to the resume effect's destination instead.
+ *
+ * This accessor is the reader. `take` semantics are Rust's own (`.take()`
+ * leaves None behind), so a stale intent cannot be applied twice, and it is
+ * consumed by rb_resolver_handle_stage_selection before any other stage arm
+ * can see it. Returns 1 for ChangeStateWait, which is the only intent the two
+ * cost.c producers set; a producer for another intent must add its own value
+ * here rather than reusing this one. */
+int rb_cost_take_stage_select_intent(void)
+{
+    int v = s_stage_select_intent;
+    s_stage_select_intent = 0;
+    return v;
+}
+
 /* ── "the optional cost was declined" latch ──
    Every auto-decline site in this file mirrors Rust's
    `entry.cost_paid = true; entry.optional_cost_result = Some(false);`
@@ -2496,31 +2536,29 @@ int rb_handle_pay_cost_all_discard(GameState *g, int actor, const char *selected
  *
  * KEPT, not deleted: deleting it would remove a header-visible spelling of a
  * live Rust predicate and change nothing else. Do not wire it, and do not
- * re-adjudicate it. */
+ * re-adjudicate it.
+ *
+ * ── DELETED 2026-10-05. The definition below was removed together with its
+ * include/rabuka.h declaration in the same edit. MEASURED 0 references outside
+ * cost.c with `bash tools/zz_refs.sh rb_cost_has_skip_prompt`, and 0 in Rust
+ * beyond the file-private `has_skip_prompt` at handlers.rs:45, which the C keeps
+ * as a static with two live call sites (cost.c:1684 and :1687). Removing the
+ * exported spelling loses nothing; removing it alone would have left a
+ * documented API whose definition is gone, i.e. a link error. */
 
-/* ── Public: rb_cost_has_skip_prompt ── */
-int rb_cost_has_skip_prompt(const AbilityEffect *cost) {
-    return has_skip_prompt(cost);
-}
-
-/* ── Public: rb_get_change_state_candidates ── */
-int rb_get_change_state_candidates(const GameState *g, int actor, int *out_positions, int max) {
-    int tmp[RB_STAGE_SIZE];
-    int n = get_change_state_candidates(g, actor, "self", NULL, NULL, 0, 0, 0, "active", tmp, max);
-    for (int i = 0; i < n && i < max; i++) out_positions[i] = tmp[i];
-    return n;
-}
-
-/* ── Public: rb_pay_cost_move_cards ── */
-int rb_pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cost,
-                           int host_cid, int is_activation) {
-    if (!g || !cost) return 0;
-    (void)host_cid;
-    (void)is_activation;
-    return pay_cost_move_cards(g, actor, cost);
-}
-
-/* ── Public: rb_pay_cost_change_state ── */
+/* ── Public: rb_pay_cost_change_state ──
+ *
+ * NOT a dead wrapper, unlike its three siblings removed in the same change.
+ * MEASURED 2026-10-05 with `bash tools/zz_refs.sh`: this name has THREE live
+ * external callers, tests/test_parity_conc_cost_card.c:296, :331 and :349
+ * (the non-"wait" no-op, the mandatory wait, and the no-candidate refusal).
+ * Those three tests name handlers.rs:936-949 as their oracle, so the exported
+ * spelling is the only way they can reach the port of that arm. Deleting the
+ * definition would have turned them into link errors.
+ *
+ * Its two dropped arguments are NOT Rust's: Rust's handlers.rs:858
+ * `pay_cost_change_state(&mut self, gs, cost)` takes neither host_cid nor
+ * is_activation, and this wrapper discards both. */
 int rb_pay_cost_change_state(GameState *g, int actor, const AbilityEffect *cost,
                              int host_cid, int is_activation) {
     if (!g || !cost) return 0;

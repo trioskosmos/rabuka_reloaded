@@ -213,7 +213,7 @@ static void pin_id(int cid, const char *want)
 
 static void test_debut_recovers_one_live_card_from_waitroom_to_hand(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int triple = test_id(&tg, TRIPLE_CARD_NO);
@@ -236,7 +236,7 @@ static void test_debut_recovers_one_live_card_from_waitroom_to_hand(void)
 
 static void test_debut_live_recovery_leaves_member_in_waitroom(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int triple = test_id(&tg, TRIPLE_CARD_NO);
@@ -256,7 +256,7 @@ static void test_debut_live_recovery_leaves_member_in_waitroom(void)
 
 static void test_live_success_recovers_member_from_waitroom(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int triple = test_id(&tg, TRIPLE_CARD_NO);
@@ -276,7 +276,7 @@ static void test_live_success_recovers_member_from_waitroom(void)
 
 static void test_live_success_member_recovery_ignores_live_cards(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int triple = test_id(&tg, TRIPLE_CARD_NO);
@@ -296,7 +296,7 @@ static void test_live_success_member_recovery_ignores_live_cards(void)
 
 static void test_discard_two_niji_member_recovery(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int me = test_id(&tg, "PL!N-sd1-005-PRproteinbar");
@@ -325,7 +325,7 @@ static void test_discard_two_niji_member_recovery(void)
 
 static void test_discard_cost_mill_then_member_recovery(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int me = test_id(&tg, "PL!N-bp1-009-R");
@@ -356,7 +356,7 @@ static void test_discard_cost_mill_then_member_recovery(void)
 
 static void test_self_wait_discard_niji_live_recovery(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int me = test_id(&tg, "PL!N-bp3-004-R");
@@ -382,7 +382,7 @@ static void test_self_wait_discard_niji_live_recovery(void)
 
 static void test_self_to_waitroom_liella_recovery(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_p1(&tg);
     int me = test_id(&tg, "PL!SP-bp4-018-N");

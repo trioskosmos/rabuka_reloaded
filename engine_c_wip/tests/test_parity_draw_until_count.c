@@ -241,7 +241,7 @@ static void test_target_sizes_via_extra(void)
 {
     static const int targets[] = { 1, 3, 5, 7 };
     for (int i = 0; i < (int)(sizeof(targets) / sizeof(targets[0])); i++) {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         reset_board(&tg);
@@ -287,7 +287,7 @@ static        TestGame tg;
 /* ── 4. Hand already at or above the target is a no-op (saturating_sub) ───── */
 static void test_hand_already_at_or_above_target(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
 
@@ -355,7 +355,7 @@ static    TestGame tg;
 /* ── 7. Completely empty deck and waitroom: no-op, no crash ──────────────── */
 static void test_empty_deck_and_waitroom(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     reset_board(&tg);
     AbilityEffect e;
@@ -386,7 +386,7 @@ static    TestGame tg;
 /* ── 9. Non-hand destination is a no-op (draw.rs:607-612 returns early) ──── */
 static void test_non_hand_destination_is_noop(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     reset_board(&tg);
@@ -419,7 +419,7 @@ static    TestGame tg;
 /* ── 11. Non-empty hand below the target (partial fill) ──────────────────── */
 static void test_partial_fill_from_non_empty_hand(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int filler = test_id(&tg, "PL!-sd1-010-SD");
     reset_board(&tg);

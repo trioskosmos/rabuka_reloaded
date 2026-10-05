@@ -303,7 +303,8 @@ impl<'a> ConditionContext<'a> {
         // The source qualifier names a member that must be sitting in some
         // waitroom — a baton touch always leaves the replaced card there.
         if let Some(src) = condition.get_baton_touch_source() {
-            let normalized = crate::card::CardDatabase::normalize_name(src);
+            // Both sides are canonical already: `src` was squashed by the parser
+            // (`parser_utils.squash_name_needles`) and `name_key` at card load.
             let in_any_waitroom = self
                 .game_state
                 .player1
@@ -312,9 +313,7 @@ impl<'a> ConditionContext<'a> {
                 .iter()
                 .chain(self.game_state.player2.waitroom.cards.iter())
                 .any(|&id| {
-                    card_db.get_card(id).is_some_and(|c| {
-                        crate::card::CardDatabase::normalize_name(&c.name).contains(&normalized)
-                    })
+                    card_db.get_card(id).is_some_and(|c| c.name_key.contains(src))
                 });
             if !in_any_waitroom {
                 return false;
@@ -904,16 +903,14 @@ impl<'a> ConditionContext<'a> {
                 let selected: &[i16] = self.selected_card_ids;
                 if let Some(&selected_id) = selected.last() {
                     if let Some(selected_card) = card_db.get_card(selected_id) {
-                        let selected_name =
-                            crate::card::CardDatabase::normalize_name(&selected_card.name);
+                        let selected_name = selected_card.name_key.as_ref();
                         let target_cards: Vec<i16> = util::zone_cards(player, location).to_vec();
                         let matching = target_cards
                             .iter()
                             .filter(|&&cid| {
-                                card_db.get_card(cid).is_some_and(|c| {
-                                    crate::card::CardDatabase::normalize_name(&c.name)
-                                        == selected_name
-                                })
+                                card_db
+                                    .get_card(cid)
+                                    .is_some_and(|c| c.name_key.as_ref() == selected_name)
                             })
                             .count()
                             .u8_count();
@@ -1611,8 +1608,7 @@ impl<'a> ConditionContext<'a> {
                         .is_none_or(|ct| util::card_matches_type(card_db, card_id, Some(ct)))
                     && !excluded.iter().any(|name| {
                         card_db.get_card(card_id).is_some_and(|card| {
-                            crate::card::CardDatabase::normalize_name(&card.name)
-                                .contains(&crate::card::CardDatabase::normalize_name(name))
+                            card.name_key.contains(name.as_str())
                                 || card.card_no.contains(name)
                         })
                     })
@@ -2985,10 +2981,12 @@ let actual = if condition.get_member_has_resource_under() == Some(true) {
                 .game_state
                 .card_database
                 .get_card(card_id)
-                .map(|c| crate::card::CardDatabase::normalize_name(&c.name));
-            let wanted = crate::card::CardDatabase::normalize_name(&pc.character);
+                .map(|c| c.name_key.to_string());
+            // `pc.character` comes from `positions_characters`, squashed by the
+            // parser — no normalisation needed on the needle side either.
+            let wanted = pc.character.as_str();
             match card_name {
-                Some(ref name) if name.contains(&wanted) => {}
+                Some(ref name) if name.contains(wanted) => {}
                 _ => {
                     push_rich(
                         &format!(
@@ -3006,11 +3004,9 @@ let actual = if condition.get_member_has_resource_under() == Some(true) {
 
     /// The cost of the first card on the stage whose name contains `name`.
     fn stage_cost_of_name(&self, stage_ids: &[i16], name: &str) -> Option<u8> {
-        let wanted = crate::card::CardDatabase::normalize_name(name);
         stage_ids.iter().find_map(|&cid| {
             let card = self.game_state.card_database.get_card(cid)?;
-            let norm_name = crate::card::CardDatabase::normalize_name(&card.name);
-            norm_name.contains(&wanted).then_some(card.cost)?
+            card.name_key.contains(name).then_some(card.cost)?
         })
     }
 
@@ -3034,14 +3030,15 @@ let actual = if condition.get_member_has_resource_under() == Some(true) {
                 self.game_state
                     .card_database
                     .get_card(cid)
-                    .map(|c| crate::card::CardDatabase::normalize_name(&c.name))
+                    .map(|c| c.name_key.to_string())
             })
             .collect();
         log::debug!("[APPEARANCE] stage card names: {:?}", stage_card_names);
-        let present = chars.iter().all(|name| {
-            let norm = crate::card::CardDatabase::normalize_name(name);
-            stage_card_names.iter().any(|cname| cname.contains(&norm))
-        });
+        // `chars` is squashed at generation time, so it compares raw against the
+        // already-canonical `name_key`.
+        let present = chars
+            .iter()
+            .all(|name| stage_card_names.iter().any(|cname| cname.contains(name)));
         log::debug!("[APPEARANCE] result={}", present);
         if !present {
             push_rich(
@@ -3834,8 +3831,7 @@ pub(crate) fn count_cards_with_filters(
                 if let Some(exc) = exclude_characters {
                     if let Some(card) = card_db.get_card(card_id) {
                         if exc.iter().any(|e| {
-                            crate::card::CardDatabase::normalize_name(&card.name)
-                                .contains(&crate::card::CardDatabase::normalize_name(e.as_str()))
+                            card.name_key.contains(e.as_str())
                                 || card.card_no.contains(e.as_str())
                         }) {
                             log::debug!(

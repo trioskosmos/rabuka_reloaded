@@ -1,4 +1,0 @@
-[RESUME_ANY] kind=1 zone=discard target= route=0 mode=2 idx=0
-[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00199160 cur=0 n=0 state=0 pending=1
-[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
-MARK:free_keepalive pending=0

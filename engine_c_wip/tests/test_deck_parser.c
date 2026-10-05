@@ -253,6 +253,81 @@ static void test_parse_line_divergences_from_rust(void)
              "a '//' comment line is skipped");
 }
 
+/* ── The THREE widenings rb_parse_deck_content has over parse_line ───────────
+ *
+ * tests/test_deck_parser.c::test_parse_line_divergences_from_rust pins the three
+ * that live in rb_parse_deck_line. The CONTENT path adds three more, one layer
+ * up, and these are they. Each is asserted here so it is a recorded divergence
+ * rather than something a reader has to rediscover from
+ * src/game/deck_parser.c's comment block. The Rust citations are
+ * engine/src/game/deck_parser.rs unless stated.
+ *
+ * W1 -- the C's strip_html deletes a tag's INTERIOR TEXT; Rust's fold does not.
+ *   Rust :173-183 maps '<' to a newline, drops '>', collapses a doubled '\n', and
+ *   keeps everything else -- so `b` inside <b> survives as content.
+ *   MEASURED: the C returns the clean card number; Rust would return "b" glued to
+ *   the front of it, which its bare-card arm would still accept.
+ * W2 -- the C maps <td> to a NEWLINE, Rust maps it to a SPACE (:169-172), so a
+ *   two-cell row is two lines to the C and one joined line to Rust.
+ *   MEASURED: Rust's " x " split then swallows the quantity cell INTO the card
+ *   number as trailing text. The C is right and Rust is wrong here, which is why
+ *   this widening is recorded and not removed.
+ * W3 -- an inline '#' comment is stripped by the C; Rust has no '#' comment
+ *   concept at all and keeps the text, which adds a space and fails Rust's
+ *   bare-card arm's `!line.contains(' ')`.
+ */
+static void test_content_widenings_over_parse_line(void)
+{
+    char **cards = NULL;
+    size_t count = 0;
+
+    /* W1 */
+    CHECK_EQ(rb_parse_deck_content("<b>PL!-sd1-010-SD</b>", &cards, &count), 0,
+             "W1: tag-interior text is deleted, so a wrapped card number still parses");
+    CHECK_EQ(count, 1, "W1: exactly one card comes out of a <b>-wrapped line");
+    if (count == 1) {
+        CHECK(strcmp(cards[0], "PL!-sd1-010-SD") == 0,
+              "W1: the C returns the CLEAN card number; Rust's fold would keep the "
+              "interior 'b' and yield \"bPL!-sd1-010-SD\"");
+    }
+    rb_deck_card_numbers_free(cards, count);
+    cards = NULL;
+    count = 0;
+
+    /* W2 */
+    CHECK_EQ(rb_parse_deck_content("<td>2 x PL!-sd1-010-SD</td><td>2</td>",
+                                   &cards, &count), 0,
+             "W2: two <td> cells are two lines to the C");
+    CHECK_EQ(count, 2, "W2: the quantity cell is its own line, not swallowed into the card");
+    if (count == 2) {
+        CHECK(strcmp(cards[0], "PL!-sd1-010-SD") == 0, "W2: first cell expands to the card");
+        CHECK(strcmp(cards[1], "PL!-sd1-010-SD") == 0, "W2: second cell expands to the card");
+    }
+    rb_deck_card_numbers_free(cards, count);
+    cards = NULL;
+    count = 0;
+
+    /* W3 */
+    CHECK_EQ(rb_parse_deck_content("PL!-sd1-010-SD # three copies",
+                                   &cards, &count), 0,
+             "W3: an inline '#' comment is stripped (Rust keeps it and rejects the line)");
+    CHECK_EQ(count, 1, "W3: the commented line yields the card exactly once");
+    if (count == 1)
+        CHECK(strcmp(cards[0], "PL!-sd1-010-SD") == 0,
+              "W3: the card number is the bare token, not the comment");
+    rb_deck_card_numbers_free(cards, count);
+
+    /* The narrow forms all still work, so none of the three widenings is the only
+     * thing holding the content path up. */
+    cards = NULL;
+    count = 0;
+    CHECK_EQ(rb_parse_deck_content("2 x PL!-sd1-010-SD\nPL!HS-bp1-019-L",
+                                   &cards, &count), 0,
+             "plain multi-line deck text still parses");
+    CHECK_EQ(count, 3, "plain text expands to three card numbers");
+    rb_deck_card_numbers_free(cards, count);
+}
+
 int main(void)
 {
     test_line_formats();
@@ -260,6 +335,7 @@ int main(void)
     test_file_status_and_expansion();
     test_normalize_card_no();
     test_parse_line_divergences_from_rust();
+    test_content_widenings_over_parse_line();
     if (failures) return 1;
     printf("ALL DECK PARSER CHECKS PASSED\n");
     return 0;

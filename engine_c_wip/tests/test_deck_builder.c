@@ -110,14 +110,28 @@ static void test_builds_from_deck_list_and_initializes_game(void)
     CHECK_EQ(deck0.main_count, 2, "deck list quantity creates two main cards");
     CHECK_EQ(deck0.energy_count, RB_MAX_ENERGY_CARDS, "deck list energy is filled");
     CHECK_EQ(rb_build_deck_from_list(&list, &deck1), 0, "second deck list builds independently");
-    /* static: sizeof(GameState) is 1195656 B (1167.6 KiB), which overflows the
-     * 1 MiB DEFAULT stack on its own. This local only ever passed because the
-     * Makefile links with -Wl,--stack,33554432 -- recorded as T5-7 / H4 in
-     * PARITY_CHECKLIST.md, blocked on the tests tree being contested. It is not
-     * contested for this file. Provably neutral: automatic storage is never
-     * zero-initialised by the C runtime and rb_init_game_from_built_decks
-     * initialises the whole struct before any read, so `static` changes no
-     * value -- it only moves 1.1 MB off the stack. */
+    /* static, and the size in this comment was WRONG for a long time.
+     *
+     * It read "sizeof(GameState) is 1195656 B (1167.6 KiB)", which is four
+     * generations stale: the Makefile:3 pin and tests/test_harness_self.c:116
+     * both say 1090528 B (1065.0 KiB), and a throwaway sizeof() TU compiled
+     * against the live header on 2026-10-05 prints 1090528. A comment that
+     * overstates the frame it explains is worse than no comment, because the
+     * next reader sizes a stack from it.
+     *
+     * The local would still have overflowed on its own: 1090528 B still exceeds
+     * the 1 MiB DEFAULT Windows stack, and this suite is linked with
+     * -Wl,--stack,33554432 (Makefile:50, recorded as T5-7 / H4 in
+     * PARITY_CHECKLIST.md). So `static` is load-bearing, not cosmetic.
+     *
+     * Provably value-neutral, which is why it can be changed without a
+     * measurement: automatic storage is never zero-initialised by the C
+     * runtime, and rb_init_game_from_built_decks -> rb_game_init initialises the
+     * whole struct before any read. `static` changes only WHERE the 1.04 MiB
+     * lives, never a value in it. (It is also what harness_self §N counts as a
+     * fixture hazard IF the same function never initialises it -- N1 reads this
+     * shape and is satisfied because rb_init_game_from_built_decks is called on
+     * the very next line.) */
     static GameState game;
     CHECK_EQ(rb_init_game_from_built_decks(&game, &deck0, &deck1), 0,
              "built decks initialize a game");
@@ -149,11 +163,20 @@ static void test_builds_from_card_numbers(void)
  * behaviour is known to depend on HashMap iteration order and the hasher was
  * deliberately left alone.
  *
- * The C therefore PINS a template instead, and this test is the pin. If the pin
- * is ever changed it changes card IDENTITY in every deck, so it has to be a
- * deliberate edit here rather than a silent drift: IKZL-PR-001-PR (id 0, the
- * first energy by index, i.e. the C's fallback) and LL-E-001-SD (id 1, the
- * preferred pin) are different cards.
+ * DO NOT "FIX" THE C TO AGREE WITH AN OBSERVED RUN. That is the trap this pin
+ * exists to close: running the Rust engine once and hard-coding whatever card it
+ * happened to pick would turn a documented non-determinism into a false contract
+ * that looks like parity and is a coin flip on the next run. The C therefore
+ * PINS a template, and these are the two numbers that pin is made of:
+ *
+ *   deck_builder.c:12  the DEFAULT, LL-E-001-SD, which is card id 1
+ *   deck_builder.c:14-16 the FALLBACK, the first energy by index, which is
+ *                      IKZL-PR-001-PR, card id 0
+ *
+ * They are DIFFERENT CARDS, so the two branches are not interchangeable and the
+ * distinction has to be observable. Both ids are asserted by value below, not by
+ * "some energy card exists": an assertion that cannot tell id 0 from id 1 would
+ * pass after the pin had silently been changed.
  */
 static void test_default_energy_template_is_pinned(void)
 {
@@ -162,16 +185,55 @@ static void test_default_energy_template_is_pinned(void)
         if (rb_card_is_energy((int)i)) { first_by_index = (int)i; break; }
     }
     CHECK(first_by_index >= 0, "the card database has at least one energy card");
-    CHECK(rb_find_card_by_no("LL-E-001-SD") != first_by_index,
-          "LL-E-001-SD is NOT the first energy by index, so the pin is a real choice");
+
+    /* ── THE CONTRACT, by id ──────────────────────────────────────────────── */
+    int pinned_id = rb_find_card_by_no("LL-E-001-SD");
+    int fallback_id = rb_find_card_by_no("IKZL-PR-001-PR");
+    CHECK_EQ(pinned_id, 1,
+             "PIN: the deck_builder.c:12 default template LL-E-001-SD is card id 1");
+    CHECK_EQ(fallback_id, 0,
+             "PIN: the deck_builder.c:14 fallback template IKZL-PR-001-PR is card id 0");
+    CHECK_EQ(first_by_index, fallback_id,
+             "PIN: the fallback branch really is 'first energy by index' == id 0");
+    CHECK(pinned_id != fallback_id,
+          "the default and the fallback are DIFFERENT cards, so the pin is a real choice");
+
+    /* The default branch is what an under-full energy deck actually gets. */
+    {
+        RbBuiltDeck deck;
+        int empty[1] = { rb_find_card_by_no("PL!-sd1-010-SD") };  /* a member: no energy */
+        CHECK_EQ(rb_build_deck_from_card_ids(empty, 1, NULL, 0, &deck), 0,
+                 "a member-only deck builds, so the default energy branch runs");
+        CHECK_EQ(deck.energy_count, RB_MAX_ENERGY_CARDS,
+                 "the default energy template fills the energy deck");
+        if (deck.energy_count > 0)
+            CHECK(same_template(deck.energy_cards[0], pinned_id),
+                  "every default energy entry is the PINNED id-1 template, not the "
+                  "id-0 fallback -- this is the assertion that would catch a swap");
+        rb_built_deck_clear(&deck);
+    }
+
+    /* The fallback branch is only reachable when the pin misses. It is not
+     * reachable through the public API, so it is pinned by identity of the
+     * template the fallback loop would find, not by driving it. */
+    {
+        Card fallback;
+        memset(&fallback, 0, sizeof(fallback));
+        CHECK(rb_decode_card_by_index((uint32_t)fallback_id, &fallback),
+              "the fallback energy template decodes");
+        CHECK_EQ(strcmp(rb_card_string(fallback.card_no_idx), "IKZL-PR-001-PR"), 0,
+                 "card id 0 really is IKZL-PR-001-PR, the fallback template");
+        CHECK(rb_card_is_energy(fallback_id), "the fallback template is classified as energy");
+        rb_free_card(&fallback);
+    }
     {
         Card pinned;
         memset(&pinned, 0, sizeof(pinned));
-        int pinned_id = rb_find_card_by_no("LL-E-001-SD");
         CHECK(rb_decode_card_by_index((uint32_t)pinned_id, &pinned),
               "the pinned energy template decodes");
+        CHECK_EQ(strcmp(rb_card_string(pinned.card_no_idx), "LL-E-001-SD"), 0,
+                 "card id 1 really is LL-E-001-SD, the pinned default");
         CHECK_EQ(pinned.cost, 0, "pinned energy template has cost 0");
-        CHECK(rb_card_is_energy(pinned_id), "pinned template is classified as energy");
         rb_free_card(&pinned);
     }
     /* An all-energy input with nothing but ONE supplied card still ends up with

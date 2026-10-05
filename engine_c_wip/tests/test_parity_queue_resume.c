@@ -656,7 +656,7 @@ static void test_resolver_ownership_round_trip(void)
 
 static void test_optional_look_select_skip_terminates(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg.state, 0);
     int c0 = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -681,7 +681,7 @@ static void test_optional_look_select_skip_terminates(void)
 
 static void test_select_routes_card_to_hand(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg.state, 0);
     int c0 = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -702,7 +702,7 @@ static void test_select_routes_card_to_hand(void)
 
 static void test_resume_pending_actions_stops_at_new_choice(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg.state, 0);
     int c0 = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -751,7 +751,7 @@ static void test_resume_pending_actions_stops_at_new_choice(void)
 
 static void test_skip_every_choice_in_sequential_chain_terminates(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg.state, 0);
     int cards[4];
@@ -801,7 +801,7 @@ static void test_skip_every_choice_in_sequential_chain_terminates(void)
 
 static void test_skip_chain_does_not_grow_the_queue(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_zones(&tg.state, 0);
     int c0 = test_new_id(&tg, "PL!-sd1-010-SD");
@@ -840,7 +840,7 @@ static void test_baton_touch_skip_chain_terminates(void)
     /* The exact scenario from tests/test_baton_touch.c's
        drain_choices_by_skip: playing into a full lane offers a chain of
        prompts, every one of which is legal to decline. */
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     clear_zones(&game.state, 0);
     clear_zones(&game.state, 1);

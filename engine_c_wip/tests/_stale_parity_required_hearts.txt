@@ -1,0 +1,561 @@
+make t-nogate: running T=parity_required_hearts WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_required_hearts src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_required_hearts.c
+./rb_verdict ./rb_engine_t_parity_required_hearts parity_required_hearts
+--- A. all_active_stage_required_hearts_reduction_test.rs (PL!S-bp7-020-L ab#0) ---
+ok: HAPPY PARTY TRAIN is the sole live card
+ok: [a_all_active_stage_reduces_required_heart] the ability DISPATCHED (1 modify_required_hearts* verdict(s)); the zero below is a per-unit/group filter verdict, not a dead effect
+ok: all members active -> need heart00 is -1
+        a_all_active_stage_reduces_required_heart: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      a_all_active_stage_reduces_required_heart
+ok: [a2/waited] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: a waited member breaks 「すべてのメンバーが...アクティブ」
+ok: [a2/empty] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: empty stage -> 「すべてのメンバーがアクティブ」 is not met
+ok: [a2/control] the ability DISPATCHED (1 modify_required_hearts* verdict(s)); the zero below is a per-unit/group filter verdict, not a dead effect
+ok: CONTROL: the same board with the member active DOES reduce (-1), so the two zeros above are real gate rejections
+        a_waited_or_empty_stage_does_not_reduce: 6 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      a_waited_or_empty_stage_does_not_reduce
+--- B. required_hearts_stacking_and_hostile_edges_test.rs (PL!S-bp7-020-L ab#0/ab#1) ---
+ok: [b1/ab0] the ability DISPATCHED (1 modify_required_hearts* verdict(s)); the zero below is a per-unit/group filter verdict, not a dead effect
+ok: ab#0 alone: all-active -> -1
+ok: [b1/ab1] the ability DISPATCHED (1 modify_required_hearts* verdict(s)); the zero below is a per-unit/group filter verdict, not a dead effect
+ok: ab#1 milled the Aqours bottom card into the waitroom
+ok: STACKING: both independent live-start abilities apply -> -2
+        b_stacking_both_gates_reduce_twice: 5 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      b_stacking_both_gates_reduce_twice
+ok: the deck starts empty
+ok: [b2/ab1-empty-deck] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: nothing to mill
+ok: condition-on-no-card (empty deck) -> no heart reduction
+ok: [b2/ab0] the ability DISPATCHED (1 modify_required_hearts* verdict(s)); the zero below is a per-unit/group filter verdict, not a dead effect
+ok: ab#0 still applies after the empty-deck mill
+        b_empty_deck_mill_shortfall: 6 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      b_empty_deck_mill_shortfall
+ok: [b3/opponent-waited] the ability DISPATCHED (1 modify_required_hearts* verdict(s)); the zero below is a per-unit/group filter verdict, not a dead effect
+ok: own-stage gate: the opponent's orientation is irrelevant -> -1
+ok: a second, distinct HAPPY PARTY TRAIN is in the live zone
+ok: [b3/own-waited] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: own waited member breaks the gate (clean instance)
+        b_opponent_waited_own_all_active: 5 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      b_opponent_waited_own_all_active
+ok: real LiveStart fired both abilities -> heart00 -2
+ok: the P1 snapshot carries at least one live card
+ok: performance required[heart00] must be base 3 + (-2) = 1
+ok: reduced heart00 is honored: leftover coloured surplus covers heart00=1
+ok: the live succeeds end-to-end under the stacking reduction
+        b_reduction_honored_at_performance: 6 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      b_reduction_honored_at_performance
+--- C. distinct_stage_waitroom_members_required_hearts_test.rs (PL!HS-pb1-026-L) ---
+ok: two live cards in the zone
+ok: [c1/six-distinct] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: the ability resolves without prompting
+ok: the OTHER 蓮ノ空 live card is untouched (target = self)
+        c_six_distinct_reduce_two: 5 assertion(s), 1 failure(s), 0 setup bug(s), 0 vacuous
+FAIL:  c_six_distinct_reduce_two
+ok: premise: the card about to be added really is the SAME PRINT as staged member 0 (PL!HS-sd1-001-SD). It is a different INSTANCE -- mid() allocates a fresh one per call via test_new_id, which is exactly what makes it a duplicate -- got id 2646 vs member 0 id 2640
+ok: premise: ... and it really is a DISTINCT instance of that print (id 2646 != 2640), not the same pool slot written twice
+ok: four cards in the waitroom: five distinct 蓮ノ空 plus a duplicate
+ok: premise: the board still carries exactly 5 DISTINCT member names after the duplicate was added (6 cards on stage+waitroom) -- so the zero below is about THIS board, not about a board that never had five in the first place
+ok: [c2/duplicate] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: no prompt
+ok: a DUPLICATE name does not add a sixth distinct unit -> 0
+        c_five_plus_duplicate: 8 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  c_five_plus_duplicate  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+ok: premise: the card about to be added really IS a ライブ card (id 2646); the whole claim of this case is that a LIVE card in the waitroom is not counted as a member unit
+ok: premise: the board really carries 5 DISTINCT member names before the live card is added
+ok: [c3/renosora-live] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: no prompt
+ok: a 蓮ノ空 LIVE card in the waitroom does not count as a member unit -> 0
+        c_five_plus_renosora_live: 6 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  c_five_plus_renosora_live  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+ok: premise: the board really carries 5 DISTINCT member names BEFORE the non-蓮ノ空 card is added
+ok: premise: the extra card really does raise the board to 6 DISTINCT member NAMES -- it is a different series, and the distinct counter is series-wide rather than group-filtered (6 cards on stage+waitroom). So the zero below is the ability's GROUP filter rejecting it, not the distinct count having stayed at 5 all along; without this, the assertion could be green because the counter never saw six at all
+ok: [c4/wrong-group] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: no prompt
+ok: a non-蓮ノ空 card in the waitroom does not count -> 0
+        c_five_plus_wrong_group: 6 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  c_five_plus_wrong_group  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+--- D. baton_arrivals_required_hearts_reduction_test.rs (PL!HS-bp2-023/025-L) ---
+ok: HNS_B arrives at the left side (first baton touch)
+ok: [d1/two-baton] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: Mirage Voyage touches heart05 only
+        d_mirage_two_baton_heart05: 5 assertion(s), 2 failure(s), 0 setup bug(s), 0 vacuous
+FAIL:  d_mirage_two_baton_heart05
+ok: HNS_B arrives at the left side
+ok: [d2/one-baton] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: only ONE baton arrival -> the gate needs 2
+        d_mirage_one_baton: 4 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  d_mirage_one_baton  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+ok: premise: the two arrivals really are two DIFFERENT cards (ids 2643 and 2644), so the case really puts two separate cards through the baton rather than replaying one slot
+ok: premise: both arrivals really are MEMBERS, not live cards (b=2643 c=2644) -- the claim under test is the membership gate, not the card type
+ok: [d3/non-renosora] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: baton arrivals without 蓮ノ空 membership do not qualify
+        d_mirage_non_renosora: 5 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  d_mirage_non_renosora  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+ok: P2 has no live card (irrelevant here)
+ok: [d4/no-baton] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: 蓮ノ空 members without a baton-touch arrival do not qualify
+        d_mirage_renosora_no_baton: 4 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  d_mirage_renosora_no_baton  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+ok: HNS_B arrives at the left side (first baton touch)
+ok: [d5/kokon] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: ココン東西 touches heart01 only
+        d_kokon_two_baton_heart01: 5 assertion(s), 2 failure(s), 0 setup bug(s), 0 vacuous
+FAIL:  d_kokon_two_baton_heart01
+--- E. ladybug_stage_cost_comparison_required_hearts_test.rs (PL!HS-bp2-024-L) ---
+ok: 徒町小鈴 prints cost 2
+ok: 村野さやか prints cost 11 (> 2)
+ok: the turn walk reaches the live-card set window
+ok: Ladybug is the live card
+ok: Q114: both members on stage -> need heart00 is -3
+        e_both_members_reduce_three: 5 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      e_both_members_reduce_three
+ok: the turn walk reaches the live-card set window
+ok: Ladybug is the live card
+ok: Q114: missing さやか -> no heart reduction
+        e_missing_sayaka: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      e_missing_sayaka
+ok: the turn walk reaches the live-card set window
+ok: Ladybug is the live card
+ok: Q114: missing 小鈴 -> no heart reduction
+        e_missing_kosuzu: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      e_missing_kosuzu
+ok: the turn walk reaches the live-card set window
+ok: Ladybug is the live card
+ok: Q114: neither 小鈴 nor さやか on stage -> no reduction
+        e_wrong_character: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      e_wrong_character
+ok: the turn walk reaches the live-card set window
+ok: Ladybug is the live card
+ok: the stage really is empty
+ok: Q114: no members at all -> no reduction
+        e_no_members: 4 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      e_no_members
+--- F. wonder_zone_center_heart03_required_hearts_test.rs (PL!-bp5-020-L) ---
+ok: centre member with 2 heart03 -> 1 unit -> need heart00 is -1
+        f_center_two_heart03_reduces_1: 1 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      f_center_two_heart03_reduces_1
+ok: premise: the centre member really prints 0 heart03 (PL!-sd1-005-SD has heart03=0; heart01=1 heart02=0 heart04=0 heart05=0 heart06=0)
+ok: centre member with 0 heart03 -> 0 reduction
+        f_center_zero_heart03: 3 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  f_center_zero_heart03  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+ok: the centre really is empty
+ok: empty centre -> condition fails -> 0
+        f_no_center_member: 3 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  f_no_center_member  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+ok: premise: the centre member really is NOT in mu's (PL!SP-sd1-001-SD)
+ok: a non-μ's centre member -> condition fails -> 0
+        f_center_non_mus: 3 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  f_center_non_mus  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+--- G. modify_required_hearts_exclude_heart_test.rs (PL!-bp5-023-L) ---
+ok: PL!-sd1-002-SD really carries heart06 only
+ok: PL!-PR-002-PR really carries heart06 only
+ok: PL!-sd1-005-SD really carries heart01 only
+ok: all three members are really staged
+ok: every member has ONLY excluded colours -> 0 reduction
+        g_all_members_excluded: 5 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      g_all_members_excluded
+ok: one member owns a colour outside {heart01, heart06} -> -1
+        g_one_non_excluded_reduces_1: 1 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      g_one_non_excluded_reduces_1
+ok: two eligible members -> -2
+        g_mixed_reduces_2: 1 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      g_mixed_reduces_2
+ok: heart01+heart03+heart06 counts (it HAS heart03) -> -1
+        g_both_excluded_and_allowed_counts: 1 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      g_both_excluded_and_allowed_counts
+--- H. hanamusubi_required_hearts_exclude_self_test.rs (PL!HS-bp5-019-L) ---
+ok: ハナムスビ is the ONLY live card
+ok: exclude_self: alone there is no OTHER 蓮ノ空 card -> 0
+        h_alone_no_reduction: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      h_alone_no_reduction
+ok: both 蓮ノ空 live cards are set
+ok: one OTHER 蓮ノ空 live card -> need heart04 is -2
+ok: the other card is not modified (target = self)
+        h_one_other_reduces_2: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      h_one_other_reduces_2
+ok: three live cards are set
+ok: two OTHER 蓮ノ空 live cards -> -2 EACH, so -4 (per-unit value is 2, not 1)
+        h_two_others_reduce_4: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      h_two_others_reduce_4
+ok: a non-蓮ノ空 live card does not satisfy the group filter -> 0
+        h_non_renosora_no_reduction: 1 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      h_non_renosora_no_reduction
+ok: heart04 is reduced by 2
+ok: heart0 is NOT reduced -- the ability names heart04 only
+        h_only_heart04: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      h_only_heart04
+ok: A sees B as one other -> -2
+ok: B sees A as one other -> -2
+        h_two_hanamusubi_each_2: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      h_two_hanamusubi_each_2
+ok: A sees two others -> -4
+ok: B sees two others -> -4
+ok: C sees two others -> -4
+        h_three_hanamusubi_each_4: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      h_three_hanamusubi_each_4
+ok: A: the filler does not match -> -2
+ok: B: the filler does not match -> -2
+        h_two_hana_one_filler: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      h_two_hana_one_filler
+ok: no OTHER 蓮ノ空 card -> 0
+        h_one_hana_one_filler: 1 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      h_one_hana_one_filler
+ok: two DIFFERENT non-蓮ノ空 live cards still give 0
+        h_one_hana_two_fillers: 1 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      h_one_hana_two_fillers
+--- I. jellyfish_appeared_moved_member_required_hearts_test.rs (PL!SP-pb1-025-L) ---
+ok: 千砂都 debuts left
+ok: 夏美 debuts centre
+        i_two_appeared_reduce_2: 3 assertion(s), 1 failure(s), 0 setup bug(s), 0 vacuous
+FAIL:  i_two_appeared_reduce_2
+ok: 千砂都 debuts centre
+        i_one_both_flags_once: 2 assertion(s), 1 failure(s), 0 setup bug(s), 0 vacuous
+FAIL:  i_one_both_flags_once
+ok: 四季 debuts into the centre
+ok: the prompt is a SelectTarget
+ok: the prompt target is "area_select"
+ok: the offered area list contains "left" (read from description; the flat RbChoice has no option-list field -- EXPECTED_GAP)
+        i_position_change_swap: 6 assertion(s), 1 failure(s), 0 setup bug(s), 0 vacuous
+FAIL:  i_position_change_swap
+        i_mixed_qualifying: 1 assertion(s), 1 failure(s), 0 setup bug(s), 0 vacuous
+FAIL:  i_mixed_qualifying
+ok: only a non-5yncri5e! member appeared -> 0
+        i_no_qualifying: 2 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  i_no_qualifying  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+        i_three_qualify_reduce_3: 1 assertion(s), 1 failure(s), 0 setup bug(s), 0 vacuous
+FAIL:  i_three_qualify_reduce_3
+        i_moved_without_appearing: 1 assertion(s), 1 failure(s), 0 setup bug(s), 0 vacuous
+FAIL:  i_moved_without_appearing
+ok: a member that neither appeared nor moved does not count -> 0
+        i_neither_appeared_nor_moved: 2 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  i_neither_appeared_nor_moved  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+ok: 千砂都 really is off-stage
+ok: 千砂都 is still recorded as appeared this turn
+ok: Q98: appeared + moved but NOT on stage -> 0
+        i_appeared_then_left: 4 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  i_appeared_then_left  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+        i_one_left_one_stays: 1 assertion(s), 1 failure(s), 0 setup bug(s), 0 vacuous
+FAIL:  i_one_left_one_stays
+--- J. modify_required_hearts_13key_test.rs (PL!-bp6-022-L) ---
+ok: 愛してるばんざーい! prints score 6
+ok: score-6 μ's live in my live zone -> need heart00 is -2
+        j_high_score_mus_reduction: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_high_score_mus_reduction
+ok: きっと青春が聞こえる prints score 2
+ok: score-2 μ's live -> no modifier (the printed threshold is 5)
+ok: CONTROL: the same recalc DOES reduce the score-6 μ's live, so the score-2 zero is a real threshold rejection
+        j_low_score_no_reduction: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_low_score_no_reduction
+ok: the score-6 live is reduced by 2
+ok: the score-2 live is not
+        j_mixed_scores: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_mixed_scores
+ok: 勇気はどこに?君の胸に! prints score 5 (>= 5) but is Aqours
+ok: an Aqours score-5 live is not a μ's live -> no modifier
+ok: CONTROL: the μ's live beside it IS reduced
+        j_non_mus_high_score: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_non_mus_high_score
+ok: CONTROL: with the activator in the success zone the effect applies
+ok: the success zone really is empty
+ok: activator in the LIVE zone -> the as-long-as gate is off -> 0
+        j_activator_not_in_success_zone: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_activator_not_in_success_zone
+ok: the live zone really is empty
+ok: no live cards -> no need_heart modifier anywhere
+ok: CONTROL: the same activator DOES reduce once a qualifying live card exists, so the empty-zone zero above is meaningful
+        j_no_live_cards_no_crash: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_no_live_cards_no_crash
+ok: two DISTINCT copies of the 13-key card are in the success zone
+ok: 「この効果は重複しない」 -> -2, NOT -4
+        j_non_stackable: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_non_stackable
+ok: before removal -> -2
+ok: rb_recalc_constants alone does NOT withdraw it: modifiers.rs:2148 is the only need_heart_modifiers.clear() in the engine
+ok: the E3 path (modifiers.rs:2145-2150) is what expires it, and it also re-applies nothing: the activator is out of the bag
+        j_as_long_as_expiration: 3 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_as_long_as_expiration
+ok: P1's own score-6 μ's live -> -2
+ok: P2's identical score-6 μ's live is NOT affected (target = self)
+        j_p1_activator_not_p2: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_p1_activator_not_p2
+ok: P2 owns the activator -> P2's score-6 μ's live is -2 (regression for resolve_target_player("self") defaulting to p1)
+ok: P1's identical live is NOT affected (the activator is P2's)
+        j_p2_activator_targets_p2: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_p2_activator_targets_p2
+ok: P2's score-2 μ's live -> no modifier
+ok: CONTROL: P2's score-6 μ's live beside it IS reduced
+        j_p2_score_threshold: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_p2_score_threshold
+ok: P2's Aqours score-5 live -> no modifier (group filter)
+ok: CONTROL: P2's μ's score-6 live beside it IS reduced
+        j_p2_group_filter: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      j_p2_group_filter
+--- K. modify_required_hearts_global_test.rs (PL!SP-bp2-010-P / PL!S-bp5-011-N) ---
+ok: the opponent owns one live card
+ok: Wien's 常時 gives the OPPONENT's live card exactly +1 heart00
+        k_wien_increases_opponent: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      k_wien_increases_opponent
+ok: the modifier is active while Wien is on stage (this assertion is the non-vacuity control for the zero below)
+ok: the modifier is removed once Wien leaves the stage
+        k_wien_removed_on_exit: 2 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      k_wien_removed_on_exit
+ok: the three opponent live prints are three distinct names
+ok: the opponent has three live cards
+ok: opponent live 0 gets exactly +1
+ok: opponent live 1 gets exactly +1
+ok: opponent live 2 gets exactly +1
+        k_wien_all_opponent_lives: 5 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      k_wien_all_opponent_lives
+ok: two Wien instances stack -> +2
+ok: the second opponent live also +2
+ok: one instance removed -> back to +1 (non-vacuity control for the +2 assertions)
+ok: same for the second opponent live
+        k_two_wien_stack: 4 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      k_two_wien_stack
+ok: 梨子 debuts right
+ok: the stage's PRINTED heart02 total is 3 (千歌 only)
+ok: the stage's PRINTED heart05 total is 2 + 2 + 1 = 5, meeting the PRINTED 「heart05が合計5つ以上」 gate on PL!S-bp5-011-N
+ok: [k-riko/condition-met] stage hearts engine/printed agree: [0,0,3,0,2,5,0,0]
+ok: Riko should increase the opponent's need heart00 by 1
+        k_riko_condition_met: 5 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      k_riko_condition_met
+ok: 梨子 debuts right
+ok: the stage's PRINTED heart05 total is below the gate (2 + 1 = 3 < 5)
+ok: condition not met -> no modifier at all
+ok: CONTROL board: the PRINTED heart05 total now reaches the printed gate (2 + 2 + 1 = 5)
+ok: [k-riko/control] stage hearts engine/printed agree: [0,0,0,0,0,5,0,0]
+        k_riko_condition_not_met: 6 assertion(s), 1 failure(s), 0 setup bug(s), 0 vacuous
+FAIL:  k_riko_condition_not_met
+--- N. stage-fold ABSENCE-sentinel regression (rb_mods_init) ---
+ok: rb_mods_init leaves heart_color_override at the -1 ABSENCE sentinel (modifiers.c:27); Rust's absent HashMap key is None (stats_pipeline.rs:30), and 0 would read as a LIVE set-to-0 override that discards the printed base
+ok: rb_mods_init leaves heart_copy at -1 (modifiers.c:27); 0 would make the fold read card 0's hearts (stats_pipeline.rs:37-43)
+ok: rb_mods_init leaves heart_multiplier at -1 (modifiers.c:27); 0 would collapse the member into heart00 (stats_pipeline.rs:51-55)
+ok: the three-member stage prints >= 5 heart05 (2 + 2 + 1)
+ok: with every sentinel at -1 and no override and no additive modifier applied, stage_hearts (stats_pipeline.rs:93-136) must equal the printed base for this colour
+ok: with every sentinel at -1 and no override and no additive modifier applied, stage_hearts (stats_pipeline.rs:93-136) must equal the printed base for this colour
+ok: with every sentinel at -1 and no override and no additive modifier applied, stage_hearts (stats_pipeline.rs:93-136) must equal the printed base for this colour
+ok: with every sentinel at -1 and no override and no additive modifier applied, stage_hearts (stats_pipeline.rs:93-136) must equal the printed base for this colour
+ok: with every sentinel at -1 and no override and no additive modifier applied, stage_hearts (stats_pipeline.rs:93-136) must equal the printed base for this colour
+ok: with every sentinel at -1 and no override and no additive modifier applied, stage_hearts (stats_pipeline.rs:93-136) must equal the printed base for this colour
+ok: with every sentinel at -1 and no override and no additive modifier applied, stage_hearts (stats_pipeline.rs:93-136) must equal the printed base for this colour
+ok: with every sentinel at -1 and no override and no additive modifier applied, stage_hearts (stats_pipeline.rs:93-136) must equal the printed base for this colour
+ok: an EXPLICIT set-to-0 heart05 override replaces that member's printed hearts outright (stats_pipeline.rs:30-33) -- 2 hearts gone, the other two members untouched
+ok: clearing the override restores the printed fold exactly
+        n_zeroed_mods_zeroes_fold: 14 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      n_zeroed_mods_zeroes_fold
+--- L. rina_debut_opponent_live_card_heart_increase_test.rs (PL!S-bp5-010-N) ---
+ok: the stage's PRINTED heart02 total is >= 5
+ok: the stage's PRINTED heart02 total is exactly 2 + 1 + 2
+ok: [l1/heart02] stage hearts engine/printed agree: [0,0,5,0,0,0,0,0]
+ok: [l1/rina-debut] the ability DISPATCHED (1 modify_required_hearts* verdict(s)); the zero below is a per-unit/group filter verdict, not a dead effect
+ok: the OPPONENT's live card need heart00 must increase
+ok: and it increases by exactly 1
+        l_heart02_ge5_increase: 6 assertion(s), 0 failure(s), 0 setup bug(s), 0 vacuous
+ok      l_heart02_ge5_increase
+ok: the stage's PRINTED heart02 total is < 5 (Rina alone prints heart02=1)
+ok: Rina alone contributes exactly 1 PRINTED heart02
+ok: [l2/heart02] stage hearts engine/printed agree: [0,0,1,0,0,0,0,0]
+ok: [l2/rina-debut-lt5] the ability did NOT dispatch (0 verdicts) -- its trigger/condition rejected this board. The non-vacuity of the zero below comes from the paired positive on this ability in this file, not from this count
+ok: no change when heart02 < 5
+        l_heart02_lt5_no_effect: 6 assertion(s), 0 failure(s), 0 setup bug(s), 1 vacuous
+FAIL: [vacuous]  l_heart02_lt5_no_effect  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+
+69 test cases: 45 ok, 11 failed, 13 setup/vacuous, 0 crashed
+236 assertions, 13 failures, 0 setup bugs, 13 VACUOUS negatives
+FAILED: parity_required_hearts  [exit=1, 51 result line(s): assert=25 vacuous=26 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=37]
+
+tests/test_parity_required_hearts.c: In function 'rh_advance_to_live_set':
+tests/test_parity_required_hearts.c:612:24: warning: the comparison will always evaluate as 'true' for the address of 'target' will never be NULL [-Waddress]
+  612 |                     (c && c->target) ? c->target : "");
+      |                        ^~
+In file included from tests/test_parity_required_hearts.c:93:
+include/rabuka.h:981:10: note: 'target' declared here
+  981 |     char target[64];
+      |          ^~~~~~
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2639 ab=0 actor=0 action=modify_required_hearts
+[QUEUE_EXEC] idx=1 n=2 cid=2639 ab=1 actor=0 action=sequential
+[YELL_COND] host=2640 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_QUEUE] cid=2640 ability=0 passes=1 occurred=1 revealed=6
+[YELL_PERFORM] queued=1 entries=1 state=0 occurred=1 revealed=6
+[YELL_COND] host=2640 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=gain_resource
+[YELL_DRAIN] cid=2640 action=gain_resource has_cond=1 cond=0xa00195f30 pending=0
+[YELL_EXEC_ENTER] host=2640 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=6
+[YELL_COND] host=2640 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_EXEC_COND] host=2640 occurred=1 revealed=6 result=1
+[YELL_COND] host=2640 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,1,0,2,2,0,0] filled=[0,0,1,1,2,2,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=7
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,3,6,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,1,0,2,2,0,0] filled=[0,0,1,1,2,2,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=3 p2=0
+[CAN_PLACE_DECODE] cid=2639 ability=0 constant=0 trigger=ライブ開始時 action=modify_required_hearts dest=-
+[CAN_PLACE_DECODE] cid=2639 ability=1 constant=0 trigger=ライブ開始時 action=sequential dest=-
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=2639 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+FAIL: six distinct 蓮ノ空 stage+waitroom members -> -2 (got 0 expected -2)
+FAIL: [vacuous] c_five_plus_duplicate -- this zero is NOT proven non-vacuous: its paired positive (c_six_distinct_reduce_two) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+FAIL: [vacuous] c_five_plus_renosora_live -- this zero is NOT proven non-vacuous: its paired positive (c_six_distinct_reduce_two) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+FAIL: [vacuous] c_five_plus_wrong_group -- this zero is NOT proven non-vacuous: its paired positive (c_six_distinct_reduce_two) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[TEST_BATON_TOUCH] test_play_to_stage(2643, area 0): area 0 already holds card 2641, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[TEST_BATON_TOUCH] test_play_to_stage(2644, area 1): area 1 already holds card 2642, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+FAIL: HNS_C arrives at the centre (second baton touch -- the printed one-baton-per-turn rule makes this unreachable in C) (got 0 expected 1)
+FAIL: two baton-touch 蓮ノ空 arrivals -> need heart05 is -1 (got 0 expected -1)
+[TEST_BATON_TOUCH] test_play_to_stage(2643, area 0): area 0 already holds card 2641, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+FAIL: [vacuous] d_mirage_one_baton -- this zero is NOT proven non-vacuous: its paired positive (d_mirage_two_baton_heart05) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[TEST_BATON_TOUCH] test_play_to_stage(2643, area 0): area 0 already holds card 2641, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+FAIL: [vacuous] d_mirage_non_renosora -- this zero is NOT proven non-vacuous: its paired positive (d_mirage_two_baton_heart05) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+FAIL: [vacuous] d_mirage_renosora_no_baton -- this zero is NOT proven non-vacuous: its paired positive (d_mirage_two_baton_heart05) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[TEST_BATON_TOUCH] test_play_to_stage(2643, area 0): area 0 already holds card 2641, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[TEST_BATON_TOUCH] test_play_to_stage(2644, area 1): area 1 already holds card 2642, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+FAIL: HNS_C arrives at the centre (second baton touch -- unreachable in C, see the note in d_mirage_two_baton_heart05) (got 0 expected 1)
+FAIL: ココン東西 reduces the heart01 requirement by 1 (got 0 expected -1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2641 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2640 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2641 ab=0 actor=0 action=modify_required_hearts
+[QUEUE_EXEC] idx=1 n=2 cid=2640 ab=0 actor=0 action=look_and_select
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2640 ab=0 actor=0 action=modify_required_hearts
+[QUEUE_EXEC] idx=1 n=2 cid=2639 ab=0 actor=0 action=look_and_select
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=modify_required_hearts
+FAIL: [vacuous] f_center_rin_zero_heart03 -- this zero is NOT proven non-vacuous: its paired positive (f_center_two_heart03_reduces_1) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=modify_required_hearts
+FAIL: [vacuous] f_no_center_member -- this zero is NOT proven non-vacuous: its paired positive (f_center_two_heart03_reduces_1) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=modify_required_hearts
+FAIL: [vacuous] f_center_non_mus -- this zero is NOT proven non-vacuous: its paired positive (f_center_two_heart03_reduces_1) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2642 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2642 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2642 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2642 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2642 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2642 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2642 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2642 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=2 hand_before=0 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2639 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=3 hand_before=0 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2641 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=3 cid=2639 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=2 hand_before=0 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=2 hand_before=0 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2639 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=2 hand_before=0 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2639 ab=0 actor=0 action=modify_required_hearts
+[QUEUE_EXEC] idx=1 n=2 cid=2640 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=3 hand_before=0 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2641 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=3 cid=2639 ab=0 actor=0 action=modify_required_hearts
+[QUEUE_EXEC] idx=1 n=3 cid=2640 ab=0 actor=0 action=modify_required_hearts
+[QUEUE_EXEC] idx=2 n=3 cid=2641 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=3 hand_before=0 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2639 ab=0 actor=0 action=modify_required_hearts
+[QUEUE_EXEC] idx=1 n=2 cid=2640 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=2 hand_before=0 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=modify_required_hearts
+[LIVE_ZONE_REFILL] pl=0 placed=3 hand_before=0 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=modify_required_hearts
+FAIL: two appeared 5yncri5e! members -> -2 (got 0 expected -2)
+FAIL: Q99: a member that both appeared AND moved counts ONCE -> -1 (got 0 expected -1)
+[RESUME_ANY] kind=2 zone= target=area_select route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: a position change makes the second member countable -> -2 (got 0 expected -2)
+FAIL: the non-5yncri5e! member does not count -> -2, not -3 (got 0 expected -2)
+FAIL: [vacuous] i_no_qualifying -- this zero is NOT proven non-vacuous: its paired positive (i_two_appeared_reduce_2) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+FAIL: three qualifying members -> -3 (got 0 expected -3)
+[RESUME_ANY] kind=2 zone= target=area_select route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: the swapped-out 四季 counts as MOVED -> -2 (got 0 expected -2)
+FAIL: [vacuous] i_neither_appeared_nor_moved -- this zero is NOT proven non-vacuous: its paired positive (i_two_appeared_reduce_2) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+FAIL: [vacuous] i_appeared_then_left -- this zero is NOT proven non-vacuous: its paired positive (i_two_appeared_reduce_2) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+FAIL: Q98: only 夏美 is on stage -> -1 (got 0 expected -1)
+FAIL: CONTROL: with the PRINTED gate satisfied the opponent's live card does get +1, so the zero above is a gate verdict (got 0 expected 1)
+FAIL: [vacuous] l_heart02_lt5 -- this zero is NOT proven non-vacuous: its paired positive (l_heart02_ge5_increase) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+FAIL: 13 negative assertion(s) could not be proven non-vacuous (see the VACUOUS lines above)
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

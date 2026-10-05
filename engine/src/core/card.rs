@@ -314,6 +314,21 @@ pub struct Card {
     #[cfg(not(feature = "compact_cards"))]
     pub img: Option<ArcStr>,
     pub name: ArcStr,
+    /// Canonical, equality-only form of `name`: whitespace stripped and a
+    /// full-width '＆' folded to '&'. Written by `cards/scrape_expansion.py`,
+    /// backfilled by `cards/normalise_names.py`, and proven output-neutral for
+    /// the ability corpus (regenerate + `git diff --numstat cards/abilities.json`
+    /// shows only `generated_at` and `engine_commit`).
+    ///
+    /// `name` is the DISPLAY string and keeps its spacing — 'trial vol.1' must
+    /// not become 'trialvol.1' — which is why the comparison form is a separate
+    /// field rather than a normalised `name`. 792 of the 2639 names differ from
+    /// their key (779 contain whitespace, 29 contain '＆'), so comparing against
+    /// this instead of rebuilding the form is real work removed: name matching
+    /// used to allocate four times per call and measured 2.99us/call on
+    /// multi-name cards in a debug build.
+    #[cfg_attr(feature = "serde_support", serde(default))]
+    pub name_key: ArcStr,
     #[cfg(not(feature = "compact_cards"))]
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub product: Box<str>,
@@ -803,7 +818,7 @@ impl CardDatabase {
     }
 
     /// Strip trailing rarity suffixes for fallback lookup.
-    /// Uses parse_base_and_rarity to extract base card number.
+/// Uses parse_base_and_rarity to extract base card number.
     fn strip_rarity_suffixes(s: &str) -> Vec<String> {
         if let Some((base, _)) = Self::parse_base_and_rarity(s) {
             vec![base]
@@ -815,17 +830,25 @@ impl CardDatabase {
     /// Strip all whitespace from a card name so that inconsistent spacing
     /// (e.g. "南 ことり" vs "南ことり") does not break ability conditions.
     ///
-    /// NOTE: this always returns an owned `String` — the "fast path" below
-    /// returns `name.to_string()`, so it is not allocation-free despite what an
-    /// earlier version of this comment claimed. Callers on a hot path should use
-    /// `ability::util::card_name_matches_group` (via `card_matches_group_str`),
-    /// which reproduces this function's output without allocating whenever the
-    /// name has no whitespace.
+    /// NOTE: this always returns an owned `String`. The "fast path" below used to
+    /// be commented as allocation-free; it is not, because `name.to_string()`
+    /// allocates. The comment was wrong for as long as it stood.
+    ///
+    /// WHAT THIS IS NOW FOR: the CARD side of a name comparison no longer needs
+    /// it at all. `Card::name_key` carries the canonical form precomputed at load
+    /// time (`cards/scrape_expansion.py`, backfilled by
+    /// `cards/normalise_names.py`), so comparing a card against a needle is a
+    /// plain string equality. What remains is the NEEDLE side — a name parsed out
+    /// of printed ability text, which has no key of its own — and that is what
+    /// this is still called for.
+    ///
+    /// Returning `Cow<'_, str>` would make the clean path genuinely free. It is
+    /// deliberately left undone: it is ~18 call-site edits across
+    /// `ability/condition.rs` and `ability/util.rs`, several matching on `&String`
+    /// patterns, which is regression risk in ability evaluation for a saving
+    /// whose release-build cost is still unmeasured.
     pub fn normalize_name(name: &str) -> String {
         if name.bytes().all(|b| !b.is_ascii_whitespace()) {
-            // Fast path: no ASCII whitespace — but still check for Unicode whitespace.
-            // In practice card names rarely have Unicode whitespace, so this
-            // covers the vast majority of calls without allocation.
             if !name.contains(|c: char| c.is_whitespace()) {
                 return name.to_string();
             }
@@ -837,12 +860,13 @@ impl CardDatabase {
     /// Used for multi-name card handling (Q65, Q69, Q81)
     pub fn get_card_names(&self, card_id: i16) -> Vec<String> {
         if let Some(card) = self.cards.get(&card_id) {
-            // Handle both regular '&' and full-width '＆' separators
-            Self::normalize_name(&card.name)
-                .replace('＆', "&")
-                .split('&')
-                .map(|s| s.to_string())
-                .collect()
+            // `name_key` is already whitespace-free and has '＆' folded to '&'
+            // (cards/scrape_expansion.py), so this is a plain split. It used to be
+            // `normalize_name(name).replace('＆', "&").split('&')` — four heap
+            // allocations, the last two unconditional no-ops for 2610 of the
+            // 2639 cards, measured at 2.99us/call on multi-name cards in a debug
+            // build and reached during ability-condition evaluation.
+            card.name_key.split('&').map(|s| s.to_string()).collect()
         } else {
             Vec::new()
         }
@@ -862,6 +886,8 @@ impl<'de> Deserialize<'de> for Card {
             #[cfg(not(feature = "compact_cards"))]
             pub img: Option<ArcStr>,
             pub name: String,
+            #[cfg_attr(feature = "serde_support", serde(default))]
+            pub name_key: Option<String>,
             #[cfg(not(feature = "compact_cards"))]
             #[cfg_attr(feature = "serde_support", serde(default))]
             pub product: String,
@@ -892,11 +918,23 @@ impl<'de> Deserialize<'de> for Card {
         let helper = CardHelper::deserialize(deserializer)?;
         let group = map_series_to_group(&helper.series);
 
+        // Computed BEFORE the struct literal because `name:` moves
+        // `helper.name`. A card added by hand may lack the key, so derive it
+        // rather than leaving every name comparison silently failing to match.
+        let name_key = ArcStr::from(
+            helper
+                .name_key
+                .filter(|k| !k.is_empty())
+                .unwrap_or_else(|| CardDatabase::normalize_name(&helper.name))
+                .as_str(),
+        );
+
         Ok(Card {
             card_no: ArcStr::from(helper.card_no),
             #[cfg(not(feature = "compact_cards"))]
             img: helper.img,
             name: ArcStr::from(helper.name),
+            name_key,
             #[cfg(not(feature = "compact_cards"))]
             product: helper.product.into(),
             card_type: helper.card_type,

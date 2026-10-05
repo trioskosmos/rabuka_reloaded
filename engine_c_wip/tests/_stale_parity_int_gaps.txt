@@ -1,0 +1,308 @@
+make t-nogate: running T=parity_int_gaps WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_int_gaps src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_int_gaps.c
+./rb_verdict ./rb_engine_t_parity_int_gaps parity_int_gaps
+heart colour mapping from the engine (rb_heart_color_as_str):
+   RB_HEART_* 0 -> heart00   (parse_heart_color("heart00") = 0)
+   RB_HEART_* 1 -> heart01   (parse_heart_color("heart01") = 1)
+   RB_HEART_* 2 -> heart02   (parse_heart_color("heart02") = 2)
+   RB_HEART_* 3 -> heart03   (parse_heart_color("heart03") = 3)
+   RB_HEART_* 4 -> heart04   (parse_heart_color("heart04") = 4)
+   RB_HEART_* 5 -> heart05   (parse_heart_color("heart05") = 5)
+   RB_HEART_* 6 -> heart06   (parse_heart_color("heart06") = 6)
+   RB_HEART_* 7 -> all   (parse_heart_color("all") = 7)
+
+== test_parity_int_gaps ==
+--- A: PL!S-bp5-023-L, the ANSWERING half of the deck-top ability ---
+        a1_fewer_than_four_lands_on_deck: 14 assertion(s), 5 failure(s)
+FAIL:   a1_fewer_than_four_lands_on_deck
+        a2_select_one_of_four: 8 assertion(s), 3 failure(s)
+FAIL:   a2_select_one_of_four
+        a3_skip_full_pool_moves_nothing: 7 assertion(s), 1 failure(s)
+FAIL:   a3_skip_full_pool_moves_nothing
+        a4_only_saintsnow_does_not_fire: 5 assertion(s), 0 failure(s)
+ok       a4_only_saintsnow_does_not_fire
+--- B: PL!SP-pb2-011-R 鬼塚冬毬 own-LS reposition -> own 自動 ---
+EXPECTED_GAP(1): the 自動's 「以下から1つを選ぶ」 3-option list (blade x2 / wait an opponent member with ≤2 blades / draw 1) is not selectable in C: the shim raises ONE SelectAutoAbility with no per-option payload, so the DRAW bullet that Rust picks (and the +1 hand) is unreachable. The CHAIN itself -- her ライブ開始時 reposition leaving centre -- IS asserted strictly above, and the same 自動 firing after a real area move is the paired positive in b2.
+        b1_toubatsu_live_start_chain: 7 assertion(s), 1 failure(s)
+FAIL:   b1_toubatsu_live_start_chain
+--- C: PL!SP-pb2-006-R きな子, the ライブ成功時 tuck arm ---
+        c1_kinako_live_success_tuck: 15 assertion(s), 6 failure(s)
+FAIL:   c1_kinako_live_success_tuck
+--- D: PL!SP-bp4-023-L Dazzling Game Q187 exclude_selected ---
+EXPECTED_GAP(2): the step-2 exclusion is UNOBSERVABLE, but NOT because the field is undecoded -- the dump above shows `extra exclude_selected = true` IS carried in AbilityEffect::extra_k/extra_v. The real gap is upstream: the same select decodes as `src=(null) dst=(null) tgt=(null)`, i.e. AbilityEffect has NO source/target field, and the prompt it raises is offered over zone="hand" instead of the stage (the assertion above). A hand-offered pool has no notion of the already-chosen STAGE member, so `exclude_selected` cannot be honoured. The step-1 blade grant is asserted strictly as the paired positive that proves the fixture is live; the exclusion is NOT claimed as a pass. A second CSV is also in play here: `extra characters = 澁谷かのん,ウィーン・マルガレーテ,鬼塚冬毬`.
+        d1_dazzling_first_selection: 16 assertion(s), 4 failure(s)
+FAIL:   d1_dazzling_first_selection
+--- E: PL!N-bp5-004-R 果林, the ちょうど4つ exact gate ---
+        e1_karin_blade4_exact_gate: 10 assertion(s), 0 failure(s)
+ok       e1_karin_blade4_exact_gate
+--- F: PL!S-bp7-010-N 千歌, 4th-from-the-top INDEX ---
+        f1_chika_examined_to_index3: 22 assertion(s), 2 failure(s)
+FAIL:   f1_chika_examined_to_index3
+--- R: effects/replacement_generic_rule_9_10 (rule 9/10) ---
+        r0_paired_positive_plain_draw: 5 assertion(s), 0 failure(s)
+ok       r0_paired_positive_plain_draw
+        r1_mandatory_replacement: 7 assertion(s), 2 failure(s)
+FAIL:   r1_mandatory_replacement
+        r2_accepted_optional: 5 assertion(s), 3 failure(s)
+FAIL:   r2_accepted_optional
+        r3_declined_optional: 3 assertion(s), 0 failure(s)
+ok       r3_declined_optional
+        r4_applies_at_most_once: 5 assertion(s), 2 failure(s)
+FAIL:   r4_applies_at_most_once
+        r5_two_registrations: 6 assertion(s), 2 failure(s)
+FAIL:   r5_two_registrations
+
+NOT ATTEMPTED (with reasons):
+  integration/per_card  multi_card            -- 3 files/18 tests; the
+      per_card half (q203/q204/q218, hard_tier, live_end_expiry) is
+      ALREADY ported in test_parity_integration.c and
+      test_parity_integration_extra.c section B (B_T1..B_Q218, all in
+      its main() run list); multi_card was left to avoid racing the
+      agent already working that cluster.
+  effects/score/per_card  (14 files/59, 15 uncovered)
+  effects/gain/blades/per_card (14/56, 11 uncovered)
+  effects/recover/per_card  (14/68, 22 uncovered)
+  effects/deploy  (15 files/61, 5 uncovered)
+  effects/ability_mod  (14/69, 10 uncovered)
+  effects/choice/per_card  (9/29, 16 uncovered)
+      -- NOT ATTEMPTED: each is a 14-file grid needing its own
+      body-level coverage audit, and the whole batch exceeds one
+      agent's budget. Uncovered, and visible as such.
+  effects/live_start/dazzling_game_test.rs (3 tests)
+      -- PARTIALLY taken: test 3 (Q187 exclude_selected) is ported as
+      d1. Tests 1 and 2 assert a PER-YELL-CARD blade_hearts[8] array
+      read off PerformanceSnapshot.yell_cards[i].blade_hearts. C's
+      RbLiveSnapshot has only ONE flat yell_blade_hearts[8] plus a
+      n_yell_cards/yell_cards list with NO per-card heart array, so
+      the assertion is not expressible in C. Rust FIXTURE NOTE: the
+      file's run_dazzling_yell stages PL!HS-pb1-023-N as the 'host',
+      and cards.json proves PL!HS-pb1-023-N is セラス 柳田
+      リリエンフェルト (cost 15, EdelNote) -- NOT 桜内梨子. The header
+      comment's name is wrong; the number is real and resolves. The
+      bp4-023 vs bp1-023 'transposition' the survey describes is not
+      present in this file: PL!SP-bp4-023-L is Dazzling Game and
+      PL!HS-pb1-023-N is a different card used only as scenery.
+  jidou/movement/ability_chain_combo pb2006 x2 + special_color x2
+      -- ALREADY COVERED, verified by body:
+      test_parity_jidou_move_yell.c section 10, lines 1434-1559.
+  jidou/movement/under_member_placement x2
+      -- ALREADY COVERED, verified by body: both_players ->
+      test_parity_jidou_extra.c section I; position_change ->
+      test_parity_jidou_move_yell.c test_kinako_tucks_group_member_
+      under_self_on_area_move (1566).
+  jidou/yell/live_success_from_yell_reveal (5 tests)
+      -- ALREADY COVERED, verified by body: jimo_ai_draw_{0,1,2} ->
+      test_parity_jidou_move_yell.c Y8; jimo_ai_draw_3 (hand-limited)
+      -> test_parity_yell.c E; miracle_wave_excess_heart_scores_four
+      -> test_parity_jidou_move_yell.c Y9.
+  effects/look_select root (5 files/9 tests)
+      -- ALREADY COVERED, verified by body: hanao (both arms) ->
+      test_parity_look_and_filter.c G; mei (both arms) ->
+      test_parity_reveal_extra.c; chika -> test_parity_look_per_card.c F
+      (only the 4th-from-top INDEX was thin -- ported here as f1);
+      honoka (both arms) -> test_parity_mill_deck.c; nozomi ->
+      test_parity_search_reorder.c.
+  integration/per_card T1 and T3 (live_end_expiry...)
+      -- ALREADY COVERED: test_parity_integration.c
+      test_live_end_grant_expires_through_rollover and
+      test_ginko_debut_cost_gate, both in main()'s call list. T2's
+      exact-gate NEGATIVE arm was thin; re-ported as the paired
+      negative in e1 rather than as a separate test.
+
+== parity_int_gaps: 4 ok, 11 failed, 0 crashed
+== EXPECTED_GAP records are printed inline above (one per fork, so they are not aggregated here)
+== case assertion/failure counts are printed per case above; the parent's totals do not cross the fork boundary
+FAILED: parity_int_gaps  [exit=1, 42 result line(s): assert=42 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=11]
+
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1748 ab=0 queued=1
+FAIL: 「4枚まで好きな順番で」 -> count 4 (got 1 expected 4)
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00196200 cur=0 n=1 state=4 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=1 cl=0 clo='' ctot=0 ctoto='' grp='Aqours,SaintSnow' ct='live_card' route=3
+[DISCARD_PICK_REJECTED] cid=2639 idx=0 — fails the prompt's filter
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=-1 available=1 count=1 mapped=0 sub_choice=0 dst='deck_top' state_change='-' p0_discard=1 p1_discard=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: 『4枚まで…デッキの上に置いて』 -- the selected live card IS on the deck
+FAIL: and it left the waitroom
+FAIL: the deck is up by exactly one (got 29 expected 31)
+FAIL: the waitroom is down by exactly one (got 1 expected 0)
+   a1 diag: deck=29 waitroom=1 (before deck=30 wait=1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1748 ab=0 queued=1
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00196200 cur=0 n=1 state=4 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=4 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 4 card(s) from the waiting room' nf=4 cl=0 clo='' ctot=0 ctoto='' grp='Aqours,SaintSnow' ct='live_card' route=3
+[DISCARD_PICK_REJECTED] cid=2639 idx=0 — fails the prompt's filter
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=-1 available=4 count=4 mapped=0 sub_choice=0 dst='deck_top' state_change='-' p0_discard=4 p1_discard=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: 「4枚まで好きな枚数」 -- exactly ONE selected card is on the deck (got 0 expected 1)
+FAIL: the deck grew by exactly one (Rust: 30 -> 31) (got 29 expected 31)
+FAIL: three unselected cards remain in the waitroom (Rust: 4 -> 3) (got 4 expected 3)
+   a2 diag: moved=0 deck=29 (was 30) waitroom=4 (was 4)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1748 ab=0 queued=1
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00196200 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: 「…置いてもよい」 — declining moves nothing to the deck (got 29 expected 30)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1748 ab=0 queued=1
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: PAIRED POSITIVE: a centre member's area move arms 冬毬's own 自動 (a prompt is on screen)
+   b1 EVIDENCE: the 自動 did not arm after a real stage->stage move. recently_moved=2639 n=2 position_change_occurred=1. Decoded effect tree:
+   --- card id 2639  no="PL!SP-pb2-011-R"  2 ability/abilities ---
+   ab#0 triggers=自動 use_limit=1
+     EFFECT:
+      action=choice src=(null) dst=(null) tgt=(null) count=1 opt=0 nchild=0 nopt=3 text=自分のステージのセンターエリアにいるメンバーがエリアを移動したとき、以下から1つを選ぶ。
+・ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+・相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。
+・カードを1枚引く
+        extra original_value = true
+        extra position = center
+        action=gain_resource src=(null) dst=(null) tgt=(null) count=2 opt=0 nchild=0 nopt=0 text=ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+          extra duration = live_end
+          extra resource = blade
+        action=change_state src=stage dst=(null) tgt=opponent count=1 opt=0 nchild=0 nopt=0 text=相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。
+          extra state_change = wait
+          extra original_value = true
+          extra blade_limit = 2
+          extra blade_limit_operator = <=
+        action=draw_card src=deck dst=hand tgt=(null) count=1 opt=0 nchild=0 nopt=0 text=カードを1枚引く
+   ab#1 triggers=ライブ開始時 use_limit=-1
+     EFFECT:
+      action=position_change src=(null) dst=(null) tgt=(null) count=-1 opt=1 nchild=0 nopt=0 text=このメンバーをポジションチェンジしてもよい
+        extra optional = true
+        extra exclude_self = true
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+FAIL: precondition: the live-success gate is open (live zone non-empty and live_success[0] set)
+FAIL: 『自分のライブが成功する…とき…1枚、このメンバーの下に置く』 — exactly one card was tucked under her on ライブ成功時 (got 0 expected 1)
+FAIL: and it is the 『Liella!』 card that was in the waitroom
+FAIL: the tucked card left the waitroom
+[QUEUE_PID_NORMALIZE] entry=0 card=2474 ab=1 'player1' -> 'p1'
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00196130 cur=0 n=1 state=4 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='Liella!' ct='member_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=2 count=1 mapped=1 sub_choice=0 dst='under_member' state_change='-' p0_discard=2 p1_discard=0
+[DISCARD_MOVE] selected=2639 of 1 available=2 moved=1 destination=under_member state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: PAIRED POSITIVE / FINDING: after `[DISCARD_MOVE] moved=1 destination=under_member`, the 『Liella!』 card is under NOBODY. under_cards = [1 0 0]; her area is 0. So `move_cards` with destination=under_member reports the move and then does not populate under_cards -- or lands it outside the activating member's own area. The 自動 is NOT dead (it queued, it executed, it resolved a discard pick), so this red is about the placement, not the ability.
+FAIL: PAIRED POSITIVE: and the tucked card is the second 『Liella!』 member that was in the waitroom
+   c1 diag: under[1].n=0 (was 0) waitroom=1
+   c1 EVIDENCE: きな子's decoded effect tree:
+   --- card id 2474  no="PL!SP-pb2-006-R"  2 ability/abilities ---
+   ab#0 triggers=常時 use_limit=-1
+     EFFECT:
+      action=modify_cost src=(null) dst=(null) tgt=(null) count=1 opt=0 nchild=0 nopt=0 text=このメンバーの下にある『Liella!』のメンバーカード1枚につき、このメンバーのコストを+1する
+        extra operation = add
+        extra value = 1
+        extra self_target = true
+        extra per_unit = true
+        extra per_unit_type = 枚
+        extra group_names = Liella!
+        extra location = under_member
+   ab#1 triggers=自動 use_limit=1
+     EFFECT:
+      action=move_cards src=discard dst=under_member tgt=self count=1 opt=0 nchild=0 nopt=0 text=自分のライブが成功するか、このメンバーがエリアを移動したとき、自分の控え室にある『Liella!』のメンバーカードを1枚、このメンバーの下に置く
+        extra group_names = Liella!
+        extra under_self = true
+   c1 board: live zone=1 success=0 p0.live_success=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2205 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2205 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2371 ab=0 queued=1
+FAIL: Q187 selects from the STAGE (got zone "hand")
+   d1 EVIDENCE: the selection was offered over "hand" instead of "stage". Dazzling Game effect tree:
+   --- card id 2205  no="PL!SP-bp4-023-L"  2 ability/abilities ---
+   ab#0 triggers=ライブ開始時 use_limit=-1
+     EFFECT:
+      action=sequential src=(null) dst=(null) tgt=(null) count=-1 opt=0 nchild=3 nopt=0 text=自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る
+        extra duration = live_end
+        action=select src=(null) dst=(null) tgt=(null) count=1 opt=0 nchild=0 nopt=0 text=自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る
+          extra characters = 澁谷かのん,ウィーン・マルガレーテ,鬼塚冬毬
+          extra group_names = Liella!
+          extra duration = live_end
+        action=select src=(null) dst=(null) tgt=(null) count=1 opt=0 nchild=0 nopt=0 text=自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る
+          extra exclude_selected = true
+          extra group_names = Liella!
+          extra duration = live_end
+        action=gain_resource src=(null) dst=(null) tgt=(null) count=1 opt=0 nchild=0 nopt=0 text={{icon_blade.png|ブレード}}を得る
+          extra resource = blade
+          extra duration = live_end
+   ab#1 triggers=ライブ開始時 use_limit=-1
+     EFFECT:
+      action=set_blade_type src=(null) dst=(null) tgt=(null) count=-1 opt=0 nchild=0 nopt=0 text=エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる
+        extra blade_type = 紫ブレード
+        extra duration = live_end
+[RESUME_ANY] kind=1 zone=hand target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198550 cur=1 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=1 n=3 cid=2205 ab=1 actor=0 action=set_blade_type
+[QUEUE_EXEC] idx=2 n=3 cid=2371 ab=0 actor=0 action=conditional_on_optional
+FAIL: PAIRED POSITIVE: the member selected in step 1 gains ブレード (got 0)
+FAIL: Q187: the second selection (a 『Liella!』 member OTHER than the one just picked) is prompted
+FAIL: the member chosen in step 2 also gains ブレード (got 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=debut zone=stage label=ステージ cid=1194 ab=0 queued=1
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=-1 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2639 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2639 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=2639 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=2639 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=3 mode=6 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00197820 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: 「4枚目に置いて」 is a fixed INDEX: the card that was at the deck's BOTTOM now sits at index 3 (deck[3]=2641, bottom was 2646; deck[0]=2646) (got 2641 expected 2646)
+FAIL: every other card is unmoved and in order: the reposition relocates the ONE examined card rather than reordering the deck
+   f1 diag: final deck order: 2646 2639 2640 2641 2642 2643 2644 2645  (bottom was 2646)
+   f1 EVIDENCE: 千歌 bp7-010 decoded effect tree:
+   --- card id 1838  no="PL!S-bp7-010-N"  1 ability/abilities ---
+   ab#0 triggers=登場 use_limit=-1
+     EFFECT:
+      action=sequential src=(null) dst=(null) tgt=(null) count=-1 opt=0 nchild=2 nopt=0 text=自分のデッキの一番下のカードを見る。それをデッキの上から4番目に置いてもよい
+        action=look_at src=deck_bottom dst=(null) tgt=self count=1 opt=0 nchild=0 nopt=0 text=自分のデッキの一番下のカードを見る
+        action=move_cards src=looked_at dst=deck_top tgt=(null) count=1 opt=1 nchild=0 nopt=0 text=それをデッキの上から4番目に置いてもよい
+          extra optional = true
+   f1 zones: waitroom=0 hand=0
+FAIL: Rust: the alternate draw(1) executes and the original draw(2) is SUPPRESSED -> hand +1. C ran the original untouched (+2): rb_add_replacement_effect stores no alternate effect and there is no run_replacement_effects in src/. (got 2 expected 1)
+FAIL: Rust sets applied_this_event when a replacement fires; C never consults the registration, so it is left at 0 (got 0 expected 1)
+FAIL: Rust raises Choice::SelectTarget { target: "apply_replacement" } for an optional replacement. C raises nothing: there is no replacement runner to raise it.
+FAIL: accepting the optional replacement runs the alternate draw(1) and suppresses the original draw(2) (got 2 expected 1)
+FAIL: …and the registration is marked applied (got 0 expected 1)
+FAIL: Rust: the single registration replaces the event once -> hand +1 (got 2 expected 1)
+FAIL: …and is marked applied_this_event (got 0 expected 1)
+FAIL: Rust: both alternates run (1 + 2) and the original draw(4) is suppressed -> hand +3. C ran the original untouched (+4). (got 4 expected 3)
+FAIL: …and BOTH are marked applied_this_event (got 0 expected 1)
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

@@ -177,15 +177,45 @@ static void record_movement(GameState *g, int cid){
     }
 }
 
-/* Swap two stage positions (carries under_cards + stage_wait). */
+/* Swap two stage positions (carries under_cards + stage_wait + stage_arrived).
+ *
+ * `stage_arrived` is the C's `Player::deployed_this_turn` (Rule 9.6.2.1.2.1 —
+ * a member deployed this turn cannot be baton-touched again). Rust models that
+ * set PER CARD: `deployed_this_turn: SmallVec<[i16;4]>` (core/player.rs:200),
+ * consulted as `deployed_this_turn.contains(&self.stage.stage[idx])`
+ * (game_setup.rs:1586, position.rs:58). The C stores it PER AREA:
+ * `int stage_arrived[2][RB_STAGE_SIZE]` (rabuka.h:1747), consulted as
+ * `stage_arrived[pl][area]` (zones.c:1041). The two agree only while every card
+ * stays in the area it was deployed into.
+ *
+ * Rule 11.10 is where they part company. A position_change moves a card
+ * BETWEEN areas, and the per-card set travels with it while the per-area flag
+ * does not — so after any position change the C locked whatever area the card
+ * LEFT and left the area it ARRIVED at unlocked, exactly inverted. That is
+ * observable: a member deployed this turn into Center, position-changed to
+ * Left, is still baton-touch-banned by Rust (it follows the card) while the C
+ * offered the now-free Left and refused the still-occupied Center.
+ *
+ * Permuting the flag alongside the card is what makes the per-area storage
+ * faithful for the rest of the turn. It is done here, in the ONE primitive
+ * every position_change source/destination path funnels through, rather than
+ * at each of the ~6 call sites, so no path can be missed.
+ *
+ * `record_movement` is NOT gated on this: Rust's `record_stage_position_swap`
+ * (position.rs:1122-1127) fires for both swapped members regardless of
+ * deployment, which is what the two calls below already did. */
 static int stage_swap(GameState *g, int who, int from, int to){
     if(from<0||to<0||from>=RB_STAGE_SIZE||to>=RB_STAGE_SIZE||from==to) return 0;
     RbPlayer *P=&g->p[who];
     int a=P->stage[from], b=P->stage[to];
     int aw=P->stage_wait[from], bw=P->stage_wait[to];
     RbBag au=P->under_cards[from], bu=P->under_cards[to];
+    int aa=g->stage_arrived[who][from], ab=g->stage_arrived[who][to];
     P->stage[from]=b; P->stage_wait[from]=bw; P->under_cards[from]=bu;
     P->stage[to]=a;   P->stage_wait[to]=aw;   P->under_cards[to]=au;
+    /* deployed_this_turn travels with the card, not the area. */
+    g->stage_arrived[who][from]=ab;
+    g->stage_arrived[who][to]=aa;
     record_movement(g,a);
     if(b>=0) record_movement(g,b);
     return 1;
@@ -369,7 +399,7 @@ static int collect_stage_candidates(const GameState *g, int who,
                                     int exclude_self_id, int exclude_selected,
                                     int *out, int max){
     const RbPlayer *P=&g->p[who];
-    const char *ctype  = e->card_type_field[0] ? e->card_type_field : eff_extra(e,"card_type");
+    const char *ctype  = e->card_type_field[0] ? e->card_type_field : NULL;
     const char *group  = eff_extra(e,"group_names");
     const char *chars  = eff_extra(e,"characters");
     const char *pos    = eff_extra(e,"position");
@@ -532,7 +562,7 @@ static void resolve_gain_resource_targets(GameState *g, int who,
     }
 
     /* heart targets */
-    const char *ctype = e->card_type_field[0] ? e->card_type_field : eff_extra(e,"card_type");
+    const char *ctype = e->card_type_field[0] ? e->card_type_field : NULL;
     const char *group = eff_extra(e,"group_names");
     const char *chars = eff_extra(e,"characters");
     if(kind==RB_RES_HEART && per_unit && per_unit_type &&
@@ -592,7 +622,7 @@ static int try_create_target_selection_choice(GameState *g, int actor,
                                       g->n_selected_cards>0,
                                       cand, RB_MISC_MAX_TARGETS);
     if(nc <= tc) return 0;
-    const char *ctype = e->card_type_field[0] ? e->card_type_field : eff_extra(e,"card_type");
+    const char *ctype = e->card_type_field[0] ? e->card_type_field : NULL;
     rb_emit_choice(g, actor, RB_CHOICE_SELECT_CARD, "stage", ctype, tc, 0, NULL);
     rb_queue_pause_for_choice(g, &g->queue.pending);
     /* target.rs:364 `.group(effect.group_name().map(|s| s.to_string()))` — ONE
@@ -617,7 +647,7 @@ static void apply_blade_resource(GameState *g, const AbilityEffect *e, int kind,
         int who, const int *targets, int n_targets,
         int activating, int is_all, int dur, int final_count, int blades_to_add){
     if(kind != RB_RES_BLADE) return;
-    const char *ctype  = e->card_type_field[0] ? e->card_type_field : eff_extra(e,"card_type");
+    const char *ctype  = e->card_type_field[0] ? e->card_type_field : NULL;
     const char *group  = eff_extra(e,"group_names");
     const char *chars  = eff_extra(e,"characters");
     const char *pos    = eff_extra(e,"position");
@@ -903,7 +933,7 @@ static int h_gain_resource(GameState *g, int actor, const AbilityEffect *e){
     const char *sign = eff_extra(e,"sign");
     int is_negative = sign && !strcmp(sign,"negative");
     int dur = duration_is_temporary(e) ? effect_duration(e) : RB_TEMP_PERM;
-    const char *ctype = e->card_type_field[0] ? e->card_type_field : eff_extra(e,"card_type");
+    const char *ctype = e->card_type_field[0] ? e->card_type_field : NULL;
     int tc = extra_int(e,"target_count",-1);
     int distinct = e->distinct_flag || extra_true(e,"distinct");
     int player_target = e->target && (!strcmp(e->target,"self")||!strcmp(e->target,"opponent"));
@@ -1050,7 +1080,7 @@ static int h_discard_until_count(GameState *g, int actor, const AbilityEffect *e
     int cur = P->hand.n;
     if(cur <= target) return 1;
     int to_discard = cur - target;
-    const char *ctype = e->card_type_field[0] ? e->card_type_field : eff_extra(e,"card_type");
+    const char *ctype = e->card_type_field[0] ? e->card_type_field : NULL;
     rb_emit_choice(g,who,RB_CHOICE_SELECT_CARD,"hand",ctype,to_discard,0,"hand");
     rb_queue_pause_for_choice(g, &g->queue.pending);
     rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
@@ -1127,7 +1157,11 @@ void rb_rules_record_cannot_live_by_effect(GameState *g, int actor, const Abilit
 static int h_restriction(GameState *g, int actor, const AbilityEffect *e){
     const char *rtype = eff_extra(e,"restriction_type");
     const char *rdest = eff_extra(e,"restricted_destination");
-    if(!rtype) rtype = eff_extra(e,"type");
+    /* The old `if(!rtype) rtype = eff_extra(e,"type")` fallback is DEAD twice
+       over: `type` is never written to the extras table (vm.c:724-740 consumes
+       the wire key "type" into the e->action STRUCT FIELD and `continue`s, so
+       no extras row is written), and Rust has no such fallback either --
+       restriction.rs:31 reads `restriction_type_any()` alone. */
     if(!rdest && e->destination) rdest = e->destination;
     int delayed = extra_true(e,"delayed");
 
@@ -1464,7 +1498,7 @@ static int h_place_energy_under_member(GameState *g, int actor, const AbilityEff
     const char *dyn = eff_extra(e,"dynamic_count");
     if(dyn) count = rb_effect_count(g,actor,s_activating_card,e,0);
     int any_number = extra_true(e,"any_number");
-    const char *source = e->source ? e->source : eff_extra(e,"source");
+    const char *source = e->source;
     const char *dest   = e->destination;
     int who = actor;
     if(e->target && !strcmp(e->target,"opponent")) who = actor^1;
@@ -1492,7 +1526,7 @@ static int h_place_energy_under_member(GameState *g, int actor, const AbilityEff
         if(!has_empty) return 1;
         int need = count>0 ? count : 1;
         rb_emit_choice(g,who,RB_CHOICE_SELECT_CARD,"under_member",
-                       eff_extra(e,"card_type"),need,
+                       e->card_type_field[0] ? e->card_type_field : NULL,need,
                        e->is_optional?1:0,"under_member");
     rb_queue_pause_for_choice(g, &g->queue.pending);
         rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
@@ -1527,7 +1561,7 @@ static int h_place_energy_under_member(GameState *g, int actor, const AbilityEff
     if(source && !strcmp(source,"under_member")){
         int need = any_number ? 0 : count;
         rb_emit_choice(g,who,RB_CHOICE_SELECT_CARD,"under_member",
-                       eff_extra(e,"card_type"),need,
+                       e->card_type_field[0] ? e->card_type_field : NULL,need,
                        e->is_optional?1:0,"under_member");
     rb_queue_pause_for_choice(g, &g->queue.pending);
         rb_choice_set_route(&g->queue.pending, RB_ROUTE_SELECT_CARDS);
@@ -1662,7 +1696,6 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
     }
     /* destination already specified */
     const char *dest = e->destination;
-    if(!dest) dest = eff_extra(e,"destination");
     if(dest && *dest){
         /* position.rs:204-214. Rust raises SelectTarget{target:"position|destination"}
            and writes "position_change:opponent:front" to the ENTRY. The C instead
@@ -1888,10 +1921,18 @@ static int h_rotation(GameState *g, int actor, const AbilityEffect *e){
     int snap_cards[RB_STAGE_SIZE];
     RbBag snap_under[RB_STAGE_SIZE];
     int snap_wait[RB_STAGE_SIZE];
+    int snap_arrived[RB_STAGE_SIZE];
     for(int i=0;i<RB_STAGE_SIZE;i++){
         snap_cards[i]=P->stage[i];
         snap_under[i]=P->under_cards[i];
         snap_wait[i]=P->stage_wait[i];
+        /* Rust's deployed_this_turn is per CARD (core/player.rs:200), so it has to
+           rotate with the cards. The C stores it per AREA (rabuka.h:1747), which
+           is only equivalent while each card stays put — see stage_swap's comment
+           for the Rule 11.10 divergence this prevents. Without the snapshot the
+           rotation CLEARED every flag, unlocking all three areas and letting a
+           member deployed this turn be baton-touched. */
+        snap_arrived[i]=g->stage_arrived[tgt][i];
     }
 
     /* Rotation: left(0)→right(2), center(1)→left(0), right(2)→center(1) */
@@ -1900,6 +1941,7 @@ static int h_rotation(GameState *g, int actor, const AbilityEffect *e){
         P->stage[i]=RB_EMPTY_SLOT;
         P->under_cards[i].n=0;
         P->stage_wait[i]=0;
+        g->stage_arrived[tgt][i]=0;
     }
     for(int src=0;src<RB_STAGE_SIZE;src++){
         int cid=snap_cards[src];
@@ -1908,6 +1950,7 @@ static int h_rotation(GameState *g, int actor, const AbilityEffect *e){
         P->stage[dst]=cid;
         P->under_cards[dst]=snap_under[src];
         P->stage_wait[dst]=snap_wait[src];
+        g->stage_arrived[tgt][dst]=snap_arrived[src];
         record_movement(g,cid);
     }
     g->position_change_occurred_this_turn=1;
@@ -2110,7 +2153,7 @@ void rb_effect_gain_surplus_heart(GameState *g, int actor, const AbilityEffect *
     int is_temp = dur && strcmp(dur,"permanent")!=0;
 
     if(!is_all){
-        const char *ctype = e->card_type_field[0]?e->card_type_field:eff_extra(e,"card_type");
+        const char *ctype = e->card_type_field[0] ? e->card_type_field : NULL;
         int is_member = ctype && !strcmp(ctype,"member_card");
         int tc = extra_int(e,"target_count",-1);
         int target_is_self = !e->target || !strcmp(e->target,"self");
@@ -2222,15 +2265,23 @@ int rb_misc_finalize_formation_change(GameState *g, int actor,
     RbPlayer *P=&g->p[actor];
     int old_stage[RB_STAGE_SIZE];
     RbBag   old_under[RB_STAGE_SIZE];
+    /* deployed_this_turn is per CARD in Rust (core/player.rs:200) and per AREA in
+       the C (rabuka.h:1747); a formation change moves cards between areas, so
+       the flag has to be permuted with them or the per-area storage diverges.
+       See stage_swap's comment. */
+    int     old_arrived[RB_STAGE_SIZE];
     for(int q=0;q<RB_STAGE_SIZE;q++){
         old_stage[q]=P->stage[q];
         old_under[q]=P->under_cards[q];
+        old_arrived[q]=g->stage_arrived[actor][q];
     }
     int new_stage[RB_STAGE_SIZE];
     RbBag   new_under[RB_STAGE_SIZE];
+    int     new_arrived[RB_STAGE_SIZE];
     for(int q=0;q<RB_STAGE_SIZE;q++){
         new_stage[q]=RB_EMPTY_SLOT;
         new_under[q].n=0;
+        new_arrived[q]=0;
     }
     int moved=0;
     /* Phase 1: planned cards to dest */
@@ -2243,6 +2294,7 @@ int rb_misc_finalize_formation_change(GameState *g, int actor,
         if(from==dst) continue;
         new_stage[dst]=mid;
         new_under[dst]=old_under[from];
+        new_arrived[dst]=old_arrived[from];
         moved++;
         record_movement(g,mid);
     }
@@ -2255,7 +2307,7 @@ int rb_misc_finalize_formation_change(GameState *g, int actor,
         if(from<0) continue;
         if(new_stage[from]!=RB_EMPTY_SLOT) continue;
         if(from==dst){
-            new_stage[from]=mid; new_under[from]=old_under[from];
+            new_stage[from]=mid; new_under[from]=old_under[from]; new_arrived[from]=old_arrived[from];
         } else {
             int evicted=old_stage[dst];
             int evicted_is_planned=0;
@@ -2264,6 +2316,7 @@ int rb_misc_finalize_formation_change(GameState *g, int actor,
                && new_stage[from]==RB_EMPTY_SLOT){
                 new_stage[from]=evicted;
                 new_under[from]=old_under[dst];
+                new_arrived[from]=old_arrived[dst];
                 record_movement(g,evicted);
                 moved++;
             }
@@ -2276,12 +2329,13 @@ int rb_misc_finalize_formation_change(GameState *g, int actor,
         int is_planned=0;
         for(int i=0;i<n_plan;i++) if(plan[i].member_id==cid){is_planned=1;break;}
         if(!is_planned && new_stage[q]==RB_EMPTY_SLOT){
-            new_stage[q]=cid; new_under[q]=old_under[q];
+            new_stage[q]=cid; new_under[q]=old_under[q]; new_arrived[q]=old_arrived[q];
         }
     }
     for(int q=0;q<RB_STAGE_SIZE;q++){
         P->stage[q]=new_stage[q];
         P->under_cards[q]=new_under[q];
+        g->stage_arrived[actor][q]=new_arrived[q];
     }
     g->position_change_occurred_this_turn=1;
     rb_recalc_constants(g);

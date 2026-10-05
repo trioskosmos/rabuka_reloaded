@@ -476,7 +476,7 @@ static void assert_same_names(TestGame *tg, int a, int b, const char *what)
 static void test_liella_heart_total_score(void)
 {
     {   /* two Liella! members, 9 + 8 = 17 >= 11 */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int filler = test_new_id(&tg, "PL!-sd1-010-SD");
         fill_decks(&tg, filler, 10);
         int live = test_id(&tg, "PL!SP-bp5-026-L");
@@ -586,7 +586,7 @@ static    TestGame tg; test_game_new(&tg);
 static void test_nonfiction_center_cost_comparison(void)
 {
     {   /* fixture identity guard: the three costs the truth table rests on */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int kanon = test_id(&tg, "PL!SP-pb1-001-R");
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         int rich = test_id(&tg, "PL!SP-bp4-004-R＋");
@@ -603,40 +603,40 @@ static void test_nonfiction_center_cost_comparison(void)
         rb_free_card(&a); rb_free_card(&b); rb_free_card(&c);
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int kanon = test_id(&tg, "PL!SP-pb1-001-R");
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         nonfiction_p1(kanon, filler, 1,
                        "PL!SP-bp4-024-L: P1 center cost 11 > P2 center cost 4 -> +1");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int kanon = test_id(&tg, "PL!SP-pb1-001-R");
         nonfiction_p1(kanon, -1, 1,
                        "PL!SP-bp4-024-L: P1 center cost 11 > P2 empty center (0) -> +1");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int kanon = test_id(&tg, "PL!SP-pb1-001-R");
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         nonfiction_p1(filler, kanon, 0,
                        "PL!SP-bp4-024-L: P1 center cost 4 < P2 center cost 11 -> +0");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         nonfiction_p1(filler, filler, 0,
                        "PL!SP-bp4-024-L: P1 center is not Liella! -> +0");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int kanon = test_id(&tg, "PL!SP-pb1-001-R");
         int kanon2 = test_new_id(&tg, "PL!SP-pb1-001-R");
         nonfiction_p1(kanon, kanon2, 0,
                        "PL!SP-bp4-024-L: P1 cost 11 == P2 cost 11 -> +0");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int kanon = test_id(&tg, "PL!SP-pb1-001-R");
         int rich = test_id(&tg, "PL!SP-bp4-004-R＋");
         nonfiction_p1(kanon, rich, 0,
@@ -704,7 +704,7 @@ static void niji_stage(TestGame *tg, int member)
 static void test_phoenix_stellar_reciprocal(void)
 {
     {   /* both in the live zone: each sees the other and both resolve */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int member = test_id(&tg, "PL!N-PR-003-PR");
         int phoenix = test_id(&tg, "PL!N-pb1-038-L");
         int stellar = test_id(&tg, "PL!N-pb1-039-L");
@@ -737,7 +737,7 @@ static        TestGame tg; test_game_new(&tg);
                  "Stellar Stream in the success zone: ability inactive, no heart06");
     }
     {   /* the mirror image */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int member = test_id(&tg, "PL!N-PR-003-PR");
         int phoenix = test_id(&tg, "PL!N-pb1-038-L");
         int stellar = test_id(&tg, "PL!N-pb1-039-L");
@@ -766,7 +766,7 @@ static        TestGame tg; test_game_new(&tg);
                  "Stellar Stream in the success zone: no fire");
     }
     {   /* a non-Nijigasaki live card satisfies neither reciprocal condition */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int member = test_id(&tg, "PL!N-PR-003-PR");
         int phoenix = test_id(&tg, "PL!N-pb1-038-L");
         int filler_live = test_id(&tg, "PL!-sd1-019-SD");
@@ -907,7 +907,7 @@ static        TestGame tg; test_game_new(&tg);
 static void test_dream_with_you_total_blade(void)
 {
     {   /* 6 + 6 = 12 blade */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int dream = test_id(&tg, "PL!N-sd1-028-SD");
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         int blader = test_id(&tg, "PL!S-PR-014-PR");
@@ -956,7 +956,7 @@ static void test_dream_with_you_total_blade(void)
                  "Dream with You: total stage blade 12 >= 10 -> +1");
     }
     {   /* 6 + 1 = 7 blade */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int dream = test_id(&tg, "PL!N-sd1-028-SD");
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         int blader = test_id(&tg, "PL!S-PR-014-PR");
@@ -1000,7 +1000,7 @@ static void test_dream_with_you_total_blade(void)
                  "Dream with You: total stage blade 7 < 10 -> +0");
     }
     {   /* Q116: Wien's reduced yell count must not block the threshold check */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int dream = test_id(&tg, "PL!N-sd1-028-SD");
         int wien = test_id(&tg, "PL!SP-bp2-010-R＋");
         int blader = test_id(&tg, "PL!S-PR-014-PR");
@@ -1043,7 +1043,7 @@ static void solitude_rain_stage(TestGame *tg, int rain, int a, int b, int c)
 static void test_solitude_rain_unique_heart_color(void)
 {
     {   /* no members at all */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int rain = test_id(&tg, "PL!N-bp1-027-L");
         solitude_rain_stage(&tg, rain, RB_EMPTY_SLOT, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
         /* DISCRIMINATOR / CONTROL: "empty stage -> 0" is only about the member
@@ -1057,7 +1057,7 @@ static void test_solitude_rain_unique_heart_color(void)
         CHECK_EQ(score_of(&tg, rain), 0, "Solitude Rain: empty stage -> +0");
     }
     {   /* PL!N-sd1-019-PR: heart02 + heart06 */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int rain = test_id(&tg, "PL!N-bp1-027-L");
         int m = test_id(&tg, "PL!N-sd1-019-PR");
         assert_identity(&tg, m, "PL!N-sd1-019-PR", "Solitude Rain 2-colour fixture");
@@ -1075,7 +1075,7 @@ static        TestGame tg; test_game_new(&tg);
                  "Solitude Rain: overlapping heart02, unique {02,05,06} -> +3");
     }
     {   /* Nijigasaki + non-Nijigasaki: only the Nijigasaki colours count */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int rain = test_id(&tg, "PL!N-bp1-027-L");
         int niji = test_id(&tg, "PL!N-bp1-013-N");
         int other = test_id(&tg, "PL!-sd1-010-SD");
@@ -1093,7 +1093,7 @@ static        TestGame tg; test_game_new(&tg);
         CHECK_EQ(score_of(&tg, rain), 2, "Solitude Rain: heart01 + heart03 -> +2");
     }
     {   /* two members with the SAME colours: still only 2 unique units */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int rain = test_id(&tg, "PL!N-bp1-027-L");
         int a = test_id(&tg, "PL!N-bp1-017-N");
         int b = test_new_id(&tg, "PL!N-bp1-017-N");
@@ -1122,7 +1122,7 @@ static        TestGame tg; test_game_new(&tg);
 static void test_note_mermaid_two_distinct(void)
 {
     {   /* PL!SP-bp1-013-PR vs PL!SP-PR-017-PR differ by a transposed letter */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live = test_id(&tg, "PL!SP-pb1-024-L");
         int ren = test_id(&tg, "PL!SP-bp1-013-PR");
         int wien = test_id(&tg, "PL!SP-PR-017-PR");
@@ -1171,7 +1171,7 @@ static        TestGame tg; test_game_new(&tg);
 static void test_mirakura_stage_threshold(void)
 {
     {   /* three distinct instances */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live_card = test_id(&tg, "PL!HS-bp5-021-L");
         int mirakura = test_id(&tg, "PL!HS-sd1-003-SD");
         int filler = test_id(&tg, "PL!-sd1-010-SD");
@@ -1213,7 +1213,7 @@ static void test_mirakura_stage_threshold(void)
                  "PL!HS-bp5-021-L: exactly +1 with 3 mirakura members");
     }
     {   /* only one mirakura member */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live_card = test_id(&tg, "PL!HS-bp5-021-L");
         int mirakura = test_id(&tg, "PL!HS-sd1-003-SD");
         int other = test_id(&tg, "PL!-sd1-010-SD");
@@ -1248,7 +1248,7 @@ static void test_mirakura_stage_threshold(void)
 static void test_aqours_heart04_threshold(void)
 {
     {   /* two PL!S-bp5-007-R copies: 5 + 5 = 10 -> +2 */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live = test_id(&tg, "PL!S-pb1-020-L");
         int a1 = test_id(&tg, "PL!S-bp5-007-R");
         int a2 = test_new_id(&tg, "PL!S-bp5-007-R");
@@ -1292,7 +1292,7 @@ static const char *const NIJI_LIVES[6] = {
 static void test_swc_distinct_waitroom_lives(void)
 {
     {   /* four distinct names */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int swc = test_id(&tg, "PL!N-bp4-028-L");
         assert_identity(&tg, swc, "PL!N-bp4-028-L", "PL!N-bp4-028-L fixture");
         test_add_to_live(&tg, swc);
@@ -1317,7 +1317,7 @@ static        TestGame tg; test_game_new(&tg);
                  "PL!N-bp4-028-L: 6 distinct-name Nijigasaki lives in the waitroom -> +2");
     }
     {   /* six copies of one print, then three distinct names */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int swc = test_id(&tg, "PL!N-bp4-028-L");
         test_add_to_live(&tg, swc);
         rb_waitroom_add(&tg.state.p[0], test_id(&tg, NIJI_LIVES[0]));
@@ -1347,7 +1347,7 @@ static        TestGame tg; test_game_new(&tg);
 static void test_go_master_fewer_success(void)
 {
     {   /* 1 vs 2 */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live = test_id(&tg, "PL!SP-bp2-023-L");
         assert_identity(&tg, live, "PL!SP-bp2-023-L", "PL!SP-bp2-023-L fixture");
         test_add_to_live(&tg, live);
@@ -1506,7 +1506,7 @@ static void test_own_energy_ahead_live_success(void)
 static void test_opponent_energy_gated(void)
 {
     {   /* opponent 3 > self 1 */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live = test_id(&tg, "PL!S-bp6-022-L");
         int e = test_id(&tg, "LL-E-001-SD");
         assert_identity(&tg, live, "PL!S-bp6-022-L", "opponent-energy-gated fixture");
@@ -1525,7 +1525,7 @@ static void test_opponent_energy_gated(void)
         CHECK_EQ(score_of(&tg, live), 1, "PL!S-bp6-022-L: opponent 3 > self 1 -> +1");
     }
     {   /* opponent 2 == self 2 */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live = test_id(&tg, "PL!S-bp6-022-L");
         int e = test_id(&tg, "LL-E-001-SD");
         test_add_to_live(&tg, live);
@@ -1644,7 +1644,7 @@ static int aquarium_setup(TestGame *tg)
 static void test_aquarium_live_success_group_hearts(void)
 {
     {   /* one Aqours member revealed */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int revealed = test_new_id(&tg, "PL!S-sd1-001-SD");
         assert_identity(&tg, revealed, "PL!S-sd1-001-SD", "Aqours revealed fixture");
         int live = aquarium_setup(&tg);
@@ -1710,7 +1710,7 @@ static        TestGame tg; test_game_new(&tg);
 static void test_monster_girls_per_waited_member(void)
 {
     {   /* direct dispatch: two waited, one active */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live = test_id(&tg, "PL!N-bp3-031-L");
         assert_identity(&tg, live, "PL!N-bp3-031-L", "PL!N-bp3-031-L fixture");
         test_add_to_live(&tg, live);
@@ -1781,7 +1781,7 @@ static        TestGame tg; test_game_new(&tg);
 static void test_love_u_q192_all_blade(void)
 {
     {   /* a b_all card is revealed by the yell -> +1 reaches the final score */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int love_u = test_id(&tg, "PL!N-bp3-030-L");
         int filler = test_id(&tg, "PL!-sd1-010-SD");
         int aqours_member = test_id(&tg, "PL!S-sd1-003-SD");
@@ -1823,7 +1823,7 @@ static void test_love_u_q192_all_blade(void)
         }
     }
     {   /* Q192: recolouring the ALL-blade card to purple breaks the condition */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int love_u = test_new_id(&tg, "PL!N-bp3-030-L");
         int b_all = test_new_id(&tg, "PL!-sd1-020-SD");
         /* Rust (all_blade_yell_live_success_live_score_q192_test.rs:89) uses
@@ -1908,7 +1908,7 @@ static void test_awake_q36_group_cheer_count(void)
 {
     {   /* 3 heart05 members + a Hasetsu deck with a blade_heart wildcard */
         int deck_card;
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         deck_card = test_id(&tg, "PL!HS-PR-020-PR");
         assert_identity(&tg, deck_card, "PL!HS-PR-020-PR", "Hasetsu deck fixture");
         awake_q36("PL!S-PR-014-PR", 3, deck_card, 30, 1,
@@ -1921,7 +1921,7 @@ static        TestGame tg; test_game_new(&tg);
                   "PL!HS-bp1-022-L: <10 cheered cards -> no score");
     }
     {   /* three blade=5 members: many cheers, none of them Hasetsu */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int deck_card = test_id(&tg, "PL!-sd1-010-SD");
         awake_q36("PL!-sd1-009-SD", 3, deck_card, 30, -1,
                   "PL!HS-bp1-022-L: non-Hasetsu cheered cards do not count toward 10");
@@ -2012,7 +2012,7 @@ static void wwd_setup(TestGame *tg, int *live_out)
 static void test_optional_energy_return_comparison(void)
 {
     {   /* accept the cost while ahead -> the comparison still holds */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live; wwd_setup(&tg, &live);
         int e = test_id(&tg, "LL-E-001-SD");
         test_give_energy(&tg, 5);
@@ -2062,7 +2062,7 @@ static        TestGame tg; test_game_new(&tg);
         CHECK_EQ(score_of(&tg, live), 0, "PL!SP-bp7-027-L: declined -> no score bonus");
     }
     {   /* accept while behind -> no immediate bonus */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live; wwd_setup(&tg, &live);
         int e = test_id(&tg, "LL-E-001-SD");
         test_give_energy(&tg, 3);
@@ -2099,7 +2099,7 @@ static        TestGame tg; test_game_new(&tg);
 static void test_angelic_angel_success_zone_constant(void)
 {
     {   /* success zone + mu's on stage -> +5 */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int angel = test_id(&tg, "PL!-bp4-019-L");
         int honoka = test_id(&tg, "PL!-sd1-010-SD");
         assert_identity(&tg, angel, "PL!-bp4-019-L", "PL!-bp4-019-L fixture");
@@ -2129,7 +2129,7 @@ static        TestGame tg; test_game_new(&tg);
         CHECK_EQ(score_of(&tg, angel), 0, "PL!-bp4-019-L: no mu's member on stage -> +0");
     }
     {   /* in the LIVE zone (not success) -> no bleed, effective score stays 4 */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int angel = test_id(&tg, "PL!-bp4-019-L");
         int honoka = test_id(&tg, "PL!-sd1-010-SD");
         test_add_to_live(&tg, angel);
@@ -2154,7 +2154,7 @@ static        TestGame tg; test_game_new(&tg);
                  "PL!-bp4-019-L: the +5 is removed once mu's leaves the stage");
     }
     {   /* expiry: the card leaves the success zone -> the +5 is cleared */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int angel = test_id(&tg, "PL!-bp4-019-L");
         int honoka = test_id(&tg, "PL!-sd1-010-SD");
         test_add_to_success(&tg, angel);
@@ -2181,7 +2181,7 @@ static        TestGame tg; test_game_new(&tg);
                  "PL!-bp4-019-L: the +5 does not bleed to the live-set-zone card");
     }
     {   /* compound AND: in the success zone but no mu's on stage */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int angel = test_id(&tg, "PL!-bp4-019-L");
         test_add_to_success(&tg, angel);
         /* CONTROL: "both halves are required" is only demonstrated if exactly

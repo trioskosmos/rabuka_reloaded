@@ -89,6 +89,7 @@ from parser_utils import (
     SPLIT_LIMIT,
     normalize_fullwidth_digits,
     as_int,
+    squash_name_needles,
     strip_suffix_period,
     extract_by_pattern,
     extract_cost_values,
@@ -14942,6 +14943,11 @@ class _FinalizationPipeline:
         # child clauses were given their location and so did nothing.
         for ability in data["unique_abilities"]:
             _drop_unsupported_child_location(ability)
+        # AFTER every fix-up and override, so a needle written by a late pass is
+        # squashed too. Canonicalises name needles once, here, so the engine can
+        # compare them against `Card::name_key` with no runtime normalisation.
+        # No-op on the current corpus; see `squash_name_needles`.
+        squash_name_needles(data["unique_abilities"])
 
     def run(self, data):
         for ability in data["unique_abilities"]:

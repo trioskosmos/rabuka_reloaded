@@ -1,16 +1,16 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-05T02:42:19.134254",
+  "generated_at": "2026-10-06T00:46:29.716189",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "5ce311e6",
+  "engine_commit": "3e7ff389",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
-    "total_cards": 2639,
-    "cards_with_abilities": 1650,
-    "total_abilities": 2116,
-    "unique_abilities": 985
+    "total_cards": 2674,
+    "cards_with_abilities": 1664,
+    "total_abilities": 2130,
+    "unique_abilities": 996
   },
   "unique_abilities": [
     {
@@ -137,7 +137,7 @@
     {
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
       "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
-      "card_count": 22,
+      "card_count": 20,
       "cards": [
         "PL!-sd1-011-PR | 絢瀬絵里 (ab#0)",
         "PL!-sd1-011-SD | 絢瀬 絵里 (ab#0)",
@@ -158,9 +158,7 @@
         "PL!N-bp1-010-P | 三船栞子 (ab#0)",
         "PL!N-bp1-010-R | 三船栞子 (ab#0)",
         "PL!N-sd1-002-SD | 中須かすみ (ab#0)",
-        "PL!N-sd1-003-SD | 桜坂しずく (ab#0)",
-        "PL!S-PR-013-PR | 高海千歌 (ab#0)",
-        "PL!S-PR-019-PR | 国木田花丸 (ab#0)"
+        "PL!N-sd1-003-SD | 桜坂しずく (ab#0)"
       ],
       "triggers": "登場",
       "use_limit": null,
@@ -5532,8 +5530,8 @@
       }
     },
     {
-      "full_text": "{{toujyou.png|登場}}以下から1つを選ぶ。\n・ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。\n・このメンバーを『Aqours』か『SaintSnow』のメンバーがいるエリアにポジションチェンジする。",
-      "triggerless_text": "以下から1つを選ぶ。\n・ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。\n・このメンバーを『Aqours』か『SaintSnow』のメンバーがいるエリアにポジションチェンジする。",
+      "full_text": "{{toujyou.png|登場}}以下から1つを選ぶ。\n・ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。\n・このメンバーを『Aqours』か『Saint Snow』のメンバーがいるエリアにポジションチェンジする。",
+      "triggerless_text": "以下から1つを選ぶ。\n・ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。\n・このメンバーを『Aqours』か『Saint Snow』のメンバーがいるエリアにポジションチェンジする。",
       "card_count": 4,
       "cards": [
         "PL!S-bp7-003-P | 松浦果南 (ab#1)",
@@ -5546,7 +5544,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "以下から1つを選ぶ。\n・ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。\n・このメンバーを『Aqours』か『SaintSnow』のメンバーがいるエリアにポジションチェンジする",
+        "text": "以下から1つを選ぶ。\n・ライブ終了時まで、自分のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下の『Aqours』のメンバーは、相手の効果によってはウェイトしない。\n・このメンバーを『Aqours』か『Saint Snow』のメンバーがいるエリアにポジションチェンジする",
         "action": "choice",
         "options": [
           {
@@ -5565,11 +5563,11 @@
             "blade_limit_operator": "<="
           },
           {
-            "text": "このメンバーを『Aqours』か『SaintSnow』のメンバーがいるエリアにポジションチェンジする",
+            "text": "このメンバーを『Aqours』か『Saint Snow』のメンバーがいるエリアにポジションチェンジする",
             "card_type": "member_card",
             "group_names": [
               "Aqours",
-              "SaintSnow"
+              "Saint Snow"
             ],
             "action": "position_change",
             "exclude_self": true
@@ -5579,7 +5577,7 @@
         "original_value": true,
         "group_names": [
           "Aqours",
-          "SaintSnow"
+          "Saint Snow"
         ]
       }
     },
@@ -7457,6 +7455,42 @@
       }
     },
     {
+      "full_text": "{{jidou.png|自動}}このメンバーがステージから控え室に置かれたとき、このメンバーがコスト9以上のメンバーとバトンタッチしていた場合、ライブ終了時まで、そのバトンタッチで登場したメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "このメンバーがステージから控え室に置かれたとき、このメンバーがコスト9以上のメンバーとバトンタッチしていた場合、ライブ終了時まで、そのバトンタッチで登場したメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "card_count": 3,
+      "cards": [
+        "PL!-PR-025-PR | 南 ことり (ab#0)",
+        "PL!HS-PR-040-PR | 安養寺姫芽 (ab#0)",
+        "PL!S-PR-047-PR | 桜内梨子 (ab#0)"
+      ],
+      "triggers": "自動",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "このメンバーがステージから控え室に置かれたとき、このメンバーがコスト9以上のメンバーとバトンタッチしていた場合、ライブ終了時まで、そのバトンタッチで登場したメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "condition": {
+          "type": "movement_condition",
+          "movement": "baton_touch",
+          "target": "self",
+          "baton_touch_trigger": true,
+          "text": "このメンバーがステージから控え室に置かれたとき、このメンバーがコスト9以上のメンバーとバトンタッチしていた場合",
+          "trigger_event": {
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "discard"
+          },
+          "cost_limit": 9,
+          "cost_limit_operator": ">="
+        },
+        "card_type": "member_card",
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": 2,
+        "duration": "live_end"
+      }
+    },
+    {
       "full_text": "{{live_start.png|ライブ開始時}}自分のデッキの上から、自分と相手のステージにいるメンバー1人につき、1枚公開する。それらの中にあるライブカード1枚につき、このカードのスコアを＋１する。その後、これにより公開したカードを控え室に置く。",
       "triggerless_text": "自分のデッキの上から、自分と相手のステージにいるメンバー1人につき、1枚公開する。それらの中にあるライブカード1枚につき、このカードのスコアを＋１する。その後、これにより公開したカードを控え室に置く。",
       "card_count": 3,
@@ -9074,8 +9108,8 @@
       }
     },
     {
-      "full_text": "{{jyouji.png|常時}}自分か相手のステージにコスト13以上のメンバーがいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "自分か相手のステージにコスト13以上のメンバーがいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "full_text": "{{jyouji.png|常時}}自分か相手のステージにコスト13以上のメンバーがいる場合、 {{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}} を得る。",
+      "triggerless_text": "自分か相手のステージにコスト13以上のメンバーがいる場合、 {{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}} を得る。",
       "card_count": 3,
       "cards": [
         "PL!S-PR-029-PR | 渡辺 曜 (ab#0)",
@@ -9087,7 +9121,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分か相手のステージにコスト13以上のメンバーがいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "text": "自分か相手のステージにコスト13以上のメンバーがいる場合、 {{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}} を得る",
         "condition": {
           "type": "location_condition",
           "location": "stage",
@@ -10472,6 +10506,44 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 2
+      }
+    },
+    {
+      "full_text": "{{jyouji.png|常時}}自分と相手の成功ライブカード置き場にあるすべてのライブカードのスコアの合計が10以上であるかぎり、{{heart_01.png|heart01}}を得る。",
+      "triggerless_text": "自分と相手の成功ライブカード置き場にあるすべてのライブカードのスコアの合計が10以上であるかぎり、{{heart_01.png|heart01}}を得る。",
+      "card_count": 2,
+      "cards": [
+        "PL!-PR-024-PR | 絢瀬絵里 (ab#0)",
+        "PL!N-PR-034-PR | 三船栞子 (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "{{heart_01.png|heart01}}を得る",
+        "condition": {
+          "text": "自分と相手の成功ライブカード置き場にあるすべてのライブカードのスコアの合計が10以上であるかぎり",
+          "target": "both",
+          "location": "success_live_card_zone",
+          "card_type": "live_card",
+          "count": 10,
+          "operator": ">=",
+          "comparison_type": "score",
+          "aggregate": "total",
+          "scope": "both",
+          "type": "comparison_condition",
+          "all": true
+        },
+        "duration": "as_long_as",
+        "conditional": true,
+        "action": "gain_resource",
+        "resource": "heart",
+        "heart_colors": [
+          "heart01"
+        ],
+        "count": 1,
+        "target": "self"
       }
     },
     {
@@ -14598,6 +14670,44 @@
             "action": "move_cards"
           }
         ]
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}自分のデッキの上から、10から自分の手札の枚数を引いた数に等しい枚数のカードを見る。その中から2枚まで手札に加える。残りを控え室に置く。",
+      "triggerless_text": "自分のデッキの上から、10から自分の手札の枚数を引いた数に等しい枚数のカードを見る。その中から2枚まで手札に加える。残りを控え室に置く。",
+      "card_count": 2,
+      "cards": [
+        "PL!HS-PR-039-PR | 百生吟子 (ab#0)",
+        "PL!SP-PR-028-PR | 米女メイ (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のデッキの上から、10から自分の手札の枚数を引いた数に等しい枚数のカードを見る。その中から2枚まで手札に加える。残りを控え室に置く",
+        "action": "look_and_select",
+        "look_action": {
+          "text": "自分のデッキの上から、10から自分の手札の枚数を引いた数に等しい枚数のカードを見る。",
+          "source": "deck",
+          "count": 1,
+          "dynamic_count": {
+            "type": "dynamic_count",
+            "reference": "自分のデッキの上から、10から自分の手札の枚数を引いた数",
+            "mode": "equals"
+          },
+          "target": "self",
+          "action": "draw_card",
+          "destination": "hand"
+        },
+        "select_action": {
+          "action": "select_cards",
+          "discard_remaining": true,
+          "text": "2枚まで手札に加える。残りを控え室に置く",
+          "destination": "hand",
+          "count": 2,
+          "max": true
+        }
       }
     },
     {
@@ -19632,30 +19742,75 @@
       }
     },
     {
-      "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "card_count": 2,
       "cards": [
-        "PL!S-PR-013-PR | 高海千歌 (ab#1)",
-        "PL!S-PR-019-PR | 国木田花丸 (ab#1)"
+        "PL!S-PR-013-PR | 高海千歌 (ab#0)",
+        "PL!S-PR-019-PR | 国木田花丸 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札を1枚控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "optional": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "action": "look_and_select",
+        "look_action": {
+          "text": "自分のデッキの上からカードを3枚見る。",
+          "source": "deck_top",
+          "count": 3,
+          "target": "self",
+          "action": "look_at"
+        },
+        "select_action": {
+          "action": "select_cards",
+          "discard_remaining": true,
+          "text": "1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+          "destination": "hand",
+          "count": 1,
+          "optional": true
+        },
+        "optional": true
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分の控え室にあるカードが9枚以下の場合、自分の控え室にあるライブカードを3枚まで選び、自分のデッキの上に好きな順番で置く。",
+      "triggerless_text": "自分の控え室にあるカードが9枚以下の場合、自分の控え室にあるライブカードを3枚まで選び、自分のデッキの上に好きな順番で置く。",
+      "card_count": 2,
+      "cards": [
+        "PL!S-PR-048-PR | 黒澤ルビィ (ab#0)",
+        "PL!SP-PR-027-PR | 平安名すみれ (ab#0)"
       ],
       "triggers": "ライブ開始時",
       "use_limit": null,
       "is_null": false,
-      "cost": {
-        "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい",
-        "optional": true,
-        "type": "pay_energy",
-        "energy": 2,
-        "zone": "energy_zone",
-        "count": 2
-      },
+      "cost": null,
       "effect": {
-        "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-        "duration": "live_end",
-        "action": "gain_resource",
-        "resource": "blade",
-        "count": 2
+        "text": "自分の控え室にあるカードが9枚以下の場合、自分の控え室にあるライブカードを3枚まで選び、自分のデッキの上に好きな順番で置く",
+        "condition": {
+          "type": "card_count_condition",
+          "count": 9,
+          "operator": "<=",
+          "text": "自分の控え室にあるカードが9枚以下の場合",
+          "location": "discard",
+          "target": "self"
+        },
+        "source": "discard",
+        "placement_order": "any_order",
+        "count": 3,
+        "card_type": "live_card",
+        "target": "self",
+        "max": true,
+        "action": "select"
       }
     },
     {
@@ -20680,8 +20835,8 @@
       }
     },
     {
-      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分の控え室からコスト10以上のメンバーカードを1枚手札に加える。これにより「桜内梨子」か「渡辺曜」を手札に加えた場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "手札を1枚控え室に置いてもよい：自分の控え室からコスト10以上のメンバーカードを1枚手札に加える。これにより「桜内梨子」か「渡辺曜」を手札に加えた場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分の控え室からコスト10以上のメンバーカードを1枚手札に加える。これにより「桜内梨子」か「渡辺 曜」を手札に加えた場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "手札を1枚控え室に置いてもよい：自分の控え室からコスト10以上のメンバーカードを1枚手札に加える。これにより「桜内梨子」か「渡辺 曜」を手札に加えた場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "card_count": 2,
       "cards": [
         "PL!S-bp7-001-P | 高海千歌 (ab#0)",
@@ -20700,7 +20855,7 @@
         "type": "move_cards"
       },
       "effect": {
-        "text": "自分の控え室からコスト10以上のメンバーカードを1枚手札に加える。これにより「桜内梨子」か「渡辺曜」を手札に加えた場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "text": "自分の控え室からコスト10以上のメンバーカードを1枚手札に加える。これにより「桜内梨子」か「渡辺 曜」を手札に加えた場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "action": "conditional_on_result",
         "primary_effect": {
           "text": "自分の控え室からコスト10以上のメンバーカードを1枚手札に加える",
@@ -20714,7 +20869,7 @@
           "action": "move_cards"
         },
         "result_condition": {
-          "text": "これにより「桜内梨子」か「渡辺曜」を手札に加えた場合",
+          "text": "これにより「桜内梨子」か「渡辺 曜」を手札に加えた場合",
           "characters": [
             "桜内梨子",
             "渡辺曜"
@@ -25159,8 +25314,8 @@
       }
     },
     {
-      "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}自分のデッキの上からカードを5枚見る。その中から「絢瀬絵里」か「朝香果林」か「葉月恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバーをすべてウェイトにする。",
-      "triggerless_text": "自分のデッキの上からカードを5枚見る。その中から「絢瀬絵里」か「朝香果林」か「葉月恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバーをすべてウェイトにする。",
+      "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}自分のデッキの上からカードを5枚見る。その中から「絢瀬絵里」か「朝香果林」か「葉月 恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバーをすべてウェイトにする。",
+      "triggerless_text": "自分のデッキの上からカードを5枚見る。その中から「絢瀬絵里」か「朝香果林」か「葉月 恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバーをすべてウェイトにする。",
       "card_count": 1,
       "cards": [
         "LL-bp4-001-R＋ | 絢瀬絵里&朝香果林&葉月 恋 (ab#0)"
@@ -25170,7 +25325,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のデッキの上からカードを5枚見る。その中から「絢瀬絵里」か「朝香果林」か「葉月恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバーをすべてウェイトにする",
+        "text": "自分のデッキの上からカードを5枚見る。その中から「絢瀬絵里」か「朝香果林」か「葉月 恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバーをすべてウェイトにする",
         "action": "look_and_select",
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -25192,7 +25347,7 @@
             "朝香果林",
             "葉月恋"
           ],
-          "text": "自分のデッキの上からカードを5枚見る。その中から「絢瀬絵里」か「朝香果林」か「葉月恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバーをすべてウェイトにする",
+          "text": "自分のデッキの上からカードを5枚見る。その中から「絢瀬絵里」か「朝香果林」か「葉月 恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバーをすべてウェイトにする",
           "original_value": true,
           "all": true
         },
@@ -25426,8 +25581,8 @@
       }
     },
     {
-      "full_text": "{{jyouji.png|常時}}このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる。",
-      "triggerless_text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる。",
+      "full_text": "{{jyouji.png|常時}}このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐 千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる。",
+      "triggerless_text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐 千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる。",
       "card_count": 1,
       "cards": [
         "LL-bp7-001-R＋ | 国木田花丸&優木せつ菜&嵐 千砂都 (ab#0)"
@@ -25436,7 +25591,7 @@
       "use_limit": null,
       "is_null": false,
       "cost": {
-        "text": "自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい",
+        "text": "自分の手札から「国木田花丸」と「優木せつ菜」と「嵐 千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい",
         "type": "move_cards",
         "source": "hand",
         "zone": "hand",
@@ -25452,7 +25607,7 @@
         "optional": true
       },
       "effect": {
-        "text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる",
+        "text": "このカードのプレイに際し、自分の手札から「国木田花丸」と「優木せつ菜」と「嵐 千砂都」のメンバーカードをそれぞれ1枚ずつ控え室に置いてもよい。そうしたとき、このカードのコストは10になる",
         "action": "modify_cost",
         "operation": "set",
         "value": 10,
@@ -25671,6 +25826,143 @@
             "card_type": "energy_card"
           }
         ]
+      }
+    },
+    {
+      "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：自分のステージに「星空 凛」か「小泉花陽」がいる場合、カードを2枚引き、手札を1枚控え室に置く。2人ともいる場合、さらにこのメンバーをアクティブにする。",
+      "triggerless_text": "このメンバーをウェイトにする：自分のステージに「星空 凛」か「小泉花陽」がいる場合、カードを2枚引き、手札を1枚控え室に置く。2人ともいる場合、さらにこのメンバーをアクティブにする。",
+      "card_count": 1,
+      "cards": [
+        "PL!-PR-022-PR | 西木野真姫 (ab#0)"
+      ],
+      "triggers": "起動",
+      "use_limit": 1,
+      "is_null": false,
+      "cost": {
+        "text": "このメンバーをウェイトにする",
+        "state_change": "wait",
+        "card_type": "member_card",
+        "self_cost": true,
+        "type": "change_state"
+      },
+      "effect": {
+        "text": "自分のステージに「星空 凛」か「小泉花陽」がいる場合、カードを2枚引き、手札を1枚控え室に置く。2人ともいる場合、さらにこのメンバーをアクティブにする",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "自分のステージに「星空 凛」か「小泉花陽」がいる場合、カードを2枚引き、手札を1枚控え室に置く",
+            "condition": {
+              "text": "自分のステージに「星空 凛」か「小泉花陽」がいる場合",
+              "characters": [
+                "星空凛",
+                "小泉花陽"
+              ],
+              "target": "self",
+              "location": "stage",
+              "type": "location_condition"
+            },
+            "action": "sequential",
+            "actions": [
+              {
+                "text": "カードを2枚引き",
+                "count": 2,
+                "action": "draw_card",
+                "source": "deck",
+                "destination": "hand"
+              },
+              {
+                "text": "手札を1枚控え室に置く",
+                "source": "hand",
+                "destination": "discard",
+                "count": 1,
+                "action": "move_cards",
+                "card_type": "card"
+              }
+            ]
+          },
+          {
+            "text": "2人ともいる場合、さらにこのメンバーをアクティブにする",
+            "condition": {
+              "text": "2人ともいる場合",
+              "count": 2,
+              "operator": ">=",
+              "target": "self",
+              "type": "comparison_condition",
+              "location": "stage"
+            },
+            "state_change": "active",
+            "card_type": "member_card",
+            "action": "change_state",
+            "target": "self",
+            "self_target": true,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "full_text": "{{jidou.png|自動}}[ターン3回]自分か相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "[ターン3回]自分か相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
+      "card_count": 1,
+      "cards": [
+        "PL!-PR-023-PR | 絢瀬絵里 (ab#0)"
+      ],
+      "triggers": "自動",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "[ターン3回]自分か相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る",
+        "duration": "live_end",
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": 1,
+        "trigger_type": "each_time",
+        "condition": {
+          "type": "location_condition",
+          "location": "stage",
+          "target": "either",
+          "text": "[ターン3回]自分か相手のステージにいるメンバーがウェイト状態になる"
+        }
+      }
+    },
+    {
+      "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}メンバー1人をウェイトにし、手札を1枚控え室に置く：カードを1枚引く。",
+      "triggerless_text": "メンバー1人をウェイトにし、手札を1枚控え室に置く：カードを1枚引く。",
+      "card_count": 1,
+      "cards": [
+        "PL!-PR-023-PR | 絢瀬絵里 (ab#1)"
+      ],
+      "triggers": "起動",
+      "use_limit": 1,
+      "is_null": false,
+      "cost": {
+        "text": "メンバー1人をウェイトにし、手札を1枚控え室に置く",
+        "type": "sequential_cost",
+        "costs": [
+          {
+            "text": "メンバー1人をウェイトにし",
+            "state_change": "wait",
+            "count": 1,
+            "card_type": "member_card",
+            "type": "change_state"
+          },
+          {
+            "text": "手札を1枚控え室に置く",
+            "source": "hand",
+            "zone": "hand",
+            "destination": "discard",
+            "count": 1,
+            "type": "move_cards"
+          }
+        ]
+      },
+      "effect": {
+        "text": "カードを1枚引く",
+        "action": "draw_card",
+        "count": 1,
+        "source": "deck",
+        "destination": "hand"
       }
     },
     {
@@ -28388,6 +28680,73 @@
         ],
         "conditional": true,
         "original_value": true
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}手札以外から登場したとき、ライブ終了時まで、{{heart_06.png|heart06}}を得る。",
+      "triggerless_text": "手札以外から登場したとき、ライブ終了時まで、{{heart_06.png|heart06}}を得る。",
+      "card_count": 1,
+      "cards": [
+        "PL!HS-PR-038-PR | セラス 柳田 リリエンフェルト (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "手札以外から登場したとき、ライブ終了時まで、{{heart_06.png|heart06}}を得る",
+        "condition": {
+          "type": "appearance_condition",
+          "appearance": true,
+          "text": "手札以外から登場したとき",
+          "trigger_event": {
+            "type": "appearance",
+            "location": "stage"
+          },
+          "location": "stage"
+        },
+        "action": "gain_resource",
+        "resource": "heart",
+        "heart_colors": [
+          "heart06"
+        ],
+        "count": 1,
+        "duration": "live_end"
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}相手のステージにいるコスト4以下のメンバー1人をウェイトにする。それは次のターンのアクティブフェイズにアクティブにならない。",
+      "triggerless_text": "相手のステージにいるコスト4以下のメンバー1人をウェイトにする。それは次のターンのアクティブフェイズにアクティブにならない。",
+      "card_count": 1,
+      "cards": [
+        "PL!HS-PR-038-PR | セラス 柳田 リリエンフェルト (ab#1)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "相手のステージにいるコスト4以下のメンバー1人をウェイトにする。それは次のターンのアクティブフェイズにアクティブにならない",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "相手のステージにいるコスト4以下のメンバー1人をウェイトにする",
+            "source": "stage",
+            "cost_limit": 4,
+            "cost_limit_operator": "<=",
+            "state_change": "wait",
+            "count": 1,
+            "card_type": "member_card",
+            "target": "opponent",
+            "action": "change_state"
+          },
+          {
+            "text": "それは次のターンのアクティブフェイズにアクティブにならない",
+            "action": "restriction",
+            "restriction_type": "cannot_activate",
+            "phase": "active_phase"
+          }
+        ]
       }
     },
     {
@@ -32051,6 +32410,39 @@
       }
     },
     {
+      "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分の控え室からメンバーが登場したとき、カードを1枚引く。",
+      "triggerless_text": "自分の控え室からメンバーが登場したとき、カードを1枚引く。",
+      "card_count": 1,
+      "cards": [
+        "PL!N-PR-033-PR | 中須かすみ (ab#0)"
+      ],
+      "triggers": "自動",
+      "use_limit": 1,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分の控え室からメンバーが登場したとき、カードを1枚引く",
+        "condition": {
+          "type": "appearance_condition",
+          "appearance": true,
+          "text": "自分の控え室からメンバーが登場したとき",
+          "trigger_event": {
+            "type": "appearance",
+            "location": "stage",
+            "appearance_source": "discard"
+          },
+          "location": "stage",
+          "appearance_source": "discard",
+          "target": "self",
+          "card_type": "member_card"
+        },
+        "action": "draw_card",
+        "count": 1,
+        "source": "deck",
+        "destination": "hand"
+      }
+    },
+    {
       "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
       "triggerless_text": "ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
       "card_count": 1,
@@ -35328,6 +35720,32 @@
       }
     },
     {
+      "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された相手のカードの中にライブカードがある場合、カードを1枚引く。",
+      "triggerless_text": "エールにより公開された相手のカードの中にライブカードがある場合、カードを1枚引く。",
+      "card_count": 1,
+      "cards": [
+        "PL!S-PR-046-PR | 渡辺 曜 (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "エールにより公開された相手のカードの中にライブカードがある場合、カードを1枚引く",
+        "condition": {
+          "type": "location_condition",
+          "location": "revealed_cards",
+          "target": "self",
+          "text": "エールにより公開された相手のカードの中にライブカードがある場合",
+          "card_type": "live_card"
+        },
+        "action": "draw_card",
+        "count": 1,
+        "source": "deck",
+        "destination": "hand"
+      }
+    },
+    {
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、ライブカードを1枚までデッキの一番下に置く。",
       "triggerless_text": "エールにより公開された自分のカードの中から、ライブカードを1枚までデッキの一番下に置く。",
       "card_count": 1,
@@ -36597,8 +37015,8 @@
       }
     },
     {
-      "full_text": "{{toujyou.png|登場}}自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい。この効果によって『SaintSnow』のメンバーが移動した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい。この効果によって『SaintSnow』のメンバーが移動した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "full_text": "{{toujyou.png|登場}}自分のステージに『Aqours』か『Saint Snow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい。この効果によって『Saint Snow』のメンバーが移動した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "自分のステージに『Aqours』か『Saint Snow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい。この効果によって『Saint Snow』のメンバーが移動した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "card_count": 1,
       "cards": [
         "PL!S-bp7-012-N | 松浦果南 (ab#0)"
@@ -36608,15 +37026,15 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい。この効果によって『SaintSnow』のメンバーが移動した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "text": "自分のステージに『Aqours』か『Saint Snow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい。この効果によって『Saint Snow』のメンバーが移動した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "action": "conditional_on_result",
         "primary_effect": {
-          "text": "自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい",
+          "text": "自分のステージに『Aqours』か『Saint Snow』のメンバーのみがいる場合、フォーメーションチェンジしてもよい",
           "condition": {
-            "text": "自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合",
+            "text": "自分のステージに『Aqours』か『Saint Snow』のメンバーのみがいる場合",
             "group_names": [
               "Aqours",
-              "SaintSnow"
+              "Saint Snow"
             ],
             "target": "self",
             "location": "stage",
@@ -36631,7 +37049,7 @@
         },
         "result_condition": {
           "type": "movement_condition",
-          "text": "この効果によって『SaintSnow』のメンバーが移動した場合",
+          "text": "この効果によって『Saint Snow』のメンバーが移動した場合",
           "trigger_event": {
             "type": "area_move",
             "tense": "past",
@@ -36639,7 +37057,7 @@
           },
           "movement": "position_change",
           "group_names": [
-            "SaintSnow"
+            "Saint Snow"
           ],
           "card_type": "member_card"
         },
@@ -36653,13 +37071,13 @@
         },
         "group_names": [
           "Aqours",
-          "SaintSnow"
+          "Saint Snow"
         ],
         "condition": {
-          "text": "自分のステージに『Aqours』か『SaintSnow』のメンバーのみがいる場合、",
+          "text": "自分のステージに『Aqours』か『Saint Snow』のメンバーのみがいる場合、",
           "group_names": [
             "Aqours",
-            "SaintSnow"
+            "Saint Snow"
           ],
           "target": "self",
           "location": "stage",
@@ -39504,8 +39922,8 @@
       }
     },
     {
-      "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる「嵐千砂都」1人は{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "ライブ終了時まで、自分のステージにいる「嵐千砂都」1人は{{icon_blade.png|ブレード}}を得る。",
+      "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる「嵐 千砂都」1人は{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "ライブ終了時まで、自分のステージにいる「嵐 千砂都」1人は{{icon_blade.png|ブレード}}を得る。",
       "card_count": 1,
       "cards": [
         "PL!SP-bp7-025-L | Memories (ab#0)"
@@ -39515,7 +39933,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージにいる「嵐千砂都」1人は{{icon_blade.png|ブレード}}を得る",
+        "text": "自分のステージにいる「嵐 千砂都」1人は{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
         "count": 1,
         "target": "self",
@@ -39523,7 +39941,7 @@
           "嵐千砂都"
         ],
         "quoted_text": {
-          "text": "嵐千砂都",
+          "text": "嵐 千砂都",
           "quoted_type": "character"
         },
         "target_count": 1,
@@ -39532,8 +39950,8 @@
       }
     },
     {
-      "full_text": "{{live_start.png|ライブ開始時}}エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分のステージに「葉月恋」がいる場合、カードを2枚引き、手札を1枚控え室に置く。",
-      "triggerless_text": "エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分のステージに「葉月恋」がいる場合、カードを2枚引き、手札を1枚控え室に置く。",
+      "full_text": "{{live_start.png|ライブ開始時}}エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分のステージに「葉月 恋」がいる場合、カードを2枚引き、手札を1枚控え室に置く。",
+      "triggerless_text": "エネルギー置き場にあるエネルギー1枚をエネルギーデッキに置いてもよい：自分のステージに「葉月 恋」がいる場合、カードを2枚引き、手札を1枚控え室に置く。",
       "card_count": 1,
       "cards": [
         "PL!SP-bp7-026-L | Dears (ab#0)"
@@ -39551,9 +39969,9 @@
         "type": "move_cards"
       },
       "effect": {
-        "text": "自分のステージに「葉月恋」がいる場合、カードを2枚引き、手札を1枚控え室に置く",
+        "text": "自分のステージに「葉月 恋」がいる場合、カードを2枚引き、手札を1枚控え室に置く",
         "condition": {
-          "text": "自分のステージに「葉月恋」がいる場合",
+          "text": "自分のステージに「葉月 恋」がいる場合",
           "characters": [
             "葉月恋"
           ],

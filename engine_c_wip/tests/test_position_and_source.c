@@ -519,7 +519,7 @@ static    TestGame tg;
 
 static void positions_characters_wrong_character_does_not_award(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int host = full_board(&tg);
     if (host < 0 || !fixture_names_are_independent()) return;
@@ -566,7 +566,7 @@ static    TestGame tg;
 
 static void positions_characters_one_of_two_correct_does_not_award(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int host = full_board(&tg);
     if (host < 0 || !fixture_names_are_independent()) return;
@@ -591,7 +591,7 @@ static void positions_characters_one_of_two_correct_does_not_award(void)
 
 static void positions_characters_empty_slot_does_not_award(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     /* Only the host stands on stage (centre), so left_side and right_side are
      * both empty. */
@@ -641,7 +641,7 @@ static    TestGame tg;
 
 static void positions_characters_absent_is_a_no_op(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int host = full_board(&tg);
     if (host < 0) return;
@@ -694,7 +694,7 @@ static    TestGame tg;
 
 static void positions_characters_consulted_alongside_characters(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int host = full_board(&tg);
     if (host < 0) return;
@@ -788,7 +788,7 @@ static    TestGame tg;
 
 static void appearance_source_absent_is_a_no_op(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int host = source_board(&tg, RB_ZONE_HAND);
     if (host < 0) return;

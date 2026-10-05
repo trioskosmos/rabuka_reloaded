@@ -1,0 +1,662 @@
+make t-nogate: running T=parity_jidou_watch WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_jidou_watch src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_jidou_watch.c
+./rb_verdict ./rb_engine_t_parity_jidou_watch parity_jidou_watch
+--- §A discard_watch / on_hand_to_discard_each_time_gain_heart01_and_blade ---
+ok: the watcher is the PL!HS-pb1-003-R (大沢瑠璃乃) print
+ok: first: heart01=1
+ok: the second qualifying event in the same turn grants again (ターン2回)
+ok: and blade 2: the re-scan guard must not veto the second 自動
+        rurino_use_limit_blocks_second_same_turn: 4 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       rurino_use_limit_blocks_second_same_turn
+--- §B discard_watch / hand_discard_batch_heart_blade_q241 ---
+ok: the debut host is the printed rarity under test
+ok: the debut host is the printed rarity under test
+ok: ＋ printing: exactly 2 candidates reach the waitroom
+        hand_discard_batch_q241_two_discarded_auto_fires_once: 9 assertion(s), 6 failure(s), 0 setup bug(s)
+FAIL:   hand_discard_batch_q241_two_discarded_auto_fires_once
+ok: the debut host is the printed rarity under test
+        hand_discard_batch_q241_three_discarded_fires_once: 4 assertion(s), 3 failure(s), 0 setup bug(s)
+FAIL:   hand_discard_batch_q241_three_discarded_fires_once
+ok: the debut host is the printed rarity under test
+ok: Q241: 0 cards discarded → no trigger at all
+ok: Q241: 0 cards discarded → no blade either
+        hand_discard_batch_q241_zero_discarded_no_trigger: 4 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   hand_discard_batch_q241_zero_discarded_no_trigger
+--- §C discard_watch / live_start_heart_requirement_reduction (Q213) ---
+ok: the Q213 host is the PL!HS-bp5-019-L (ハナムスビ) print
+ok: the real live card fixture is the LL-bp5-001-L print
+ok: the 「non-live member」 fixture really is a 蓮ノ空 non-ライブ card
+ok: the WAITROOM did not shrink across the two passes (the Rust twin's own assertion, kept verbatim: live_slot_cards_only_test.rs:59). This is a floor, not a measurement of the eviction -- moving a card out of the LIVE slot cannot shrink the WAITROOM
+ok: RUST ORACLE: at ライブ開始時 the wrongly-set member is STILL in the live zone -- phases.rs:245 fires trigger_live_start_abilities before live_card_zone.face_up is set at phases.rs:343, and check_invalid_live_cards (mod.rs:1734) returns early while it is false -- so the Q213 live-slot reduction COUNTS this member. THE C MATCHES RUST HERE. Q213 wants the opposite and is unimplemented in BOTH engines: file it against Rust mod.rs:1734, do not move the C.
+        hanamusubi_q213_member_card_still_in_live_zone_at_live_start: 5 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       hanamusubi_q213_member_card_still_in_live_zone_at_live_start
+--- §D discard_watch / deck_to_discard_optional_hand_discard_recover_self ---
+ok: the watcher is the PL!N-bp7-011-R＋ (ミア・テイラー) print
+ok: accepting: ab#0 presents its conditional_optional recover
+ok: discard 1 + recover 1 → the hand is back to 2 cards
+        deck_to_discard_self_recovery_accept_discards_one_and_recovers_self: 5 assertion(s), 2 failure(s), 0 setup bug(s)
+FAIL:   deck_to_discard_self_recovery_accept_discards_one_and_recovers_self
+ok: skipping leaves ミア in the waitroom
+ok: skipping discards nothing from hand
+ok: and ミア is NOT recovered
+        deck_to_discard_self_recovery_skip_no_discard_no_recover: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       deck_to_discard_self_recovery_skip_no_discard_no_recover
+ok: empty hand → the optional discard cannot happen, so ミア stays put
+ok: そうしたとき: the recover is contingent on the discard actually happening, so an empty hand recovers nothing
+        deck_to_discard_self_recovery_empty_hand_no_recover: 2 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       deck_to_discard_self_recovery_empty_hand_no_recover
+ok: ミア and the other waitroom card are distinct ids
+ok: the non-ミア waitroom card must NOT be recovered — the trigger is self-targeted
+        deck_to_discard_self_recovery_recovers_only_self: 3 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   deck_to_discard_self_recovery_recovers_only_self
+ok: ab#0 must not fire when a different card reaches the waitroom
+ok: the hand is unchanged
+        deck_to_discard_self_recovery_does_not_fire_for_other_card: 2 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       deck_to_discard_self_recovery_does_not_fire_for_other_card
+ok: 手札→控え室 is not the デッキ→控え室 trigger, so ミア stays put
+ok: and is not recovered to hand
+ok: hand→discard must not discard anything from hand
+ok: the waitroom is unchanged
+        deck_to_discard_self_recovery_does_not_fire_on_hand_to_discard: 4 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       deck_to_discard_self_recovery_does_not_fire_on_hand_to_discard
+--- §E discard_watch / real_mill_optional_discard_recover_self ---
+ok: the miller is the PL!S-sd1-013-SD (黒澤ダイヤ) print
+ok: 黒澤ダイヤ's real 登場 (mill 5) exists and is queued
+ok: ダイヤ's real mill records a movement for ミア
+ok: and ミア really is in the waitroom after the mill
+        real_deck_top_mill_offers_discard_and_recovers_self: 6 assertion(s), 2 failure(s), 0 setup bug(s)
+FAIL:   real_deck_top_mill_offers_discard_and_recovers_self
+ok: the activator is the PL!N-bp1-014-PRproteinbar (中須かすみ) print
+ok: 中須かすみ's real 登場 (draw 1, discard 1 from hand) exists
+ok: かすみ's discard selected ミア (hand→waitroom)
+ok: ミア really sits in the waitroom after the hand discard
+ok: ミア stays discarded, not recovered
+        real_hand_discard_does_not_trigger_deck_to_discard_self_recovery: 6 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   real_hand_discard_does_not_trigger_deck_to_discard_self_recovery
+--- §F discard_watch / deck_to_discard_self_recovery_yell_refresh (Q269) ---
+ok: the yell really did reveal ミア (the test must be meaningful)
+ok: Q269: a yell reveal must not raise ab#0's optional
+ok: Q269: ミア is not recovered to hand by a yell reveal
+ok: Q269: the yell discards nothing from hand
+ok: Q269: ミア does not move to the waitroom from a yell reveal
+        q269_yell_reveal_does_not_trigger_deck_to_discard_recovery: 5 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       q269_yell_reveal_does_not_trigger_deck_to_discard_recovery
+ok: control: a genuine deck→waitroom movement DOES offer the recover
+        q269_control_deck_to_discard_triggers: 2 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   q269_control_deck_to_discard_triggers
+--- §G discard_watch / Q252 桜内梨子 own live-zone discard ---
+ok: no live_card_zone movement → the 自動 must not fire, even with an 『Aqours』 live card sitting in the waitroom
+        riko_q252_no_movement_no_trigger: 1 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       riko_q252_no_movement_no_trigger
+ok: no live cards at all → the condition fails, no trigger
+        riko_q252_no_live_cards_anywhere_no_trigger: 1 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       riko_q252_no_live_cards_anywhere_no_trigger
+ok: the negative fixture is genuinely outside 『Aqours』
+ok: a non-『Aqours』 ライブ → the group filter blocks the trigger
+ok: and the card stays in the waitroom
+        riko_q252_non_aqours_live_alone_no_trigger: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       riko_q252_non_aqours_live_alone_no_trigger
+ok: an empty recently-moved set → the condition counts 0
+ok: no recently-moved record at all → the condition counts 0
+        riko_q252_empty_and_null_moved_cards_no_trigger: 2 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       riko_q252_empty_and_null_moved_cards_no_trigger
+ok: the TAS scan only sees stage cards, so an off-stage 桜内梨子 is never enqueued
+ok: and the live card stays in the waitroom
+        riko_q252_watcher_off_stage_no_trigger: 2 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       riko_q252_watcher_off_stage_no_trigger
+ok: the positive fixture is genuinely inside 『Aqours』
+ok: the 『Aqours』 MEMBER fixture is inside the group but is not a ライブ
+ok: the non-『Aqours』 ライブ remains
+ok: the 『Aqours』 member remains (not a ライブ)
+ok: the energy card remains
+        riko_q252_mixed_batch_filters_correctly: 8 assertion(s), 3 failure(s), 0 setup bug(s)
+FAIL:   riko_q252_mixed_batch_filters_correctly
+GAP: the position|destination prompt carries its deck_top / deck_bottom options — the flat RbChoice struct has no options list (only n_heart_options), so no destination is observable from C and the answer index is read as an area
+        riko_q252_single_card_deck_top_exact_identity: 6 assertion(s), 5 failure(s), 0 setup bug(s)
+FAIL:   riko_q252_single_card_deck_top_exact_identity
+ok: second trigger in the same turn: ターン1回 is spent, so no prompt
+ok: and live_b stays in the waitroom untouched
+        riko_q252_turn_limit_blocks_second_trigger: 6 assertion(s), 4 failure(s), 0 setup bug(s)
+FAIL:   riko_q252_turn_limit_blocks_second_trigger
+ok: declining keeps live1 in the waitroom
+ok: declining keeps live2 in the waitroom
+ok: and neither card reaches the deck
+ok: and neither card reaches the deck
+        riko_q252_decline_keeps_cards_in_waitroom: 5 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   riko_q252_decline_keeps_cards_in_waitroom
+ok: and leaves live1 in the waitroom
+        riko_q252_r_plus_printing_selects_the_second_card: 4 assertion(s), 3 failure(s), 0 setup bug(s)
+FAIL:   riko_q252_r_plus_printing_selects_the_second_card
+--- §H debut_watch / ally_member_debut_pay_energy_or_center_ally_blade ---
+ok: the watcher is the PL!HS-pb1-001-R print
+ok: the arriving ally really is a 『スリーズブーケ』 member
+ok: the watcher is a 『スリーズブーケ』 member herself
+ok: the 『スリーズブーケ』 ally is played
+ok: and lands at Left
+ok: the each_time fired: an optional payment prompt was raised (Rust asserts the rule_log contains "offered")
+ok: declining the payment leaves energy at the play cost only (4)
+        hana_001_ally_appears_offers_payment: 7 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       hana_001_ally_appears_offers_payment
+ok: the negative fixture really is OUTSIDE 『スリーズブーケ』
+ok: a non-『スリーズブeke』 ally must not raise the payment prompt
+ok: no trigger means no energy activation, only the play cost (4)
+ok: CONTROL: with no 花帆 001 on the stage, the identical play raises no prompt at all — so the prompt in the case above IS 001's 自動
+ok: CONTROL: only the play cost
+        hana_001_non_matching_ally_no_trigger: 5 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       hana_001_non_matching_ally_no_trigger
+ok: 「ほかの」成员的登場 excludes her own debut, so no payment prompt
+ok: self-appearance costs her printed 11 and activates no energy
+        hana_001_self_play_no_trigger: 2 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       hana_001_self_play_no_trigger
+ok: the watcher is the printed 009 rarity
+ok: the arriving ally is a 『スリーズブーケ』 member
+ok: 009 at CENTER gains blade+2 when a 『スリーズブeke』 member appears
+        hana_009_center_ally_appears_gains_blade: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       hana_009_center_ally_appears_gains_blade
+ok: the watcher is the printed 009 rarity
+ok: the arriving ally is a 『スリーズブーケ』 member
+ok: 009 at CENTER gains blade+2 when a 『スリーズブeke』 member appears
+        hana_009_p_plus_center_ally_appears_gains_blade: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       hana_009_p_plus_center_ally_appears_gains_blade
+ok: the watcher is the printed 009 rarity
+ok: the arriving ally is a 『スリーズブーケ』 member
+ok: 009 is NOT at center, so 「自分のステージのセンター」 is false and it gains nothing
+        hana_009_not_center_no_trigger: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       hana_009_not_center_no_trigger
+ok: no blade before the self-deploy
+ok: 009 really is at Center
+ok: Q245: 009 deployed to center triggers her own 自動 (blade+2)
+        hana_009_q245_self_deploy_to_center_triggers: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       hana_009_q245_self_deploy_to_center_triggers
+ok: no blade before the non-center deploy
+ok: Q245 edge: 009 deployed to NON-center must not trigger — the condition requires the Center area
+        hana_009_q245_self_deploy_non_center_no_trigger: 2 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       hana_009_q245_self_deploy_non_center_no_trigger
+--- §I debut_watch / jump_up_high_multi_target_blade_grant_lifecycle ---
+ok: the grant host is the PL!S-sd1-022-SD print
+ok: beneficiary A really is inside 『Aqours』 (by series, not by unit)
+ok: beneficiary B really is inside 『Aqours』
+ok: the non-beneficiary must be OUTSIDE 『Aqours』, or the group filter is never exercised in the negative direction
+ok: CONTROL: on this same board the non-『Aqours』 member gains 4 blades from recalc alone — 2 members x 2, which is her own 常時 and which the 『Aqours』-filtered ライブ開始時 grant could never pay
+ok: CONTROL: and an 『Aqours』 member gains none either, so the ライブ開始時 grant was not re-derived by recalc
+ok: the grant host is the PL!S-sd1-022-SD print
+ok: beneficiary A really is inside 『Aqours』 (by series, not by unit)
+ok: beneficiary B really is inside 『Aqours』
+ok: the non-beneficiary must be OUTSIDE 『Aqours』, or the group filter is never exercised in the negative direction
+ok: the ライブ開始時 trigger is queued for Jump up HIGH!!
+ok: an 『Aqours』 member gains EXACTLY ONE blade — 2 would mean the fan-out double-counted, and a `>= 1` check cannot see that
+ok: the second 『Aqours』 member also gains exactly one
+ok: 『Aqours』のメンバー is the printed condition, so a non-『Aqours』 member on the same board gains nothing — and that 0 is correct: norecalc has run on this board yet, so it measures the GRANT alone. Theoutsider's own 常時 lands as 4 on the next recalc, asserted below.
+ok: round 1: the grant is stable, not cumulative
+ok: round 1: the grant is stable, not cumulative
+ok: round 1: the grant is stable, not cumulative
+ok: round 2: the grant is stable, not cumulative
+ok: round 2: the grant is stable, not cumulative
+ok: round 2: the grant is stable, not cumulative
+ok: round 3: the grant is stable, not cumulative
+ok: round 3: the grant is stable, not cumulative
+ok: round 3: the grant is stable, not cumulative
+ok: round 4: the grant is stable, not cumulative
+ok: round 4: the grant is stable, not cumulative
+ok: round 4: the grant is stable, not cumulative
+ok: round 5: the grant is stable, not cumulative
+ok: round 5: the grant is stable, not cumulative
+ok: round 5: the grant is stable, not cumulative
+        jump_up_high_gives_each_aqours_member_exactly_one_blade: 29 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       jump_up_high_gives_each_aqours_member_exactly_one_blade
+ok: the grant host is the PL!S-sd1-022-SD print
+ok: beneficiary A really is inside 『Aqours』 (by series, not by unit)
+ok: beneficiary B really is inside 『Aqours』
+ok: the non-beneficiary must be OUTSIDE 『Aqours』, or the group filter is never exercised in the negative direction
+ok: the ライブ開始時 fires
+ok: precondition: member A holds the blade
+ok: precondition: member B holds the blade
+ok: rule 4.1.4: a member that left the stage must not keep a grant resolved while it was on the board
+ok: the other member's grant is unaffected by one departure
+ok: 『自分のステージにいる』 is assessed when the trigger fires, so a member arriving later does not gain the blade
+        jump_up_high_does_not_reach_a_late_arrival_nor_outlive_a_departure: 10 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       jump_up_high_does_not_reach_a_late_arrival_nor_outlive_a_departure
+ok: the grant host is the PL!S-sd1-022-SD print
+ok: beneficiary A really is inside 『Aqours』 (by series, not by unit)
+ok: beneficiary B really is inside 『Aqours』
+ok: the non-beneficiary must be OUTSIDE 『Aqours』, or the group filter is never exercised in the negative direction
+ok: precondition: the grant exists only after ライブ開始時 fires
+ok: the live card's trigger fires
+ok: the live card's trigger does grant it
+ok: a member added after the grant does not gain it (the membership latch, pinned from the other side)
+ok: and the original holder is not topped up by the later scan
+ok: the late arrival is a genuine 『Aqours』 member print, and the grant host really is the ライブ print, not a member printing the same text
+        jump_up_high_grant_is_scoped_to_the_live_card: 10 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       jump_up_high_grant_is_scoped_to_the_live_card
+ok: the beneficiary is the PL!HS-bp5-004 print, the ONLY corpus node that carries group_names AND exclude_group_names
+ok: she really is inside the excluded group
+ok: and A really is outside it, or the exclusion is never exercised
+ok: and so is B
+ok: A17b: with the inclusion collapsed the exclusion alone applies, so her own 常時 pays 2 blades for each of the 2 non-『スリーズブーケ』 members
+ok: A17b: and the effect is target=self, so the other members gain nothing
+ok: A17b: nor does the second non-excluded member
+ok: A17b: alone on the stage she counts 0 qualifying members, so the collapsed filter is an EXCLUSION, not a dropped one
+        a17b_inclusion_collapses_so_the_exclusion_alone_applies: 8 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       a17b_inclusion_collapses_so_the_exclusion_alone_applies
+--- §J debut_watch / three_way_choices (絢瀬絵里 / 若菜四季) ---
+ok: the chooser is the PL!-bp5-011-N (絢瀬絵里) print
+ok: precondition: two success-zone cards
+ok: the ライブ開始時 fires
+GAP: the heart choice publishes all THREE options with their colours, so "option 2 == heart06" is checkable from C
+ok: 『カード1枚につき、選んだハートを1つ得る』 with 2 success cards = 2 of the CHOSEN heart; a first-option implementation lands on heart04
+        ericho_gains_only_the_chosen_heart_two_per_success_card: 8 assertion(s), 3 failure(s), 0 setup bug(s)
+FAIL:   ericho_gains_only_the_chosen_heart_two_per_success_card
+ok: the ライブ開始時 fires
+ok: 『カード1枚につき』 multiplies a count of 0: no heart of any colour, including the chosen one
+ok: …heart05 is 0 too
+ok: …and the chosen heart06 is 0 as well
+        ericho_gains_nothing_with_an_empty_success_zone: 5 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   ericho_gains_nothing_with_an_empty_success_zone
+ok: the chooser is the PL!SP-pb2-030-N (若菜四季) print
+ok: precondition: no colour override is applied before the choice
+ok: the ライブ開始時 fires
+ok: and it is NOT the heart she printed — a 'choose the first option' or 'keep the original' reading lands on heart06 and fails only here
+        wakana_the_chosen_heart_replaces_her_printed_hearts: 6 assertion(s), 2 failure(s), 0 setup bug(s)
+FAIL:   wakana_the_chosen_heart_replaces_her_printed_hearts
+--- §K debut_watch / edel_note_ally_debut_waits_opponent_active_member (Q250) ---
+ok: precondition: the opponent member starts ACTIVE
+ok: the 自動 is queued
+ok: 1 target → the auto-resolved path, no prompt
+ok: Q250: the lone active opponent member is put to WAIT
+        edel_note_waits_lone_active_opponent_member: 4 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       edel_note_waits_lone_active_opponent_member
+ok: the two opponent members are distinct instances
+ok: m0 starts active
+ok: m1 starts active
+ok: the 自動 is queued
+ok: 2 candidates → the opponent picks which one to wait
+ok: the choice resolves completely
+ok: m0 stays active — only the SELECTED member waits
+ok: m1 is the one put to wait
+        edel_note_waits_the_selected_opponent_member_only: 8 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       edel_note_waits_the_selected_opponent_member_only
+ok: the 自動 can be queued directly (the Rust test drives the same path)
+ok: no appearance (no recently-moved card) → no wait prompt is offered
+        edel_note_without_recent_debut_offers_no_wait: 2 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       edel_note_without_recent_debut_offers_no_wait
+ok: first trigger is queued
+ok: first trigger works and offers the selection
+ok: first trigger resolves
+ok: and really waited m0
+ok: second trigger in the same turn is blocked by ターン1回 — same copy
+ok: and m0 is not touched again
+        edel_note_turn_limit_blocks_second_trigger: 6 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       edel_note_turn_limit_blocks_second_trigger
+ok: the P print fixture resolves
+ok: the P print debuts to Center
+ok: the P print's debut still waits the lone opponent member
+ok: and nothing is left pending
+        edel_note_p_self_debut_waits_lone_opponent_member: 4 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       edel_note_p_self_debut_waits_lone_opponent_member
+--- §L debut_watch / baton_touch_arrival_self_or_other_draws_one (せつ菜) ---
+ok: the watcher is the PL!N-PR-025-PR (優木せつ菜) print
+        setsuna_self_baton_arrival_draws_one: 3 assertion(s), 2 failure(s), 0 setup bug(s)
+FAIL:   setsuna_self_baton_arrival_draws_one
+ok: the watcher is the PL!N-PR-025-PR (優木せつ菜) print
+ok: third arrival in the same turn: ターン2回 is spent, no draw
+        setsuna_turn2_budget_two_draws_third_refused: 7 assertion(s), 5 failure(s), 0 setup bug(s)
+FAIL:   setsuna_turn2_budget_two_draws_third_refused
+ok: the watcher is the PL!N-PR-025-PR (優木せつ菜) print
+ok: a plain debut (no baton touch) must not fire
+ok: and no use is recorded
+        setsuna_normal_debut_does_not_fire: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       setsuna_normal_debut_does_not_fire
+        other_member_baton_arrival_draws_one: 1 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   other_member_baton_arrival_draws_one
+--- §M debut_watch / third_debut_this_turn_draws_until_hand_five (宮下 愛) ---
+ok: Q161: the count reaches 3 and includes 宮下 愛's own debut
+ok: the 自動 draws until the hand holds 5
+ok: the deck loses exactly the 2 cards drawn
+ok: nothing is discarded — the 自動 has no cost
+ok: 宮下 愛 is on Right
+        ai_bp3_three_deploys_draws_to_five: 5 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       ai_bp3_three_deploys_draws_to_five
+ok: only 2 debuits happened
+ok: 『メンバーが3枚』 is false, so nothing is drawn
+ok: and the deck is untouched
+        ai_bp3_only_two_deploys_no_draw: 3 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       ai_bp3_only_two_deploys_no_draw
+ok: the boundary: from an EMPTY hand the draw fills to 5
+ok: and the deck loses exactly 5
+ok: precondition: the deck really is empty
+ok: an empty deck yields no card and consumes nothing
+ok: and the deck stays empty
+        ai_bp3_draw_from_empty_hand_and_empty_deck: 5 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       ai_bp3_draw_from_empty_hand_and_empty_deck
+ok: the watcher is the PL!N-bp3-005-P print
+ok: debut #1 counted
+ok: debut #2 counted
+ok: the departure does not decrement the count
+ok: Q160: the count still reaches 3 even though a debuted member left
+ok: 宮下 愛 is at Right
+ok: Q160: the 自動 fires and draws to 5
+        ai_bp3_q160_displaced_debuts_still_count: 7 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       ai_bp3_q160_displaced_debuts_still_count
+--- §N debut_watch / bare_draw_and_zone_disjunction ---
+ok: the draw host is the PL!SP-pb2-004-R (平安名すみれ) print
+ok: the hand grew by exactly what the deck lost — a draw moves one card, it does not duplicate or source it elsewhere
+ok: the hand grew by exactly what the deck lost — a draw moves one card, it does not duplicate or source it elsewhere
+ok: 「元々のスコアより高いスコアのライブカードがあるか」 alone satisfies the OR
+ok: the hand grew by exactly what the deck lost — a draw moves one card, it does not duplicate or source it elsewhere
+ok: 「エールにより公開された…スコアを持つライブカードがある場合」 alone satisfies the OR — the case an AND reading fails
+ok: the hand grew by exactly what the deck lost — a draw moves one card, it does not duplicate or source it elsewhere
+ok: both clauses true still draws exactly ONE card — the printed text is a single draw guarded by a disjunction, not one draw per branch
+        sumire_draws_when_either_zone_condition_alone_holds: 9 assertion(s), 1 failure(s), 0 setup bug(s)
+FAIL:   sumire_draws_when_either_zone_condition_alone_holds
+ok: the draw host is the PL!HS-bp5-011-N print
+ok: precondition: a stocked deck
+ok: 「カードを1枚引く」 — exactly one card, and it came from the deck
+ok: 5 - 1 = 4: a real deck→hand move, not a hand-only shuffle
+ok: precondition: the deck really is empty
+ok: an empty deck yields no card and consumes nothing — a fallback to the waitroom or the hand would show up here
+ok: and nothing was taken from the waitroom as a substitute
+        rurino_draws_one_card_and_nothing_from_an_empty_deck: 7 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       rurino_draws_one_card_and_nothing_from_an_empty_deck
+--- §O debut_watch / deck_contents_decide_debut_branch ---
+ok: playing her from hand does not touch the deck, and her 登場 mills 3: 13 - 3 = 10
+ok: exactly the three milled cards are in the waitroom
+ok: the same three cards are milled either way — the first clause does not depend on the branch
+        kosuzu_branch_is_decided_by_the_milled_cards: 7 assertion(s), 4 failure(s), 0 setup bug(s)
+FAIL:   kosuzu_branch_is_decided_by_the_milled_cards
+ok: the miller is the PL!S-bp5-015-N (津島善子) print
+ok: 『デッキの上からカードを10枚控え室に置く』 moves exactly 10
+ok: 20 - 10 (milled) = 10
+ok: an under-supplied mill empties the deck rather than refusing
+ok: and the waitroom receives those three — not ten. The reading the text does not state, pinned so a change to it is deliberate
+ok: the second miller is the PL!HS-bp2-011-PR (村野さやか) print
+ok: 『デッキの上からカードを5枚控え室に置く』 moves 5 — 津島善子's 10 from the same fixture is what shows the printed size is honoured
+ok: 20 - 5 (milled) = 15
+        mill_sizes_are_honoured_at_the_printed_count: 8 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       mill_sizes_are_honoured_at_the_printed_count
+--- §P debut_watch / simultaneous_triggers_active_player_resolves_first (Q84) ---
+ok: the baton-touch watcher is the PL!HS-sd1-001-SD print
+ok: 花帆 really is a 『スリーズブeke』 member
+ok: the cost-4 EdelNote print really did baton-touch 花帆 off Center
+ok: 花帆 requires a cost>=10 『スリーズブeke』 partner, and the arriver costs 4, so her 自動 must not activate any energy
+ok: セラス fires on the same 『EdelNote』 appearance and waits the opponent
+        q84_baton_touch_appearance_triggers_resolve_ordered: 5 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       q84_baton_touch_appearance_triggers_resolve_ordered
+
+==== parity_jidou_watch: 58 test case(s) run ====
+     37 ok, 21 FAILED, 0 CRASHED, 0 SETUPBUG
+     per-assertion counts and any GAP lines are printed by each child above.
+FAILED: parity_jidou_watch  [exit=1, 73 result line(s): assert=73 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=21]
+
+[QUEUE_PID_NORMALIZE] entry=0 card=823 ab=1 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=823 ab=1 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=823 ab=1 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=823 ab=1 actor=0 action=sequential
+FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] the 登場 must have offered its 「好きな枚数」 hand select
+FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] 好きな枚数 = 2: exactly 2 of the candidates reach the waitroom (got 3 expected 2)
+FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] Q241: 2 cards discarded in one batch → the 自動 fires once (got 0 expected 1)
+FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] Q241: 2 cards in one batch → blade exactly 1 (got 0 expected 1)
+[QUEUE_PID_NORMALIZE] entry=0 card=822 ab=1 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=822 ab=1 actor=0 action=sequential
+FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] ＋ printing: Q241 still fires once (got 0 expected 1)
+FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] ＋ printing: blade exactly 1 (got 0 expected 1)
+[QUEUE_PID_NORMALIZE] entry=0 card=823 ab=1 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=823 ab=1 actor=0 action=sequential
+FAIL: [hand_discard_batch_q241_three_discarded_fires_once] 好きな枚数 = 3: exactly 3 candidates reach the waitroom — pinned by IDENTITY, because 1 card would also fire the 自動 once (got 4 expected 3)
+FAIL: [hand_discard_batch_q241_three_discarded_fires_once] Q241: 3 cards discarded in one batch still fires the 自動 once (got 0 expected 1)
+FAIL: [hand_discard_batch_q241_three_discarded_fires_once] Q241: 3 cards in one batch → blade exactly 1 (got 0 expected 1)
+[QUEUE_PID_NORMALIZE] entry=0 card=823 ab=1 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=823 ab=1 actor=0 action=sequential
+FAIL: [hand_discard_batch_q241_zero_discarded_no_trigger] 0 chosen → no candidate reaches the waitroom (got 1 expected 0)
+[LIVE_ZONE_REFILL] pl=0 placed=2 hand_before=0 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=727 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=727 ab=0 actor=0 action=modify_required_hearts
+[RESUME_ANY] kind=2 zone= target=conditional_optional route=0 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: [deck_to_discard_self_recovery_accept_discards_one_and_recovers_self] ミア is recovered to hand on accept
+FAIL: [deck_to_discard_self_recovery_accept_discards_one_and_recovers_self] exactly the FIRST hand card (f1) is the one discarded
+[RESUME_ANY] kind=2 zone= target=conditional_optional route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=conditional_optional route=0 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=conditional_optional route=0 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: [deck_to_discard_self_recovery_recovers_only_self] ミア is recovered to hand
+FAIL: [real_deck_top_mill_offers_discard_and_recovers_self] ミア ab#0 must fire when a REAL deck_top→waitroom mill puts her in the waitroom
+FAIL: [real_deck_top_mill_offers_discard_and_recovers_self] ミア is recovered to hand after accepting the optional
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00197700 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: [real_hand_discard_does_not_trigger_deck_to_discard_self_recovery] discarding ミア from HAND must NOT trigger her deck→waitroom ab#0
+[RESUME_ANY] kind=2 zone= target=conditional_optional route=0 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: [q269_control_deck_to_discard_triggers] control: the scan is live, so the Q269 negatives are about yell ≠ deck→waitroom and not about a dead scan
+[QUEUE_PID_NORMALIZE] entry=0 card=1771 ab=0 'player1' -> 'p1'
+FAIL: [riko_q252_mixed_batch_filters_correctly] one 『Aqours』 ライブ in the batch satisfies the condition
+FAIL: [riko_q252_mixed_batch_filters_correctly] the prompt after the filter is the deck placement step
+FAIL: [riko_q252_mixed_batch_filters_correctly] the single 『Aqours』 ライブ is the one taken — the non-『Aqours』 ライブ, the 『Aqours』 member and the energy are all filtered out
+[QUEUE_PID_NORMALIZE] entry=0 card=1771 ab=0 'player1' -> 'p1'
+FAIL: [riko_q252_single_card_deck_top_exact_identity] a single 『Aqours』 ライブ reaching the waitroom offers the placement
+FAIL: [riko_q252_single_card_deck_top_exact_identity] the targeted live card leaves the waitroom
+FAIL: [riko_q252_single_card_deck_top_exact_identity] nothing else is left in the waitroom (got 1 expected 0)
+FAIL: [riko_q252_single_card_deck_top_exact_identity] the deck gains exactly one card (got 20 expected 21)
+FAIL: [riko_q252_single_card_deck_top_exact_identity] the relocated live card really reached the deck (deck_top when the destination prompt resolves to index 0, deck_bottom otherwise)
+[QUEUE_PID_NORMALIZE] entry=0 card=1771 ab=0 'player1' -> 'p1'
+FAIL: [riko_q252_turn_limit_blocks_second_trigger] first trigger: the placement prompt appears
+FAIL: [riko_q252_turn_limit_blocks_second_trigger] first trigger: live_a is relocated
+FAIL: [riko_q252_turn_limit_blocks_second_trigger] first trigger: live_a reached the deck
+FAIL: [riko_q252_turn_limit_blocks_second_trigger] live_a is still on the deck, not displaced
+[QUEUE_PID_NORMALIZE] entry=0 card=1771 ab=0 'player1' -> 'p1'
+FAIL: [riko_q252_decline_keeps_cards_in_waitroom] Q252: with 2 candidates the player is prompted to pick 1 (or skip)
+[QUEUE_PID_NORMALIZE] entry=0 card=1770 ab=0 'player1' -> 'p1'
+FAIL: [riko_q252_r_plus_printing_selects_the_second_card] the ＋ printing raises the same selection prompt
+FAIL: [riko_q252_r_plus_printing_selects_the_second_card] the prompt is the Q252 card selection
+FAIL: [riko_q252_r_plus_printing_selects_the_second_card] picking index 1 really moves live2 out of the waitroom
+[QUEUE_PID_NORMALIZE] entry=0 card=819 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=819 ab=0 actor=0 action=conditional_on_optional
+[RESUME_ANY] kind=2 zone= target=conditional_optional route=0 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_PID_NORMALIZE] entry=0 card=819 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=819 ab=0 actor=0 action=conditional_on_optional
+[QUEUE_PID_NORMALIZE] entry=0 card=819 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=819 ab=0 actor=0 action=conditional_on_optional
+[QUEUE_PID_NORMALIZE] entry=0 card=835 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=835 ab=0 actor=0 action=gain_resource
+[QUEUE_PID_NORMALIZE] entry=0 card=834 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=834 ab=0 actor=0 action=gain_resource
+[TEST_BATON_TOUCH] test_play_to_stage(914, area 1): area 1 already holds card 2639, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[QUEUE_PID_NORMALIZE] entry=0 card=835 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=835 ab=0 actor=0 action=gain_resource
+[QUEUE_PID_NORMALIZE] entry=0 card=835 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=835 ab=0 actor=0 action=gain_resource
+[QUEUE_PID_NORMALIZE] entry=0 card=835 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=835 ab=0 actor=0 action=gain_resource
+FAIL: [ericho_gains_only_the_chosen_heart_two_per_success_card] precondition: the 3-way heart choice is actually offered
+FAIL: [ericho_gains_only_the_chosen_heart_two_per_success_card] the FIRST option was not chosen, so heart04 is not granted — the assertion an 'applies all three' reading fails (got 2 expected 0)
+FAIL: [ericho_gains_only_the_chosen_heart_two_per_success_card] and the middle option is not granted either (got 2 expected 0)
+FAIL: [ericho_gains_nothing_with_an_empty_success_zone] precondition: the choice is offered regardless of the success zone
+DEBUG [SET_HEART_APPLIED] heart_type=heart00 duration=live_end host_cid=2514
+DEBUG [SET_HEART_APPLIED] applied cid=2514 col=0 ht=heart00
+FAIL: [wakana_the_chosen_heart_replaces_her_printed_hearts] precondition: the 3-way heart choice is offered
+FAIL: [wakana_the_chosen_heart_replaces_her_printed_hearts] 『元々持つハートは選んだハートになる』 — the chosen heart is applied as a duration-scoped colour override, replacing the heart06 she printed (got 0 expected 2)
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2640 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2640 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=2640 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=2640 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+[RESUME_ANY] kind=1 zone=stage target=change_state route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0xa00198ce0 target=0x0 eff=0xa00198ce0 cur=0 n=1 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=1 slot=1 cid=2641 target=change_state
+[RESUME_EXEC] def=0xa00198ce0 action=change_state is_cost=0 host=2639
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] prior selection filtered nc=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2641 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2641 ori=wait
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=2641 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+[RESUME_ANY] kind=1 zone=stage target=change_state route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00198ce0 target=0x0 eff=0xa00198ce0 cur=0 n=1 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=0 slot=0 cid=2640 target=change_state
+[RESUME_EXEC] def=0xa00198ce0 action=change_state is_cost=0 host=2639
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] prior selection filtered nc=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2640 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2640 ori=wait
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=2640 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_PID_NORMALIZE] entry=0 card=759 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=759 ab=0 actor=0 action=change_state
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=759 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=498 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=498 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=498 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=498 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[TEST_BATON_TOUCH] test_play_to_stage(959, area 1): area 1 already holds card 2639, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[QUEUE_PID_NORMALIZE] entry=0 card=959 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=959 ab=0 actor=0 action=draw_card
+FAIL: [setsuna_self_baton_arrival_draws_one] self baton-touch arrival draws exactly 1 (got 0 expected 1)
+FAIL: [setsuna_self_baton_arrival_draws_one] one use is recorded (got 0 expected 1)
+[TEST_BATON_TOUCH] test_play_to_stage(959, area 1): area 1 already holds card 2640, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[QUEUE_PID_NORMALIZE] entry=0 card=959 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=959 ab=0 actor=0 action=draw_card
+FAIL: [setsuna_turn2_budget_two_draws_third_refused] first firing draws (got 0 expected 1)
+FAIL: [setsuna_turn2_budget_two_draws_third_refused] one use recorded (got 0 expected 1)
+[TEST_BATON_TOUCH] test_play_to_stage(2642, area 0): area 0 already holds card 2639, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+FAIL: [setsuna_turn2_budget_two_draws_third_refused] second firing draws (hand 1+1-1+1) (got 1 expected 2)
+FAIL: [setsuna_turn2_budget_two_draws_third_refused] two uses recorded (got 0 expected 2)
+[TEST_BATON_TOUCH] test_play_to_stage(2643, area 2): area 2 already holds card 2641, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+FAIL: [setsuna_turn2_budget_two_draws_third_refused] and no third use is recorded (got 0 expected 2)
+[QUEUE_PID_NORMALIZE] entry=0 card=959 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=959 ab=0 actor=0 action=draw_card
+[TEST_BATON_TOUCH] test_play_to_stage(2639, area 1): area 1 already holds card 498, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[QUEUE_PID_NORMALIZE] entry=0 card=959 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=959 ab=0 actor=0 action=draw_card
+FAIL: [other_member_baton_arrival_draws_one] せつ菜 ab#0 draws 1 when ANOTHER member debuts via baton touch (got 0 expected 1)
+[QUEUE_PID_NORMALIZE] entry=0 card=1056 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1056 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1056 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=1 card=1056 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=1 n=2 cid=1056 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1056 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=2 card=1056 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=2 n=3 cid=1056 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1056 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=1
+[EXEC_EFFECT_DISPATCH] has=1 action=draw_until_count
+[EXECUTOR_DRAW_UNTIL] actor=0 ptr=0xa00196070
+[QUEUE_PID_NORMALIZE] entry=0 card=1056 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1056 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1056 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=1 card=1056 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=1 n=2 cid=1056 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1056 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=0 card=1056 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1056 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1056 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=1 card=1056 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=1 n=2 cid=1056 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1056 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=2 card=1056 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=2 n=3 cid=1056 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1056 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=1
+[EXEC_EFFECT_DISPATCH] has=1 action=draw_until_count
+[EXECUTOR_DRAW_UNTIL] actor=0 ptr=0xa00196070
+[QUEUE_PID_NORMALIZE] entry=0 card=1056 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1056 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1056 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=1 card=1056 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=1 n=2 cid=1056 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1056 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=2 card=1056 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=2 n=3 cid=1056 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1056 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=1
+[EXEC_EFFECT_DISPATCH] has=1 action=draw_until_count
+[EXECUTOR_DRAW_UNTIL] actor=0 ptr=0xa00196070
+[QUEUE_PID_NORMALIZE] entry=0 card=1055 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1055 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1055 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=1 card=1055 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=1 n=2 cid=1055 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1055 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=2 card=1055 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=2 n=3 cid=1055 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1055 pending=0 depth=0 ptr=0xa00196070
+[EXEC_EFFECT_COND] action=draw_until_count ok=1
+[EXEC_EFFECT_DISPATCH] has=1 action=draw_until_count
+[EXECUTOR_DRAW_UNTIL] actor=0 ptr=0xa00196070
+FAIL: [sumire_draws_when_either_zone_condition_alone_holds] NEITHER clause: nothing is drawn, so the printed comma is not an AND that happens to be satisfied (got 1 expected 0)
+FAIL: [kosuzu_branch_is_decided_by_the_milled_cards] 『それらがすべてメンバーカードの場合』 holds, so one card is drawn (got 0 expected 1)
+FAIL: [kosuzu_branch_is_decided_by_the_milled_cards] 『すべてメンバーカード』 is false with one ライブ among the three, so NO card is drawn — the quantifier assertion (got 1 expected 0)
+FAIL: [kosuzu_branch_is_decided_by_the_milled_cards] an under-supplied mill empties the deck rather than refusing (got 1 expected 0)
+FAIL: [kosuzu_branch_is_decided_by_the_milled_cards] and a short mill is not read as a satisfied one — no draw (got 1 expected 0)
+[TEST_BATON_TOUCH] test_play_to_stage(2639, area 1): area 1 already holds card 903, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[QUEUE_PID_NORMALIZE] entry=0 card=760 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=2 cid=760 ab=0 actor=0 action=change_state
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=760 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2640 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2640 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=2640 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=2640 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[QUEUE_EXEC] idx=1 n=2 cid=903 ab=0 actor=0 action=change_state
+21 test case(s) FAILED. Every red assertion in this file is classified in the header comment (E1..E13 = engine bugs, H1 = C harness limit); none is a weakened assertion.
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

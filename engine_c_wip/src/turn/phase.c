@@ -1111,17 +1111,17 @@ int rb_resolve_rps_if_both_chosen(GameState *g) {
 
 /* ───────────────────────────── play-time cost reduction ─────────────────────────────
    Faithful port of engine/src/turn/phases.rs:1317-1670:
-     play_time_cost_reduction_hook        (phases.rs:1317)
-     play_time_cost_reduction_amount      (phases.rs:1437)
-     play_time_alt_cost_chars             (phases.rs:1472)
-     normalize_member_name                (phases.rs:1505)
-     has_play_time_alt_cost_hand_cards    (phases.rs:1509)
-     can_assign_hand_for_alt_cost         (phases.rs:1518)
-     build_alt_cost_candidates            (phases.rs:1529)
-     has_distinct_assignment_k            (phases.rs:1557)
-     find_distinct_assignment_k           (phases.rs:1561)
-     discard_play_time_alt_cost           (phases.rs:1589)
-     shuffle_waitroom_members_to_deck_bottom (phases.rs:1639)
+     play_time_cost_reduction_hook        (phases.rs:1401)
+     play_time_cost_reduction_amount      (phases.rs:1521)
+     play_time_alt_cost_chars             (phases.rs:1556)
+     normalize_member_name                (phases.rs:1589)
+     has_play_time_alt_cost_hand_cards    (phases.rs:1593)
+     can_assign_hand_for_alt_cost         (phases.rs:1602)
+     build_alt_cost_candidates            (phases.rs:1613)
+     has_distinct_assignment_k            (phases.rs:1641)
+     find_distinct_assignment_k           (phases.rs:1645)
+     discard_play_time_alt_cost           (phases.rs:1673)
+     shuffle_waitroom_members_to_deck_bottom (phases.rs:1723)
 
    The C model has no Option<i8> / Option<Vec<String>>; "absent" is the
    RB_PTC_NONE sentinel and the character list is a CSV buffer, matching how
@@ -1216,7 +1216,7 @@ static int ptc_cond_bool(const Condition *c, const char *key) {
     return 0;
 }
 
-/* Rust: normalize_member_name (phases.rs:1505) — `s.replace([' ', '　'], "")`.
+/* Rust: normalize_member_name (phases.rs:1589) — `s.replace([' ', '　'], "")`.
    Drops the ASCII space and the ideographic space U+3000 (E3 80 80). */
 void rb_normalize_member_name(const char *src, char *out, size_t out_sz) {
     if (!out || !out_sz) return;
@@ -1235,7 +1235,7 @@ void rb_normalize_member_name(const char *src, char *out, size_t out_sz) {
     out[w] = '\0';
 }
 
-/* Rust: find_distinct_assignment_k::backtrack (phases.rs:1562-1579).
+/* Rust: find_distinct_assignment_k::backtrack (phases.rs:1646-1663).
    Recursive search over the candidate matrix: slot `level` picks any candidate
    not already used; success when every slot is filled. `acc` accumulates the
    chosen card ids in slot order. Returns 1 on success, 0 on failure. */
@@ -1258,7 +1258,7 @@ int rb_backtrack(int cands[][RB_MAX_HAND], const int *cand_counts, int n_levels,
     return 0;
 }
 
-/* Rust: build_alt_cost_candidates (phases.rs:1529-1553). One candidate list per
+/* Rust: build_alt_cost_candidates (phases.rs:1613-1637). One candidate list per
    required character name: every hand card that is a member and whose
    normalized name CONTAINS the normalized needle. `exclude_id` is the card
    being played (it is in hand but cannot pay for itself). Returns 0 when any
@@ -1289,7 +1289,7 @@ int rb_build_alt_cost_candidates(const GameState *g, int pl, int exclude_id,
     return 1;
 }
 
-/* Rust: find_distinct_assignment_k (phases.rs:1561-1587). Writes the chosen
+/* Rust: find_distinct_assignment_k (phases.rs:1645-1671). Writes the chosen
    card ids to `out` (slot order) and returns the number chosen, or 0 when no
    distinct assignment exists (Rust: None). */
 int rb_find_distinct_assignment_k(const GameState *g, int pl, int exclude_id,
@@ -1309,14 +1309,14 @@ int rb_find_distinct_assignment_k(const GameState *g, int pl, int exclude_id,
     return n_acc;
 }
 
-/* Rust: has_distinct_assignment_k (phases.rs:1557) — existence only. */
+/* Rust: has_distinct_assignment_k (phases.rs:1641) — existence only. */
 int rb_has_distinct_assignment_k(const GameState *g, int pl, int exclude_id,
                                  const char *const *chars, int n_chars) {
     return rb_find_distinct_assignment_k(g, pl, exclude_id, chars, n_chars,
                                          NULL, 0) > 0;
 }
 
-/* Rust: can_assign_hand_for_alt_cost (phases.rs:1518-1527). */
+/* Rust: can_assign_hand_for_alt_cost (phases.rs:1602-1611). */
 int rb_can_assign_hand_for_alt_cost(const GameState *g, int pl, int exclude_id,
                                     const char *const *chars, int n_chars) {
     if (!g || pl < 0 || pl > 1) return 0;
@@ -1394,7 +1394,7 @@ static int ptc_find_alt_cost_ability(int card_id, char names[][RB_PTC_NAME_MAX],
     return 0;
 }
 
-/* Rust: play_time_cost_reduction_amount (phases.rs:1437-1463). Returns the
+/* Rust: play_time_cost_reduction_amount (phases.rs:1521-1547). Returns the
    reduction amount, or RB_PTC_NONE when the card has no play-time reduction. */
 int rb_play_time_cost_reduction_amount(const GameState *g, int card_id) {
     (void)g; /* Rust reads only the card database here too. */
@@ -1405,7 +1405,7 @@ int rb_play_time_cost_reduction_amount(const GameState *g, int card_id) {
     return amt;
 }
 
-/* Rust: play_time_alt_cost_chars (phases.rs:1472-1502). Writes the required
+/* Rust: play_time_alt_cost_chars (phases.rs:1556-1586). Writes the required
    character names as CSV into `chars` and returns the set-cost value, or
    RB_PTC_NONE when the card has no generic play-time alternative cost. */
 int rb_play_time_alt_cost_chars(const GameState *g, int card_id, char *chars,
@@ -1427,7 +1427,7 @@ int rb_play_time_alt_cost_chars(const GameState *g, int card_id, char *chars,
     return set_value;
 }
 
-/* Rust: has_play_time_alt_cost_hand_cards (phases.rs:1509-1516) — the ACTIVE
+/* Rust: has_play_time_alt_cost_hand_cards (phases.rs:1593-1600) — the ACTIVE
    player's hand must be able to cover every named character. */
 int rb_has_play_time_alt_cost_hand_cards(const GameState *g, int card_id) {
     if (!g) return 0;
@@ -1439,7 +1439,7 @@ int rb_has_play_time_alt_cost_hand_cards(const GameState *g, int card_id) {
     return rb_can_assign_hand_for_alt_cost(g, g->active, card_id, chars, n_names);
 }
 
-/* Rust: discard_play_time_alt_cost (phases.rs:1589-1636) — move one distinct
+/* Rust: discard_play_time_alt_cost (phases.rs:1673-1720) — move one distinct
    hand card per named character to the waitroom, and record the moves.
    Returns 1 on success, 0 when the hand cannot cover the cost. */
 int rb_discard_play_time_alt_cost(GameState *g, int pl, int played_card_id) {
@@ -1467,7 +1467,7 @@ int rb_discard_play_time_alt_cost(GameState *g, int pl, int played_card_id) {
     return 1;
 }
 
-/* Rust: shuffle_waitroom_members_to_deck_bottom (phases.rs:1639-1670).
+/* Rust: shuffle_waitroom_members_to_deck_bottom (phases.rs:1723-1754).
    ONLY member cards leave the waitroom: they are shuffled among themselves and
    appended to the BOTTOM of the deck; every non-member waitroom card stays. */
 void rb_shuffle_waitroom_members_to_deck_bottom(GameState *g, int pl) {
@@ -1702,7 +1702,7 @@ int rb_handle_live_card_skip(GameState *g) {
 
    The double-baton PLACEMENT (pay, protection check, replace both, land, fire
    debut/auto) is engine.c's rb_play_double_baton_ex, the port of Rust's
-   play_double_baton (phases.rs:936-1087). The single-baton placement is
+   play_double_baton (phases.rs:978-1129). The single-baton placement is
    rb_play_member_ex, the port of Player::move_card_from_hand_to_stage
    (core/player.rs:344-...).
 
@@ -1822,7 +1822,7 @@ void rb_3ds_tdbg(const char *msg) {
 }
 
 
-/* ── execute_performance_phase (phases.rs:318-662) ─────────────────────────────────
+/* ── execute_performance_phase (phases.rs:353-697) ─────────────────────────────────
    The C port splits this Rust function: the yell reveal, the 8.3.14-8.3.16 heart
    calculation, the success check and the snapshot are owned by
    src/turn/live.c:rb_perform_live (the Rust player_perform_live /
@@ -1947,7 +1947,7 @@ void rb_execute_performance_phase(GameState *g, int is_first) {
     }
 }
 
-/* ── play_time_cost_reduction_hook (phases.rs:1317-1433) ───────────────────────────
+/* ── play_time_cost_reduction_hook (phases.rs:1401-1517) ───────────────────────────
    Two mutually exclusive shapes, detected off the card's 常時 modify_cost
    abilities:
      1. a plain reduction -> set the cost to (base - reduction) and shuffle the

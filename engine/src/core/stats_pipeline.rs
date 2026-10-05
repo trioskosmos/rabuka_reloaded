@@ -17,6 +17,9 @@ use crate::core::constants::CountCast;
 use crate::card::{CardDatabase, HeartColor, HeartMap};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::HashMap;
+// `no_std` crate: `Vec` needs the alloc-qualified import. Used below to order
+// heart modifiers before wildcard spending.
+use alloc::vec::Vec;
 
 /// A member's original hearts after copy/multiplier/set layers.
 pub fn member_original_hearts(

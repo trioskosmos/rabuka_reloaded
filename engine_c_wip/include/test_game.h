@@ -1,5 +1,6 @@
 #ifndef TEST_GAME_H
 #define TEST_GAME_H
+#include <stdio.h>   /* FILE, for the UTF-8 writer helpers below */
 #include "rabuka.h"
 
 /* Minimal TestGame shim mirroring engine/tests/helpers/mod.rs:361 TestGame
@@ -16,7 +17,67 @@ typedef struct {
 } TestGame;
 
 void test_game_new(TestGame *tg);
-int  test_id(TestGame *tg, const char *card_no); /* card index or -1, like Rust i16 */
+/* ═══════════════════════════════════════════════════════════════════════════
+ * test_id IS THE SHARED TEMPLATE. THE REAL NAME SAYS SO.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * C's test_id(tg, no) is `rb_find_card_by_no(no)`, i.e. THE TEMPLATE INDEX,
+ * on every call, with no per-card counter (Rust's TestGame::id has one --
+ * engine/tests/helpers/mod.rs:217-243 -- so in Rust the first 11 uses per
+ * (TestGame, card_no) hand out DISTINCT pre-made copies). Two consequences
+ * that have each already cost real time here:
+ *
+ *   1. `int a = test_id(tg, X); int b = test_id(tg, X); assert(a != b);`
+ *      CANNOT FAIL. Every "these are two distinct instances" assertion written
+ *      that way is vacuous, and it reads green.
+ *   2. `test_id` is FORGIVING (data.c:598: exact, then base+rarity rebuild,
+ *      then lowest-prefix, then a SUBSTRING search), so a mistyped or
+ *      truncated print resolves to a DIFFERENT real card, silently.
+ *
+ * So the function is named test_id_TEMPLATE_ONLY and `test_id` is a MACRO
+ * ALIAS onto it. That keeps all 3019 existing call sites compiling unchanged
+ * while making the true contract greppable at the definition, at every
+ * expansion, and in any diagnostic a compiler prints.
+ *
+ * ── THE COMPILE-TIME GUARD: RB_TEST_ID_STRICT ──────────────────────────────
+ * The alias above cannot be made to fail on its own: a wrong call site is
+ * type-correct whatever it says. What IS detectable is the DECLARED INTENT of
+ * a file, so a file may declare that it tracks card identity:
+ *
+ *     #define RB_TEST_ID_STRICT 1     // before #include "test_game.h"
+ *     #include "test_game.h"
+ *
+ * and then EVERY test_id() in that translation unit becomes a hard COMPILE
+ * ERROR naming the reason, because test_id expands to a call to a function
+ * declared __attribute__((error(...))). No suite in the corpus declares it
+ * today (measured 0 of 178), so nothing moves; the escape hatch costs nothing
+ * and is available to the next suite that wants it. It is also asserted from
+ * the outside by tests/test_harness_self.c §O, which compiles a probe TU both
+ * ways, so the guard cannot rot into a no-op.
+ *
+ * For the identity-tracking spelling itself use test_id_IDENTITY_TRACKED(),
+ * which is test_new_id under a name that says what it costs.
+ */
+#if defined(RB_TEST_ID_STRICT) && RB_TEST_ID_STRICT
+/* Declared, never defined, never called: naming it is the error. GCC's
+ * __attribute__((error)) prints the message at the CALL SITE, with the file
+ * and line, and the compile fails. */
+void rb_test_id_ALIASES_THE_SHARED_TEMPLATE_use_test_id_IDENTITY_TRACKED(void)
+    __attribute__((error("test_id() returns the SHARED TEMPLATE index on every call: two calls for one card_no give ONE id, so any 'these are two distinct instances' assertion here is vacuous. Define RB_TEST_ID_STRICT only in a file that means it; use test_id_IDENTITY_TRACKED() (== test_new_id) or test_id_exact() instead.")));
+#define test_id(tg, card_no) \
+    rb_test_id_ALIASES_THE_SHARED_TEMPLATE_use_test_id_IDENTITY_TRACKED()
+#else
+/* TEMPLATE ONLY. Never a distinct instance. */
+int  test_id_TEMPLATE_ONLY(TestGame *tg, const char *card_no);
+#define test_id(tg, card_no) test_id_TEMPLATE_ONLY((tg), (card_no))
+#endif
+/* Identity-tracking spelling of test_new_id: a DISTINCT card copy per call,
+ * or -1 once the process-global copy pool is dry (see below). Named so that a
+ * reader who reaches for identity cannot pick the template by accident. It is a
+ * MACRO onto test_new_id rather than a second symbol, so the two can never
+ * drift apart. */
+#define test_id_IDENTITY_TRACKED(tg, card_no) test_new_id((tg), (card_no))
+/* card index or -1, like Rust i16. ALIASES THE TEMPLATE -- see the block above. */
 /* EXACT card_no lookup, or -1. rb_find_card_by_no (and therefore test_id)
    is deliberately forgiving -- base+rarity rebuild, then lowest-prefix, then
    a SUBSTRING search (data.c:446) -- so a truncated or mistyped print
@@ -117,6 +178,38 @@ void test_insert_live_card_at(TestGame *tg, int slot, int card_id);
 void test_insert_live_card_at_for(TestGame *tg, int pl, int slot, int card_id);
 const char *test_card_name(int card_id);
 int  test_find_live_by_score(TestGame *tg, int score);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * UTF-8 OUTPUT -- the WRITER states its encoding (src/test_game.c)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Japanese reaches a reviewer's eyes through these logs, and two real bugs in
+ * this project were found ONLY by reading it: TRIG_LIVE_START written as U+8177
+ * instead of U+958B (33 tests red for a reason no ASCII inspection could see),
+ * and a corrupted 「Aqours」 surfacing as 「Auクール！」. Neither is visible in a
+ * byte dump, so the pipeline that carries the text has to be trustworthy.
+ *
+ * MEASURED 2026-10-05, not assumed: a REDIRECTED stream was already
+ * byte-exact UTF-8 (captured raw, decodes clean, ライブ開始時 / 登場 intact), so
+ * the writer was never wrong there and the mojibake was introduced downstream.
+ * A CONSOLE stream was the real writer-side hazard: the CRT renders bytes
+ * through the console output code page, which is 437/1252 here, so identical
+ * valid UTF-8 bytes display as mojibake and look like a writer bug. The
+ * console code page is therefore set to UTF-8 and both streams are put in
+ * BINARY mode, which leaves the already-correct redirected bytes untouched and
+ * makes the console render them as the characters they are. No byte is ever
+ * re-encoded. */
+void test_output_utf8_init(void);          /* idempotent; call once in main()  */
+/* Write UTF-8 as BYTES. No locale, no code page, no wide-char conversion.   */
+void test_write_utf8(FILE *f, const char *s);
+/* 1 valid / 0 invalid / -1 NULL. Rejects overlongs, surrogates and >U+10FFFF,
+ * so a byte string that merely LOOKS like UTF-8 does not pass. */
+int  test_utf8_valid(const char *s);
+/* Write `s` to `path` with the explicit byte path, read it back, compare
+ * byte-for-byte. 1 only if the bytes on disk are the bytes handed in; 0 on any
+ * I/O failure and 0 for NULL, so a caller that passes nothing cannot see green.
+ * The temp file is removed. */
+int  test_utf8_roundtrip(const char *path, const char *s);
 
 /* board helpers for assertions */
 int  test_stage_has(TestGame *tg, int area, int card_id);

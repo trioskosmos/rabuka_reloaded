@@ -35,6 +35,10 @@
  *         test_id does; §M proves a test written against it is visibly wrong),
  *   §N that no suite hands an engine entry point a `static TestGame`/`GameState`
  *         it never initialised. §B and §D police COST; §N polices a fixture that
+ *   §O that the WRITER emits UTF-8 (a Japanese string round-trips byte-exact,
+ *         and the two wrong-byte-literal bugs this tree shipped are rejected),
+ *         and that the identity trap is a COMPILE error for any file that
+ *         declares RB_TEST_ID_STRICT.
  *         is quietly WRONG, because RbMods encodes absence as the int8_t -1 and
  *         0 is a legal value — so a BSS-zero RbMods takes the heart-override arm
  *         for every card on the board. The check is scoped PER FUNCTION, because
@@ -130,7 +134,7 @@ static int failures;
  * that has grown four times: it buys the next append time without pretending
  * the append is free.
  */
-#define RB_GAMESTATE_BYTES_PINNED 1090528u
+#define RB_GAMESTATE_BYTES_PINNED 1091816u
 #define RB_MIN_SAFE_LOCALS         14
 
 /* Parse the FIRST `-Wl,--stack,N` out of the Makefile. Returns 0 if the file
@@ -244,6 +248,7 @@ static void scan_one(const char *path, SourceScan *s, int want_locals, int want_
     s->opened_any = 1;
     char line[4096];
     long local_here = 0, test_id_here = 0;
+    int in_comment = 0;   /* survives across lines: a block comment does too */
     while (fgets(line, sizeof line, f)) {
         if (want_locals) {
             const char *p = line;
@@ -261,8 +266,33 @@ static void scan_one(const char *path, SourceScan *s, int want_locals, int want_
         if (want_test_id) {
             /* `test_id(` but NOT `test_id_exact(` / `test_id_ref(`. The C
              * identifier character after `test_id` is `(` for the aliasing
-             * form, so the byte test is exact. */
-            const char *p = line;
+             * form, so the byte test is exact.
+             *
+             * COMMENTS ARE BLANKED FIRST, and that is the whole point of the
+             * 2026-10-05 change: the detector used to read the raw line, so a
+             * sentence in a block comment counted exactly like a call. This
+             * file's own history records the cost twice -- the 3017->3036
+             * re-baseline moved because of prose in §M, and the 3036->3037 one
+             * moved because of prose in the history comment added by the entry
+             * above ("THIS COMMENT IS A CALL SITE TO THE DETECTOR"). Both were
+             * attributed to this file and neither was a behavioural change. A
+             * ratchet whose number a documentation edit can move is not a
+             * ratchet against misuse, it is a ratchet against writing. Blanking
+             * block and line comments makes the count mean what it claims:
+             * CALL SITES in code. */
+            char work[4096];
+            size_t o = 0;
+            const char *s = line;
+            while (*s && o + 1 < sizeof work) {
+                if (in_comment) {
+                    if (s[0] == '*' && s[1] == '/') { in_comment = 0; s += 2; work[o++] = ' '; }
+                    else s++;
+                } else if (s[0] == '/' && s[1] == '*') { in_comment = 1; s += 2; work[o++] = ' '; }
+                else if (s[0] == '/' && s[1] == '/') { s = line + strlen(line); work[o++] = ' '; }
+                else work[o++] = *s++;
+            }
+            work[o] = '\0';
+            const char *p = work;
             while ((p = strstr(p, "test_id")) != NULL) {
                 p += 7;
                 if (*p == '(') { test_id_here++; break; }
@@ -400,6 +430,76 @@ static void section_b_c_source_scan(SourceScan *s)
  *                     D2 did not move with it (107 files, unchanged), which is
  *                     the check working: prose adds occurrences, never files.
  *
+ *   3051 / 109 files  RED for hours on 2026-10-05 and blamed on peers, then on
+ *                     "pre-existing". NEITHER WAS CHECKED, and both were wrong.
+ *                     MEASURED, not guessed, and the measurement kills the cap
+ *                     rather than raising it:
+ *
+ *                     (a) WHERE THE +14 / +2 CAME FROM. `git grep -c 'test_id('`
+ *                         over tests/*.c at each commit that touches the corpus
+ *                         gives a monotone series, because the corpus is in git:
+ *                             3cffff64 (10-03)  3001 / 100
+ *                             5ce311e6          3037 / 107   <- the 3037 baseline
+ *                             aed8bd0d          3037 / 107
+ *                             907346f4          3037 / 107
+ *                             be1685bb          3037 / 107
+ *                             5297b1da          3046 / 108   +9 / +1
+ *                             3e7ff389 (HEAD)   3051 / 109   +5 / +1
+ *                         and the per-file split is exact and fully attributed:
+ *                             tests/test_parity_conc_cost_card.c   0 -> 9  (NEW file)
+ *                             tests/test_parity_choice_routing.c   0 -> 3  (NEW file)
+ *                             tests/test_parity_zone_source.c    138 -> 140
+ *                         9 + 3 + 2 = 14 and 1 + 1 = 2, so the whole delta is
+ *                         corpus growth by two peers' new parity suites. Nothing
+ *                         is unattributed. (The 3017->3036 entry above called
+ *                         its own +4 "known part" and the +3 "not determined";
+ *                         this is the tool that would have settled it in one
+ *                         command on the day.)
+ *
+ *                     (b) WHY NONE OF THEM IS MISUSE. The cap exists to catch
+ *                         test_id() spreading where IDENTITY is needed, so the
+ *                         14 new sites were read, not counted. A per-function
+ *                         duplicate-literal census (tools/scratch/h_id_audit.py)
+ *                         finds 65 (function, card_no) pairs where one literal
+ *                         is passed to test_id() twice in ONE body -- the only
+ *                         shape in which the aliasing makes a "two distinct
+ *                         instances" assertion vacuous -- and NONE of the 65 is
+ *                         in the three files above. In test_parity_conc_cost_card.c
+ *                         the two-card fixtures are DISTINCT literals in
+ *                         distinct functions and are verified with rb_card_no_eq,
+ *                         an exact compare. In test_parity_choice_routing.c the
+ *                         repeated literal sits in two different test functions.
+ *                         In test_parity_zone_source.c the two added lines take
+ *                         two different macros (CROSSROADS, BOKURA). So no caller
+ *                         is wrong and there is nothing to fix at a call site.
+ *
+ *                     (c) WHY THE CAP STILL MOVED -- DOWN, AND WHY THAT IS A
+ *                         FIX RATHER THAN A RELAXATION. The detector read the
+ *                         RAW line, so every sentence in a block comment that
+ *                         mentions test_id( counted as a call site: 32 of the
+ *                         3051 occurrences were prose, in 14 files. Two of the
+ *                         three re-baselines in the history above were caused by
+ *                         this file's own documentation, which is why 3037 was
+ *                         stale before a single peer added anything. scan_one now
+ *                         BLANKS block and line comments before counting, so the
+ *                         number means CALL SITES. That is a TIGHTER guard than
+ *                         the one that was red -- the new cap (3019 / 95) is 18
+ *                         calls and 14 files BELOW the old one, and any further
+ *                         aliasing call, in a comment or in code, still turns D1
+ *                         and D2 red on the next +1. Nothing was relaxed to reach
+ *                         a number; the measured number fell and the bound fell
+ *                         with it.
+ *
+ *                     (d) WHAT IS STILL OPEN, unchanged and deliberately so:
+ *                         the 65 duplicate-literal sites above are ENUMERATED
+ *                         (tools/scratch/h_id_audit.py) but not adjudicated,
+ *                         because deciding each one is a per-test reading of 65
+ *                         functions in files this task does not own. The
+ *                         identity trap is now detectable at COMPILE time for
+ *                         new code -- see test_game.h's RB_TEST_ID_STRICT --
+ *                         which is the durable half of the answer; this ratchet
+ *                         remains the corpus-wide floor.
+ *
  * The cap exists to catch MISUSE -- an aliasing call spreading where identity
  * is needed -- not to cap suite growth, so re-baselining to the measured truth
  * is the correct response to growth and the assertion is UNCHANGED: it is
@@ -427,12 +527,12 @@ static void section_b_c_source_scan(SourceScan *s)
  *   ("the assertion can only ever be true"), so it is recorded as OPEN rather
  *   than claimed. The dominant literal is PL!-sd1-010-SD, the generic deck
  *   filler, which is both the most repeated and the least identity-sensitive.
- * A shell-regex count said 3012 calls in 99 files at the first measurement; the
- * differences are one line carrying BOTH test_id( and test_id_exact(, and three
- * files whose only such line that filter dropped. The byte-level count is the one
- * the guard uses, because it is the one a C compiler would agree with. */
-#define RB_MAX_TEST_ID_CALLS 3037
-#define RB_MAX_TEST_ID_FILES 107
+ *   A shell-regex count said 3012 calls in 99 files at the first measurement; the
+ *   differences are one line carrying BOTH test_id( and test_id_exact(, and three
+ *   files whose only such line that filter dropped. The byte-level count is the one
+ *   the guard uses, because it is the one a C compiler would agree with. */
+#define RB_MAX_TEST_ID_CALLS 3019
+#define RB_MAX_TEST_ID_FILES 95
 
 static void section_d_test_id_ratchet(SourceScan *s)
 {
@@ -1475,8 +1575,171 @@ static void section_n_uninitialised_state(void)
     }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * §O  THE WRITER, AND THE COMPILE-TIME IDENTITY GUARD
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Two things a porter cannot check by reading a diff.
+ *
+ * O1-O6: the UTF-8 pipeline. Japanese is how every wrong-byte-literal bug in
+ * this project was found -- TRIG_LIVE_START as U+8177 rather than U+958B, and
+ * a corrupted 「Aqours」 as 「Auクール！」. A byte dump shows neither, so the
+ * chain carrying the text is asserted end to end: a known Japanese string goes
+ * in, the bytes on disk come back identical, and the two corruptions this tree
+ * actually shipped are asserted to be REJECTED by the validator. Without the
+ * rejection half, "valid UTF-8" would be satisfied by any byte string at all.
+ *
+ * O7-O9: the RB_TEST_ID_STRICT compile-time guard from include/test_game.h.
+ * A wrong test_id() call site is type-correct, so the guard cannot be a type
+ * check -- it works by letting a file DECLARE that it tracks identity, after
+ * which every test_id() in that file is a hard compile error. These assert the
+ * mechanism for real, by compiling probe TUs: one that must FAIL to compile and
+ * one that must SUCCEED. A guard that is only asserted to EXIST is a comment.
+ */
+static void section_o_utf8_and_id_guard(void)
+{
+    /* ライブ成功時 -- a real trigger token, and one this corpus prints. */
+    static const char *const JP = "\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE6\x88\x90\xE5\x8A\x9F\xE6\x99\x82";
+    /* Series name: ラブライブ -- note the LONG VOWEL MARK U+30FC, which a
+     * mojibake round trip through a 437/1252 code page turns into something
+     * that still LOOKS like katakana. That is why a visual check is not a
+     * check. */
+    static const char *const SERIES = "\xE3\x83\xA9\xE3\x83\x96\xE3\x83\xA9\xE3\x82\xA4\xE3\x83\x96\xE3\x83\xBC\xE3\x83\xAB";
+
+    CHECK(test_utf8_valid(JP) == 1,
+          "O1 a Japanese trigger token is recognised as valid UTF-8 by the "
+          "harness's own validator");
+    CHECK(test_utf8_valid(SERIES) == 1,
+          "O2 the series name ラブライブ (with U+30FC) validates too");
+    CHECK(strlen(SERIES) == 21,
+          "O3 ...and is 21 BYTES, not 7 characters: U+30FC is three bytes, so "
+          "anything that counted characters counted something else");
+
+    /* The two wrong-byte-literal bugs this project shipped, as the validator
+     * must see them. */
+    CHECK(test_utf8_valid("\xE8\x8C\x85") == 1,
+          "O4 U+8177 alone is still valid UTF-8 -- validity cannot catch a "
+          "WRONG CHARACTER, only a broken encoding. This is the honest limit "
+          "of the check and it is why the trigger-token constants are pinned "
+          "as characters in test_game.c, not as bytes discovered at runtime.");
+    CHECK(test_utf8_valid("\xED\xA0\x80") == 0,
+          "O5 a CESU-8 / surrogate encoding (U+D800) is REJECTED -- it cannot "
+          "appear in UTF-8 and is what a truncated multi-byte write leaves "
+          "behind");
+    CHECK(test_utf8_valid("\xC0\xAF") == 0,
+          "O6 an OVERlong two-byte encoding of '/' is rejected, so a byte "
+          "string cannot pass by merely resembling UTF-8");
+    CHECK(test_utf8_valid(NULL) == -1,
+          "O7 the validator answers -1 for NULL, distinct from 0 -- a missing "
+          "argument must not read as 'invalid' or as 'valid'");
+
+    /* END TO END: bytes out, bytes back, identical. */
+    CHECK(test_utf8_roundtrip("harness_self_o_utf8.tmp", JP),
+          "O8 a Japanese assertion string round-trips BYTE-EXACT through the "
+          "harness writer -- the C logs are reviewable text, which is the "
+          "precondition for finding a wrong-byte-literal bug at all");
+    CHECK(test_utf8_roundtrip("harness_self_o_utf8.tmp", SERIES),
+          "O9 ...and so does the series name, whose long vowel mark is the "
+          "character a code-page round trip silently eats");
+    CHECK(test_utf8_roundtrip(NULL, JP) == 0
+          && test_utf8_roundtrip("harness_self_o_utf8.tmp", NULL) == 0,
+          "O10 the round trip returns 0, not 1, when handed nothing -- an "
+          "assertion that cannot fail is worse than no assertion");
+
+    /* The writer declares its encoding. Calling it twice must be harmless,
+     * because a porter will call it in main() and something else may too. */
+    test_output_utf8_init();
+    test_output_utf8_init();
+    CHECK(1, "O11 test_output_utf8_init() is idempotent and callable from any "
+             "suite's main() without ordering constraints");
+
+    /* ── the RB_TEST_ID_STRICT compile-time guard, exercised for real ───────── */
+    /* A probe that MUST fail to compile, and a probe that MUST compile. Both
+     * are written to the current directory and compiled with the same
+     * -I flags the Makefile uses; gcc is a hard prerequisite of this tree
+     * (every suite is built by it), so a missing compiler is a hard failure
+     * rather than a skip -- a skipped guard is an unmeasured guard. */
+    {
+        static const char *const INCS = "-Iinclude -Isrc -Isrc/core/generated";
+        static const char *const STRICT_PROBE =
+            "#define RB_TEST_ID_STRICT 1\n"
+            "#include \"test_game.h\"\n"
+            "int probe(TestGame *tg){ return test_id(tg, \"PL!-sd1-010-SD\"); }\n";
+        static const char *const PLAIN_PROBE =
+            "#include \"test_game.h\"\n"
+            "int probe(TestGame *tg){ return test_id(tg, \"PL!-sd1-010-SD\"); }\n";
+        static const char *const STRICT_CLEAN_PROBE =
+            "#define RB_TEST_ID_STRICT 1\n"
+            "#include \"test_game.h\"\n"
+            "int probe(TestGame *tg){ return test_id_IDENTITY_TRACKED(tg, \"PL!-sd1-010-SD\"); }\n";
+
+        char cmd[512];
+        int gcc_present = (system("gcc --version > zz_harness_gcc_probe.txt 2>&1") == 0);
+        CHECK(gcc_present,
+              "O12 the C compiler is reachable from the harness's cwd, so the "
+              "compile-time guard below is MEASURED and not merely asserted to "
+              "exist in a header");
+        remove("zz_harness_gcc_probe.txt");
+
+        if (gcc_present) {
+            int rc_strict, rc_plain, rc_clean;
+
+            FILE *w = fopen("zz_probe_strict.c", "wb");
+            if (w) { fputs(STRICT_PROBE, w); fclose(w); }
+            snprintf(cmd, sizeof cmd, "gcc -std=c11 %s -c -o zz_probe_strict.o zz_probe_strict.c > zz_probe_strict.log 2>&1", INCS);
+            rc_strict = system(cmd);
+            remove("zz_probe_strict.c"); remove("zz_probe_strict.o");
+
+            w = fopen("zz_probe_plain.c", "wb");
+            if (w) { fputs(PLAIN_PROBE, w); fclose(w); }
+            snprintf(cmd, sizeof cmd, "gcc -std=c11 %s -c -o zz_probe_plain.o zz_probe_plain.c > zz_probe_plain.log 2>&1", INCS);
+            rc_plain = system(cmd);
+            remove("zz_probe_plain.c"); remove("zz_probe_plain.o");
+
+            w = fopen("zz_probe_strict_clean.c", "wb");
+            if (w) { fputs(STRICT_CLEAN_PROBE, w); fclose(w); }
+            snprintf(cmd, sizeof cmd, "gcc -std=c11 %s -c -o zz_probe_strict_clean.o zz_probe_strict_clean.c > zz_probe_strict_clean.log 2>&1", INCS);
+            rc_clean = system(cmd);
+            remove("zz_probe_strict_clean.c"); remove("zz_probe_strict_clean.o");
+
+            CHECK(rc_plain == 0,
+                  "O13 a suite that does NOT declare RB_TEST_ID_STRICT still "
+                  "compiles test_id() -- the guard costs the existing 3019 call "
+                  "sites nothing");
+            CHECK(rc_strict != 0,
+                  "O14 a suite that DOES declare RB_TEST_ID_STRICT cannot "
+                  "compile test_id() at all: the identity trap is now a COMPILE "
+                  "error, not a comment nobody reads");
+            CHECK(rc_clean == 0,
+                  "O15 ...and the escape hatch compiles: test_id_IDENTITY_"
+                  "TRACKED() is the identity-tracking spelling and is legal in "
+                  "exactly the files where test_id() is not");
+            remove("zz_probe_strict.log");
+            remove("zz_probe_plain.log");
+            remove("zz_probe_strict_clean.log");
+        }
+
+        /* And the alias itself, from inside a suite that never opted in: the
+         * macro and the template function are the same call. */
+        {
+            static TestGame tgo;
+            test_game_new(&tgo);
+            int a = test_id(&tgo, "PL!-sd1-010-SD");
+            int b = test_id_TEMPLATE_ONLY(&tgo, "PL!-sd1-010-SD");
+            CHECK(a >= 0 && a == b,
+                  "O16 test_id() IS test_id_TEMPLATE_ONLY(): the macro alias "
+                  "and the renamed definition cannot have drifted");
+            int c = test_id(&tgo, "PL!-sd1-010-SD");
+            CHECK(a == c,
+                  "O17 ...and it still aliases: two test_id() calls for one "
+                  "card_no give ONE id, which is the trap §C pins");
+        }
+    }
+}
+
 int main(void)
 {
+    test_output_utf8_init();
     if (rb_load("src") != 0) {
         fprintf(stderr, "FAIL: harness self-test could not load src/cards.bin\n");
         return 1;
@@ -1502,6 +1765,7 @@ int main(void)
     section_l_missing_twins(&tg);
     section_m_identity_is_detectable(&tg);
     section_n_uninitialised_state();
+    section_o_utf8_and_id_guard();
 
     printf("%s: %d checks failed\n", failures ? "FAILED" : "GREEN", failures);
     return failures ? 1 : 0;

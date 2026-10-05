@@ -183,7 +183,7 @@ static void test_look_at_counts_and_zones(void)
 /* Q85 / rule 10.2.2.2  Elook N from a short deck draws, refreshes, draws the rest. */
 static void test_look_at_short_deck_refresh(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int top = test_new_id(&tg, MEMBER_MUS);
@@ -250,7 +250,7 @@ static    TestGame tg;
 
 static void test_reveal_hand_automatic_when_count_covers_all(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -937,7 +937,7 @@ static    TestGame tg;
 /* look.rs:176-203  Ea look_action that is not look_at runs as a nested effect. */
 static void test_look_and_select_nested_look_action(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);
@@ -975,7 +975,7 @@ static void test_look_and_select_nested_look_action(void)
 /* Remainder routing  Ekeep_shuffle_under finalisation. */
 static void test_look_and_select_remainder_routes(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     clear_player(&tg.state.p[0]);
     int a = test_new_id(&tg, MEMBER_MUS);

@@ -921,7 +921,52 @@ type ScoreFn = fn(&GameState, &[game_setup::Action], u8) -> Vec<(f64, String)>;
 fn behaviorally_equal(a: &GameState, b: &GameState) -> ArenaResult<bool> {
     let actions_a = game_setup::generate_possible_actions(a);
     let actions_b = game_setup::generate_possible_actions(b);
+    for (tag, g) in [("a", a), ("b", b)] {
+        let p1 = &g.player1;
+        eprintln!(
+            "[eq] {tag} p1 hand={:?} deck={:?} energy={:?}\n     p1 wr={:?} stage={:?}",
+            p1.hand.cards,
+            p1.main_deck.cards,
+            p1.energy_zone.cards,
+            p1.waitroom.cards,
+            p1.stage.stage,
+        );
+        eprintln!(
+            "[eq] {tag} p1 act={} p2 act={} p2 hand={:?} deck={:?} energy={:?} wr={:?} stage={:?}",
+            p1.energy_zone.active_energy_count,
+            g.player2.energy_zone.active_energy_count,
+            g.player2.hand.cards,
+            g.player2.main_deck.cards,
+            g.player2.energy_zone.cards,
+            g.player2.waitroom.cards,
+            g.player2.stage.stage,
+        );
+        eprintln!(
+            "[eq] {tag} hist={:?} trace={:?} mods={:?}",
+            g.game_state_history, g.debug_trace, g.mods
+        );
+        if let Some(pass) = actions_a.first() {
+            let mut sim = g.clone();
+            let ok = game_setup::execute_action(&mut sim, pass).is_ok();
+            game_setup::settle_single_player_state(&mut sim);
+            eprintln!(
+                "[eq] {tag} after Pass ok={ok} hand={:?} deck={:?} energy={:?} wr={:?} stage={:?}",
+                sim.player1.hand.cards,
+                sim.player1.main_deck.cards,
+                sim.player1.energy_zone.cards,
+                sim.player1.waitroom.cards,
+                sim.player1.stage.stage,
+            );
+        }
+    }
     if serde_json::to_value(&actions_a)? != serde_json::to_value(&actions_b)? {
+        eprintln!(
+            "[behaviorally_equal] legal actions differ\n  a({}) = {}\n  b({}) = {}",
+            actions_a.len(),
+            serde_json::to_value(&actions_a)?,
+            actions_b.len(),
+            serde_json::to_value(&actions_b)?
+        );
         return Ok(false);
     }
     let me = if decision_player(a).id == a.player1.id {
@@ -930,22 +975,44 @@ fn behaviorally_equal(a: &GameState, b: &GameState) -> ArenaResult<bool> {
         1u8
     };
     if decision_player(a).id != decision_player(b).id {
+        eprintln!(
+            "[behaviorally_equal] decision player differs: a={} b={}",
+            decision_player(a).id,
+            decision_player(b).id
+        );
         return Ok(false);
     }
-    for score in [
+    for (i, score) in [
         strategy_v6::score_actions as ScoreFn,
         strategy_v7::score_actions as ScoreFn,
-            strategy_v8::score_actions_v8 as ScoreFn,
-
-    ] {
+        strategy_v8::score_actions_v8 as ScoreFn,
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let x = policy_call(|| score(a, &actions_a, me));
         let y = policy_call(|| score(b, &actions_b, me));
-        if x.len() != y.len()
-            || x.iter()
-                .zip(&y)
-                .any(|((s1, c1), (s2, c2))| s1.to_bits() != s2.to_bits() || c1 != c2)
-        {
+        if x.len() != y.len() {
+            eprintln!(
+                "[behaviorally_equal] scorer {i} length differs: a={} b={}",
+                x.len(),
+                y.len()
+            );
             return Ok(false);
+        }
+        for (j, ((s1, c1), (s2, c2))) in x.iter().zip(&y).enumerate() {
+            if s1.to_bits() != s2.to_bits() || c1 != c2 {
+                eprintln!(
+                    "[behaviorally_equal] scorer {i} entry {j} differs: \
+                     a=({:?}, {}) b=({:?}, {})\n  action={}",
+                    s1,
+                    c1,
+                    s2,
+                    c2,
+                    serde_json::to_string(&actions_a[j])?
+                );
+                return Ok(false);
+            }
         }
     }
     Ok(true)

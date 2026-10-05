@@ -4,6 +4,7 @@ use crate::card::{
     parse_heart_color, Ability, AbilityEffect, AbilityFilter, Card, CardDatabase, DistinctType,
     Operator,
 };
+use crate::core::types::ArcStr;
 use crate::{HashMap, HashSet};
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -1049,22 +1050,15 @@ pub fn card_matches_characters(
 ) -> bool {
     match characters {
         Some(names) if !names.is_empty() => {
-            // Normalise the needle list ONCE per call rather than once per
-            // (needle, candidate-part) pair. `normalize_name` returns an owned
-            // String, so the old inner loop allocated one per name per card —
-            // 3 names x 20 candidates = 60 allocations to filter one zone, on a
-            // path the corpus exercises heavily (most live/performance text
-            // names characters).
-            //
-            // Semantics preserved exactly: the same `normalize_name`, applied to
-            // the same names, then the same `contains` test against the same
-            // `get_card_names` parts. Only the hoisting changed.
-            let clean: Vec<String> = names
-                .iter()
-                .map(|n| CardDatabase::normalize_name(n))
-                .collect();
+            // Needles are canonicalised once, at generation time
+            // (`parser_utils.squash_name_needles`), and `get_card_names` returns
+            // `name_key` parts, so both sides are raw strings. This used to run
+            // `normalize_name` over every needle per call — one allocation each,
+            // 3 names x 20 candidates = 60 allocations to filter one zone.
             let card_names = card_db.get_card_names(card_id);
-            clean.iter().any(|cn| card_names.iter().any(|part| part.contains(cn)))
+            names
+                .iter()
+                .any(|cn| card_names.iter().any(|part| part.contains(cn.as_str())))
         }
         _ => true,
     }
@@ -1170,11 +1164,14 @@ pub fn card_matches_name_constraint(
 ) -> bool {
     match name_constraint {
         Some(name) => {
-            let norm = CardDatabase::normalize_name(name);
+            // `get_card_names` returns `name_key` parts and the needle is
+            // canonicalised at generation time, so this is a raw comparison.
+            // The needle used to be re-normalised here — one allocation per
+            // call, rebuilding a string the corpus already had.
             card_db
                 .get_card_names(card_id)
                 .iter()
-                .any(|cn| CardDatabase::normalize_name(cn) == norm)
+                .any(|cn| *cn == name)
         }
         None => true,
     }
@@ -1976,10 +1973,11 @@ pub fn filter_current_blade(
 
 fn card_matches_name_fragments(db: &CardDatabase, id: i16, fragments: &[String]) -> bool {
     db.get_card(id).is_some_and(|card| {
-        let norm_name = CardDatabase::normalize_name(&card.name);
+        // Both sides canonical: `name_key` at load, `card_names` at parse time.
+        let norm_name = card.name_key.as_ref();
         fragments
             .iter()
-            .all(|f| norm_name.contains(&CardDatabase::normalize_name(f)))
+            .all(|f| norm_name.contains(f.as_str()))
     })
 }
 
@@ -2178,12 +2176,12 @@ pub fn dedupe_by_normalized_name<T: Copy>(
     card_id: impl Fn(&T) -> i16,
     db: &CardDatabase,
 ) -> Vec<T> {
-    let mut seen = HashSet::<String>::default();
+    let mut seen = HashSet::<ArcStr>::default();
     items
         .iter()
         .filter(|item| {
             db.get_card(card_id(item))
-                .map(|c| seen.insert(CardDatabase::normalize_name(&c.name)))
+                .map(|c| seen.insert(c.name_key.clone()))
                 .unwrap_or(true)
         })
         .copied()
@@ -2853,13 +2851,13 @@ pub fn apply_distinct_filter(
 ///   because the joint's constituent names are already present as standalones.
 pub fn count_distinct_member_name_units(cards: &[i16], card_db: &CardDatabase) -> usize {
     let mut single_names: HashSet<String> = HashSet::default();
-    let mut joint_names: HashSet<String> = HashSet::default();
+    let mut joint_names: HashSet<ArcStr> = HashSet::default();
     let mut joints: Vec<Vec<String>> = Vec::new();
     for &id in cards {
         let Some(card) = card_db.get_card(id) else { continue };
         let names = card_db.get_card_names(id);
         if names.len() > 1 {
-            let full_name = CardDatabase::normalize_name(&card.name).replace('＆', "&");
+            let full_name = card.name_key.clone();
             if joint_names.insert(full_name) {
                 joints.push(names);
             }

@@ -1,4 +1,0 @@
-FAIL: paying that unpayable cost fails (got 1 expected 0)
-make[2]: *** [Makefile:515: t-run] エラー 1
-make[1]: *** [Makefile:354: t] エラー 2
-make: *** [Makefile:536: t-nogate] エラー 2

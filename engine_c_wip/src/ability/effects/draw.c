@@ -670,7 +670,17 @@ void rb_effect_select_effect(GameState *g, int actor, AbilityEffect *e, int host
     const char *or_ct = draw_extra(e, "or_card_types");
     const char *chars = draw_extra(e, "characters");
     const char *group = draw_extra(e, "group_names");
-    const char *ctype = draw_extra(e, "card_type");
+    /* `card_type` is a TYPED field (vm.c:1120-1134), NOT an extras row: that
+       branch `continue`s before the scalar tail, so the extras table never
+       holds a `card_type` at all (measured: 0 of 2230 effects). Rust reads
+       `effect.card_type_any()` (selection.rs), which is populated only for the
+       three names CardType::from_card_str accepts and is None otherwise --
+       exactly what card_type_field holds. Reading the extras row here therefore
+       yielded a permanent NULL, which silently took the area_select arm below
+       (n_hc==0 && !or_ct && !chars && !group) for every node that DOES spell a
+       vocabulary card_type, and defaulted `source` to "hand" instead of "stage"
+       at line 692. */
+    const char *ctype = e->card_type_field[0] ? e->card_type_field : NULL;
 
     /* Area select: no source, no heart_colors, no or_card_types, no characters, no group */
     if (!src && n_hc == 0 && !or_ct && !chars && !group) {

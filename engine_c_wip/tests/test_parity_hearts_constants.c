@@ -132,7 +132,7 @@ static void fill_decks(TestGame *tg, const char *filler_no, int per_player)
 
 static void test_ten_energy_constant_heart06(void)
 {
-    TestGame tg; test_game_new(&tg);
+    static TestGame tg; test_game_new(&tg);
     int member = cid(&tg, "PL!SP-bp5-016-N");
     stage_center(&tg, member);
     fill_decks(&tg, "PL!-sd1-010-SD", 15);
@@ -209,7 +209,7 @@ static void test_energy_threshold_two_hearts_at_eight(void)
         { 8, 2, "Ren: 8 energy (>=8) -> both heart03" },
     };
     for (unsigned i = 0; i < sizeof cases / sizeof cases[0]; i++) {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int ren = cid(&tg, "PL!SP-pb2-027-N");
         set_stage(&tg, 0, RB_EMPTY_SLOT, ren, RB_EMPTY_SLOT);
         set_energy(&tg, 0, cases[i].energy, cases[i].energy);
@@ -220,7 +220,7 @@ static void test_energy_threshold_two_hearts_at_eight(void)
 
 static void test_energy_threshold_stacked_heart02(void)
 {
-    TestGame tg; test_game_new(&tg);
+    static TestGame tg; test_game_new(&tg);
     int kanon = cid(&tg, "PL!SP-pb2-023-N");
     stage_center(&tg, kanon);
 
@@ -271,7 +271,7 @@ static    TestGame tg; test_game_new(&tg);
 
     /* combined_energy_fifteen_heart02_boundary_test.rs: exactly 15 / 14. */
     {
-        TestGame t2; test_game_new(&t2);
+        static TestGame t2; test_game_new(&t2);
         int s2 = cid(&t2, "PL!N-bp4-007-R+");
         stage_center(&t2, s2);
         set_energy(&t2, 0, 10, 10);
@@ -280,7 +280,7 @@ static    TestGame tg; test_game_new(&tg);
         CHECK_EQ(heart(&t2, s2, H02), 2, "Hanayo: combined energy = 15 -> +2 heart02");
     }
     {
-        TestGame t2; test_game_new(&t2);
+        static TestGame t2; test_game_new(&t2);
         int s2 = cid(&t2, "PL!N-bp4-007-R+");
         stage_center(&t2, s2);
         set_energy(&t2, 0, 10, 10);
@@ -460,7 +460,7 @@ static        TestGame tg; test_game_new(&tg);
 
     /* center_highest_cost_constant_heart_empty_and_single_member_test.rs */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int sumire = cid(&tg, SUMIRE_R);
         set_stage(&tg, 0, RB_EMPTY_SLOT, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
         test_recalc(&tg);
@@ -468,7 +468,7 @@ static        TestGame tg; test_game_new(&tg);
                  "empty stage leaves the source without a heart03 bonus");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int sumire = cid(&tg, SUMIRE_R);
         set_stage(&tg, 0, RB_EMPTY_SLOT, sumire, RB_EMPTY_SLOT);
         test_recalc(&tg);
@@ -559,7 +559,7 @@ static void test_group_live_need_heart_eight_constant_heart03(void)
     /* PL!SP-bp1-023-L: Liella!, need_heart total 4. */
     /* PL!-sd1-019-SD: non-Liella, need_heart total 3. */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int kanon = cid(&tg, "PL!SP-bp5-012-N");
         int filler = cid(&tg, "PL!-sd1-010-SD");
         test_add_to_stage(&tg, 1, kanon);
@@ -571,7 +571,7 @@ static void test_group_live_need_heart_eight_constant_heart03(void)
                  "Kanon: empty live zone -> condition fails, heart03 = 0");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int kanon = cid(&tg, "PL!SP-bp5-012-N");
         int tiny_stars = cid(&tg, "PL!SP-bp1-024-L");
         int filler = cid(&tg, "PL!-sd1-010-SD");
@@ -584,7 +584,7 @@ static void test_group_live_need_heart_eight_constant_heart03(void)
                  "Kanon: Liella! live card with need_heart 8 -> +1 heart03");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int kanon = cid(&tg, "PL!SP-bp5-012-N");
         int start_true = cid(&tg, "PL!SP-bp1-023-L");
         int filler = cid(&tg, "PL!-sd1-010-SD");
@@ -597,7 +597,7 @@ static void test_group_live_need_heart_eight_constant_heart03(void)
                  "Kanon: Liella! live card need_heart 4 (<8) -> no heart03");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int kanon = cid(&tg, "PL!SP-bp5-012-N");
         int start_dash = cid(&tg, "PL!-sd1-019-SD");
         int filler = cid(&tg, "PL!-sd1-010-SD");
@@ -610,7 +610,7 @@ static void test_group_live_need_heart_eight_constant_heart03(void)
                  "Kanon: a non-Liella! live card fails the group filter -> no heart03");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int kanon = cid(&tg, "PL!SP-bp5-012-N");
         int a = cid(&tg, "PL!SP-bp1-023-L");
         int b = cid_new(&tg, "PL!SP-bp1-023-L");
@@ -686,7 +686,7 @@ static        TestGame tg; test_game_new(&tg);
     }
     {
         /* Karin: exactly 6 combined members -> exactly +1 heart02 and heart05. */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int karin = cid(&tg, "PL!N-PR-027-PR");
         CHECK(rb_card_no_eq(karin, "PL!N-PR-027-PR"),
               "Karin identity: PL!N-PR-027-PR resolves to the right card");
@@ -767,7 +767,7 @@ static        TestGame tg; test_game_new(&tg);
 static void test_per_other_group_member_constant_heart05(void)
 {
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int c = cid(&tg, "PL!-bp5-111-R");
         set_stage(&tg, 0, RB_EMPTY_SLOT, c, RB_EMPTY_SLOT);
         fill_decks(&tg, COST_4, 15);
@@ -777,7 +777,7 @@ static void test_per_other_group_member_constant_heart05(void)
                  "no other A-RISE member means no heart05 (self is excluded)");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int c = cid(&tg, "PL!-bp5-111-R");
         int anju = cid(&tg, "PL!-bp5-222-R");
         set_stage(&tg, 0, anju, c, RB_EMPTY_SLOT);
@@ -785,7 +785,7 @@ static void test_per_other_group_member_constant_heart05(void)
         CHECK_EQ(heart(&tg, c, H05), 1, "1 other A-RISE member grants exactly 1 heart05");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int member = cid(&tg, "PL!-bp5-111-R");
         set_stage(&tg, 0, cid(&tg, "PL!-bp5-222-R"), member, cid(&tg, "PL!-bp5-333-R"));
         test_recalc(&tg);
@@ -826,7 +826,7 @@ static        TestGame tg; test_game_new(&tg);
     }
     {
         /* Only energy under THIS member counts. */
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int s = cid(&tg, "PL!N-bp7-007-R＋");
         int e = cid(&tg, "LL-E-001-SD");
         int other_member = cid(&tg, "PL!SP-sd1-001-SD");
@@ -838,7 +838,7 @@ static        TestGame tg; test_game_new(&tg);
                  "energy under a DIFFERENT area plus a member under center -> still 0");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         set_energy(&tg, 0, 4, 4);
         int s = cid(&tg, "PL!N-bp7-007-R＋");
         stage_center(&tg, s);
@@ -846,7 +846,7 @@ static        TestGame tg; test_game_new(&tg);
         CHECK_EQ(heart(&tg, s, H02), 0, "ab#0: no energy under and energy <= 6 -> no heart02");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         set_energy(&tg, 0, 4, 4);
         int s = cid(&tg, "PL!N-bp7-007-R＋");
         stage_center(&tg, s);
@@ -933,7 +933,7 @@ static    TestGame tg; test_game_new(&tg);
 
 static void test_position_color_three_hearts_constant(void)
 {
-    TestGame tg; test_game_new(&tg);
+    static TestGame tg; test_game_new(&tg);
     int member = cid(&tg, "PL!SP-bp5-011-R");
 
     set_stage(&tg, 0, member, RB_EMPTY_SLOT, RB_EMPTY_SLOT);
@@ -1028,7 +1028,7 @@ static        TestGame tg; test_game_new(&tg);
         CHECK(heart(&tg, me, H03) > 0, "a cost-15 member on stage -> self gains heart03");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int me = cid(&tg, "PL!SP-sd2-008-SD2");
         int small = cid(&tg, COST_4);            /* cost 4 */
         set_stage(&tg, 0, me, small, RB_EMPTY_SLOT);
@@ -1083,7 +1083,7 @@ static        TestGame tg; test_game_new(&tg);
                  "no collateral blade either");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int hanayo = cid(&tg, "PL!-bp5-008-R");
         stage_center(&tg, hanayo);
         test_add_to_opp_success(&tg, cid_new(&tg, "PL!S-pb1-023-L"));
@@ -1105,7 +1105,7 @@ static        TestGame tg; test_game_new(&tg);
                  "six score-0 lives give a score sum of 0 < 6 -> no hearts");
     }
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int hanayo = cid(&tg, "PL!-bp5-008-R");
         test_add_to_success(&tg, cid(&tg, "PL!SP-bp1-027-L"));  /* score 6 */
         test_recalc(&tg);

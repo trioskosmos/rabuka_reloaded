@@ -1,0 +1,1437 @@
+[harness_self] FAIL:  2 checks failed
+[harness_self] FAIL: D1 test_id( call sites in tests/ stay <= 3037 (now 3051)
+[harness_self] FAIL: D2 files using test_id( stay <= 107 (now 109)
+[parity_cce_gaps] FAIL:   a1_discard_member_buffs
+[parity_cce_gaps] FAIL:   a2_skip_cost_no_effect
+[parity_cce_gaps] FAIL:   a5_same_print_as_activating
+[parity_cce_gaps] FAIL:   a6_self_is_target
+[parity_cce_gaps] FAIL:   a8_filter_shape_and_scope
+[parity_cce_gaps] FAIL:   a10_heart04_only
+[parity_cce_gaps] FAIL:   a11_p_variant
+[parity_cce_gaps] FAIL:   a12_p_plus_variant
+[parity_cce_gaps] FAIL:   a13_sec_variant
+[parity_cce_gaps] FAIL:   a14_non_contiguous_hand
+[parity_cce_gaps] FAIL:   a16_left_position
+[parity_cce_gaps] FAIL:   a17_right_position
+[parity_cce_gaps] FAIL:   a18_mixed_hand
+[parity_cce_gaps] FAIL:   a19_diff_name_no_target
+[parity_cce_gaps] FAIL:   a21_temporary_live_end
+[parity_cce_gaps] FAIL:   a22b_resolver_path_pays
+[parity_cce_gaps] FAIL:   c1_unit_gain_only_doll
+[parity_cce_gaps] FAIL:   d1_mari_bottom_mill
+[parity_cce_gaps] FAIL:   e1_q214_no_live_in_waitroom
+[parity_cce_gaps] FAIL:   e2_q214_turn1_blocks
+[parity_cce_gaps] FAIL:   e3_q214_p_variant
+[parity_cce_gaps] FAIL:   e3_q214_ar_variant
+[parity_cce_gaps] FAIL:   f1_two_mirakura_one_change
+[parity_cce_gaps] FAIL:   f2_one_mirakura_one_change
+[parity_cce_gaps] FAIL:   i1_q157_wait_energy_placed
+[parity_cce_gaps] FAIL:   i2_q184_not_counted
+[parity_cce_gaps] FAIL:   i3_debut_to_vacated_area
+[parity_cce_gaps] FAIL:   i4_energy_under_vacated
+[parity_cce_gaps] FAIL:   j3_three_keep_one
+[parity_cce_gaps] FAIL:   j5_reveal_live_scores
+[parity_cce_gaps] FAIL:   j8_three_skip_reveal_live
+[parity_cce_gaps] FAIL:   k5_insufficient_hand
+[parity_cce_gaps] FAIL: a1: the same-name member gains +1 heart04 until live end (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a2c: POSITIVE CONTROL - paying the same cost grants heart04 (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a5: the activating member is the only same-name member and is buffed (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a6: the activating card is itself a same-name member, so it is buffed (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a8: exactly 2 filtered stage candidates (the two own same-name members; got 0) (expected 2, actual 0)
+[parity_cce_gaps] FAIL: a8: exactly 2 filtered stage candidates (the two own same-name members; got 0) (expected 2, actual 0)
+[parity_cce_gaps] FAIL: a8: the UNselected member gets no heart04 (expected 0, actual 1)
+[parity_cce_gaps] FAIL: a8: the selected member gets +1 heart04 (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a8: selected member gets +1 blade (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a8: different name gets no blade (expected 0, actual 1)
+[parity_cce_gaps] FAIL: a10: +1 heart04 is granted (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a11/p: the variant grants heart04 (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a11/pp: the variant grants heart04 (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a11/sec: the variant grants heart04 (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a14: heart04 is granted (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a16/left: heart04 is granted at area 0 (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a16/right: heart04 is granted at area 2 (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a18: heart04 is granted (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a19: ... and no blade (expected 0, actual 1)
+[parity_cce_gaps] FAIL: a21: heart04 is granted (expected 1, actual 0)
+[parity_cce_gaps] FAIL: a22b: with the cost paid, the same_name gain_resource grants +1 heart04 - the parser and the same_name filter are CORRECT and the whole of section A reduces to the missing rb_pay_cost in rb_drain_ability_queue (expected 1, actual 0)
+[parity_cce_gaps] FAIL: c1: a DOLLCHESTRA member gets +5 cost (expected 5, actual 0)
+[parity_cce_gaps] FAIL: c1: the ACTIVATING DOLLCHESTRA member also gets +5 cost (the unit filter is not exclude_self) (expected 5, actual 0)
+[parity_cce_gaps] FAIL: d1: the TOP marker must still be in the deck - if it left too, the engine milled from the wrong end
+[parity_cce_gaps] FAIL: e1: no live in the waitroom -> no recovery selection prompt (got kind=1 zone="discard" target="" count=1 allow_skip=0 n_filtered=0 desc="")
+[parity_cce_gaps] FAIL: e1: the cost card reached the waitroom (expected 0, actual 1)
+[parity_cce_gaps] FAIL: e2: the first activation recovered the live card to the hand (energy 10)
+[parity_cce_gaps] FAIL: e3/p: the PL!N-bp5-003-P print also recovers the live card to the hand
+[parity_cce_gaps] FAIL: e3/ar: the PL!N-bp5-003-AR print also recovers the live card to the hand
+[parity_cce_gaps] FAIL: f1: Himeno ended in a mirakura area (stage = 2639/2640/2641)
+[parity_cce_gaps] FAIL: f2: mk ended at Left (expected 2640, actual 2639)
+[parity_cce_gaps] FAIL: f2: Himeno ended at Center (expected 2639, actual 2640)
+[parity_cce_gaps] FAIL: [VACUOUS]  i1: the energy-under-member SelectCard must appear - only 0 prompt(s) were offered, need 1
+[parity_cce_gaps] FAIL: i1: the prompt is a SelectCard over zone=energy (got (no pending choice))
+[parity_cce_gaps] FAIL: i1: 2 active consumed for the cost (expected 0, actual 2)
+[parity_cce_gaps] FAIL: i1: 1 card popped for the under-member placement (3 -> 3) (expected 2, actual 3)
+[parity_cce_gaps] FAIL: [VACUOUS]  i2: the energy-under-member prompt must appear - only 0 prompt(s) were offered, need 1
+[parity_cce_gaps] FAIL: i2: Q184 - 1 card removed for the placement, 2 remain (got 3) (expected 2, actual 3)
+[parity_cce_gaps] FAIL: i2: Q184 - 2 active consumed for the cost, 1 removed for the placement -> 0 remaining (got 3) (expected 0, actual 3)
+[parity_cce_gaps] FAIL: i3: THE REGRESSION - the new card debuts to the VACATED RightSide area, not to Center (stage = 2640/-1/2639) (expected 2640, actual 2639)
+[parity_cce_gaps] FAIL: i3: the original Setsuna is off the stage
+[parity_cce_gaps] FAIL: i3: the original Setsuna is in the waitroom
+[parity_cce_gaps] FAIL: i4: the new card is on RightSide (expected 2640, actual 2639)
+[parity_cce_gaps] FAIL: i4: THE REGRESSION - the energy is under the member on the RIGHT side, not under Center (under = 0/0/0) (expected 1, actual 0)
+[parity_cce_gaps] FAIL: j3: three 虹ヶ咲 members -> look at exactly 3 cards (expected 3, actual 1)
+[parity_cce_gaps] FAIL: j5: revealing a LIVE card grants +1 score (expected 1, actual 0)
+[parity_cce_gaps] FAIL: j8: revealing that live card grants +1 score (expected 1, actual 0)
+[parity_cce_gaps] FAIL: k5: with 0 successes and 2 hand cards the activation is refused outright (fired=1, no prompt opened) or the full cost is asked; neither happened
+[parity_cost_and_effect] FAIL:  test_q196_mandatory_cost_then_draw
+[parity_cost_and_effect] FAIL:  test_q214_optional_score_energy_pay_and_decline
+[parity_cost_and_effect] FAIL:  test_success_score_gate_offers_no_cost
+[parity_cost_and_effect] FAIL:  test_success_score_sequential_discard_two
+[parity_cost_and_effect] FAIL:  test_reveal_cost_cost20_places_under_and_draws
+[parity_cost_and_effect] FAIL:  test_reveal_cost_cost10_placed_under
+[parity_cost_and_effect] FAIL:  test_optional_energy_placement_accept_and_decline
+[parity_cost_and_effect] FAIL:  test_opponent_forced_discard_comply_and_decline
+[parity_cost_and_effect] FAIL:  test_optional_debut_ee_pay_skip_and_multi
+[parity_cost_and_effect] FAIL:  test_optional_two_card_cost_pay_and_skip
+[parity_cost_and_effect] FAIL:  test_center_compound_cost_paid_before_effect
+[parity_cost_and_effect] FAIL:  test_maki_cost_discard_and_all_match_blade
+[parity_cost_and_effect] FAIL:  test_gap_sequential_cost_root_dropped_by_bridge
+[parity_cost_and_effect] FAIL: A: net hand change is -1 cost card +1 drawn card (got 2 expected 1)
+[parity_cost_and_effect] FAIL: B1: the optional score-energy payment is a SelectTarget gate
+[parity_cost_and_effect] FAIL: B1: accepting pays the live card's score in energy (5 -> 3) (got 5 expected 3)
+[parity_cost_and_effect] FAIL: B1: after paying, the recovered live card is MOVED into the hand
+[parity_cost_and_effect] FAIL: B1: the paid live card is no longer in the waitroom
+[parity_cost_and_effect] FAIL: B2: a score-0 live is still recovered to the hand when the cost is accepted
+[parity_cost_and_effect] FAIL: B2: the score-0 live leaves the waitroom
+[parity_cost_and_effect] FAIL: B4: declining still goes through the optional payment gate
+[parity_cost_and_effect] FAIL: C0: the refused 起動 discards no cost card (got 1 expected 3)
+[parity_cost_and_effect] FAIL: C1: a pending choice is outstanding (got 2 expected 1)
+[parity_cost_and_effect] FAIL: E1: exactly one member is placed under 嵐 千砂都 (got 0 expected 1)
+[parity_cost_and_effect] FAIL: E1: the revealed cost-20 member is the one placed under (got 0 expected 2472)
+[parity_cost_and_effect] FAIL: E1: reveal 1 from hand, draw 2 (got 5 expected 4)
+[parity_cost_and_effect] FAIL: E3: a cost-10 member is placed under 嵐 千砂都 (got 0 expected 1)
+[parity_cost_and_effect] FAIL: E3: the cost-10 member is the card placed under (got 0 expected 977)
+[parity_cost_and_effect] FAIL: G1: the optional energy placement prompts
+[parity_cost_and_effect] FAIL: G2: the optional energy placement prompts
+[parity_cost_and_effect] FAIL: G2: declined → no energy placed (got 1 expected 0)
+[parity_cost_and_effect] FAIL: G2: declined → the opponent draws nothing (got 1 expected 0)
+[parity_cost_and_effect] FAIL: I2: opponent declined → ブレード×4 (got 0 expected 4)
+[parity_cost_and_effect] FAIL: L2: skipping the cost leaves the live card in the waitroom
+[parity_cost_and_effect] FAIL: L2: skipping the cost places nothing in the live zone
+[parity_cost_and_effect] FAIL: L2: skipping the cost must not reduce the live-card-set limit (got 1 expected 0)
+[parity_cost_and_effect] FAIL: L3: the unchosen live card stays in the waitroom (got 0 expected 1)
+[parity_cost_and_effect] FAIL: M1: the chosen ally gains +2 heart01 (got 4 expected 2)
+[parity_cost_and_effect] FAIL: N1: the effect sacrificed the selected Aqours member
+[parity_cost_and_effect] FAIL: N1: ダイヤ (cost 11 = 9+2) is summoned to the vacated area (got 1594 expected 1600)
+[parity_cost_and_effect] FAIL: N1: the summoned member is no longer in the waitroom
+[parity_cost_and_effect] FAIL: O2: the selected μ's card is MOVED from the revealed set into the hand
+[parity_cost_and_effect] FAIL: P: the rb_activate_card bridge must charge the 2E leg of a sequential_cost cost (got 15 expected 13)
+[parity_cost_and_effect] FAIL: P: the bridge must pay the このカードを手札から控え室に置く leg
+[parity_cost_discount] FAIL:  c_equal_energy_denies_bonus
+[parity_cost_discount] FAIL:  c_less_energy_denies_bonus
+[parity_cost_discount] FAIL:  c_mirror_equal_energy_neither_gets_bonus
+[parity_cost_discount] FAIL:  c_plus2_turns_off_when_opponent_catches_up
+[parity_cost_discount] FAIL:  c_gate_without_bonus_offers_base_cost
+[parity_cost_discount] FAIL:  e_success_zone_deploy_spends_base_plus_one
+[parity_cost_discount] FAIL:  f_reduction_applies_to_no_ability_member
+[parity_cost_discount] FAIL:  f_cost_four_pays_three_energy
+[parity_cost_discount] FAIL:  f_reduction_stacks
+[parity_cost_discount] FAIL:  g_reduction_charges_effective_cost
+[parity_cost_discount] FAIL:  g_selects_one_eligible_opponent_physical_instance
+[parity_cost_discount] FAIL:  h_on_stage_card_ignores_hand_for_other_card_cost
+[parity_cost_discount] FAIL:  i_hand_size_reduces_play_cost_with_zero_floor
+[parity_cost_discount] FAIL:  k_gameplay_accept_cost10_discards_hand
+[parity_cost_discount] FAIL:  k_gameplay_no_hand_cards_no_choice_pays15
+[parity_cost_discount] FAIL:  k_waitroom_fodder_cannot_enable_ten_energy_play
+[parity_cost_discount] FAIL:  k_gameplay_incomplete_hand_no_choice
+[parity_cost_discount] FAIL:  k_second_copy_can_be_used_as_one_fodder
+[parity_cost_discount] FAIL:  k_one_card_cannot_cover_two_slots
+[parity_cost_discount] FAIL:  k_optimal_assignment_with_multi_name
+[parity_cost_discount] FAIL:  k_played_card_not_counted_as_fodder
+[parity_cost_discount] FAIL:  k_non_member_dual_name_does_not_count
+[parity_cost_discount] FAIL:  k_with_extra_unrelated_cards_still_offers_choice
+[parity_cost_discount] FAIL:  k_many_duplicates_still_finds_assignment
+[parity_cost_discount] FAIL:  k_cost_cleared_after_play_and_second_play_costs_15
+[parity_cost_discount] FAIL:  k_stage_member_not_counted_as_hand_fodder
+[parity_cost_discount] FAIL:  l_accept_reduces_cost_by_2
+[parity_cost_discount] FAIL:  l_decline_pays_full_cost
+[parity_cost_discount] FAIL:  l_no_waitroom_members_still_offers_choice
+[parity_cost_discount] FAIL:  n_reduces_cost_seventeen_group_member_by_two
+[parity_cost_discount] FAIL: [vacuous]  f_no_reduction_for_member_with_ability  <-- its PAIRED POSITIVE f_reduction_applies_to_no_ability_member is RED, so this case's zeros are unearned (assertions above stand, result reclassified)
+[parity_cost_discount] FAIL: [vacuous]  n_does_not_reduce_low_cost_group_member  <-- its PAIRED POSITIVE n_reduces_cost_seventeen_group_member_by_two is RED, so this case's zeros are unearned (assertions above stand, result reclassified)
+[parity_cost_discount] FAIL: [vacuous]  n_does_not_reduce_wrong_group_member  <-- its PAIRED POSITIVE n_reduces_cost_seventeen_group_member_by_two is RED, so this case's zeros are unearned (assertions above stand, result reclassified)
+[parity_cost_discount] FAIL: [vacuous]  n_absent_after_source_removed_before_play  <-- its PAIRED POSITIVE n_reduces_cost_seventeen_group_member_by_two is RED, so this case's zeros are unearned (assertions above stand, result reclassified)
+[parity_cost_discount] FAIL: [vacuous]  k_gameplay_decline_pays15_keeps_hand  <-- its PAIRED POSITIVE k_gameplay_accept_cost10_discards_hand is RED, so this case's zeros are unearned (assertions above stand, result reclassified)
+[parity_cost_discount] FAIL: [vacuous]  k_accept_with_ten_energy_pays_ten  <-- its PAIRED POSITIVE k_gameplay_accept_cost10_discards_hand is RED, so this case's zeros are unearned (assertions above stand, result reclassified)
+[parity_cost_discount] FAIL: [vacuous]  k_passive_cost_not_set_by_discard  <-- its PAIRED POSITIVE k_gameplay_accept_cost10_discards_hand is RED, so this case's zeros are unearned (assertions above stand, result reclassified)
+[parity_cost_discount] FAIL: [vacuous]  k_passive_cost_not_set_with_hand_cards  <-- its PAIRED POSITIVE k_gameplay_accept_cost10_discards_hand is RED, so this case's zeros are unearned (assertions above stand, result reclassified)
+[parity_cost_discount] FAIL: [vacuous]  g_four_unique_groups_cost_zero  <-- its PAIRED POSITIVE g_reduction_charges_effective_cost is RED, so this case's zeros are unearned (assertions above stand, result reclassified)
+[parity_cost_discount] FAIL: [vacuous]  g_zero_cost_all_rarities  <-- its PAIRED POSITIVE g_reduction_charges_effective_cost is RED, so this case's zeros are unearned (assertions above stand, result reclassified)
+[parity_cost_discount] FAIL: 7 == 7 is not MORE than the opponent -> no +2 even at the >= 7 gate  (got 2, expected 0)
+[parity_cost_discount] FAIL: 7 < 9 is not more than the opponent -> no +2  (got 2, expected 0)
+[parity_cost_discount] FAIL: P1 == P2 energy -> no +2 for P1  (got 2, expected 0)
+[parity_cost_discount] FAIL: P2 == P1 energy -> no +2 for P2  (got 2, expected 0)
+[parity_cost_discount] FAIL: 7 < 9 -> the +2 must be removed on the next recalc  (got 2, expected 0)
+[parity_cost_discount] FAIL: setup: no +2 (equal energy)  (got 2, expected 0)
+[parity_cost_discount] FAIL: without the bonus the gate must price the baton at the base 9-2=7  (got 5, expected 7)
+[parity_cost_discount] FAIL: the ENERGY ACTUALLY CHARGED must be base + 1 = 5, not the base 4  (got 4, expected 5)
+[parity_cost_discount] FAIL: exactly base + 1 = 5 energy consumed out of base + 6 = 10  (got 6, expected 5)
+[parity_cost_discount] FAIL: cost 4 reduced to 3: exactly 3 energy paid  (got 4, expected 3)
+[parity_cost_discount] FAIL: cost 4 reduced to 3  (got 4, expected 3)
+[parity_cost_discount] FAIL: cost 4 reduced by 2 -> exactly 2 energy paid (the reductions stack)  (got 4, expected 2)
+[parity_cost_discount] FAIL: resolution charges the REDUCED cost 2 (5 - 2 = 3), not the printed 4  (got 1, expected 3)
+[parity_cost_discount] FAIL: the SECOND physical instance is the one that waited
+[parity_cost_discount] FAIL: the reduced 3-energy cost was charged in full  (got 3, expected 0)
+[parity_cost_discount] FAIL: no reduction from a stage-resident source even with many hand cards  (got 3, expected 0)
+[parity_cost_discount] FAIL: CONTROL: 3 cards in hand prices the card at 20 - 2 = 18  (got 17, expected 18)
+[parity_cost_discount] FAIL: with 18 energy the play succeeds (20 - 2 reduction)  (got 0, expected 1)
+[parity_cost_discount] FAIL: all 18 energy is consumed  (got 18, expected 0)
+[parity_cost_discount] FAIL: the card must be playable for 0 energy with 25 cards in hand  (got 0, expected 1)
+[parity_cost_discount] FAIL: 国木田花丸 is discarded to the waitroom
+[parity_cost_discount] FAIL: 優木せつ菜 is discarded to the waitroom
+[parity_cost_discount] FAIL: 嵐千砂都 is discarded to the waitroom
+[parity_cost_discount] FAIL: the hand no longer holds 国木田花丸
+[parity_cost_discount] FAIL: exactly the three named cards were discarded  (got 0, expected 3)
+[parity_cost_discount] FAIL: PROMPT CONTROL: NO play-time choice is offered when the hand cannot cover the three required members
+[parity_cost_discount] FAIL: PROMPT CONTROL: the hand holds only the card being played, so no 10-energy alternative may be offered
+[parity_cost_discount] FAIL: PROMPT CONTROL: 嵐千砂都 is missing from the hand, so no choice
+[parity_cost_discount] FAIL: the second copy is the discarded fodder
+[parity_cost_discount] FAIL: PROMPT CONTROL: a single multi-name card must not count for two slots
+[parity_cost_discount] FAIL: exactly three cards are discarded  (got 0, expected 3)
+[parity_cost_discount] FAIL: PROMPT CONTROL: the card being played is excluded from the hand check, so it cannot be its own fodder
+[parity_cost_discount] FAIL: PROMPT CONTROL: the energy card must not count as member fodder
+[parity_cost_discount] FAIL: exactly three cards are discarded  (got 0, expected 3)
+[parity_cost_discount] FAIL: exactly three cards are discarded  (got 0, expected 3)
+[parity_cost_discount] FAIL: 6 in hand - 1 played - 3 discarded = 2 remain  (got 5, expected 2)
+[parity_cost_discount] FAIL: PROMPT CONTROL: the fodder is exhausted, so the second play has no alternative -- a lingering set-cost would still offer one
+[parity_cost_discount] FAIL: PROMPT CONTROL: a stage-resident 国木田花丸 must not enable the 10-energy play
+[parity_cost_discount] FAIL: PROMPT CONTROL: playing ミア with waitroom members must offer the play-time cost reduction (L2's decline arm is vacuous without this)
+[parity_cost_discount] FAIL: accepted: 13 - 2 = 11 paid, 2 energy remain  (got 0, expected 2)
+[parity_cost_discount] FAIL: accepted: the waitroom members are shuffled out into the deck  (got 2, expected 0)
+[parity_cost_discount] FAIL: accepted: the two waitroom members moved to the deck bottom  (got 0, expected 2)
+[parity_cost_discount] FAIL: PROMPT CONTROL: the choice is genuinely offered. Without this the three assertions below would pass on a board where the feature is simply dead, which is the vacuity the brief warns about
+[parity_cost_discount] FAIL: PROMPT CONTROL: the choice is still offered with an empty waitroom
+[parity_cost_discount] FAIL: accepted: the cost is reduced to 11 even with no waitroom members  (got 0, expected 2)
+[parity_cost_discount] FAIL: paid 17 - 2 = 15 out of 20  (got 3, expected 5)
+[parity_cost_discount] FAIL: 10 negative assertion(s) could not be proven non-vacuous (see the VACUOUS lines above)
+[parity_full_round] FAIL:   A1_both_have_blade_heart
+[parity_full_round] FAIL:   A2_one_no_blade_heart
+[parity_full_round] FAIL:   A3_q265_both_no_blade
+[parity_full_round] FAIL:   A4_draw_counts_replaced
+[parity_full_round] FAIL:   A5_group_filter_liella
+[parity_full_round] FAIL:   A7_normal_debut_fires_nothing
+[parity_full_round] FAIL:   B1_q193_q194_draw_and_deploy
+[parity_full_round] FAIL:   B2_no_baton_no_draw
+[parity_full_round] FAIL:   B6_no_liella_plays_normally
+[parity_full_round] FAIL:   B7_double_baton_pays_cost
+[parity_full_round] FAIL:   F2_non_member_on_stage_no_trigger
+[parity_full_round] FAIL:   F3_member_without_live_start
+[parity_full_round] FAIL:   F3c_each_time_watcher_direct
+[parity_full_round] FAIL:   F15_turn_limit_second_activation
+[parity_full_round] FAIL:   F16_you_q186_cost_reduced
+[parity_full_round] FAIL: [A1_both_have_blade_heart]: A1: 2 Liella! replaced -> 2 cards drawn (hand 2-1+2=3) (got 1 expected 3)
+[parity_full_round] FAIL: [A2_one_no_blade_heart]: A2: 2 Liella! replaced -> 2 cards drawn (got 1 expected 3)
+[parity_full_round] FAIL: [A2_one_no_blade_heart]: A2: exactly one replaced Liella! lacks blade_heart -> +2 blade (got 0 expected 2)
+[parity_full_round] FAIL: [A3_q265_both_no_blade]: A3: 2 Liella! replaced -> 2 cards drawn (got 1 expected 3)
+[parity_full_round] FAIL: [A3_q265_both_no_blade]: A3: two blade-heart-less Liella! -> +4 blade (Q265) (got 0 expected 4)
+[parity_full_round] FAIL: [A4_draw_counts_replaced]: A4: drew 2 for the 2 REPLACED Liella!, ignoring the 5 pre-existing waitroom cards (got 2 expected 4)
+[parity_full_round] FAIL: [A5_group_filter_liella]: A5: drew for the ONE replaced Liella! only (got 2 expected 3)
+[parity_full_round] FAIL: [A5_group_filter_liella]: A5: the blade gain is fed only by the Liella! member (got 0 expected 2)
+[parity_full_round] FAIL: [A7_normal_debut_fires_nothing]: A7: played 1, drew 0 (got 1 expected 0)
+[parity_full_round] FAIL: [A7_normal_debut_fires_nothing]: A7: the deck is untouched - no draw on a non-baton debut (got 1 expected 0)
+[parity_full_round] FAIL: [A7_normal_debut_fires_nothing]: A7: no blade bonus on a non-baton debut (got 2 expected 0)
+[parity_full_round] FAIL: [B1_q193_q194_draw_and_deploy]: B1/Q193: Sumire occupies the CENTER area it was played into (got 0 expected 1)
+[parity_full_round] FAIL: [B1_q193_q194_draw_and_deploy]: B1/Q193: exactly one of the two Liella! members is back on stage (got 0 expected 1)
+[parity_full_round] FAIL: [B1_q193_q194_draw_and_deploy]: B1/Q193: the other Liella! member stayed in the waitroom (got 2 expected 1)
+[parity_full_round] FAIL: [B1_q193_q194_draw_and_deploy]: B1/Q193: ab#1 drew 2 (hand 2-1+2=3) (got 1 expected 3)
+[parity_full_round] FAIL: [B2_no_baton_no_draw]: B2: no baton touch happened (the target area was empty) (got 2 expected 0)
+[parity_full_round] FAIL: [B2_no_baton_no_draw]: B2: no baton -> ab#1 does not trigger, no draw (got 3 expected 1)
+[parity_full_round] FAIL: [B6_no_liella_plays_normally]: B6: Sumire was placed on stage normally (non-vacuous control) (got 0 expected 1)
+[parity_full_round] FAIL: [B6_no_liella_plays_normally]: B6: no baton touch - no Liella! member was on stage (got 2 expected 0)
+[parity_full_round] FAIL: [B7_double_baton_pays_cost]: B7: the printed cost is what left the energy zone (got 30 expected 8)
+[parity_full_round] FAIL: [B7_double_baton_pays_cost]: B7: the cost-2 Liella! (bp1-005-R) is deployed back to the vacated area (got 0 expected 1)
+[parity_full_round] FAIL: [B7_double_baton_pays_cost]: B7: the deployed Liella! left the waitroom (got 1 expected 0)
+[parity_full_round] FAIL: [F2_non_member_on_stage_no_trigger]: F2: the member with ライブ開始時 gains all-harts; the non-member neighbour is irrelevant
+[parity_full_round] FAIL: [F3_member_without_live_start]: F3: a stage neighbour without ライブ開始時 does not consume the each_time trigger
+[parity_full_round] FAIL: [F3c_each_time_watcher_direct]: F3c: calling rb_trigger_each_time_for_member by hand DOES grant the all-hart - the engine simply never calls it
+[parity_full_round] FAIL: [F15_turn_limit_second_activation]: F15: the first 起動 raised at least one prompt (non-vacuous control)
+[parity_full_round] FAIL: [F16_you_q186_cost_reduced]: F16: You is playable with only 4 energy (cost 20 - 16 reduction)
+[parity_full_round] FAIL: [F16_you_q186_cost_reduced]: F16: You really reached the stage (non-vacuous control) (got 0 expected 1)
+[parity_full_round] FAIL: [F16_you_q186_cost_reduced]: F16: exactly 4 energy was spent, i.e. the self cost reduction applied (got 0 expected 4)
+[parity_full_round2] FAIL:   N1_positive_exact_path
+[parity_full_round2] FAIL:   N2b_positive_twin_of_N2
+[parity_full_round2] FAIL:   N3_sync_opponent_gets_choice
+[parity_full_round2] FAIL:   N4_q170_turn_player_first
+[parity_full_round2] FAIL:   N5_requires_empty_area_self
+[parity_full_round2] FAIL:   N6_cost_filter_only_eligible
+[parity_full_round2] FAIL:   N7_q169_occupies_area
+[parity_full_round2] FAIL:   N8_prompt_path_two_eligible
+[parity_full_round2] FAIL:   N9_both_two_eligible
+[parity_full_round2] FAIL:   N10_direct_placement_wait
+[parity_full_round2] FAIL:   N11_full_stage_then_prompt
+[parity_full_round2] FAIL:   N12_q181_area_freed
+[parity_full_round2] FAIL:   N13_placed_debuts_fire
+[parity_full_round2] FAIL:   S1_ai_screeam_answer_both_blade
+[parity_full_round2] FAIL: [N1_positive_exact_path]: N1: the opponent prompt is addressed to P2 (target=both): the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N2b_positive_twin_of_N2]: N2b arm 2: THE ONE ADDED COST-2 CARD MAKES THE ABILITY ASK — the discard is read, so N2's skip is the rule and not an inert engine
+[parity_full_round2] FAIL: [N2b_positive_twin_of_N2]: N2b arm 2: the standing prompt is P1's: the standing prompt is LABELLED for p1 (got -1 expected 0)
+[parity_full_round2] FAIL: [N2b_positive_twin_of_N2]: N2b arm 2: the standing prompt is P1's: the queue entry's choice_player_id names p1 (got -1 expected 0)
+[parity_full_round2] FAIL: [N2b_positive_twin_of_N2]: N2b arm 2: the opponent half follows
+[parity_full_round2] FAIL: [N3_sync_opponent_gets_choice]: N3: the SelectCard is routed to P2 — P1 had no eligible card at all: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N3_sync_opponent_gets_choice]: N3: a position prompt follows the selection
+[parity_full_round2] FAIL: [N3_sync_opponent_gets_choice]: N3: P2's stage is empty (3 slots) so the placement asks for a position
+[parity_full_round2] FAIL: [N3_sync_opponent_gets_choice]: N3: the position prompt is P2's: the standing prompt is LABELLED for p2 (got -1 expected 1)
+[parity_full_round2] FAIL: [N3_sync_opponent_gets_choice]: N3: the position prompt is P2's: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N3_sync_opponent_gets_choice]: N3: the card P2 selected is at P2 left (got -1 expected 2642)
+[parity_full_round2] FAIL: [N3_sync_opponent_gets_choice]: N3: P2's appeared member is in WAIT state
+[parity_full_round2] FAIL: [N4_q170_turn_player_first]: N4: the OPPONENT (P2) is asked second: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N5_requires_empty_area_self]: N5: the standing prompt belongs to P2: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N5_requires_empty_area_self]: N5: P2's OWN discard card is untouched — the pick must be read from the seat the prompt is labelled for, not from the actor
+[parity_full_round2] FAIL: [N6_cost_filter_only_eligible]: N6: the prompt carries the ability's 「コスト2以下」 limit (got 0 expected 2)
+[parity_full_round2] FAIL: [N6_cost_filter_only_eligible]: N6: only ONE candidate is offered — the cost-9 card is filtered out (got 0 expected 1)
+[parity_full_round2] FAIL: [N6_cost_filter_only_eligible]: N6: the opponent prompt is P2's: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N7_q169_occupies_area]: N7: the second prompt is P2's: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N8_prompt_path_two_eligible]: N8: a position prompt follows the selection
+[parity_full_round2] FAIL: [N8_prompt_path_two_eligible]: N8: 2 empty slots on P1's stage, so the placement asks for a position
+[parity_full_round2] FAIL: [N8_prompt_path_two_eligible]: N8: the position prompt is still P1's: the standing prompt is LABELLED for p1 (got -1 expected 0)
+[parity_full_round2] FAIL: [N8_prompt_path_two_eligible]: N8: the OPPONENT half prompts next
+[parity_full_round2] FAIL: [N8_prompt_path_two_eligible]: N8: P2 had ONE eligible card (Exact) so it goes straight to a position
+[parity_full_round2] FAIL: [N8_prompt_path_two_eligible]: N8: the third prompt is P2's: the standing prompt is LABELLED for p2 (got -1 expected 1)
+[parity_full_round2] FAIL: [N8_prompt_path_two_eligible]: N8: the third prompt is P2's: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N8_prompt_path_two_eligible]: N8: P1's appeared card is in WAIT state
+[parity_full_round2] FAIL: [N8_prompt_path_two_eligible]: N8: P2's card appeared at P2 right (got -1 expected 2643)
+[parity_full_round2] FAIL: [N8_prompt_path_two_eligible]: N8: P2's appeared card is in WAIT state
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: prompt 2 is standing
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: prompt 2 is P1's SelectPosition
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: prompt 2 is P1's: the standing prompt is LABELLED for p1 (got -1 expected 0)
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: prompt 3 is standing
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: P2's TWO eligible cards raise their own SelectCard (not P1's again)
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: prompt 3 is P2's: the standing prompt is LABELLED for p2 (got -1 expected 1)
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: prompt 3 is P2's: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: prompt 4 is standing
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: prompt 4 is P2's SelectPosition
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: prompt 4 is P2's: the standing prompt is LABELLED for p2 (got -1 expected 1)
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: prompt 4 is P2's: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: P2's selected card at P2 right (got -1 expected 2643)
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: P1's appeared card is in WAIT state
+[parity_full_round2] FAIL: [N9_both_two_eligible]: N9: P2's appeared card is in WAIT state
+[parity_full_round2] FAIL: [N10_direct_placement_wait]: N10: the opponent prompt is standing
+[parity_full_round2] FAIL: [N10_direct_placement_wait]: N10: P1 had ONE empty slot -> placed DIRECTLY, no P1 position prompt
+[parity_full_round2] FAIL: [N10_direct_placement_wait]: N10: the standing prompt is P2's, not a leftover P1 prompt: the standing prompt is LABELLED for p2 (got -1 expected 1)
+[parity_full_round2] FAIL: [N10_direct_placement_wait]: N10: the standing prompt is P2's, not a leftover P1 prompt: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N10_direct_placement_wait]: N10: P2's card appeared at P2 left (got -1 expected 2642)
+[parity_full_round2] FAIL: [N10_direct_placement_wait]: N10: P1's DIRECTLY placed card is STILL in wait state
+[parity_full_round2] FAIL: [N10_direct_placement_wait]: N10: P2's appeared card is in wait state
+[parity_full_round2] FAIL: [N11_full_stage_then_prompt]: N11: the only prompt that appears belongs to P2: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N12_q181_area_freed]: N12: P2 is asked second: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [N13_placed_debuts_fire]: N13: the opponent is asked second: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[parity_full_round2] FAIL: [S1_ai_screeam_answer_both_blade]: S1: the OPPONENT answers 「相手に何が好き？」 (Rust: entry p2): the standing prompt is LABELLED for p2 (got -1 expected 1)
+[parity_full_round3] FAIL:   K2_choose_number_gains_blade
+[parity_full_round3] FAIL:   K3_equal_choice_both
+[parity_full_round3] FAIL:   Y3_abilityless_not_in_choice
+[parity_full_round3] FAIL:   C1_choice_discard_flow
+[parity_full_round3] FAIL:   C2_choice_wait_option
+[parity_full_round3] FAIL: [K2_choose_number_gains_blade]: K2: the revealed card is NOT in hand -- the chosen number exceeded its cost
+[parity_full_round3] FAIL: [K2_choose_number_gains_blade]: K2: the revealed card was returned to the TOP of the deck
+[parity_full_round3] FAIL: [K2_choose_number_gains_blade]: K2: blade WAS gained on Kosuzu
+[parity_full_round3] FAIL: [K3_equal_choice_both]: K3: the EQUAL case ALSO gains blade -- both halves fire
+[parity_full_round3] FAIL: [Y3_abilityless_not_in_choice]: Y3: after paying once the optional cost RE-ASKS (still under the 3-card cap)
+[parity_full_round3] FAIL: [C1_choice_discard_flow]: C1: two choice_condition cost options are offered (Rust asserts two ChoiceOption actions) (got 0, expected 2)
+[parity_full_round3] FAIL: [C1_choice_discard_flow]: C1: the choice_condition cost raises its option prompt
+[parity_full_round3] FAIL: [C1_choice_discard_flow]: C1: the option labels carry the real cost text (ウェイト), not Yes/No
+[parity_full_round3] FAIL: [C1_choice_discard_flow]: C1: the discard option creates a SelectCard prompt (got 0, expected 1)
+[parity_full_round3] FAIL: [C1_choice_discard_flow]: C1: the selected card really is in the waitroom
+[parity_full_round3] FAIL: [C2_choice_wait_option]: C2: the choice_condition cost raises its option prompt
+[parity_full_round3] FAIL: [C2_choice_wait_option]: C2: Kanon is in WAIT state after taking the wait option
+[parity_hearts_constants] FAIL:  test_ten_energy_constant_heart06
+[parity_hearts_constants] FAIL:  test_combined_energy_fifteen_heart02
+[parity_hearts_constants] FAIL:  test_combined_stage_count_constant_heart
+[parity_hearts_constants] FAIL:  test_setsuna_under_member_and_energy_over_six
+[parity_hearts_constants] FAIL:  test_per_waited_opponent_member_constant_heart06
+[parity_hearts_constants] FAIL:  test_six_heart_types_constant_all_heart
+[parity_hearts_constants] FAIL: spending back below the 10-energy threshold removes the heart06 gain (got 2 expected 0)
+[parity_hearts_constants] FAIL: combined energy >= 15 -> +2 heart02 (got 0 expected 2)
+[parity_hearts_constants] FAIL: 15 total cards incl. wait-state energy -> +2 heart02 (got 0 expected 2)
+[parity_hearts_constants] FAIL: Hanayo: combined energy = 15 -> +2 heart02 (got 0 expected 2)
+[parity_hearts_constants] FAIL: SP-PR-022: 6 combined members -> heart02
+[parity_hearts_constants] FAIL: SP-PR-022: 6 combined members -> heart03
+[parity_hearts_constants] FAIL: S-PR-042: 6 staged members -> heart02
+[parity_hearts_constants] FAIL: S-PR-042: 6 staged members -> heart04
+[parity_hearts_constants] FAIL: Karin: exactly 6 members -> +1 heart02 (got 0 expected 1)
+[parity_hearts_constants] FAIL: Karin: exactly 6 members -> +1 heart05 (got 0 expected 1)
+[parity_hearts_constants] FAIL: Karin x6: +1 heart02 across both stages (got 0 expected 1)
+[parity_hearts_constants] FAIL: Karin x6: +1 heart05 across both stages (got 0 expected 1)
+[parity_hearts_constants] FAIL: ab#1: 8 - 6 = 2 heart02 (got 1 expected 2)
+[parity_hearts_constants] FAIL: ab#1: 12 - 6 = 6 heart02 (got 1 expected 6)
+[parity_hearts_constants] FAIL: ab#1: 12 - 6 = 6 heart02 after the gain rises (got 1 expected 6)
+[parity_hearts_constants] FAIL: one waited opponent member -> exactly +1 heart06 (got 0 expected 1)
+[parity_hearts_constants] FAIL: the all-six-heart-types ability grants the icon_all (heart_color=all) heart
+[parity_hearts_live_start] FAIL:  a_area_moved_member_pl_sp_bp5_024_l
+[parity_hearts_live_start] FAIL:  a_hs_pr_029_pr_paid_energy
+[parity_hearts_live_start] FAIL:  a_cooking_bp7_028_l_condition_branches
+[parity_hearts_live_start] FAIL:  a_cooking_bp7_028_l_accept_and_decline
+[parity_hearts_live_start] FAIL:  a_fire_bird_four_blade_group_heart02
+[parity_hearts_live_start] FAIL:  b_himeno_bp5_006_same_group_pair
+[parity_hearts_live_start] FAIL:  b_himeno_bp5_006_skip_cost
+[parity_hearts_live_start] FAIL:  b_himeno_bp5_006_cost_moves_cards_to_waitroom
+[parity_hearts_live_start] FAIL:  b_himeno_bp5_006_stage_area_irrelevant
+[parity_hearts_live_start] FAIL:  b_himeno_bp5_006_rarity_variants
+[parity_hearts_live_start] FAIL:  b_rurino_bp5_003_discard_group_filter
+[parity_hearts_live_start] FAIL:  b_rurino_bp5_003_cross_unit_same_group
+[parity_hearts_live_start] FAIL:  b_himeno_bp5_006_hand_pair_filter
+[parity_hearts_live_start] FAIL:  b_bp6_001_r_discard_distinct_heart_colors
+[parity_hearts_live_start] FAIL:  b_umi_bp3_013_n_per_success_card
+[parity_hearts_live_start] FAIL:  b_setsuna_bp5_007_equal_success_counts
+[parity_hearts_live_start] FAIL:  b_hs_bp5_021_l_convert_selected_member
+[parity_hearts_live_start] FAIL: area-moved member gains the chosen heart until live end (got 3 expected 1)
+[parity_hearts_live_start] FAIL: paid -> heart01 until live end (got 0 expected 1)
+[parity_hearts_live_start] FAIL: LIVE card + blade-less member in discard -> the may-shuffle offer appears (got 0 expected 1)
+[parity_hearts_live_start] FAIL: the may-shuffle option is offered
+[parity_hearts_live_start] FAIL: all discard cards should be shuffled to the deck bottom (got 3 expected 0)
+[parity_hearts_live_start] FAIL: 3 discard cards go back to deck (got 0 expected 3)
+[parity_hearts_live_start] FAIL: every shuffled card landed in the deck
+[parity_hearts_live_start] FAIL: 虹ヶ咲 member A gains heart01 (got 0 expected 1)
+[parity_hearts_live_start] FAIL: 虹ヶ咲 member B gains heart01 (got 0 expected 1)
+[parity_hearts_live_start] FAIL: the may-shuffle option is offered
+[parity_hearts_live_start] FAIL: blade-3 member must NOT receive heart02 (got 2 expected 0)
+[parity_hearts_live_start] FAIL: no gain with a 2-blade member (got 2 expected 0)
+[parity_hearts_live_start] FAIL: a 蓮ノ空 pair in hand triggers the cost prompt (got 0 expected 1)
+[parity_hearts_live_start] FAIL: second selection prompt should appear
+[parity_hearts_live_start] FAIL: himeno heart01 after the cost is paid or skipped (got 0 expected 2)
+[parity_hearts_live_start] FAIL: a pair whose group differs from the holder's still qualifies (got 0 expected 1)
+[parity_hearts_live_start] FAIL: second selection prompt should appear
+[parity_hearts_live_start] FAIL: himeno heart01 after the cost is paid or skipped (got 0 expected 2)
+[parity_hearts_live_start] FAIL: cross-unit same-group pair (みらくらぱーく! + スリーズブーケ) (got 0 expected 1)
+[parity_hearts_live_start] FAIL: second selection prompt should appear
+[parity_hearts_live_start] FAIL: himeno heart01 after the cost is paid or skipped (got 0 expected 2)
+[parity_hearts_live_start] FAIL: the payable cost prompts
+[parity_hearts_live_start] FAIL: the cost prompt appears
+[parity_hearts_live_start] FAIL: the second selection prompt appears
+[parity_hearts_live_start] FAIL: both paid cost cards land in the waitroom
+[parity_hearts_live_start] FAIL: paying the pair costs 2 heart01 (got 0 expected 2)
+[parity_hearts_live_start] FAIL: himeno in the left area still pays the pair cost (got 0 expected 2)
+[parity_hearts_live_start] FAIL: himeno in the center area still pays the pair cost (got 0 expected 2)
+[parity_hearts_live_start] FAIL: himeno in the right area still pays the pair cost (got 0 expected 2)
+[parity_hearts_live_start] FAIL: the variant's cost prompt appears
+[parity_hearts_live_start] FAIL: PL!HS-bp5-006-P: paying the pair grants heart01 x2 (got 0 expected 2)
+[parity_hearts_live_start] FAIL: the variant's cost prompt appears
+[parity_hearts_live_start] FAIL: PL!HS-bp5-006-AR: paying the pair grants heart01 x2 (got 0 expected 2)
+[parity_hearts_live_start] FAIL: only みらくらぱーく! members (hs@0, rurino@1) are selectable, not Printemps@2
+[parity_hearts_live_start] FAIL: all three 蓮ノ空 members are selectable across different units
+[parity_hearts_live_start] FAIL: the cost prompt should appear as a hand SelectCard
+[parity_hearts_live_start] FAIL: the same-group pair cost is a card selection prompt
+[parity_hearts_live_start] FAIL: only the 蓮ノ空 pair (indices 0,1) is selectable, not the lone Printemps card
+[parity_hearts_live_start] FAIL: second selection prompt should appear
+[parity_hearts_live_start] FAIL: both same-group cards go to the waitroom
+[parity_hearts_live_start] FAIL: the activating card gains 2 heart01 (got 0 expected 2)
+[parity_hearts_live_start] FAIL: H02 from dia (got 0 expected 1)
+[parity_hearts_live_start] FAIL: H04 from kosuzu (got 0 expected 1)
+[parity_hearts_live_start] FAIL: H05 is shared and is counted ONCE (got 0 expected 1)
+[parity_hearts_live_start] FAIL: H06 from kosuzu (got 0 expected 1)
+[parity_hearts_live_start] FAIL: H02 from dia (subset case) (got 0 expected 1)
+[parity_hearts_live_start] FAIL: H04 from kosuzu (subset case) (got 0 expected 1)
+[parity_hearts_live_start] FAIL: H05 shared (subset case) (got 0 expected 1)
+[parity_hearts_live_start] FAIL: H06 from kosuzu (subset case) (got 0 expected 1)
+[parity_hearts_live_start] FAIL: H04 from the single kosuzu (got 0 expected 1)
+[parity_hearts_live_start] FAIL: H05 from the single kosuzu (got 0 expected 1)
+[parity_hearts_live_start] FAIL: H06 from the single kosuzu (got 0 expected 1)
+[parity_hearts_live_start] FAIL: 3 distinct hearts from the single kosuzu card (got 0 expected 3)
+[parity_hearts_live_start] FAIL: Umi's ability should create a heart-colour choice at live start
+[parity_hearts_live_start] FAIL: gained 3 heart01 (1 per 3 success-zone cards) (got 0 expected 3)
+[parity_hearts_live_start] FAIL: Q230: both success counts are 0 -> heart02 x2 gained (got 0 expected 2)
+[parity_hearts_live_start] FAIL: unequal success counts (P1=2, P2=1) -> condition fails -> no heart02 (got 2 expected 0)
+[parity_hearts_live_start] FAIL: PL!N-bp5-007-AR: equal zero success counts should grant heart02 twice (got 0 expected 2)
+[parity_hearts_live_start] FAIL: PL!N-bp5-007-P: equal zero success counts should grant heart02 twice (got 0 expected 2)
+[parity_hearts_live_start] FAIL: PL!N-bp5-007-SEC: equal zero success counts should grant heart02 twice (got 0 expected 2)
+[parity_hearts_live_start] FAIL: the FIRST selectable member is the one converted (got -1 expected 1)
+[parity_hearts_live_start] FAIL: the unselected member is NOT converted (got 1 expected -1)
+[parity_hearts_live_start] FAIL: the converted member is the first filtered index offered (got 0 expected 1)
+[parity_hearts_live_start] FAIL: the CENTRE member (picked index 1) is converted (got -1 expected 1)
+[parity_integration] FAIL:  test_natsumi_blades
+[parity_integration] FAIL:  test_hajimari_set_required_hearts
+[parity_integration] FAIL:  test_suzu_cost_bonus
+[parity_integration] FAIL:  test_izumi_debut_draw2_discard1
+[parity_integration] FAIL:  test_kanon_invalidate_and_recover
+[parity_integration] FAIL:  test_kanan_discard_gain_live
+[parity_integration] FAIL:  test_karin_ab1_select_from_discard
+[parity_integration] FAIL:  test_saikou_success_zone_scores
+[parity_integration] FAIL:  test_kokoro_cost_copy
+[parity_integration] FAIL:  test_karin_livestart_blade4_window
+[parity_integration] FAIL:  test_live_start_choice_routing_both_seats
+[parity_integration] FAIL: natsumi 6a: self gains 1 blade at energy 7 (got 0 expected 1)
+[parity_integration] FAIL: natsumi 6a: the other Liella! member also gains 1 blade (got 2 expected 1)
+[parity_integration] FAIL: natsumi 6b: with no other Liella! on stage, self still gains 1 blade (got 0 expected 1)
+[parity_integration] FAIL: natsumi 6d: the blade is registered during the performance (got 0 expected 1)
+[parity_integration] FAIL: hajimari 7a: heart02 is SET to 3 (set, not added) (got 0 expected 3)
+[parity_integration] FAIL: hajimari 7a: heart06 is SET to 3 (got 0 expected 3)
+[parity_integration] FAIL: hajimari 7a: a colour outside the set is untouched (got 3 expected 0)
+[parity_integration] FAIL: suzu 17a: 蓮ノ空 total 16 > opponent 12 -> heart05 granted (got 0 expected 1)
+[parity_integration] FAIL: izumi 9a: draw 2 then discard 1 is a net zero hand change (got 5 expected 4)
+[parity_integration] FAIL: izumi 9b: from an empty hand, draw 2 - discard 1 leaves exactly 1 (got 2 expected 1)
+[parity_integration] FAIL: kanon 1b: no Liella! on stage -> nothing is recovered (got 1 expected 0)
+[parity_integration] FAIL: kanon 1b: the waitroom keeps the Liella! card (got 0 expected 1)
+[parity_integration] FAIL: kanan 2a: discarding 1 hand card recovers exactly 1 live card (got 2 expected 1)
+[parity_integration] FAIL: karin ab#1: 1 waited member -> the waitroom loses exactly 1 card (got 1 expected 0)
+[parity_integration] FAIL: karin ab#1: the selected card lands on the deck TOP (got 498 expected 1472)
+[parity_integration] FAIL: karin ab#1: 3 waited / 1 available -> the waitroom loses exactly 1 card (got 1 expected 0)
+[parity_integration] FAIL: karin ab#1: the single available card lands on the deck TOP (got 498 expected 1472)
+[parity_integration] FAIL: karin ab#1: target=self — P1's waitroom loses 1 card (got 3 expected 2)
+[parity_integration] FAIL: karin ab#1: the card comes from P1's waitroom to P1's deck top (got 498 expected 1472)
+[parity_integration] FAIL: saikou: a score-2 card is neither 1 nor 5 -> no bonus (got 1 expected 0)
+[parity_integration] FAIL: kokoro: the holder's cost becomes the chosen member's ORIGINAL 17 - 1 (got 4 expected 16)
+[parity_integration] FAIL: kokoro: a cost of 16 satisfies 「10以上」 -> heart05 until live end (got 0 expected 1)
+[parity_integration] FAIL: kokoro boundary: 11 - 1 = 10, the inclusive 「10以上」 edge (got 4 expected 10)
+[parity_integration] FAIL: kokoro boundary: exactly 10 satisfies 「10以上」 (inclusive) (got 0 expected 1)
+[parity_integration] FAIL: kokoro below threshold: 10 - 1 = 9, the cost is still SET (got 4 expected 9)
+[parity_integration] FAIL: karin dual window: the ライブ開始時 window rests the exactly-blade-4 member (got 0 expected 1)
+[parity_integration] FAIL: routing: LiveStart with 3 abilities per side leaves a pending choice (got 0 expected 1)
+[parity_integration] FAIL: routing: P1's three ライブ開始時 abilities each raise their own heart-colour prompt
+[parity_int_gaps] FAIL:   a1_fewer_than_four_lands_on_deck
+[parity_int_gaps] FAIL:   a2_select_one_of_four
+[parity_int_gaps] FAIL:   a3_skip_full_pool_moves_nothing
+[parity_int_gaps] FAIL:   b1_toubatsu_live_start_chain
+[parity_int_gaps] FAIL:   c1_kinako_live_success_tuck
+[parity_int_gaps] FAIL:   d1_dazzling_first_selection
+[parity_int_gaps] FAIL:   f1_chika_examined_to_index3
+[parity_int_gaps] FAIL:   r1_mandatory_replacement
+[parity_int_gaps] FAIL:   r2_accepted_optional
+[parity_int_gaps] FAIL:   r4_applies_at_most_once
+[parity_int_gaps] FAIL:   r5_two_registrations
+[parity_int_gaps] FAIL: 「4枚まで好きな順番で」 -> count 4 (got 1 expected 4)
+[parity_int_gaps] FAIL: 『4枚まで…デッキの上に置いて』 -- the selected live card IS on the deck
+[parity_int_gaps] FAIL: and it left the waitroom
+[parity_int_gaps] FAIL: the deck is up by exactly one (got 29 expected 31)
+[parity_int_gaps] FAIL: the waitroom is down by exactly one (got 1 expected 0)
+[parity_int_gaps] FAIL: 「4枚まで好きな枚数」 -- exactly ONE selected card is on the deck (got 0 expected 1)
+[parity_int_gaps] FAIL: the deck grew by exactly one (Rust: 30 -> 31) (got 29 expected 31)
+[parity_int_gaps] FAIL: three unselected cards remain in the waitroom (Rust: 4 -> 3) (got 4 expected 3)
+[parity_int_gaps] FAIL: 「…置いてもよい」 — declining moves nothing to the deck (got 29 expected 30)
+[parity_int_gaps] FAIL: PAIRED POSITIVE: a centre member's area move arms 冬毬's own 自動 (a prompt is on screen)
+[parity_int_gaps] FAIL: 『自分のライブが成功する…とき…1枚、このメンバーの下に置く』 — exactly one card was tucked under her on ライブ成功時 (got 0 expected 1)
+[parity_int_gaps] FAIL: and it is the 『Liella!』 card that was in the waitroom
+[parity_int_gaps] FAIL: the tucked card left the waitroom
+[parity_int_gaps] FAIL: PAIRED POSITIVE / FINDING: after `[DISCARD_MOVE] moved=1 destination=under_member`, the 『Liella!』 card is under NOBODY. under_cards = [1 0 0]; her area is 0. So `move_cards` with destination=under_member reports the move and then does not populate under_cards -- or lands it outside the activating member's own area. The 自動 is NOT dead (it queued, it executed, it resolved a discard pick), so this red is about the placement, not the ability.
+[parity_int_gaps] FAIL: PAIRED POSITIVE: and the tucked card is the second 『Liella!』 member that was in the waitroom
+[parity_int_gaps] FAIL: Q187 selects from the STAGE (got zone "hand")
+[parity_int_gaps] FAIL: PAIRED POSITIVE: the member selected in step 1 gains ブレード (got 0)
+[parity_int_gaps] FAIL: Q187: the second selection (a 『Liella!』 member OTHER than the one just picked) is prompted
+[parity_int_gaps] FAIL: the member chosen in step 2 also gains ブレード (got 0)
+[parity_int_gaps] FAIL: 「4枚目に置いて」 is a fixed INDEX: the card that was at the deck's BOTTOM now sits at index 3 (deck[3]=2641, bottom was 2646; deck[0]=2646) (got 2641 expected 2646)
+[parity_int_gaps] FAIL: every other card is unmoved and in order: the reposition relocates the ONE examined card rather than reordering the deck
+[parity_int_gaps] FAIL: Rust: the alternate draw(1) executes and the original draw(2) is SUPPRESSED -> hand +1. C ran the original untouched (+2): rb_add_replacement_effect stores no alternate effect and there is no run_replacement_effects in src/. (got 2 expected 1)
+[parity_int_gaps] FAIL: Rust sets applied_this_event when a replacement fires; C never consults the registration, so it is left at 0 (got 0 expected 1)
+[parity_int_gaps] FAIL: Rust raises Choice::SelectTarget { target: "apply_replacement" } for an optional replacement. C raises nothing: there is no replacement runner to raise it.
+[parity_int_gaps] FAIL: accepting the optional replacement runs the alternate draw(1) and suppresses the original draw(2) (got 2 expected 1)
+[parity_int_gaps] FAIL: …and the registration is marked applied (got 0 expected 1)
+[parity_int_gaps] FAIL: Rust: the single registration replaces the event once -> hand +1 (got 2 expected 1)
+[parity_int_gaps] FAIL: …and is marked applied_this_event (got 0 expected 1)
+[parity_int_gaps] FAIL: Rust: both alternates run (1 + 2) and the original draw(4) is suppressed -> hand +3. C ran the original untouched (+4). (got 4 expected 3)
+[parity_int_gaps] FAIL: …and BOTH are marked applied_this_event (got 0 expected 1)
+[parity_jidou_life] FAIL:   a1_rina_copy_registers_once_after_withdraw_and_regrant
+[parity_jidou_life] FAIL:   a5_real_phase_walk_registers_and_fires_the_copy_once
+[parity_jidou_life] FAIL:   b1_all_four_rarities_reposition_the_opponent_member
+[parity_jidou_life] FAIL:   b2_own_member_position_choice_resolves
+[parity_jidou_life] FAIL:   b3_reposition_swaps_the_opponents_centre_and_left
+[parity_jidou_life] FAIL:   b4_baton_arriver_is_offered_a_position_change
+[parity_jidou_life] FAIL:   b5_baton_lone_arriver_still_offers_a_position_change
+[parity_jidou_life] FAIL:   b6_baton_offers_own_and_opponent_members
+[parity_jidou_life] FAIL:   b7_declined_reposition_preserves_the_opponent
+[parity_jidou_life] FAIL: A1: withdrawing the copy must not destroy a card -- the source is held out of the board by the fixture, not removed from it  (got 82, expected 83)
+[parity_jidou_life] FAIL: A5 PRECONDITION: the live's need_heart must be satisfied and the phase must be victory determination, or NO ?????? fires at all and every count below is vacuous
+[parity_jidou_life] FAIL: A5: the single registered copy must place exactly ONE energy card out of the energy deck (a duplicated registration would move two)  (got 3, expected 2)
+[parity_jidou_life] FAIL: A5: exactly one energy card reached the zone  (got 0, expected 1)
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-AR: the reposition must finish
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-AR: the opponent member moved to the left  (got -1, expected 2641)
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-AR: the opponent's centre is now empty  (got 2641, expected -1)
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-P: the reposition must finish
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-P: the opponent member moved to the left  (got -1, expected 2641)
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-P: the opponent's centre is now empty  (got 2641, expected -1)
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-R＋: the reposition must finish
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-R＋: the opponent member moved to the left  (got -1, expected 2641)
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-R＋: the opponent's centre is now empty  (got 2641, expected -1)
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-SEC: the reposition must finish
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-SEC: the opponent member moved to the left  (got -1, expected 2641)
+[parity_jidou_life] FAIL: B1 PL!HS-bp5-003-SEC: the opponent's centre is now empty  (got 2641, expected -1)
+[parity_jidou_life] FAIL: B2: the own-member position change must resolve and leave no prompt
+[parity_jidou_life] FAIL: B2: the own member must END UP at the chosen area. A reposition that resolves the prompt and moves nothing is the failure mode B1 and B3 also see, and an assertion that only checked 'no prompt is left' would pass on it  (got -1, expected 2640)
+[parity_jidou_life] FAIL: B3: the reposition must finish
+[parity_jidou_life] FAIL: B3: the CHOSEN (centre) member ends up on the left  (got 2644, expected 2643)
+[parity_jidou_life] FAIL: B3: the member that was on the left is displaced into the centre, not dropped -- a drop would show up here and on the census  (got 2643, expected 2644)
+[parity_jidou_life] FAIL: [VACUITY CONTROL] B4: the host's auto must offer a position change after a REAL baton touch  (control point was 0, only 0 prompt(s) on screen, so the absence this licenses proves nothing)
+[parity_jidou_life] FAIL: [VACUITY CONTROL] B5: the arriver IS on stage, so there is a valid target and the offer must appear even with no other members anywhere  (control point was 0, only 0 prompt(s) on screen, so the absence this licenses proves nothing)
+[parity_jidou_life] FAIL: [VACUITY CONTROL] B6: with an own member AND an opponent member on stage, the offer must name BOTH -- an own-stage-only reading would offer one, not two, so the prompt count here is what separates them  (control point was 0, only 0 prompt(s) on screen, so the absence this licenses proves nothing)
+[parity_jidou_life] FAIL: B7: no more choices after the skip
+[parity_jidou_move_yell] FAIL:   keke_opponent_effect_area_move_triggers_heart06
+[parity_jidou_move_yell] FAIL:   kinako_q94_debut_grants_two_blades
+[parity_jidou_move_yell] FAIL:   kinako_q94_debut_blades_expire_at_live_victory
+[parity_jidou_move_yell] FAIL:   kinako_q94_debut_then_swap_stacks_four_blades
+[parity_jidou_move_yell] FAIL:   shiki_auto_is_one_shot_per_waited_state
+[parity_jidou_move_yell] FAIL:   aspire_moved_liella_gains_blade_only
+[parity_jidou_move_yell] FAIL:   aspire_liella_and_non_liella_moved_only_liella_gains
+[parity_jidou_move_yell] FAIL:   fuyumari_appear_triggers_opponent_wait
+[parity_jidou_move_yell] FAIL:   fuyumari_area_move_triggers_opponent_wait
+[parity_jidou_move_yell] FAIL:   fuyumari_already_wait_excluded_from_candidates
+[parity_jidou_move_yell] FAIL:   special_color_set_blades_and_score_twin_in_one_live
+[parity_jidou_move_yell] FAIL:   kinako_tucks_group_member_under_self_on_area_move
+[parity_jidou_move_yell] FAIL:   awaken_only_matching_lives_are_filtered
+[parity_jidou_move_yell] FAIL:   wien_q112_real_yell_no_blade_heart_grants_heart03
+[parity_jidou_move_yell] FAIL:   daisuki_two_blade_hearts_prompts
+[parity_jidou_move_yell] FAIL:   daisuki_three_blade_hearts_blocks
+[parity_jidou_move_yell] FAIL:   daisuki_zero_blade_hearts_prompts
+[parity_jidou_move_yell] FAIL:   daisuki_accept_discard_then_re_yells
+[parity_jidou_move_yell] FAIL:   daisuki_skip_discard_no_re_yell
+[parity_jidou_move_yell] FAIL:   threshold_base_heart_only_does_not_count
+[parity_jidou_move_yell] FAIL:   threshold_duplicate_blade_heart_colors_do_not_stack
+[parity_jidou_move_yell] FAIL:   yell_two_blade_heartless_members_do_not_set_all_heart
+[parity_jidou_move_yell] FAIL:   live_revealed_with_eight_hand_cards_does_not_draw
+[parity_jidou_move_yell] FAIL:   jimoai_draw_2_discard_2
+[parity_jidou_move_yell] FAIL:   jimoai_draw_1_discard_1
+[parity_jidou_move_yell] FAIL:   miracle_wave_excess_heart_scores_four
+[parity_jidou_move_yell] FAIL:   dia_re_yell_works
+[parity_jidou_move_yell] FAIL:   dia_skip_discard_no_followup
+[parity_jidou_move_yell] FAIL: 「(対戦相手のカードの効果でも発動する。)」 — an opponent-caused move grants heart06 (got 0 expected 1)
+[parity_jidou_move_yell] FAIL: Q94: the 登場 leg grants blade x2 (got 0 expected 2)
+[parity_jidou_move_yell] FAIL: precondition: the debut granted blade x2 (got 0 expected 2)
+[parity_jidou_move_yell] FAIL: the grant survives UNTIL LiveVictoryDetermination ends (got 0 expected 2)
+[parity_jidou_move_yell] FAIL: the debut leg: +2 (got 0 expected 2)
+[parity_jidou_move_yell] FAIL: the OTHER member's debut must not touch the watcher (got 0 expected 2)
+[parity_jidou_move_yell] FAIL: Q94 CORE: debut (+2) + area move (+2) = exactly +4 (got 2 expected 4)
+[parity_jidou_move_yell] FAIL: the second, unarmed move: the swap must actually move her out of 0 (she is now at 0)
+[parity_jidou_move_yell] FAIL: the re-armed move: the swap must actually move her out of 0 (she is now at 0)
+[parity_jidou_move_yell] FAIL: the re-armed 自動 must fire on the next self-move — a gate that latches shut would leave her ウェイト状態 forever
+[parity_jidou_move_yell] FAIL: a moved 『Liella!』 member gains blade (got 0 expected 1)
+[parity_jidou_move_yell] FAIL: the moved 『Liella!』 member gains blade (got 0 expected 1)
+[parity_jidou_move_yell] FAIL: the 登場 leg waits exactly one opponent member whose blade is ≤ 3 (got 0 expected 1)
+[parity_jidou_move_yell] FAIL: the area-move leg waits the same single opponent member (got 0 expected 1)
+[parity_jidou_move_yell] FAIL: an already-ウェイト member is filtered out, so the other candidate is taken
+[parity_jidou_move_yell] FAIL: ab#0: the centre 『Liella!』 member has her blades set to 3 (got 0 expected 3)
+[parity_jidou_move_yell] FAIL: ab#1: the centre 『Liella!』 member moved this turn -> +1 score (got 0 expected 1)
+[parity_jidou_move_yell] FAIL: ab#0's blade set persists alongside ab#1's score (got 0 expected 3)
+[parity_jidou_move_yell] FAIL: the 『Liella!』 card must have left the waitroom via the 自動
+[parity_jidou_move_yell] FAIL: the 『Liella!』 card must be tucked under the subject after the move
+[parity_jidou_move_yell] FAIL: the prompt is raised
+[parity_jidou_move_yell] FAIL: a real yell revealing no blade heart grants heart03 DURING the live (got 0 expected 1)
+[parity_jidou_move_yell] FAIL: 「1枚以上公開」 + 「2枚以下」 -> the discard prompt appears (got 0 expected 1)
+[parity_jidou_move_yell] FAIL: 3 stage members -> 3 revealed cards (got 5 expected 3)
+[parity_jidou_move_yell] FAIL: 0 blade hearts ≤ 2 -> the discard prompt appears
+[parity_jidou_move_yell] FAIL: the discard prompt appears
+[parity_jidou_move_yell] FAIL: accepting the discard discards the revealed cards and re-yells (got 0 expected 1)
+[parity_jidou_move_yell] FAIL: the discard prompt appears
+[parity_jidou_move_yell] FAIL: cards with base_heart but NO blade_heart must NOT count toward the blade-heart-type condition (got 1 expected 0)
+[parity_jidou_move_yell] FAIL: 3 cards but only 2 DISTINCT blade-heart colours -> the threshold of 3 is not met (got 1 expected 0)
+[parity_jidou_move_yell] FAIL: only two qualifying members must not set HeartColor::All (got 1 expected 0)
+[parity_jidou_move_yell] FAIL: the reveal must not draw when the hand already holds 8 (got 1 expected 0)
+[parity_jidou_move_yell] FAIL: 2 『Aqours』 members -> draw 2 (got 0 expected 2)
+[parity_jidou_move_yell] FAIL: 1 『Aqours』 member -> draw 1 (got 0 expected 1)
+[parity_jidou_move_yell] FAIL: Q182: excess heart ≥ 2 -> the live scores exactly 4 (got 11 expected 4)
+[parity_jidou_move_yell] FAIL: no LIVE card among the revealed -> the optional discard prompt
+[parity_jidou_move_yell] FAIL: Q107: accepting the discard makes the re-yell follow (got 0 expected 1)
+[parity_jidou_move_yell] FAIL: the optional discard prompt is raised
+[parity_jidou_watch] FAIL:   hand_discard_batch_q241_two_discarded_auto_fires_once
+[parity_jidou_watch] FAIL:   hand_discard_batch_q241_three_discarded_fires_once
+[parity_jidou_watch] FAIL:   hand_discard_batch_q241_zero_discarded_no_trigger
+[parity_jidou_watch] FAIL:   deck_to_discard_self_recovery_accept_discards_one_and_recovers_self
+[parity_jidou_watch] FAIL:   deck_to_discard_self_recovery_recovers_only_self
+[parity_jidou_watch] FAIL:   real_deck_top_mill_offers_discard_and_recovers_self
+[parity_jidou_watch] FAIL:   real_hand_discard_does_not_trigger_deck_to_discard_self_recovery
+[parity_jidou_watch] FAIL:   q269_control_deck_to_discard_triggers
+[parity_jidou_watch] FAIL:   riko_q252_mixed_batch_filters_correctly
+[parity_jidou_watch] FAIL:   riko_q252_single_card_deck_top_exact_identity
+[parity_jidou_watch] FAIL:   riko_q252_turn_limit_blocks_second_trigger
+[parity_jidou_watch] FAIL:   riko_q252_decline_keeps_cards_in_waitroom
+[parity_jidou_watch] FAIL:   riko_q252_r_plus_printing_selects_the_second_card
+[parity_jidou_watch] FAIL:   ericho_gains_only_the_chosen_heart_two_per_success_card
+[parity_jidou_watch] FAIL:   ericho_gains_nothing_with_an_empty_success_zone
+[parity_jidou_watch] FAIL:   wakana_the_chosen_heart_replaces_her_printed_hearts
+[parity_jidou_watch] FAIL:   setsuna_self_baton_arrival_draws_one
+[parity_jidou_watch] FAIL:   setsuna_turn2_budget_two_draws_third_refused
+[parity_jidou_watch] FAIL:   other_member_baton_arrival_draws_one
+[parity_jidou_watch] FAIL:   sumire_draws_when_either_zone_condition_alone_holds
+[parity_jidou_watch] FAIL:   kosuzu_branch_is_decided_by_the_milled_cards
+[parity_jidou_watch] FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] the 登場 must have offered its 「好きな枚数」 hand select
+[parity_jidou_watch] FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] 好きな枚数 = 2: exactly 2 of the candidates reach the waitroom (got 3 expected 2)
+[parity_jidou_watch] FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] Q241: 2 cards discarded in one batch → the 自動 fires once (got 0 expected 1)
+[parity_jidou_watch] FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] Q241: 2 cards in one batch → blade exactly 1 (got 0 expected 1)
+[parity_jidou_watch] FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] ＋ printing: Q241 still fires once (got 0 expected 1)
+[parity_jidou_watch] FAIL: [hand_discard_batch_q241_two_discarded_auto_fires_once] ＋ printing: blade exactly 1 (got 0 expected 1)
+[parity_jidou_watch] FAIL: [hand_discard_batch_q241_three_discarded_fires_once] 好きな枚数 = 3: exactly 3 candidates reach the waitroom — pinned by IDENTITY, because 1 card would also fire the 自動 once (got 4 expected 3)
+[parity_jidou_watch] FAIL: [hand_discard_batch_q241_three_discarded_fires_once] Q241: 3 cards discarded in one batch still fires the 自動 once (got 0 expected 1)
+[parity_jidou_watch] FAIL: [hand_discard_batch_q241_three_discarded_fires_once] Q241: 3 cards in one batch → blade exactly 1 (got 0 expected 1)
+[parity_jidou_watch] FAIL: [hand_discard_batch_q241_zero_discarded_no_trigger] 0 chosen → no candidate reaches the waitroom (got 1 expected 0)
+[parity_jidou_watch] FAIL: [deck_to_discard_self_recovery_accept_discards_one_and_recovers_self] ミア is recovered to hand on accept
+[parity_jidou_watch] FAIL: [deck_to_discard_self_recovery_accept_discards_one_and_recovers_self] exactly the FIRST hand card (f1) is the one discarded
+[parity_jidou_watch] FAIL: [deck_to_discard_self_recovery_recovers_only_self] ミア is recovered to hand
+[parity_jidou_watch] FAIL: [real_deck_top_mill_offers_discard_and_recovers_self] ミア ab#0 must fire when a REAL deck_top→waitroom mill puts her in the waitroom
+[parity_jidou_watch] FAIL: [real_deck_top_mill_offers_discard_and_recovers_self] ミア is recovered to hand after accepting the optional
+[parity_jidou_watch] FAIL: [real_hand_discard_does_not_trigger_deck_to_discard_self_recovery] discarding ミア from HAND must NOT trigger her deck→waitroom ab#0
+[parity_jidou_watch] FAIL: [q269_control_deck_to_discard_triggers] control: the scan is live, so the Q269 negatives are about yell ≠ deck→waitroom and not about a dead scan
+[parity_jidou_watch] FAIL: [riko_q252_mixed_batch_filters_correctly] one 『Aqours』 ライブ in the batch satisfies the condition
+[parity_jidou_watch] FAIL: [riko_q252_mixed_batch_filters_correctly] the prompt after the filter is the deck placement step
+[parity_jidou_watch] FAIL: [riko_q252_mixed_batch_filters_correctly] the single 『Aqours』 ライブ is the one taken — the non-『Aqours』 ライブ, the 『Aqours』 member and the energy are all filtered out
+[parity_jidou_watch] FAIL: [riko_q252_single_card_deck_top_exact_identity] a single 『Aqours』 ライブ reaching the waitroom offers the placement
+[parity_jidou_watch] FAIL: [riko_q252_single_card_deck_top_exact_identity] the targeted live card leaves the waitroom
+[parity_jidou_watch] FAIL: [riko_q252_single_card_deck_top_exact_identity] nothing else is left in the waitroom (got 1 expected 0)
+[parity_jidou_watch] FAIL: [riko_q252_single_card_deck_top_exact_identity] the deck gains exactly one card (got 20 expected 21)
+[parity_jidou_watch] FAIL: [riko_q252_single_card_deck_top_exact_identity] the relocated live card really reached the deck (deck_top when the destination prompt resolves to index 0, deck_bottom otherwise)
+[parity_jidou_watch] FAIL: [riko_q252_turn_limit_blocks_second_trigger] first trigger: the placement prompt appears
+[parity_jidou_watch] FAIL: [riko_q252_turn_limit_blocks_second_trigger] first trigger: live_a is relocated
+[parity_jidou_watch] FAIL: [riko_q252_turn_limit_blocks_second_trigger] first trigger: live_a reached the deck
+[parity_jidou_watch] FAIL: [riko_q252_turn_limit_blocks_second_trigger] live_a is still on the deck, not displaced
+[parity_jidou_watch] FAIL: [riko_q252_decline_keeps_cards_in_waitroom] Q252: with 2 candidates the player is prompted to pick 1 (or skip)
+[parity_jidou_watch] FAIL: [riko_q252_r_plus_printing_selects_the_second_card] the ＋ printing raises the same selection prompt
+[parity_jidou_watch] FAIL: [riko_q252_r_plus_printing_selects_the_second_card] the prompt is the Q252 card selection
+[parity_jidou_watch] FAIL: [riko_q252_r_plus_printing_selects_the_second_card] picking index 1 really moves live2 out of the waitroom
+[parity_jidou_watch] FAIL: [ericho_gains_only_the_chosen_heart_two_per_success_card] precondition: the 3-way heart choice is actually offered
+[parity_jidou_watch] FAIL: [ericho_gains_only_the_chosen_heart_two_per_success_card] the FIRST option was not chosen, so heart04 is not granted — the assertion an 'applies all three' reading fails (got 2 expected 0)
+[parity_jidou_watch] FAIL: [ericho_gains_only_the_chosen_heart_two_per_success_card] and the middle option is not granted either (got 2 expected 0)
+[parity_jidou_watch] FAIL: [ericho_gains_nothing_with_an_empty_success_zone] precondition: the choice is offered regardless of the success zone
+[parity_jidou_watch] FAIL: [wakana_the_chosen_heart_replaces_her_printed_hearts] precondition: the 3-way heart choice is offered
+[parity_jidou_watch] FAIL: [wakana_the_chosen_heart_replaces_her_printed_hearts] 『元々持つハートは選んだハートになる』 — the chosen heart is applied as a duration-scoped colour override, replacing the heart06 she printed (got 0 expected 2)
+[parity_jidou_watch] FAIL: [setsuna_self_baton_arrival_draws_one] self baton-touch arrival draws exactly 1 (got 0 expected 1)
+[parity_jidou_watch] FAIL: [setsuna_self_baton_arrival_draws_one] one use is recorded (got 0 expected 1)
+[parity_jidou_watch] FAIL: [setsuna_turn2_budget_two_draws_third_refused] first firing draws (got 0 expected 1)
+[parity_jidou_watch] FAIL: [setsuna_turn2_budget_two_draws_third_refused] one use recorded (got 0 expected 1)
+[parity_jidou_watch] FAIL: [setsuna_turn2_budget_two_draws_third_refused] second firing draws (hand 1+1-1+1) (got 1 expected 2)
+[parity_jidou_watch] FAIL: [setsuna_turn2_budget_two_draws_third_refused] two uses recorded (got 0 expected 2)
+[parity_jidou_watch] FAIL: [setsuna_turn2_budget_two_draws_third_refused] and no third use is recorded (got 0 expected 2)
+[parity_jidou_watch] FAIL: [other_member_baton_arrival_draws_one] せつ菜 ab#0 draws 1 when ANOTHER member debuts via baton touch (got 0 expected 1)
+[parity_jidou_watch] FAIL: [sumire_draws_when_either_zone_condition_alone_holds] NEITHER clause: nothing is drawn, so the printed comma is not an AND that happens to be satisfied (got 1 expected 0)
+[parity_jidou_watch] FAIL: [kosuzu_branch_is_decided_by_the_milled_cards] 『それらがすべてメンバーカードの場合』 holds, so one card is drawn (got 0 expected 1)
+[parity_jidou_watch] FAIL: [kosuzu_branch_is_decided_by_the_milled_cards] 『すべてメンバーカード』 is false with one ライブ among the three, so NO card is drawn — the quantifier assertion (got 1 expected 0)
+[parity_jidou_watch] FAIL: [kosuzu_branch_is_decided_by_the_milled_cards] an under-supplied mill empties the deck rather than refusing (got 1 expected 0)
+[parity_jidou_watch] FAIL: [kosuzu_branch_is_decided_by_the_milled_cards] and a short mill is not read as a satisfied one — no draw (got 1 expected 0)
+[parity_jidou_watch_clusters] FAIL:   b2_joint_grant_expires_at_live_end
+[parity_jidou_watch_clusters] FAIL:   b4_hanamaru_grant_stays_single_then_expires
+[parity_jidou_watch_clusters] FAIL:   b5_honoka_grant_is_permanent_and_leaves_only_on_zone_exit
+[parity_jidou_watch_clusters] FAIL:   c2_kanon_invalidation_silences_then_restores
+[parity_jidou_watch_clusters] FAIL:   c3_kanon_invalidation_is_scoped_to_own_stage
+[parity_jidou_watch_clusters] FAIL:   d2_baton_touch_activates_energy_q167
+[parity_jidou_watch_clusters] FAIL:   e3_q277_control_no_refresh_recovers_milled_self
+[parity_jidou_watch_clusters] FAIL:   e5_q277_real_mill_refreshes_before_mia_auto_resolves
+[parity_jidou_watch_clusters] FAIL:   e6_real_deck_top_mill_declined_leaves_self_in_waitroom
+[parity_jidou_watch_clusters] FAIL:   e7_q241_one_discarded_fires_once
+[parity_jidou_watch_clusters] FAIL:   f1_selected_aqours_live_moves_to_deck
+[parity_jidou_watch_clusters] FAIL:   f2_simultaneous_moves_only_first_selected
+[parity_jidou_watch_clusters] FAIL:   f3_second_trigger_offers_no_choice
+[parity_jidou_watch_clusters] FAIL:   f4_mixed_types_keeps_member_and_non_group
+[parity_jidou_watch_clusters] FAIL:   f6_batch_of_three_first_only_taken
+[parity_jidou_watch_clusters] FAIL: B2 precondition: the walk crossed the live-end rollover — a grant armed outside a live never sees one, so this would assert nothing
+[parity_jidou_watch_clusters] FAIL: ライブ終了時まで is the whole duration: the +3 must not survive the live that granted it  (got 3, expected 0)
+[parity_jidou_watch_clusters] FAIL: B2: the registration must be cleared as well as the score  (got 1, expected 0)
+[parity_jidou_watch_clusters] FAIL: B4 precondition: the walk crossed a real victory determination
+[parity_jidou_watch_clusters] FAIL: B4: ライブ終了時まで must clear the grant  (got 2, expected 0)
+[parity_jidou_watch_clusters] FAIL: B4: the recipient's registration must be cleared as well as the score  (got 1, expected 0)
+[parity_jidou_watch_clusters] FAIL: B5 precondition: the live zone totals >= 8, so the ライブ開始時 must grant the +1 EXACTLY once — a doubled dispatch reads 2  (got 0, expected 1)
+[parity_jidou_watch_clusters] FAIL: B5 precondition: one granted ability  (got 0, expected 1)
+[parity_jidou_watch_clusters] FAIL: B5 round 1: the grant must not accumulate as scans repeat  (got 0, expected 1)
+[parity_jidou_watch_clusters] FAIL: B5 round 2: the grant must not accumulate as scans repeat  (got 0, expected 1)
+[parity_jidou_watch_clusters] FAIL: B5 round 3: the grant must not accumulate as scans repeat  (got 0, expected 1)
+[parity_jidou_watch_clusters] FAIL: B5 round 4: the grant must not accumulate as scans repeat  (got 0, expected 1)
+[parity_jidou_watch_clusters] FAIL: B5 round 5: the grant must not accumulate as scans repeat  (got 0, expected 1)
+[parity_jidou_watch_clusters] FAIL: this grant prints NO ライブ終了時まで, so it must SURVIVE a live end — expiring it here would silently drop a permanent +1 mid-match  (got 0, expected 1)
+[parity_jidou_watch_clusters] FAIL: [VACUITY CONTROL] C2: her debut must OFFER the optional invalidation -- a case in which nothing was offered has not armed anything  (control point was 0, only 0 prompt(s) on screen, so the absence this licenses proves nothing)
+[parity_jidou_watch_clusters] FAIL: C2: the prompt is a target SELECTION for the invalidation
+[parity_jidou_watch_clusters] FAIL: C3: the debut must offer the optional invalidation as a target selection
+[parity_jidou_watch_clusters] FAIL: D2 PRECONDITION: the two partners must differ on the printed group, which is the only difference between the boards
+[parity_jidou_watch_clusters] FAIL: Q167: on an otherwise identical board, a >=10 partner of the printed group must leave the active-energy counter 2 HIGHER than a cheap outsider does. The cost model is identical on both boards, so the whole difference is the 「2枚アクティブ」 the clause grants (qualifying 19, non-qualifying 19)  (got 0, expected 2)
+[parity_jidou_watch_clusters] FAIL: E3 CONTROL: MIA is still in the waitroom, so it IS recovered to hand
+[parity_jidou_watch_clusters] FAIL: Q277: the real mill must refresh MIA out of the waitroom into the deck BEFORE the auto resolves
+[parity_jidou_watch_clusters] FAIL: E6: MIA's ab#0 must STILL present its optional even when the answer will be to decline -- the prompt is not conditional on accepting
+[parity_jidou_watch_clusters] FAIL: E7 PRECONDITION: the debut must have offered its hand select -- a run in which no prompt appeared would make every count below vacuous
+[parity_jidou_watch_clusters] FAIL: E7: exactly ONE of the two candidates reaches the waitroom  (got 2, expected 1)
+[parity_jidou_watch_clusters] FAIL: Q241: 1 card discarded in one batch fires the auto exactly once (heart01 == 1)
+[parity_jidou_watch_clusters] FAIL: Q241: 1 card discarded gives blade exactly 1  (got 0, expected 1)
+[parity_jidou_watch_clusters] FAIL: F1: a single group-matching live reaching the waitroom offers the placement
+[parity_jidou_watch_clusters] FAIL: F1: the selected live card leaves the waitroom
+[parity_jidou_watch_clusters] FAIL: F1: nothing else is left behind in the waitroom  (got 1, expected 0)
+[parity_jidou_watch_clusters] FAIL: F1: the deck gains exactly one card  (got 20, expected 21)
+[parity_jidou_watch_clusters] FAIL: F1: the relocated live card really reached the deck
+[parity_jidou_watch_clusters] FAIL: F2: with 2 candidates the player is prompted to pick 1
+[parity_jidou_watch_clusters] FAIL: F2: picking index 1 really moves the SECOND card out of the waitroom
+[parity_jidou_watch_clusters] FAIL: F2: exactly one card reached the deck  (got 20, expected 21)
+[parity_jidou_watch_clusters] FAIL: F3 PRECONDITION: the first trigger really does offer the placement -- without it the per-turn limit is not exercised
+[parity_jidou_watch_clusters] FAIL: F3 PRECONDITION: the first trigger relocated it
+[parity_jidou_watch_clusters] FAIL: F3 PRECONDITION: and it reached the deck
+[parity_jidou_watch_clusters] FAIL: [VACUITY CONTROL] F3 CONTROL: the control point is read AFTER the first trigger's prompt was answered, so the absence below is not just a prompt that was never raised  (control point was 0, only 0 prompt(s) on screen, so the absence this licenses proves nothing)
+[parity_jidou_watch_clusters] FAIL: F3: and the first card is not displaced
+[parity_jidou_watch_clusters] FAIL: F4: one group-matching LIVE in the batch satisfies the condition
+[parity_jidou_watch_clusters] FAIL: F4: the group-matching LIVE is the one taken
+[parity_jidou_watch_clusters] FAIL: F4: exactly one card reached the deck  (got 20, expected 21)
+[parity_jidou_watch_clusters] FAIL: F6: the batch of 3 offers a single-card selection
+[parity_jidou_watch_clusters] FAIL: F6: the FIRST card is the one taken
+[parity_jidou_watch_clusters] FAIL: F6: exactly two of the three remain in the waitroom  (got 3, expected 2)
+[parity_jidou_watch_clusters] FAIL: F6: exactly one card reached the deck  (got 20, expected 21)
+[parity_live_total] FAIL:   C_muse_two_original_blade_side_members_adds_one
+[parity_live_total] FAIL:   D1_kasumi_alone_on_both_stages_gains_score
+[parity_live_total] FAIL:   D2_kasumi_with_lower_opponent_gains
+[parity_live_total] FAIL:   D6_kasumi_with_own_side_higher_no_gain
+[parity_live_total] FAIL:   G2_opponent_surplus_exactly_two_grants
+[parity_live_total] FAIL:   I1_chisato_liella_move_grants_score
+[parity_live_total] FAIL:   I7_chisato_move_and_live_success_gives_score
+[parity_live_total] FAIL:   J2_wait_member_outside_center_cannot_pay_or_gain
+[parity_live_total] FAIL:   J3_wait_member_selected_cost_target_stays_on_stage
+[parity_live_total] FAIL:   J4_wait_member_selected_cost_target_grants_exactly_one
+[parity_live_total] FAIL:   J5_wait_member_right_target_waits_without_affecting_others
+[parity_live_total] FAIL:   J6_wait_member_second_activation_cannot_stack
+[parity_live_total] FAIL:   J7_wait_member_baton_removes_recipient_loses_score
+[parity_live_total] FAIL:   J8_wait_member_baton_removes_source_recipient_keeps_score
+[parity_live_total] FAIL:   K1_joint_discard_three_gains_score3
+[parity_live_total] FAIL:   K2_joint_discard_two_gains_score3
+[parity_live_total] FAIL:   K5_joint_discard_mixed_named_gains_score3
+[parity_live_total] FAIL:   K6_joint_hand_copy_counts_as_named_card
+[parity_live_total] FAIL: blade-2 members in BOTH side areas -> live total +1 (got 0 expected 1)
+[parity_live_total] FAIL: control: only the left side filled -> no live-total bonus (got 1 expected 0)
+[parity_live_total] FAIL: Kasumi alone on both stages -> +1 live total (got 0 expected 1)
+[parity_live_total] FAIL: Kasumi (6) > opponent filler (2) -> +1 (got 0 expected 1)
+[parity_live_total] FAIL: a member on her OWN side with more hearts disqualifies her (got 1 expected 0)
+[parity_live_total] FAIL: surplus exactly 2 (7 hearts - 5 needed) -> the bonus applies (got 0 expected 1)
+[parity_live_total] FAIL: a Liella! effect moved Chisato -> live total +1 (got 0 expected 1)
+[parity_live_total] FAIL: a Liella! move this turn plus ライブ成功時 -> live total +1 (got 0 expected 1)
+[parity_live_total] FAIL: no orientation modifier is granted outside the center
+[parity_live_total] FAIL: no live-total bonus outside the center (got 1 expected 0)
+[parity_live_total] FAIL: control: with two own members the cost does prompt for a target
+[parity_live_total] FAIL: the selected target is in wait orientation
+[parity_live_total] FAIL: the source is not waited
+[parity_live_total] FAIL: control: the cost prompt is raised
+[parity_live_total] FAIL: control: the cost prompt is raised
+[parity_live_total] FAIL: the RIGHT target is the one waited
+[parity_live_total] FAIL: the unselected source is unaffected
+[parity_live_total] FAIL: control: the first activation prompts
+[parity_live_total] FAIL: control: the selected member is waiting
+[parity_live_total] FAIL: control: the source is not waited
+[parity_live_total] FAIL: the first waited member is still waiting
+[parity_live_total] FAIL: the source is still not waited
+[parity_live_total] FAIL: control: the cost prompt is raised
+[parity_live_total] FAIL: control: the gained ability is registered on the RECIPIENT
+[parity_live_total] FAIL: removing the recipient immediately removes the live-total +1 (got 1 expected 0)
+[parity_live_total] FAIL: control: the cost prompt is raised
+[parity_live_total] FAIL: the recipient is STILL waited after the source leaves
+[parity_live_total] FAIL: three cards were discarded (got 3 expected 1)
+[parity_live_total] FAIL: two cards were discarded (got 2 expected 1)
+[parity_live_total] FAIL: two mixed cards discarded (got 2 expected 1)
+[parity_live_total] FAIL: the self-copy plus 澁谷かのん were discarded (got 2 expected 1)
+[parity_live_total2] FAIL:  001_empty_success_zone_fires_nothing
+[parity_live_total2] FAIL:  041_three_lily_white_success_cards_still_one
+[parity_live_total2] FAIL:  039_the_live_success_harness_fires_the_ability
+[parity_live_total2] FAIL:  038_in_live_zone_with_two_mus_also_plus_one
+[parity_live_total2] FAIL:  038_three_members_do_not_satisfy_exactly_two
+[parity_live_total2] FAIL: there is nothing in the zone to key on
+[parity_live_total2] FAIL: live-start driver: never reached the live-card set phase (stopped at Energy)
+[parity_live_total2] FAIL: 2枚以上 gates the effect on once -- three qualifying cards must still be +1, not +2 (got -999 expected 1)
+[parity_live_total2] FAIL: live-start driver: never reached the live-card set phase (stopped at Energy)
+[parity_live_total2] FAIL: POSITIVE CONTROL: 2 differently-named mu's members must give +2 score (Rust records +0 for every case in this file -- see the header; if this line is red, the per-unit + group-filtered modify_score path is still the unfixed general gap the Rust documents) (got 0 expected 2)
+[parity_live_total2] FAIL: ライブカード置き場**か**成功ライブカード置き場 -- the live card zone is the other half of the same disjunction, so it scores too (got 0 expected 1)
+[parity_live_total2] FAIL: 2人のみ is a count of exactly two, so three mu's members must NOT qualify (got 1 expected 0)
+[parity_recover_live] FAIL:   b_aqours_high_activates
+[parity_recover_live] FAIL:   b_partial_activation
+[parity_recover_live] FAIL:   c_insufficient_energy
+[parity_recover_live] FAIL:   c_score7_excluded
+[parity_recover_live] FAIL:   h_seras_pay
+[parity_recover_live] FAIL:   h_cl1002_accept
+[parity_recover_live] FAIL:   h_cl1002_decline
+[parity_recover_live] FAIL:   k_q237_104_to_base
+[parity_recover_live] FAIL:   k_q237_105_to_104
+[parity_recover_live] FAIL:   k_q237_104_to_105
+[parity_recover_live] FAIL:   k_butterfly_not
+[parity_recover_live] FAIL:   k_link_not
+[parity_recover_live] FAIL:   k_no_match
+[parity_recover_live] FAIL:   l_heart06_too_low
+[parity_recover_live] FAIL:   l_no_eligible
+[parity_recover_live] FAIL:   m_accept_adds_niji
+[parity_recover_live] FAIL:   m_decline_nothing
+[parity_recover_live] FAIL:   n2_card_type_ignored
+[parity_recover_live] FAIL:   n4_diff_group_names
+[parity_recover_live] FAIL: b: 『Aqours』 score>=6 fetched -> activate 4 (2+4=6) (got 2 expected 6)
+[parity_recover_live] FAIL: b: activate 4 requested but only 2 waited energies exist -> Q167 partial resolution activates those 2 (1+2=3) (got 1 expected 3)
+[parity_recover_live] FAIL: c: nothing was recovered
+[parity_recover_live] FAIL: c: the live card did not reach the hand
+[parity_recover_live] FAIL: [VACUOUS]  c: the activation must have reached the engine before a 'score 7 was not recovered' claim means anything - only 0 prompt(s) were offered, need 1
+[parity_recover_live] FAIL: h: the recovery selection must be offered after the cost is paid
+[parity_recover_live] FAIL: h: expected a SelectCard recovery (got )
+[parity_recover_live] FAIL: h: paying must open the recovery selection
+[parity_recover_live] FAIL: h: DEFECT - the optional E answered with PAY was not tapped (got 5 expected 4)
+[parity_recover_live] FAIL: h: declined -> the card stays in the waitroom
+[parity_recover_live] FAIL: k: Q237: PL!HS-bp1-019-L must NOT be recovered from PL!HS-bp5-017-L
+[parity_recover_live] FAIL: k: Q237: the target stays in the waitroom
+[parity_recover_live] FAIL: k: Q237 cross-variant: PL!HS-bp5-017-L must NOT be recovered from PL!HS-sd1-018-SD
+[parity_recover_live] FAIL: k: Q237 cross-variant: the target stays in the waitroom
+[parity_recover_live] FAIL: k: Q237 cross-variant reverse: PL!HS-sd1-018-SD must NOT be recovered from PL!HS-bp5-017-L
+[parity_recover_live] FAIL: k: Q237 cross-variant reverse: the target stays in the waitroom
+[parity_recover_live] FAIL: k: Butterfly Wing -> Butterfly: PL!N-bp1-028-L must NOT be recovered from PL!SP-pb2-046-L
+[parity_recover_live] FAIL: k: Butterfly Wing -> Butterfly: the target stays in the waitroom
+[parity_recover_live] FAIL: k: Link to the FUTURE 104 -> base: PL!HS-bp2-020-L must NOT be recovered from PL!HS-sd1-020-SD
+[parity_recover_live] FAIL: k: Link to the FUTURE 104 -> base: the target stays in the waitroom
+[parity_recover_live] FAIL: k: a mismatched live card should not be recovered
+[parity_recover_live] FAIL: k: the mismatched live stays in the waitroom
+[parity_recover_live] FAIL: l: only the 2 cost cards left the hand (got 1 expected 2)
+[parity_recover_live] FAIL: l: the hand ends with the 2 unrecovered cost cards (got 1 expected 2)
+[parity_recover_live] FAIL: m: the ab#1 optional must be offered after a 虹ヶ咲 live is moved
+[parity_recover_live] FAIL: m: accepting adds the 虹ヶ咲 live card to hand
+[parity_recover_live] FAIL: m: accepting grants +1 score (got 0 expected 1)
+[parity_recover_live] FAIL: m: exactly one copy of the 虹ヶ咲 live card is in hand (got 0 expected 1)
+[parity_recover_live] FAIL: m: ab#1 must present its optional even when declined
+[parity_recover_live] FAIL: n2: the recovery prompt must open
+[parity_recover_live] FAIL: n2: DEFECT - every waitroom card is a candidate, including the member; only 0 live cards exist (got 0 expected 2)
+[parity_recover_live] FAIL: n2: DEFECT - a member card IS offered as a candidate slot
+[parity_recover_live] FAIL: n4: DEFECT - a μ's card was recovered even though the stage holds a μ's member; group_reference=different_group_names is not implemented on the move path, so the card_type=card filter matches the whole waitroom (got 0 expected 1)
+[parity_required_hearts] FAIL:  c_six_distinct_reduce_two
+[parity_required_hearts] FAIL: [vacuous]  c_five_plus_duplicate  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL: [vacuous]  c_five_plus_renosora_live  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL: [vacuous]  c_five_plus_wrong_group  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL:  d_mirage_two_baton_heart05
+[parity_required_hearts] FAIL: [vacuous]  d_mirage_one_baton  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL: [vacuous]  d_mirage_non_renosora  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL: [vacuous]  d_mirage_renosora_no_baton  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL:  d_kokon_two_baton_heart01
+[parity_required_hearts] FAIL: [vacuous]  f_center_zero_heart03  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL: [vacuous]  f_no_center_member  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL: [vacuous]  f_center_non_mus  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL:  i_two_appeared_reduce_2
+[parity_required_hearts] FAIL:  i_one_both_flags_once
+[parity_required_hearts] FAIL:  i_position_change_swap
+[parity_required_hearts] FAIL:  i_mixed_qualifying
+[parity_required_hearts] FAIL: [vacuous]  i_no_qualifying  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL:  i_three_qualify_reduce_3
+[parity_required_hearts] FAIL:  i_moved_without_appearing
+[parity_required_hearts] FAIL: [vacuous]  i_neither_appeared_nor_moved  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL: [vacuous]  i_appeared_then_left  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL:  i_one_left_one_stays
+[parity_required_hearts] FAIL:  k_riko_condition_not_met
+[parity_required_hearts] FAIL: [vacuous]  l_heart02_lt5_no_effect  <-- no reported failures, but a negative assertion could not be proven non-vacuous
+[parity_required_hearts] FAIL: six distinct 蓮ノ空 stage+waitroom members -> -2 (got 0 expected -2)
+[parity_required_hearts] FAIL: [vacuous] c_five_plus_duplicate -- this zero is NOT proven non-vacuous: its paired positive (c_six_distinct_reduce_two) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: [vacuous] c_five_plus_renosora_live -- this zero is NOT proven non-vacuous: its paired positive (c_six_distinct_reduce_two) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: [vacuous] c_five_plus_wrong_group -- this zero is NOT proven non-vacuous: its paired positive (c_six_distinct_reduce_two) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: HNS_C arrives at the centre (second baton touch -- the printed one-baton-per-turn rule makes this unreachable in C) (got 0 expected 1)
+[parity_required_hearts] FAIL: two baton-touch 蓮ノ空 arrivals -> need heart05 is -1 (got 0 expected -1)
+[parity_required_hearts] FAIL: [vacuous] d_mirage_one_baton -- this zero is NOT proven non-vacuous: its paired positive (d_mirage_two_baton_heart05) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: [vacuous] d_mirage_non_renosora -- this zero is NOT proven non-vacuous: its paired positive (d_mirage_two_baton_heart05) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: [vacuous] d_mirage_renosora_no_baton -- this zero is NOT proven non-vacuous: its paired positive (d_mirage_two_baton_heart05) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: HNS_C arrives at the centre (second baton touch -- unreachable in C, see the note in d_mirage_two_baton_heart05) (got 0 expected 1)
+[parity_required_hearts] FAIL: ココン東西 reduces the heart01 requirement by 1 (got 0 expected -1)
+[parity_required_hearts] FAIL: [vacuous] f_center_rin_zero_heart03 -- this zero is NOT proven non-vacuous: its paired positive (f_center_two_heart03_reduces_1) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: [vacuous] f_no_center_member -- this zero is NOT proven non-vacuous: its paired positive (f_center_two_heart03_reduces_1) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: [vacuous] f_center_non_mus -- this zero is NOT proven non-vacuous: its paired positive (f_center_two_heart03_reduces_1) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: two appeared 5yncri5e! members -> -2 (got 0 expected -2)
+[parity_required_hearts] FAIL: Q99: a member that both appeared AND moved counts ONCE -> -1 (got 0 expected -1)
+[parity_required_hearts] FAIL: a position change makes the second member countable -> -2 (got 0 expected -2)
+[parity_required_hearts] FAIL: the non-5yncri5e! member does not count -> -2, not -3 (got 0 expected -2)
+[parity_required_hearts] FAIL: [vacuous] i_no_qualifying -- this zero is NOT proven non-vacuous: its paired positive (i_two_appeared_reduce_2) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: three qualifying members -> -3 (got 0 expected -3)
+[parity_required_hearts] FAIL: the swapped-out 四季 counts as MOVED -> -2 (got 0 expected -2)
+[parity_required_hearts] FAIL: [vacuous] i_neither_appeared_nor_moved -- this zero is NOT proven non-vacuous: its paired positive (i_two_appeared_reduce_2) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: [vacuous] i_appeared_then_left -- this zero is NOT proven non-vacuous: its paired positive (i_two_appeared_reduce_2) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: Q98: only 夏美 is on stage -> -1 (got 0 expected -1)
+[parity_required_hearts] FAIL: CONTROL: with the PRINTED gate satisfied the opponent's live card does get +1, so the zero above is a gate verdict (got 0 expected 1)
+[parity_required_hearts] FAIL: [vacuous] l_heart02_lt5 -- this zero is NOT proven non-vacuous: its paired positive (l_heart02_ge5_increase) is red in the same run, so the assertion cannot distinguish a real gate rejection from an effect that never applies.
+[parity_required_hearts] FAIL: 13 negative assertion(s) could not be proven non-vacuous (see the VACUOUS lines above)
+[parity_sequential] FAIL:   a_shortfall_mill_then_recover
+[parity_sequential] FAIL:   a_no_live_no_prompt
+[parity_sequential] FAIL:   a_waitroom_seven_mills_one
+[parity_sequential] FAIL:   b_deficit_mill_then_recovery
+[parity_sequential] FAIL:   b_deficit_without_live
+[parity_sequential] FAIL:   c_q226_clamp_and_skip
+[parity_sequential] FAIL:   d_cost_total_8_all_heart
+[parity_sequential] FAIL:   d_cost_total_25_live_score
+[parity_sequential] FAIL:   d_cost_total_6_draws_only
+[parity_sequential] FAIL:   d_declined_keeps_waitroom
+[parity_sequential] FAIL:   d_own_discard_only
+[parity_sequential] FAIL:   e_mill_one_live_stop
+[parity_sequential] FAIL:   e_two_iterations_stop
+[parity_sequential] FAIL:   e_bounded_at_five_mills
+[parity_sequential] FAIL:   e_never_waits_others
+[parity_sequential] FAIL:   e_position_ends
+[parity_sequential] FAIL:   f_live_start_score_two
+[parity_sequential] FAIL:   h_opponent_picks_first
+[parity_sequential] FAIL:   h_one_live_card_fails
+[parity_sequential] FAIL:   h_opponent_picks_second
+[parity_sequential] FAIL:   h_duplicate_names_stay
+[parity_sequential] FAIL:   i_discard_to_three_draw_three
+[parity_sequential] FAIL:   i_no_baton_no_trigger
+[parity_sequential] FAIL:   j_keep_three_draw_three
+[parity_sequential] FAIL:   m_blade_then_heart06
+[parity_sequential] FAIL:   o_baton_touch_places_under
+[parity_sequential] FAIL:   p_discard_two_draw_three
+[parity_sequential] FAIL:   q_reveal_until_live
+[parity_sequential] FAIL:   s_places_energy_under_draws
+[parity_sequential] FAIL: A1: waitroom 5 of 8 -> mill exactly the 3-card shortfall (got 5 expected 8)
+[parity_sequential] FAIL: A1: the second step (recover the milled live) prompts
+[parity_sequential] FAIL: A1: the recovery step is a SelectCard
+[parity_sequential] FAIL: A1: the recovery step selects out of the waitroom
+[parity_sequential] FAIL: A1: accepting returns the MILLED live card to the deck TOP (step 2 observes step 1's result) (got 2639 expected 509)
+[parity_sequential] FAIL: A1 control: the decline fixture also prompts
+[parity_sequential] FAIL: A1 control: the decline really answered a prompt
+[parity_sequential] FAIL: A1: declining …してもよい keeps the milled live card in the waitroom
+[parity_sequential] FAIL: A1: a declined recovery puts nothing on the deck
+[parity_sequential] FAIL: A2: waitroom 2 of 8 -> mill exactly 6 (got 2 expected 8)
+[parity_sequential] FAIL: A4: waitroom 7 of 8 -> mill exactly 1 (got 7 expected 8)
+[parity_sequential] FAIL: A4: the one milled card IS a live card -> the recovery step prompts
+[parity_sequential] FAIL: B1: the recovery step prompts after the play
+[parity_sequential] FAIL: B1: the recovery step is a SelectCard over the waitroom
+[parity_sequential] FAIL: B1: the live card among the just-milled cards lands on the deck top (got 2644 expected 509)
+[parity_sequential] FAIL: B2 control: the same optional prompt appears
+[parity_sequential] FAIL: B2 control: the decline really answered a prompt
+[parity_sequential] FAIL: B2: declining …してもよい keeps the live card out of the deck
+[parity_sequential] FAIL: B3: waitroom 5 of 8 -> mill 3 even with no live card involved (got 5 expected 8)
+[parity_sequential] FAIL: C3: only the pre-existing filler is in the waitroom (got 3 expected 1)
+[parity_sequential] FAIL: D1: the optional two-member cost prompts
+[parity_sequential] FAIL: D1 control: the cost really was a prompt, so the reward below is not a vacuous zero reading
+[parity_sequential] FAIL: D1: the two cost members moved in (got 0 expected 2)
+[parity_sequential] FAIL: D: net deck growth for this branch (two cost members net of this branch's own reward) (got 20 expected 2)
+[parity_sequential] FAIL: D: 好きな順番でデッキの一番下に置いてもよい -> BOTH paid members are in the deck
+[parity_sequential] FAIL: D1: 合計が8の場合、ライブ終了時まで、ハートを得る (got 0 expected 1)
+[parity_sequential] FAIL: D1 control: the declined fixture also prompts
+[parity_sequential] FAIL: D1 control: the decline answered a real prompt
+[parity_sequential] FAIL: D2: the optional two-member cost prompts
+[parity_sequential] FAIL: D2 control: the cost was a real prompt
+[parity_sequential] FAIL: D: net deck growth for this branch (two cost members net of this branch's own reward) (got 20 expected 2)
+[parity_sequential] FAIL: D: 好きな順番でデッキの一番下に置いてもよい -> BOTH paid members are in the deck
+[parity_sequential] FAIL: D: at least one paid member is the deck's LAST card (bottom)
+[parity_sequential] FAIL: D2: 合計が25の場合、ライブ終了時まで、「ライブの合計スコアを＋１する。」を得る (got 0 expected 1)
+[parity_sequential] FAIL: D3: the optional two-member cost prompts
+[parity_sequential] FAIL: D3 control: the cost was a real prompt
+[parity_sequential] FAIL: D3: 2 paid, 1 drawn back -> +1 (got 0 expected 1)
+[parity_sequential] FAIL: D: net deck growth for this branch (two cost members net of this branch's own reward) (got 20 expected 1)
+[parity_sequential] FAIL: D: 好きな順番でデッキの一番下に置いてもよい -> BOTH paid members are in the deck
+[parity_sequential] FAIL: D: at least one paid member is the deck's LAST card (bottom)
+[parity_sequential] FAIL: D4: the optional cost prompts
+[parity_sequential] FAIL: D4 control: the decline answered a real prompt
+[parity_sequential] FAIL: D4: declining …してもよい leaves both members put (got 0 expected 2)
+[parity_sequential] FAIL: D4: both cost members are still the same two waitroom cards
+[parity_sequential] FAIL: D5: the optional two-member cost prompts
+[parity_sequential] FAIL: D5 control: the cost was a real prompt
+[parity_sequential] FAIL: D5: BOTH own-discard members moved to the DECK BOTTOM
+[parity_sequential] FAIL: E2: a repeat gate follows the first mill
+[parity_sequential] FAIL: E2: そうした場合 — the milled card IS a live card -> this member waits
+[parity_sequential] FAIL: E4: iter 0 repeat gate prompts
+[parity_sequential] FAIL: E4: iter 1 mill gate prompts (the sequential tail survived the pause)
+[parity_sequential] FAIL: E4 control: three-or-more gates were really answered, so the blade count below is not a no-op artefact
+[parity_sequential] FAIL: E4: 2 cards milled (got 4 expected 3)
+[parity_sequential] FAIL: E4: 2 blades gained (one per mill) (got 1 expected 2)
+[parity_sequential] FAIL: E4: the wait from iter 1's live mill persists
+[parity_sequential] FAIL: E5 control: five mill gates were really answered (max_repeats=4)
+[parity_sequential] FAIL: E5: 5 cards milled (initial + 4 repeats) (got 9 expected 5)
+[parity_sequential] FAIL: E5: 5 blades gained (one per mill) (got 1 expected 5)
+[parity_sequential] FAIL: E5: milling live cards waits this member
+[parity_sequential] FAIL: E6 control: five mill gates were really answered
+[parity_sequential] FAIL: E6: 5 blades gained (got 0 expected 5)
+[parity_sequential] FAIL: E6: only 鬼塚夏美 is waited
+[parity_sequential] FAIL: E7a: the left position still waits
+[parity_sequential] FAIL: E7b: the right position still waits
+[parity_sequential] FAIL: F7: score 3 does NOT satisfy the score<=2 gate
+[parity_sequential] FAIL: H1: step 1 is routed to the ACTIVATOR (p1)
+[parity_sequential] FAIL: H1: step 2 (opponent picks 1 of the 2) prompts
+[parity_sequential] FAIL: H1 control: step 2 really prompted
+[parity_sequential] FAIL: H1: the opponent's chosen card reaches the ACTIVATOR's hand
+[parity_sequential] FAIL: H1: at least one live card left the waitroom
+[parity_sequential] FAIL: H2: Q118 — with fewer than 2 distinct live cards NO prompt is created
+[parity_sequential] FAIL: H3 control: the opponent's pick really prompted
+[parity_sequential] FAIL: H3: exactly one of the three distinct lives reaches hand
+[parity_sequential] FAIL: H4: the hand must contain one of the two DISTINCT picks
+[parity_sequential] FAIL: I3: 4 hand - 1 played = 3, an EQUAL-cost baton touch must not trigger the ability (got 6 expected 3)
+[parity_sequential] FAIL: I3: the opponent is never touched either (got 3 expected 0)
+[parity_sequential] FAIL: I4: 4 hand - 1 played = 3, no baton touch -> no draw from the ability (got 6 expected 3)
+[parity_sequential] FAIL: I4: the opponent is never touched (got 3 expected 0)
+[parity_sequential] FAIL: J1: P1 — 1 card shuffled under the deck, 3 drawn (got 1 expected 6)
+[parity_sequential] FAIL: J1: P2 — 1 card shuffled under their own deck, 3 drawn (got 4 expected 6)
+[parity_sequential] FAIL: J2: P1 — nothing under, drew 3 (got 1 expected 5)
+[parity_sequential] FAIL: J2: P2 — nothing under, drew 3 (got 2 expected 5)
+[parity_sequential] FAIL: J4: P1 — kept all 3, drew 3 (got 1 expected 6)
+[parity_sequential] FAIL: J4: P2 — kept all 3, drew 3 (got 3 expected 6)
+[parity_sequential] FAIL: J4: P1 deck — 3 drawn, nothing moved under (got 14 expected 7)
+[parity_sequential] FAIL: J4: P2 deck — 3 drawn, nothing under (got 10 expected 7)
+[parity_sequential] FAIL: M2 control: the blade target really prompted
+[parity_sequential] FAIL: M2: the only member gets +2 blades (got 4 expected 2)
+[parity_sequential] FAIL: M3: exactly 1 member gets heart06 (got 2 expected 1)
+[parity_sequential] FAIL: M3: the same-name duplicate (e3) must not be the heart06 target (got 2 expected 0)
+[parity_sequential] FAIL: M4: same-name only -> no heart06 (no differently-named member) (got 2 expected 0)
+[parity_sequential] FAIL: O1: the 『Liella!』 member is placed UNDER her
+[parity_sequential] FAIL: O1: it is not left in the waitroom
+[parity_sequential] FAIL: P1: the 好きな枚数 select is a SelectCard
+[parity_sequential] FAIL: P1 control: the 好きな枚数 select really prompted
+[parity_sequential] FAIL: P1: 好きな枚数 = 2 -> exactly two of the candidates reach the waitroom (got 0 expected 2)
+[parity_sequential] FAIL: P1: exactly one candidate is left in hand (got 0 expected 1)
+[parity_sequential] FAIL: P1: その後、その枚数に1を足した枚数 — 2 + 1 = 3 cards left the deck (got 5 expected 3)
+[parity_sequential] FAIL: P2: the 好きな枚数 select prompts
+[parity_sequential] FAIL: P2 control: choosing 0 answered a real prompt
+[parity_sequential] FAIL: P2: the candidate is still in hand
+[parity_sequential] FAIL: P2: 0 + 1 = exactly one card drawn (got 3 expected 1)
+[parity_sequential] FAIL: Q1: revealing exactly 1 live leaves 3 fillers (got 4 expected 3)
+[parity_sequential] FAIL: S1: カードを1枚引く — exactly 1 drawn (got 1 expected 2)
+[parity_sequential] FAIL: S1: ライブ終了時まで、heart01 を得る (got 0 expected 1)
+[parity_sequential] FAIL: S2: +1 after the first activation (got 0 expected 1)
+[parity_sequential] FAIL: S2: ターン1回 — a second activation in the same turn does not double the heart modifier (got 0 expected 1)
+[parity_small_clusters] FAIL:   A1_no_valid_target
+[parity_small_clusters] FAIL:   A3_pay_activates
+[parity_small_clusters] FAIL:   A3_skip_optional
+[parity_small_clusters] FAIL:   A3_empty_discard
+[parity_small_clusters] FAIL:   A5_hareruya_set
+[parity_small_clusters] FAIL:   A5_hareruya_heart00
+[parity_small_clusters] FAIL:   A0_center_highest
+[parity_small_clusters] FAIL:   A0_tie_for_highest
+[parity_small_clusters] FAIL:   B1_one_colour
+[parity_small_clusters] FAIL:   B1_no_blade_heart
+[parity_small_clusters] FAIL:   B1_all_and_green
+[parity_small_clusters] FAIL:   B3_q272_not_twice
+[parity_small_clusters] FAIL:   B3_one_discard_one
+[parity_small_clusters] FAIL:   B3_two_distinct
+[parity_small_clusters] FAIL:   B3_non_niji
+[parity_small_clusters] FAIL:   B3_skip_discard
+[parity_small_clusters] FAIL:   B3_ab1_one_no_blade
+[parity_small_clusters] FAIL:   B4_condition_met
+[parity_small_clusters] FAIL:   B4_condition_not_met
+[parity_small_clusters] FAIL:   C1_two_copies
+[parity_small_clusters] FAIL:   C1_peer_irrelevant
+[parity_small_clusters] FAIL:   C2_zero_wait
+[parity_small_clusters] FAIL:   C2_one_wait
+[parity_small_clusters] FAIL:   C2_dynamic
+[parity_small_clusters] FAIL:   C4_nico_blocks_kotori
+[parity_small_clusters] FAIL:   C4_active_phase_still
+[parity_small_clusters] FAIL:   D2_three_appearances
+[parity_small_clusters] FAIL:   D2_hand_six_no_draw
+[parity_small_clusters] FAIL:   D2_small_deck
+[parity_small_clusters] FAIL:   E1_mus_in_success
+[parity_small_clusters] FAIL:   E2_score_or_revealed
+[parity_small_clusters] FAIL:   E3_accept_with_ren
+[parity_small_clusters] FAIL:   E3_decline
+[parity_small_clusters] FAIL:   E3_accept_without_ren
+[parity_small_clusters] FAIL:   E4_area_moved
+[parity_small_clusters] FAIL:   F2_mover_gains_host
+[parity_small_clusters] FAIL:   F2_non_syncrise
+[parity_small_clusters] FAIL:   F2_self_target_moved
+[parity_small_clusters] FAIL:   F2_self_target_still
+[parity_small_clusters] FAIL: A1 negative: the activator gains nothing (got 1 expected 0)
+[parity_small_clusters] FAIL: A3: paying the optional cost activated the waited member
+[parity_small_clusters] FAIL: A3: exactly ONE copy of the live card was moved, not two (got 0 expected 1)
+[parity_small_clusters] FAIL: A3 skip: declining the option leaves the live card in the waitroom
+[parity_small_clusters] FAIL: A3 skip: the 「そうした場合」 second action did not fire
+[parity_small_clusters] FAIL: A3 empty: paying still activated the waited member
+[parity_small_clusters] FAIL: A5 Hareruya CONTROL: the ability opened at least one prompt, so the set assertions below are not vacuous
+[parity_small_clusters] FAIL: A5 Q127: Hareruya's set has NO heart00, so Wien's +1 is the only contributor and reads 1 (got 0 expected 1)
+[parity_small_clusters] FAIL: A5 Hareruya CONTROL: the ability opened a prompt
+[parity_small_clusters] FAIL: A5 Q127: the set has no heart00, so Wien's +1 is the whole value (got 0 expected 1)
+[parity_small_clusters] FAIL: A0: sumire is on the RIGHT, so the centre-gate does not reach it (got 1 expected 0)
+[parity_small_clusters] FAIL: A0 CONTROL: with the tied peer gone, the lone centre member is trivially highest -> heart03 appears, so the tie check above is measuring the tie and not a dead ability (got 0 expected 1)
+[parity_small_clusters] FAIL: B1: only 1 distinct blade-heart colour -> no heart04 (got 1 expected 0)
+[parity_small_clusters] FAIL: B1: 0 blade-heart colours among the milled members -> no heart04 (got 1 expected 0)
+[parity_small_clusters] FAIL: B1: one member colour plus a non-member all-blade live -> no heart04 (got 1 expected 0)
+[parity_small_clusters] FAIL: B3 Q272 CONTROL: the ability opened at least one prompt
+[parity_small_clusters] FAIL: B3 Q272: 2 hand cards were discarded as the optional cost (got 2 expected 0)
+[parity_small_clusters] FAIL: B3 Q272: a member cannot be selected twice, so 2 discards still grant exactly 1 blade (got 0 expected 1)
+[parity_small_clusters] FAIL: B3 one CONTROL: the ability opened prompts
+[parity_small_clusters] FAIL: B3 one CONTROL: at least one card pick prompt was really answered, so the blade count below is measuring the effect and not a no-op
+[parity_small_clusters] FAIL: B3: 1 discard -> the selected member gains 1 blade (got 0 expected 1)
+[parity_small_clusters] FAIL: B3 two CONTROL: the ability opened prompts
+[parity_small_clusters] FAIL: B3: the first selected member gains exactly 1 blade (got 0 expected 1)
+[parity_small_clusters] FAIL: B3: the second selected member gains exactly 1 blade (got 0 expected 1)
+[parity_small_clusters] FAIL: B3 non-niji CONTROL: the ability opened prompts
+[parity_small_clusters] FAIL: B3 non-niji: the 虹ヶ咲 member on the SAME stage did gain, which is what makes the non-虹ヶ咲 zero a filter and not a no-op (got 0 expected 1)
+[parity_small_clusters] FAIL: B3 skip: no card left hand (got 1 expected 2)
+[parity_small_clusters] FAIL: B3 skip: nothing reached the waitroom (got 1 expected 0)
+[parity_small_clusters] FAIL: B3 ab#1: only 1 such member -> no score (got 1 expected 0)
+[parity_small_clusters] FAIL: B4: paying 「手札を1枚控え室に置いてもよい」 really discards one card -- without this the whole test would read the DECLINED branch under the name of the paid one (got 0 expected 1)
+[parity_small_clusters] FAIL: B4: 蓮ノ空 total 36 > opponent 4 -> blade granted
+[parity_small_clusters] FAIL: B4 negative: the cost is still PAID here, so the only thing the condition can be measuring is the cost comparison (got 0 expected 1)
+[parity_small_clusters] FAIL: C1: the active centre copy gains 0 (got 1 expected 0)
+[parity_small_clusters] FAIL: C1: after the swap the left copy is active -> 0 (got 1 expected 0)
+[parity_small_clusters] FAIL: C1 irrelevant: Erena's own ACTIVE state decides, not her peer's (got 1 expected 0)
+[parity_small_clusters] FAIL: C2: 0 waited opponent members -> no heart06 (got 1 expected 0)
+[parity_small_clusters] FAIL: C2: 1 waited member is below 2 -> no heart06 (got 1 expected 0)
+[parity_small_clusters] FAIL: C2 dynamic: dropping to 1 waited member removes the heart06 (got 1 expected 0)
+[parity_small_clusters] FAIL: C4 CONTROL: Nico's ab#1 really installed a per-card delayed_cannot_active flag, so the 'still in wait' below is a refusal and not an absent effect
+[parity_small_clusters] FAIL: C4 CONTROL: the GameState cannot_active_cards list the resolver actually consults is non-empty too
+[parity_small_clusters] FAIL: C4 Q180 CONTROL: the aura really is flagging the member, so the Active phase result below is a rule exemption and not a missing flag
+[parity_small_clusters] FAIL: D: the 3rd appearance this turn brings the hand from 2 to 5 (draw_until_count target 5) (got 2 expected 5)
+[parity_small_clusters] FAIL: D: the hand was already 6 (>= target 5) at the 3rd appearance, so draw_until_count is a saturating_sub no-op (got 7 expected 6)
+[parity_small_clusters] FAIL: D: a 2-card deck yields only what exists and stops (got 1 expected 2)
+[parity_small_clusters] FAIL: E1: a μ's-group card in the success zone -> the base draw plus one more (got 1 expected 2)
+[parity_small_clusters] FAIL: E1 CONTROL: the 2 drawn cards really reached hand (got 1 expected 2)
+[parity_small_clusters] FAIL: E2 step 1: neither condition met -> no draw (got 1 expected 0)
+[parity_small_clusters] FAIL: E2 step 1 CONTROL: the same card DOES draw in steps 2 and 3, so this zero is the condition and not a dead ability (got 1 expected 0)
+[parity_small_clusters] FAIL: E2 step 2: a live scoring above its printed score -> draw 1 (got 2 expected 1)
+[parity_small_clusters] FAIL: E2 step 3: a revealed scored live -> the OR branch draws 1 more (got 3 expected 2)
+[parity_small_clusters] FAIL: E3 pay CONTROL: the cost prompt was really answered
+[parity_small_clusters] FAIL: E3 decline: the energy deck is untouched (got 3 expected 2)
+[parity_small_clusters] FAIL: E3 decline: the energy zone is untouched (got 4 expected 5)
+[parity_small_clusters] FAIL: E3 decline: no draw (got 2 expected 0)
+[parity_small_clusters] FAIL: E3 no-Ren: no 葉月恋 on stage -> no draw (e3_accept_cost_with_ren shows the same card DOES draw) (got 1 expected 0)
+[parity_small_clusters] FAIL: E3 no-Ren: and therefore no discard (got 1 expected 0)
+[parity_small_clusters] FAIL: E4: area-moved this turn -> the base draw plus one more (got 0 expected 2)
+[parity_small_clusters] FAIL: F2: the MOVER gains no blades -- only the host does (got 4 expected 0)
+[parity_small_clusters] FAIL: F2 non CONTROL: the non-5yncri5e! filler really moved TO the centre (got 2641 expected 2640)
+[parity_small_clusters] FAIL: F2: a SELF-target host that itself moved to the centre gains 1 blade
+[parity_small_clusters] FAIL: F2 self-neg CONTROL: the host stayed on the left (got 2640 expected 2639)
+[parity_under_member] FAIL:   activation_paid_under_energy_recovers_exact_nijigasaki_live
+[parity_under_member] FAIL:   activation_once_per_turn_blocks_second_under_energy_payment_and_live_recovery
+[parity_under_member] FAIL:   live_start_with_under_energy_grants_one_heart01
+[parity_under_member] FAIL:   activation_reveals_same_name_hand_member_and_moves_it_under_self
+[parity_under_member] FAIL:   sayaka_use_limit_enforced
+[parity_under_member] FAIL:   two_live_start_sayaka_instances_count_only_their_own_under_cards
+[parity_under_member] FAIL:   baton_touch_recycles_owner_under_energy
+[parity_under_member] FAIL:   awakening_move_1_of_2
+[parity_under_member] FAIL:   awakening_targets_energy_owner_member_only
+[parity_under_member] FAIL:   awakening_move_all_energy
+[parity_under_member] FAIL:   reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost
+[parity_under_member] FAIL:   kotori_deploy_to_empty_right
+[parity_under_member] FAIL:   kotori_deploy_to_left_when_right_full
+[parity_under_member] FAIL:   kotori_multiple_under_only_one_deployed
+[parity_under_member] FAIL:   energy_under_original_blade_limit_cost_moves_one_energy_from_zone_under_member
+[parity_under_member] FAIL:   energy_under_original_blade_limit_boundary_exact_blade_waited
+[parity_under_member] FAIL:   energy_under_original_blade_limit_threshold_scales_with_energy_under
+[parity_under_member] FAIL:   energy_under_original_blade_limit_uses_original_blade_not_current
+[parity_under_member] FAIL:   energy_under_original_blade_limit_multiple_candidates_selects_one
+[parity_under_member] FAIL:   energy_under_original_blade_limit_single_candidate_auto_waited
+[parity_under_member] FAIL:   non_liella_stage_member_blocks_wait_energy_placement_pl_sp_bp4_001_r
+[parity_under_member] FAIL:   live_success_places_one_waited_energy_card_for_the_opponent
+[parity_under_member] FAIL:   live_success_placed_energy_skips_next_active_phase_wwd_pl_sp_bp7_027_l
+[parity_under_member] FAIL:   margarete_bp4_010_r_activation_waits_self_and_places_waited_energy
+[parity_under_member] FAIL:   margarete_bp4_010_r_empty_energy_deck_still_waits_self_without_placing_energy
+[parity_under_member] FAIL:   margarete_bp4_010_r_energy_deck_pick_is_the_top_card_without_a_prompt
+[parity_under_member] FAIL:   margarete_bp4_010_r_no_energy_refused_without_waiting_self
+[parity_under_member] FAIL: the paid energy left the energy zone  [activation_paid_under_energy_recovers_exact_nijigasaki_live]
+[parity_under_member] FAIL: the 虹ヶ咲 live reaches the hand  [activation_paid_under_energy_recovers_exact_nijigasaki_live]
+[parity_under_member] FAIL: the live leaves the waitroom  [activation_paid_under_energy_recovers_exact_nijigasaki_live]
+[parity_under_member] FAIL: first activation retrieves a 虹ヶ咲 live  [activation_once_per_turn_blocks_second_under_energy_payment_and_live_recovery]
+[parity_under_member] FAIL: control arm: with 0 energy under any member, no heart01 is granted (got 1 expected 0)  [live_start_with_under_energy_grants_one_heart01]
+[parity_under_member] FAIL: PROMPT CONTROL: the LiveStart condition is evaluated -- the 1-energy arm and the 0-energy arm do not agree  [live_start_with_under_energy_grants_one_heart01]
+[parity_under_member] FAIL: 1 card is under sayaka after reveal -> under_member (got 0 expected 1)  [activation_reveals_same_name_hand_member_and_moves_it_under_self]
+[parity_under_member] FAIL: the revealed sayaka is the card under sayaka  [activation_reveals_same_name_hand_member_and_moves_it_under_self]
+[parity_under_member] FAIL: the revealed card is removed from hand, not duplicated  [activation_reveals_same_name_hand_member_and_moves_it_under_self]
+[parity_under_member] FAIL: 1 card is under sayaka after the first activation (got 0 expected 1)  [sayaka_use_limit_enforced]
+[parity_under_member] FAIL: the left sayaka counts only the 3 cards under her (got 6 expected 3)  [two_live_start_sayaka_instances_count_only_their_own_under_cards]
+[parity_under_member] FAIL: the center sayaka counts only the 3 cards under her (got 6 expected 3)  [two_live_start_sayaka_instances_count_only_their_own_under_cards]
+[parity_under_member] FAIL: the displaced member's under-energy returns to the energy deck (got 0 expected 2)  [baton_touch_recycles_owner_under_energy]
+[parity_under_member] FAIL: 1 energy moved back to the energy deck (got 0 expected 1)  [awakening_move_1_of_2]
+[parity_under_member] FAIL: 1 of the 2 under-cards remains (got 2 expected 1)  [awakening_move_1_of_2]
+[parity_under_member] FAIL: 3 heart02 (1 energy x 3 per card) (got 0 expected 3)  [awakening_move_1_of_2]
+[parity_under_member] FAIL: 1 energy moved back to the energy deck (got 0 expected 1)  [awakening_targets_energy_owner_member_only]
+[parity_under_member] FAIL: the energy owner gains heart02 x3 (got 0 expected 3)  [awakening_targets_energy_owner_member_only]
+[parity_under_member] FAIL: 2 energy moved (got 0 expected 2)  [awakening_move_all_energy]
+[parity_under_member] FAIL: 0 under-cards remain (got 2 expected 0)  [awakening_move_all_energy]
+[parity_under_member] FAIL: 6 heart02 (2 energy x 3 per card) (got 0 expected 6)  [awakening_move_all_energy]
+[parity_under_member] FAIL: exactly the material card is under her (got 0 expected 1)  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+[parity_under_member] FAIL: the material card is the one  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+[parity_under_member] FAIL: the material card left the hand  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+[parity_under_member] FAIL: the material card is still under her (got 0 expected 1)  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+[parity_under_member] FAIL: and still not in hand  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+[parity_under_member] FAIL: +4 cost for 1 under member (got 0 expected 4)  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+[parity_under_member] FAIL: heart05=1 for 1 under member (got 0 expected 1)  [reveal_same_name_under_then_live_start_grants_one_heart05_and_four_cost]
+[parity_under_member] FAIL: the μ's member is deployed to the empty right area (got -1 expected 2640)  [kotori_deploy_to_empty_right]
+[parity_under_member] FAIL: nothing remains under kotori (got 1 expected 0)  [kotori_deploy_to_empty_right]
+[parity_under_member] FAIL: the μ's member is deployed to the only empty area (Left) (got -1 expected 2640)  [kotori_deploy_to_left_when_right_full]
+[parity_under_member] FAIL: nothing remains under kotori (got 1 expected 0)  [kotori_deploy_to_left_when_right_full]
+[parity_under_member] FAIL: the first under member is the one deployed (got -1 expected 2640)  [kotori_multiple_under_only_one_deployed]
+[parity_under_member] FAIL: 1 card remains under kotori (got 2 expected 1)  [kotori_multiple_under_only_one_deployed]
+[parity_under_member] FAIL: an opponent within the limit is waited  [energy_under_original_blade_limit_cost_moves_one_energy_from_zone_under_member]
+[parity_under_member] FAIL: a member exactly at the threshold IS waited (<=, not <)  [energy_under_original_blade_limit_boundary_exact_blade_waited]
+[parity_under_member] FAIL: the threshold scales with energy under: 2 under -> <= 3 blades  [energy_under_original_blade_limit_threshold_scales_with_energy_under]
+[parity_under_member] FAIL: original blade 2 <= threshold 2; the +1 current-blade modifier is ignored  [energy_under_original_blade_limit_uses_original_blade_not_current]
+[parity_under_member] FAIL: PROMPT CONTROL: two eligible opponents require a selection prompt  [energy_under_original_blade_limit_multiple_candidates_selects_one]
+[parity_under_member] FAIL: exactly one member should be selected (got -1 expected 1)  [energy_under_original_blade_limit_multiple_candidates_selects_one]
+[parity_under_member] FAIL: the chosen member is waited  [energy_under_original_blade_limit_multiple_candidates_selects_one]
+[parity_under_member] FAIL: a single eligible opponent is auto-waited  [energy_under_original_blade_limit_single_candidate_auto_waited]
+[parity_under_member] FAIL: a non-Liella member on the stage fails the group condition (got 8 expected 7)  [non_liella_stage_member_blocks_wait_energy_placement_pl_sp_bp4_001_r]
+[parity_under_member] FAIL: the energy deck is untouched (got 2 expected 3)  [non_liella_stage_member_blocks_wait_energy_placement_pl_sp_bp4_001_r]
+[parity_under_member] FAIL: precondition: 元気全開 must reach the success live-card zone, or the ライブ成功時 that places the energy never runs. HARNESS LIMITATION in the C port: the performance allocates 3 heart04 where the live needs 4 (see [LIVE_ALLOCATION_CARD] on stderr), so the live FAILS and the window is never entered -- see genki_live_success_effect_fired_directly_places_waited_energy, which pins the effect itself  [live_success_places_one_waited_energy_card_for_the_opponent]
+[parity_under_member] FAIL: WWD's placed energy remains waited after the next active phase (got 1 expected 0)  [live_success_placed_energy_skips_next_active_phase_wwd_pl_sp_bp7_027_l]
+[parity_under_member] FAIL: PROMPT CONTROL: the 起動 {E} cost is charged  [margarete_bp4_010_r_activation_waits_self_and_places_waited_energy]
+[parity_under_member] FAIL: the activation cost waits this member  [margarete_bp4_010_r_activation_waits_self_and_places_waited_energy]
+[parity_under_member] FAIL: the {E} cost consumed one active energy; the placed card is WAITED (got 5 expected 4)  [margarete_bp4_010_r_activation_waits_self_and_places_waited_energy]
+[parity_under_member] FAIL: PROMPT CONTROL: the 起動 {E} cost is still charged  [margarete_bp4_010_r_empty_energy_deck_still_waits_self_without_placing_energy]
+[parity_under_member] FAIL: the wait IS the cost and applies regardless  [margarete_bp4_010_r_empty_energy_deck_still_waits_self_without_placing_energy]
+[parity_under_member] FAIL: PROMPT CONTROL: the self-wait cost really was paid  [margarete_bp4_010_r_energy_deck_pick_is_the_top_card_without_a_prompt]
+[parity_under_member] FAIL: 0 energy: the activation is refused (got 1 expected 0)  [margarete_bp4_010_r_no_energy_refused_without_waiting_self]
+[parity_under_member] FAIL: refused: the energy deck is untouched (got 1 expected 2)  [margarete_bp4_010_r_no_energy_refused_without_waiting_self]
+[parity_wave1a] FAIL: a1_becoming_wait_activates_and_grants_a_blade
+[parity_wave1a] FAIL: a3_does_not_fire_for_another_cards_ability
+[parity_wave1a] FAIL: b2_alone_counts_as_two_and_earns_the_score_bonus
+[parity_wave1a] FAIL: c2_invalidating_a_live_success_ability_gains_heart03
+[parity_wave1a] FAIL: c3_target_with_no_live_success_ability_gains_nothing
+[parity_wave1a] FAIL: c4_our_own_live_success_abilities_are_not_invalidated
+[parity_wave1a] FAIL: d1_mus_score_card_grants_the_constant_to_every_mus_member
+[parity_wave1a] FAIL: d3_non_mus_score_card_grants_nothing
+[parity_wave1a] FAIL: d4_empty_success_zone_grants_nothing
+[parity_wave1a] FAIL: d5_score_card_arriving_after_debut_does_not_backfill
+[parity_wave1a] FAIL: e1_recolors_listed_blade_hearts_to_purple
+[parity_wave1a] FAIL: e2_leaves_draw_and_colorless_icons_unchanged
+[parity_wave1a] FAIL: e3_q187_exclude_selected_liella_other_pickable
+[parity_wave1a] FAIL: A1: the wait branch of the `or` grants exactly one blade (got 0 expected 1)
+[parity_wave1a] FAIL: A1: the wait branch of the `or` also makes her active (orientation is "wait")
+[parity_wave1a] FAIL: A3 CONTROL: on this very board the STAGED instance DOES gain a blade, so the un-staged twin's zero is a real scoping result and not a dead engine
+[parity_wave1a] FAIL: B2: alone in the success live card zone this card is ONE lily white card against a 2-above threshold, so the 常時 weight is the only thing that can satisfy it, and the +1 must follow (got 0 expected 1)
+[parity_wave1a] FAIL: C2: a target prompt was open at the assertion site
+[parity_wave1a] FAIL: [VACUOUS]  C2: the target selection really was prompted -- without a prompt the heart could not be attributable to this ability - 0 prompt(s) were produced after the                            control point, need at least 1
+[parity_wave1a] FAIL: C3: a target prompt WAS offered -- the card text names no group filter, so C2 and C3 reach the engine identically up to the answer
+[parity_wave1a] FAIL: C3: 「これにより無効にした場合」 -- a target with no ライブ成功時 ability gains nothing (got 1 expected 0)
+[parity_wave1a] FAIL: C4: with no opponent member there is nothing to invalidate, so the conditional heart is not granted (got 1 expected 0)
+[parity_wave1a] FAIL: D1: she is a mu's member too, so the gained constant applies to her (got 0 expected 1)
+[parity_wave1a] FAIL: D3: a DOLLCHESTRA live carrying the score icon fails the group filter (got 1 expected 0)
+[parity_wave1a] FAIL: D4: no cards in the success zone, so the ability is not gained (got 1 expected 0)
+[parity_wave1a] FAIL: D5 step 1: precondition -- debuted with an empty success zone (got 1 expected 0)
+[parity_wave1a] FAIL: D5: the 登場 evaluated the condition once at debut; a card arriving afterwards does not retroactively grant the ability (got 1 expected 0)
+[parity_wave1a] FAIL: E1: every listed blade heart was recoloured TO purple, so nothing is left at indices 1..5 (got 7 expected 0)
+[parity_wave1a] FAIL: E1: exactly the revealed listed cards carry a purple blade heart at index 6 (got 0 expected 7)
+[parity_wave1a] FAIL: E2: the draw-icon card's blade heart left index 5 (got 7 expected 0)
+[parity_wave1a] FAIL: E2: only the draw-icon card carries a recoloured purple blade heart; the colorless card gains none (got 0 expected 1)
+[parity_wave1a] FAIL: E3: the first member selection must be prompted
+[parity_wave1a] FAIL: E3: expected a SelectCard stage prompt (got "")
+[parity_wave1a] FAIL: E3: the exclude_selected second selection must be prompted
+[parity_wave1a] FAIL: E3: expected a SelectCard stage prompt on the second selection (got "")
+[parity_wave1a] FAIL: [VACUOUS]  E3: a SECOND real prompt was offered (a single-prompt board would make the first CHECK vacuous) - 1 prompt(s) were produced after the                            control point, need at least 2
+[parity_wave1a] FAIL: E3: Kanon gains a blade from Dazzling Game
+[parity_wave1a] FAIL: E3: the other Liella! member gains a blade from Dazzling Game
+[parity_wave1b] FAIL:   a1_jidou_energy_is_exactly_what_live_start_pays
+[parity_wave1b] FAIL:   a2_declining_jidou_leaves_live_start_unable_to_pay
+[parity_wave1b] FAIL:   a6_one_appearance_grants_blade_to_host_below_threshold
+[parity_wave1b] FAIL:   a9_blades_land_on_the_host_so_the_condition_reads_them
+[parity_wave1b] FAIL:   a11_rurino_stage_to_waitroom_draws_exactly_two
+[parity_wave1b] FAIL:   a12_mill_arms_jidou_recover_and_its_blade_counts_the_same_batch
+[parity_wave1b] FAIL:   a13_declining_jidou_recover_keeps_the_mills_blade_but_recovers_nothing
+[parity_wave1b] FAIL:   a14_wien_real_yell_with_no_blade_heart_grants_heart03
+[parity_wave1b] FAIL:   a15_sumire_real_yell_with_no_blade_heart_grants_heart06
+[parity_wave1b] FAIL: A1+: ab#0 paid 1E out of the 1 the 4-cost ally left (1->0) and activated the 2 waited (0->2).  The zone must hold 2 active for ab#1. (got 1 expected 2)
+[parity_wave1b] FAIL: A1+: VACUITY CONTROL -- ab#1's 2E payment really was OFFERED as a SelectTarget (0)
+[parity_wave1b] FAIL: A1+: ab#1 spent exactly the 2 energy ab#0 activated -- the zone empties. This is the link: the sibling's payment is funded by the jidou. (got 1 expected 0)
+[parity_wave1b] FAIL: A1+: ab#1 granted its ブレード to 花帆 (EXACT, not > 0: the grant is a fixed amount) (got 0 expected 1)
+[parity_wave1b] FAIL: A1+: ab#1 also granted heart04, as printed (got 0 expected 1)
+[parity_wave1b] FAIL: A2: ab#1's 2E payment was still offered on a board with only 1 active energy (0 SelectTarget)
+[parity_wave1b] FAIL: A6+: the appearing ally must NOT receive the blades; only the センター host does (got 2 expected 0)
+[parity_wave1b] FAIL: A9: the first appearing 蓮ノ空 member must not receive the blades (got 4 expected 0)
+[parity_wave1b] FAIL: A11: カードを2枚引き -- exactly 2 (got 0 expected 2)
+[parity_wave1b] FAIL: A11: 手札を2枚控え室に置く (the two discards join the baton arrival and herself): waitroom 0 -> 1
+[parity_wave1b] FAIL: A12+: ab#0 -- the 起動 milled 2 「Liella!」 members -> ブレード 2.  This reads the SAME batch ab#1 recovers from. (got 3 expected 2)
+[parity_wave1b] FAIL: A12+: ab#1 MUST fire on the 起動's own mill of 3 cards into the 控え室 (0 SelectTarget offered).  If this is absent the 自動 and the 起動 are not coupled and the pair's whole point is void.
+[parity_wave1b] FAIL: A12+: ab#1 adds EXACTLY 1 of 「それらのカード」 to hand (got 0, hand 0->0).  A card from outside the mill would mean ab#1 read the wrong batch. (got 0 expected 1)
+[parity_wave1b] FAIL: A12+: ab#1 recovers 1 card to hand (got 0 expected 1)
+[parity_wave1b] FAIL: A13: ab#1 must be OFFERED after the 起動 mills, even though the player will decline the E (0 SelectTarget)
+[parity_wave1b] FAIL: A13: declining ab#1 must not change ab#0's ブレード -- the 起動's blade is earned by the mill itself, independent of the choice (got 3 expected 2)
+[parity_wave1b] FAIL: A14+: g->yell_occurred is still 0 at the assertion site.  The engine logs occurred=1 at yell time and clears the flag inside the SAME pass, so the Rust `state.yell_occurred` observation has no C twin at this vantage point (the yell itself is proven by the line above and by heart03=1).
+[parity_wave1b] FAIL: A15: precondition -- g->yell_occurred is transient in C (logged occurred=1 at yell time, cleared inside the same pass)
+[parity_wave1c] FAIL:   a0_skew_probe
+[parity_wave1c] FAIL:   a1_four_printemps_members_go_under_her
+[parity_wave1c] FAIL:   a6_a_mix_takes_only_the_printemps_members
+[parity_wave1c] FAIL:   a7_it_is_her_own_under_area
+[parity_wave1c] FAIL:   b1_retrieved_card_lands_in_the_left_side_she_vacated
+[parity_wave1c] FAIL:   b2_retrieved_card_lands_in_the_centre_she_vacated
+[parity_wave1c] FAIL:   b3_a_member_costing_exactly_fifteen_is_eligible
+[parity_wave1c] FAIL:   b4_hasunosora_member_costing_seventeen_is_not_a_target
+[parity_wave1c] FAIL:   b5_a_non_hasunosora_member_is_not_a_target
+[parity_wave1c] FAIL:   b7_a_success_zone_total_of_five_withholds_the_ability
+[parity_wave1c] FAIL:   b8_an_empty_success_zone_withholds_the_ability
+[parity_wave1c] FAIL:   c2_effect_places_the_revealed_card_into_the_success_zone
+[parity_wave1c] FAIL:   c3_the_take_from_the_success_zone_is_currently_missing
+[parity_wave1c] FAIL: SKEW: PL!-pb2-014-P＋ must decode a '登場' ability whose effect destination is "success_live_zone". A wrong word here is a BYTE SPLICE from the offset table, NOT an engine bug -- re-run after the bytecode/string-table fix lands.
+[parity_wave1c] FAIL: SKEW: PL!-pb2-014-P＋ must decode source="selected_cards" action="move_cards" on its 登場 ability
+[parity_wave1c] FAIL: [VACUOUS]  A: A1 -- the 4-card selection was never offered, so the under-count below is not about the effect - 0 prompt(s) offered, control was 0, so the negative proves nothing
+[parity_wave1c] FAIL: A: A1 -- a pending choice was standing after the play
+[parity_wave1c] FAIL: A: A1 -- the engine says it wants 4 cards (printed 「4枚」) (got 0 expected 4)
+[parity_wave1c] FAIL: A: A1 -- and it offers at least 4 candidates (offered 0)
+[parity_wave1c] FAIL: [VACUOUS]  A: A6 -- the 4-card selection was never offered, so the under-count below is not about the effect - 1 prompt(s) offered, control was 1, so the negative proves nothing
+[parity_wave1c] FAIL: A: A6 -- a pending choice was standing after the play
+[parity_wave1c] FAIL: A: A6 -- the engine says it wants 4 cards (printed 「4枚」) (got 0 expected 4)
+[parity_wave1c] FAIL: A: A6 -- and it offers at least 4 candidates (offered 0)
+[parity_wave1c] FAIL: [VACUOUS]  A: A7 -- the 4-card selection was never offered, so the under-count below is not about the effect - 1 prompt(s) offered, control was 1, so the negative proves nothing
+[parity_wave1c] FAIL: A: A7 -- a pending choice was standing after the play
+[parity_wave1c] FAIL: A: A7 -- the engine says it wants 4 cards (printed 「4枚」) (got 0 expected 4)
+[parity_wave1c] FAIL: A: A7 -- and it offers at least 4 candidates (offered 0)
+[parity_wave1c] FAIL: A7: precondition -- the four members landed under HER (got 0 expected 4)
+[parity_wave1c] FAIL: A7: under_self -- the cards belong under the member who gained the ability, not under whoever else is on the stage (got 4 expected 0)
+[parity_wave1c] FAIL: A7: waitroom card 0 landed under HER specifically
+[parity_wave1c] FAIL: A7: waitroom card 1 landed under HER specifically
+[parity_wave1c] FAIL: A7: waitroom card 2 landed under HER specifically
+[parity_wave1c] FAIL: A7: waitroom card 3 landed under HER specifically
+[parity_wave1c] FAIL: B1 COST LEG 1 NOT PAID: the 起動 costs {{icon_energy}}{{icon_energy}} -- active energy was 9 after the play and 9 after the activation, so the 2E leg of the sequential_cost did not run. The EFFECT ran anyway (a selection prompt was raised and answered), so this is a half-paid activation, not a refused one.
+[parity_wave1c] FAIL: B1 COST LEG 2 NOT PAID: 「このメンバーをステージから控え室に置く」 -- SAYAKA is not in MY waitroom after the activation. She is still standing in area 0, so no area was ever vacated, 「このメンバーがいたエリア」 has nothing to remember, and every positive in this family is being satisfied by a host who never left. (waitroom now holds: see the [B1 board] dump above.)
+[parity_wave1c] FAIL: B1: precondition -- SAYAKA was moved to the waitroom by the cost (このメンバーをステージから控え室に置く)
+[parity_wave1c] FAIL: B1: area 0 still holds SAYAKA herself while the cost never moved her, so the 'a card is in the vacated area' check below is satisfied by a host who never left -- nothing was deployed
+[parity_wave1c] FAIL: B1 COST LEG 1 NOT PAID: the 起動 costs {{icon_energy}}{{icon_energy}} -- active energy was 9 after the play and 9 after the activation, so the 2E leg of the sequential_cost did not run. The EFFECT ran anyway (a selection prompt was raised and answered), so this is a half-paid activation, not a refused one.
+[parity_wave1c] FAIL: B1 COST LEG 2 NOT PAID: 「このメンバーをステージから控え室に置く」 -- SAYAKA is not in MY waitroom after the activation. She is still standing in area 1, so no area was ever vacated, 「このメンバーがいたエリア」 has nothing to remember, and every positive in this family is being satisfied by a host who never left. (waitroom now holds: see the [B1 board] dump above.)
+[parity_wave1c] FAIL: B2: the centre still holds SAYAKA herself while the cost never moved her, so nothing was deployed into the vacated area
+[parity_wave1c] FAIL: B2: the left side stays empty.  Together with b1 this pins the area: a defaulted slot would fill the same index in both runs. (got 2641 expected -1)
+[parity_wave1c] FAIL: B1 COST LEG 1 NOT PAID: the 起動 costs {{icon_energy}}{{icon_energy}} -- active energy was 9 after the play and 9 after the activation, so the 2E leg of the sequential_cost did not run. The EFFECT ran anyway (a selection prompt was raised and answered), so this is a half-paid activation, not a refused one.
+[parity_wave1c] FAIL: B1 COST LEG 2 NOT PAID: 「このメンバーをステージから控え室に置く」 -- SAYAKA is not in MY waitroom after the activation. She is still standing in area 0, so no area was ever vacated, 「このメンバーがいたエリア」 has nothing to remember, and every positive in this family is being satisfied by a host who never left. (waitroom now holds: see the [B1 board] dump above.)
+[parity_wave1c] FAIL: B1 COST LEG 1 NOT PAID: the 起動 costs {{icon_energy}}{{icon_energy}} -- active energy was 9 after the play and 9 after the activation, so the 2E leg of the sequential_cost did not run. The EFFECT ran anyway (a selection prompt was raised and answered), so this is a half-paid activation, not a refused one.
+[parity_wave1c] FAIL: B1 COST LEG 2 NOT PAID: 「このメンバーをステージから控え室に置く」 -- SAYAKA is not in MY waitroom after the activation. She is still standing in area 0, so no area was ever vacated, 「このメンバーがいたエリア」 has nothing to remember, and every positive in this family is being satisfied by a host who never left. (waitroom now holds: see the [B1 board] dump above.)
+[parity_wave1c] FAIL: B1 COST LEG 1 NOT PAID: the 起動 costs {{icon_energy}}{{icon_energy}} -- active energy was 9 after the play and 9 after the activation, so the 2E leg of the sequential_cost did not run. The EFFECT ran anyway (a selection prompt was raised and answered), so this is a half-paid activation, not a refused one.
+[parity_wave1c] FAIL: B1 COST LEG 2 NOT PAID: 「このメンバーをステージから控え室に置く」 -- SAYAKA is not in MY waitroom after the activation. She is still standing in area 0, so no area was ever vacated, 「このメンバーがいたエリア」 has nothing to remember, and every positive in this family is being satisfied by a host who never left. (waitroom now holds: see the [B1 board] dump above.)
+[parity_wave1c] FAIL: INSTRUMENT GAP: B7 -- rb_generate_action_candidates emitted 5 action(s) on this Main-phase board and NONE of them is RB_ACTION_ACTIVATE_ABILITY (0). The generator only ever emits a pass placeholder and a per-area play-member action, so a STAGED member's 起動 has no OFFER in C and the 「のみ起動できる」 gate cannot be measured. Without this the withheld-ability cases below would be green because nothing offers anything.
+[parity_wave1c] FAIL: INSTRUMENT GAP: B8 -- rb_generate_action_candidates emitted 5 action(s) on this Main-phase board and NONE of them is RB_ACTION_ACTIVATE_ABILITY (0). The generator only ever emits a pass placeholder and a per-area play-member action, so a STAGED member's 起動 has no OFFER in C and the 「のみ起動できる」 gate cannot be measured. Without this the withheld-ability cases below would be green because nothing offers anything.
+[parity_wave1c] FAIL: C2: これにより公開したカードを自分の成功ライブカード置き場に置く -- a MOVE (got action=[sequential])
+[parity_wave1c] FAIL: C2: これにより公開したカード -- the source is the card the COST revealed (got [(null)])
+[parity_wave1c] FAIL: C2: 自分の成功ライブカード置き場に置く (got destination=[(null)])
+[parity_wave1c] FAIL: C2: 1枚 (got -1 expected 1)
+[parity_wave1c] FAIL: OPEN GAP: 成功ライブカード置き場にあるカードを1枚手札に加え AND これにより公開したカードを成功ライブカード置き場に置く is a TWO-STEP effect, but the node is a bare move_cards (action=[sequential]), so the first step is not represented
+[parity_wave1c] FAIL: OPEN GAP: the そうしたとき gate is still present as a condition
+[parity_zones_position] FAIL:  test_mill_three_deck_four
+[parity_zones_position] FAIL:  test_mill_three_deck_two_no_waitroom
+[parity_zones_position] FAIL:  test_mill_three_deck_and_waitroom_empty
+[parity_zones_position] FAIL:  test_himeno_front_area_shapes
+[parity_zones_position] FAIL:  test_himeno_front_no_opponent_members
+[parity_zones_position] FAIL:  test_tomari_activation_returns_energy
+[parity_zones_position] FAIL:  test_seira_position_change_swaps_and_records
+[parity_zones_position] FAIL: LeftSide empties after the position change (got 2654 expected -1)  [tests/test_parity_zones_position.c:557]
+[parity_zones_position] FAIL: Q234: the member reaches RightSide (got -1 expected 2652)  [tests/test_parity_zones_position.c:559]
+[parity_zones_position] FAIL: the center member is not disturbed by a move into an empty area (got 2652 expected 2654)  [tests/test_parity_zones_position.c:561]
+[parity_zones_position] FAIL: a two-card deck with an empty waitroom cannot pay the cost  [tests/test_parity_zones_position.c:584]
+[parity_zones_position] FAIL: the unpayable activation draws nothing (got 0 expected 2)  [tests/test_parity_zones_position.c:588]
+[parity_zones_position] FAIL: a two-card deck with an empty waitroom cannot pay the cost  [tests/test_parity_zones_position.c:584]
+[parity_zones_position] FAIL: the unpayable activation draws nothing (got 0 expected 2)  [tests/test_parity_zones_position.c:588]
+[parity_zones_position] FAIL: a two-card deck with an empty waitroom cannot pay the cost  [tests/test_parity_zones_position.c:584]
+[parity_zones_position] FAIL: the unpayable activation draws nothing (got 0 expected 2)  [tests/test_parity_zones_position.c:588]
+[parity_zones_position] FAIL: no position choice when both deck and waitroom are empty  [tests/test_parity_zones_position.c:604]
+[parity_zones_position] FAIL: front of left is the mirrored RightSide (Rule 4.5.7) (got 2675 expected 2674)  [tests/test_parity_zones_position.c:722]
+[parity_zones_position] FAIL: front of right is the mirrored LeftSide (Rule 4.5.7) (got -1 expected 2678)  [tests/test_parity_zones_position.c:740]
+[parity_zones_position] FAIL: an empty opponent stage offers no front-area target  [tests/test_parity_zones_position.c:758]
+[parity_zones_position] FAIL: one energy is returned to the energy deck (got 0 expected 1)  [tests/test_parity_zones_position.c:869]
+[parity_zones_position] FAIL: the energy zone loses the energy that paid the cost (got 5 expected 4)  [tests/test_parity_zones_position.c:871]
+[parity_zones_position] FAIL: the member no longer sits in the center after the position change  [tests/test_parity_zones_position.c:873]
+[parity_zones_position] FAIL: the displaced member takes the vacated center (got 2700 expected 2701)  [tests/test_parity_zones_position.c:971]
+[parity_zones_position] FAIL: the moving member lands on the right after the position change (got 2701 expected 2700)  [tests/test_parity_zones_position.c:973]
+[parity_zones_position] FAIL: the swapped member is recorded as having moved this turn  [tests/test_parity_zones_position.c:979]
+[parity_zone_source] FAIL:   A_one_card_plus_one
+[parity_zone_source] FAIL:   A_zero_cards_nothing
+[parity_zone_source] FAIL:   A_not_at_center
+[parity_zone_source] FAIL:   B_blind_reveal_choice
+[parity_zone_source] FAIL:   B_mixed_pick_live
+[parity_zone_source] FAIL:   C_appear_choice
+[parity_zone_source] FAIL:   E_p2_routing
+[parity_zone_source] FAIL:   F_accepts_replacement
+[parity_zone_source] FAIL:   F_selects_exact
+[parity_zone_source] FAIL:   G_cost_mills_three
+[parity_zone_source] FAIL:   G_live_offers_choice
+[parity_zone_source] FAIL:   G_member_nobh_choice
+[parity_zone_source] FAIL:   G_option_energy
+[parity_zone_source] FAIL:   G_option_blade
+[parity_zone_source] FAIL:   G_use_limit_twice
+[parity_zone_source] FAIL:   H_fixture_identity
+[parity_zone_source] FAIL:   H_zero_members
+[parity_zone_source] FAIL:   H_one_member
+[parity_zone_source] FAIL:   H_two_members
+[parity_zone_source] FAIL:   H_tomari_two
+[parity_zone_source] FAIL:   I_blade_heart_no_draw
+[parity_zone_source] FAIL: 1 scoring μ's card in the success zone -> live total +1 (got 2 expected 1)
+[parity_zone_source] FAIL: A CONTROL: the debut resolved and granted no 常時 ability (got 1 expected 0)
+[parity_zone_source] FAIL: 0 scoring μ's cards in the success zone -> nothing (got 2 expected 0)
+[parity_zone_source] FAIL: left side -> the センター activation_condition blocks the 常時 (got 2 expected 0)
+[parity_zone_source] FAIL: picker=opponent -> the choice is routed to p2, not to self (got 0 expected 1)
+[parity_zone_source] FAIL: picking the LIVE card -> live total +1 (got 0 expected 1)
+[parity_zone_source] FAIL: picker=self -> the choice is routed to p1 (the reveal is YOURS) (got 1 expected 0)
+[parity_zone_source] FAIL: the p2 winner is the one prompted (got 0 expected 1)
+[parity_zone_source] FAIL: F: CROSSROADS exists exactly once (got 2 expected 1)
+[parity_zone_source] FAIL: F: the selected card is in hand
+[parity_zone_source] FAIL: the 虹ヶ咲 live was discarded
+[parity_zone_source] FAIL: the non-虹ヶ咲 filler was discarded
+[parity_zone_source] FAIL: a 虹ヶ咲 live card among the discarded 3 offers the choice
+[parity_zone_source] FAIL: a 虹ヶ咲 member without a blade heart offers the choice
+[parity_zone_source] FAIL: G: the choice is offered
+[parity_zone_source] FAIL: option 0 activates 2 energy (got 0 expected 2)
+[parity_zone_source] FAIL: G: the choice is offered
+[parity_zone_source] FAIL: option 1 grants blade x2 (got 0 expected 2)
+[parity_zone_source] FAIL: G CONTROL: the first use really offered a choice
+[parity_zone_source] FAIL: H: 鬼塚冬毬 has no blade_heart -> both count -> she becomes ACTIVE
+[parity_zone_source] FAIL: H: 鬼塚冬毬 has no blade_heart -> both count -> blade +2 (got 0 expected 2)
+[parity_zone_source] FAIL: H CONTROL: the 2-card hand cost really emptied the hand (got 3 expected 0)
+[parity_zone_source] FAIL: H: 1 no-blade-heart member discarded -> she becomes ACTIVE
+[parity_zone_source] FAIL: H: 2 no-blade-heart members discarded -> she becomes ACTIVE
+[parity_zone_source] FAIL: H: 2 blades (got 0 expected 2)
+[parity_zone_source] FAIL: H: 鬼塚冬毬 has no blade_heart -> both count -> she becomes ACTIVE
+[parity_zone_source] FAIL: H: 鬼塚冬毬 has no blade_heart -> both count -> blade +2 (got 0 expected 2)
+[parity_zone_source] FAIL: I: hand = (played member) - (discarded) and NO card was drawn (got 1 expected 0)

@@ -2136,11 +2136,49 @@ int rb_matching_indices_filter(const RbCardFilter *rf, const int *cards, int n, 
     return r;
 }
 
-/* Mirror util.rs::matching_ids — return card IDs matching the filter. */
+/* Mirror util.rs::matching_ids — return card IDs matching the filter.
+ *
+ * THE `has_filter` SHORT-CIRCUIT THAT WAS HERE IS GONE. It read
+ * `if (!rf || !rf->has_filter || !local_filter_from_public(rf, &f))`, which
+ * passes EVERY card through whenever `has_filter` is false. Rust's
+ * matching_ids (util.rs:2065-2076) has no such arm: it is
+ * `cards.iter().filter(|&&id| filter.matches(db, id, skip_empty)).copied()`
+ * and nothing else, so an absent term is decided by `matches()` — which
+ * rejects — never by a precomputed flag.
+ *
+ * The two disagree, because CardFilter::has_filter (util.rs:1461-1482) lists 21
+ * fields and NOT `exclude_cards` (:1494-1496) or `exclude_names` (:1498-1513),
+ * both of which `matches()` reads. `has_filter` is Rust's "could this reject a
+ * card" flag for a CONSTRUCTED filter, and those two are filled programmatically
+ * AFTER construction (util.rs:2089); it is not a precondition on matching.
+ * rb_matching_indices_filter (:2125) never had the term and was already
+ * Rust-equivalent, so the two C entry points for one Rust predicate disagreed.
+ *
+ * MEASURED, 2 639-card corpus, before the fix:
+ *   empty filter            C 2639  Rust 2639  (agree — an all-None filter
+ *                                               rejects nothing, which is also
+ *                                               what the surviving pass-through
+ *                                               below yields)
+ *   exclude_cards = [0]     C 2639  Rust 2638  (DISAGREE by one card: C accepted
+ *                                               the card Rust rejects)
+ * That is one wrong card in a candidate pool, from a filter that looks empty.
+ *
+ * UNREACHABLE TODAY, measured: walking every effect of all 985 abilities through
+ * rb_effect_filter_subset produces ZERO filters with has_filter false while
+ * carrying exclude_cards / exclude_names / exclude_self, so no suite count moves
+ * and none of the numbers in this batch's report are affected by this edit. It
+ * is fixed because it is a wrong-value bug on a reachable public entry point
+ * (rb_count_matching_filter, rb_build_candidate_pool and
+ * rb_matching_ids_filtered all reach it), not because it is firing today.
+ *
+ * The surviving `!local_filter_from_public` arm is the real "nothing to match
+ * with" case: that function returns 0 only for a NULL filter pointer. An
+ * all-zero RbCardFilter still goes through local_filter_matches, which is
+ * correct — it is exactly Rust's all-None CardFilter. */
 int rb_matching_ids(const RbCardFilter *rf, const int *cards, int n, int *out, int max) {
     if (!cards || !out) return 0;
     LocalCardFilter f;
-    if (!rf || !rf->has_filter || !local_filter_from_public(rf, &f)) {
+    if (!local_filter_from_public(rf, &f)) {
         int m = 0;
         for (int i = 0; i < n && m < max; i++) out[m++] = cards[i];
         return m;
@@ -2968,13 +3006,36 @@ int rb_constant_per_unit_units(const AbilityEffect *effect, const GameState *g, 
     if (effect->per_unit_count <= 0 && puc && *puc) per_unit_count = atoi(puc);
     if (per_unit_count < 1) per_unit_count = 1;
     int units = per_count / per_unit_count;
+    /* hearts.rs:96-100 -- `if effect.max.unwrap_or(false) { if let Some(cap) =
+       effect.count_any() { units = units.min(cap) } }`. `count_any()`
+       (core/card.rs:2411-2418) is `self.count.or_else(kind.filter().count)`, so
+       the FIRST source Rust consults is the typed `count` field -- exactly
+       `AbilityEffect::count`, which vm.c:741-744 fills from the `count` key when
+       the tag is I64.
+     *
+     * This read `eff_extra(effect, "count")`, and that key is NEVER POPULATED:
+     * vm.c's `count` branch assigns the struct field and `continue`s, so no
+     * extras row is ever created for it. Measured over all 985 abilities: of the
+     * 25 effects whose `max` extra is "true", 25 carry a non-negative
+     * `AbilityEffect::count` and 0 carry a `count` extra. The cap was therefore
+     * dead on every one of them, and the C returned an UNCAPPED unit count
+     * wherever Rust returns `units.min(cap)`.
+     *
+     * The `max` GATE is unchanged and stays: `max` is a genuine extra (populated
+     * on 25 effects) because vm.c:839-863 keeps the optional / conditional /
+     * conditional_negation / is_further / max family as stringified extras as
+     * well as struct flags. Only the cap's VALUE SOURCE moves, from a key that
+     * cannot exist to the field Rust reads first.
+     *
+     * Rust's SECOND source, `kind.filter().count`, stays unreachable: the C does
+     * not decode the nested filter object's fields into extras at all, which is
+     * a vm.c gap and not this one. See the extras-key census note in
+     * src/core/data.c for the full measured list of keys that reach the wire and
+     * are dropped at decode. */
     const char *max_str = eff_extra(effect, "max");
-    if (max_str && !strcmp(max_str, "true")) {
-        const char *cap_str = eff_extra(effect, "count");
-        if (cap_str) {
-            int cap = atoi(cap_str);
-            if (units > cap) units = cap;
-        }
+    if (max_str && !strcmp(max_str, "true") && effect->count >= 0) {
+        int cap = effect->count;
+        if (units > cap) units = cap;
     }
     return units;
 }

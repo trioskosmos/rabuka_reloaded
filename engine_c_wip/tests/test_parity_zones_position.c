@@ -1243,8 +1243,11 @@ static void test_position_destination_answer_uses_the_entry_route(void)
     CHECK_EQ(tg.state.p[0].stage[AREA_LEFT], src,
              "the member the stamped tail named lands on the chosen destination "
              "(choice.rs:3147-3148 feeds explicit_source_pos from the route)");
-    CHECK_EQ(tg.state.p[0].stage[AREA_CENTER], other,
-             "the displaced member takes the vacated source position");
+    CHECK_EQ(tg.state.p[0].stage[AREA_CENTER], filler,
+             "a position change SWAPS, so the member that occupied the chosen "
+             "destination takes the vacated source position");
+    CHECK_EQ(tg.state.p[0].stage[AREA_RIGHT], other,
+             "the member that was never involved is not disturbed");
 }
 
 int main(void)

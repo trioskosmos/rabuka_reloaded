@@ -100,13 +100,57 @@ static void print_stage(const TestGame *game)
     printf(")\n");
 }
 
-/// Rust: `sayaka_activation_charges_energy_and_terminates`.
+/* Rust `count_sayaka_offers` (activation_offer_bounded_and_terminates_test.rs:14-23),
+ * verbatim:
+ *     game_setup::generate_possible_actions(&game.state).into_iter()
+ *       .filter(|a| a.action_type == ActionType::UseAbility
+ *                && a.parameters.as_ref().and_then(|p| p.card_id) == Some(sayaka))
+ *       .count()
+ *
+ * C TWINS, all present in this tree:
+ *   - `rb_generate_action_candidates` (include/rabuka.h:2061, src/turn/phase.c) is
+ *     the C twin of `game_setup::generate_possible_actions`;
+ *   - `RB_SETUP_ACT_USE_ABILITY` (include/rabuka.h:3719) is Rust's
+ *     `ActionType::UseAbility`;
+ *   - `RbGeneratedAction.parameters.card_id` is `parameters.card_id`;
+ *   - the ability half of the Main-phase generator is
+ *     `rb_setup_for_each_ability_candidate` (src/game/game_setup.c:1339), which
+ *     game_setup.c:1320-1324 records as the bridge phase.c calls, added because
+ *     "before this bridge existed it had no caller in the tree, so an activated
+ *     ability could never be offered".
+ *
+ * WHY THIS HELPER EXISTS AT ALL: the previous revision of this file measured
+ * the offer by PRESSING the card and treating a refusal as "no longer offered".
+ * That was written when the C had no action generator to read.  It is not the
+ * same observable -- Rust counts rows in the generated menu, this counted press
+ * successes -- and it is what made `activations` overshoot Rust's bound.
+ * `rb_generate_action_candidates` returns an EMPTY list unless the current phase
+ * is Main (src/turn/phase.c:2156-2160), so the caller must park there; see the
+ * `RB_PHASE_MAIN` assignments below.
+ *
+ * NOTE the returned `RbGeneratedActionList.actions` is a malloc'd block and the
+ * tree exposes no free for it; these are process-lifetime test allocations. */
+static int count_ability_offers(const GameState *st, int card_id)
+{
+    RbGeneratedActionList list = rb_generate_action_candidates(st);
+    int n = 0;
+    for (int i = 0; i < list.count; i++) {
+        if (list.actions[i].action_type != RB_SETUP_ACT_USE_ABILITY) continue;
+        if (!list.actions[i].has_parameters) continue;
+        if (list.actions[i].parameters.card_id != card_id) continue;
+        n++;
+    }
+    return n;
+}
+
+/// Rust: `sayaka_activation_charges_energy_and_terminates`
+/// (activation_offer_bounded_and_terminates_test.rs:25-80).
 ///
-/// Rust asks `game_setup::generate_possible_actions` how many UseAbility offers
-/// exist for the card; the C engine has NO action generator, so the offer is
-/// measured by pressing the card and letting the engine's own cost/affordability
-/// path answer. A press the engine refuses stands in for "no longer offered",
-/// and a press it accepts is one activation that must have been charged.
+/// Rust loops on `count_sayaka_offers`: `offers == 0` BREAKS, and every step with
+/// `offers != 0` increments `activations`.  Its single assertion is
+/// `activations <= 5` (:75-79).  So the bound is a bound on how many times the
+/// card was OFFERED, i.e. on affordability, and the C now reads that directly
+/// instead of counting presses.
 static void sayaka_activation_charges_energy_and_terminates(void)
 {
 static    TestGame game;
@@ -161,24 +205,35 @@ static    TestGame game;
     int activations = 0;
     int all_charged_two = 1;
     int charged_samples = 0;
+    /* Main is where the generator emits anything at all
+     * (src/turn/phase.c:2156-2160: Rust matches on current_phase and returns
+     * Vec::new() for Active/Energy/Draw/Performance phases). */
+    game.state.phase = RB_PHASE_MAIN;
+    game.state.active = 0;
     for (int step = 0; step < 20; step++) {
         int en_before = game.state.p[0].energy_active;
         int stage_before[3];
         for (int i = 0; i < 3; i++) stage_before[i] = game.state.p[0].stage[i];
 
-        int res = rb_execute_main_phase_action(&game.state, RB_ACT_USE_ABILITY,
-                                              sayaka, -1, -1, -1);
-        if (res <= 0) {
+        /* THE RUST LOOP CONDITION.  Rust :44-48 reads the generated menu and
+         * breaks when the card is no longer offered; `activations` counts the
+         * steps where it WAS offered.  This replaces the retired press proxy. */
+        int offers = count_ability_offers(&game.state, sayaka);
+        if (offers == 0) {
             printf("step %d: no longer offered (en=%d)\n", step, en_before);
             break;
         }
         activations++;
+        int res = rb_execute_main_phase_action(&game.state, RB_ACT_USE_ABILITY,
+                                              sayaka, -1, -1, -1);
         int en_after = game.state.p[0].energy_active;
         int charged = en_before - en_after;
-        charged_samples++;
-        if (charged != 2) all_charged_two = 0;
-        printf("step %d: ok=%d en %d->%d (charged %d) stage %d,%d,%d -> %d,%d,%d\n",
-               step, res, en_before, en_after, charged,
+        if (charged_samples == 0 || res > 0) {
+            charged_samples++;
+            if (charged != 2) all_charged_two = 0;
+        }
+        printf("step %d: offers=%d ok=%d en %d->%d (charged %d) stage %d,%d,%d -> %d,%d,%d\n",
+               step, offers, res, en_before, en_after, charged,
                stage_before[0], stage_before[1], stage_before[2],
                game.state.p[0].stage[0], game.state.p[0].stage[1],
                game.state.p[0].stage[2]);
@@ -186,32 +241,79 @@ static    TestGame game;
 
         /* resolve any pending choices with the first option */
         drain_first_option(&game);
-        /* Rust: game_setup::settle_single_player_state — no C equivalent entry
+        /* Rust: game_setup::settle_single_player_state -- no C equivalent entry
            point; draining the ability queue + recalculating constants is the
-           closest real engine settle. */
+           closest real engine settle.  LEFT AS A DOCUMENTED LIMITATION: unlike
+           the offer count above, this entry point really is absent. */
         rb_drain_ability_queue(&game.state);
         test_recalc(&game);
+        /* The offer list is read at the top of the next step; re-entering Main
+         * keeps the generator's phase precondition satisfied across the
+         * settle, which does not itself advance the phase. */
+        game.state.phase = RB_PHASE_MAIN;
     }
 
     CHECK(activations > 0,
-          "sayaka's {{E}}{{E}} activation is accepted at least once with 9 energy");
+          "sayaka's {{E}}{{E}} activation is OFFERED at least once with 9 energy "
+          "(RUST: count_sayaka_offers > 0, "
+          "activation_offer_bounded_and_terminates_test.rs:44-49)");
     if (charged_samples > 0) {
         CHECK(all_charged_two,
               "every accepted activation charged exactly the {{E}}{{E}} = 2 cost");
     } else {
         printf("note: no accepted activation, so the 2-energy charge was never exercised\n");
     }
-    CHECK(activations <= 5,
-          "activation run is bounded by energy (9/2 ~ 4)");
-    printf("info: total accepted activations = %d\n", activations);
+    /* RUST'S ACTUAL ASSERTION, verbatim:
+     * activation_offer_bounded_and_terminates_test.rs:75-79,
+     * `assert!(activations <= 5, ...)`.  `activations` counts OFFERS here, as it
+     * does there; the retired press proxy counted something else and overshot. */
+    printf("info: offered activation count = %d (Rust asserts <= 5)\n", activations);
+    /* NOT written as a bare `CHECK(activations <= 5, ...)`.  With the real
+     * generator a zero offer count satisfies that bound VACUOUSLY -- 0 <= 5 --
+     * and a vacuously green bound is exactly how this file's premise went
+     * stale in the first place.  The bound is therefore only evaluated once
+     * its premise holds, and a missing premise is a FAILURE rather than a
+     * silent pass.  The retired press proxy could not go vacuous this way,
+     * which is the only thing it had going for it. */
+    if (activations > 0) {
+        CHECK(activations <= 5,
+              "RUST (:75-79): activations <= 5 -- bounded by affordable energy "
+              "(9/2 = 4); the count on the preceding info line is what is bounded");
+    } else {
+        CHECK(0,
+              "RUST (:75-79) bound is UNEVALUABLE: rb_generate_action_candidates "
+              "emitted no RB_SETUP_ACT_USE_ABILITY row for PL!HS-bp1-002-R at all, "
+              "with the card on p1's centre and 9 active energy, so 'activations "
+              "<= 5' would hold at 0 for free. Rust's count_sayaka_offers "
+              "(game_setup.rs:2078 activation scan) is non-zero here. This is a C "
+              "GENERATOR gap, not a bound that was met.");
+    }
+    {
+        RbGeneratedActionList dbg = rb_generate_action_candidates(&game.state);
+        int use_ability_rows = 0;
+        for (int i = 0; i < dbg.count; i++)
+            if (dbg.actions[i].action_type == RB_SETUP_ACT_USE_ABILITY) use_ability_rows++;
+        printf("info: generated rows=%d of which USE_ABILITY=%d "
+               "(phase=%d active=%d energy_active=%d)\n",
+               dbg.count, use_ability_rows, game.state.phase, game.state.active,
+               game.state.p[0].energy_active);
+    }
+    printf("info: total OFFERED activations = %d\n", activations);
 }
 
 /// Rust: `sayaka_unaffordable_not_offered_and_press_rejected`.
 ///
-/// The `offers == 0` half of the Rust assertion has no C equivalent (no
-/// generate_possible_actions). The directly checkable half is the affordability
-/// pre-check: pressing an unpayable {{E}}{{E}} activation must be refused
-/// cleanly — no partial resolution, no energy spent, nothing left pending.
+/// Rust, activation_offer_bounded_and_terminates_test.rs:94-120, has THREE
+/// assertions and the C previously had only the last two:
+///   :111  `assert_eq!(offers, 0, "cost 2 with 1 active energy must not be offered")`
+///   :115  the press is rejected with an error mentioning cost/energy
+///   :120  `assert!(!game.has_pending_choice())`
+/// The missing first one was written off with "no C equivalent (no
+/// generate_possible_actions)".  `rb_generate_action_candidates` EXISTS
+/// (include/rabuka.h:2061) and `count_ability_offers` above reads it, so the
+/// `offers == 0` half is asserted here from the real generator, exactly as
+/// Rust does.  The press half is kept unchanged: it is Rust's :115 and it is
+/// still the direct check of the affordability pre-check.
 static void sayaka_unaffordable_not_offered_and_press_rejected(void)
 {
 static    TestGame game;
@@ -234,12 +336,26 @@ static    TestGame game;
     test_give_energy(&game, 1); /* cost is {{E}}{{E}} = 2 */
     test_add_to_discard(&game, cid);
 
+    /* Main is the generator's only productive phase (src/turn/phase.c:2156-2160). */
+    game.state.phase = RB_PHASE_MAIN;
+    game.state.active = 0;
+
+    /* RUST :110-111 -- generation WITHHOLDS the unpayable activation.  This is
+     * the half the old revision dropped as "no C equivalent"; it is read from
+     * the real generator now. */
+    int offers = count_ability_offers(&game.state, sayaka);
+    CHECK_EQ(offers, 0,
+             "RUST (:111): cost 2 with 1 active energy must NOT be offered -- "
+             "game_setup::generate_possible_actions withholds it; C: "
+             "rb_generate_action_candidates");
+
     int en_before = game.state.p[0].energy_active;
     int res = test_activate_ability(&game, sayaka);
     int en_after = game.state.p[0].energy_active;
 
     CHECK_EQ(res, 0,
-             "unpayable {{E}}{{E}} activation is refused by the affordability pre-check");
+             "RUST (:113-119): a direct press of an unpayable {{E}}{{E}} "
+             "activation is rejected by the affordability pre-check");
     CHECK_EQ(en_after, en_before,
              "a refused activation charges no energy (no partial resolution)");
     CHECK(!test_has_pending_choice(&game),

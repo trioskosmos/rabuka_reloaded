@@ -149,6 +149,32 @@ def product_name(expansion_name):
     return re.sub(r"[-\s]+", "", expansion_name or "")
 
 
+def name_key(card_name):
+    """Canonical comparison form of a card name: no whitespace, '&' not '＆'.
+
+    `name` is the DISPLAY string and must keep its spacing — 'trial vol.1' and
+    '五條 実也&橘 fir&西木野 lam' both read as wrong without the spaces, and the
+    romanised parts need them. So `name` is left alone and this key is stored
+    beside it purely for equality tests.
+
+    Why it exists: 779 of the 2639 card names contain whitespace and 29 contain
+    a full-width '＆', while ability text refers to those cards by a squashed
+    form. The engine used to reconcile the two at every comparison with
+    `CardDatabase::normalize_name` + a full-width '＆' replace, which cost four
+    heap allocations per call and measured 2.99us/call on multi-name cards in a
+    debug build — the most expensive name path in the engine, on a path walked
+    during ability-condition evaluation. Doing the squashing ONCE here means the
+    engine can compare directly.
+
+    The '＆' -> '&' half matters because '＆' is a distinct code point from '&'
+    and the upstream API mixes both within the same expansion (the same
+    inconsistency documented for `rare` in docs/ADDING_AN_EXPANSION.md section 4).
+    """
+    if not card_name:
+        return ""
+    return re.sub(r"\s+", "", card_name).replace("＆", "&")
+
+
 def to_ability(text):
     if not text or text == "-":
         return ""
@@ -158,11 +184,22 @@ def to_ability(text):
 
 
 def parse_blade_heart(raw):
-    """'桃1' -> {'b_heart01': 1}; 'ALL1' -> {'b_all': 1}; '無2' -> {'b_heart07': 1}."""
+    """'桃1' -> {'b_heart01': 1}; 'ALL1' -> {'b_all': 1}; '無2' -> {'b_heart07': 1}.
+
+    The API also returns bracketed Japanese forms for the same values, e.g.
+    '[全ブレード]', which mean the same thing as the ASCII spellings above.
+    """
     if not raw or raw in ("-", ""):
         return {}
     raw = raw.strip()
-    if raw == "ALL1":
+    # '[全ブレード]' and friends: unwrap the brackets and normalise to the ASCII form
+    # the rest of this function already understands.
+    if len(raw) > 2 and raw[0] == "[" and raw[-1] == "]":
+        inner = raw[1:-1].strip()
+        if inner in ("全ブレード", "ALL", "ALL1", "ALLブレード"):
+            return {"b_all": 1}
+        raw = inner
+    if raw in ("ALL1", "全ブレード"):
         return {"b_all": 1}
     m = re.fullmatch(r"(無)?([桃緑青赤黄紫])?(\d+)", raw)
     if not m:
@@ -195,6 +232,7 @@ def build_entry(card, product):
         "card_no": card_no,
         "img": f"{BASE}/wordpress/wp-content/images/cardlist/{img_rel}",
         "name": card["card_name"],
+        "name_key": name_key(card["card_name"]),
         "product": product,
         "type": card["card_kind"],
         "series": derive_series(card_no),

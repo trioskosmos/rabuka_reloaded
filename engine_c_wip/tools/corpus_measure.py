@@ -32,9 +32,20 @@ for dirpath, _dirs, files in os.walk(os.path.join(ROOT, "src")):
         if f.endswith(".o"):
             OBJ.append(os.path.join(dirpath, f))
 OBJ.sort()
-# BASELINE3 defect: OBJ_LIB literally names src/web_server.o, which `make all`
-# builds here but the suite links do not need.  Dropped, per the Makefile's own
-# comment about suite links.
+# CORRECTED 2026-10-05: the comment here used to read "OBJ_LIB literally names
+# src/web_server.o ... Dropped, per the Makefile's own comment about suite
+# links", citing the Makefile `clean` block's claim that web_server.o is "NOT in
+# SRC or OBJ_LIB". That claim was FALSE -- Makefile:61 (SRC) and :64 (OBJ_LIB)
+# both name it -- so this file was dropping an object on the strength of a
+# misreading. It is still dropped, for the real reason: it is the WEBSERVER TU
+# and no suite calls into it, so keeping it would only add link time. NOTE the
+# consequence, which is a live difference and not a cosmetic one: `make t-run`
+# links $(OBJ_LIB) VERBATIM and therefore DOES include src/web_server.o, so a
+# suite built by `make t T=<stem>` and the same suite built here are not linked
+# from an identical object set. No duplicate symbol results either way (web_*
+# symbols are defined in no other TU), so the two links agree on behaviour; only
+# the object list differs. Not changed here, because changing it would move
+# every recorded baseline at once.
 #
 # src/main.o is dropped for a second, harder reason: it defines its own `main`,
 # so a suite linked against the full object list fails with `multiple

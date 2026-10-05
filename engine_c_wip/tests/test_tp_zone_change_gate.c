@@ -221,7 +221,7 @@ static    TestGame game;
 
 static void reina_fires_after_non_blade_member_left_live_zone(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int reina  = test_id(&game, REINA);
@@ -258,7 +258,7 @@ static void reina_fires_after_non_blade_member_left_live_zone(void)
 
 static void reina_silent_when_blade_heart_member_left_live_zone(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int reina  = test_id(&game, REINA);
@@ -301,7 +301,7 @@ static int miyamiya_setup(TestGame *game, int ai, int newcomer, int filler)
 
 static void miyamiya_baton_touch_cost15_newcomer_full_payoff(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int ai        = test_id(&game, MIYAMIYA);

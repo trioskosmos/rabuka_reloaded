@@ -349,7 +349,8 @@ pub fn execute_draw(
                     // Gate on distinct_should_dedupe so pass-through variants keep
                     // the plain sequential draw below.
                     let dedupe = util::distinct_should_dedupe(Some(distinct));
-                    let mut seen_names = crate::compat::HashSet::<String>::default();
+                            let mut seen_names =
+                                crate::compat::HashSet::<crate::core::types::ArcStr>::default();
                     let mut drawn: Vec<i16> = Vec::new();
                     let mut attempts = 0;
                     let max_attempts = player.main_deck.cards.len();
@@ -366,9 +367,9 @@ pub fn execute_draw(
                                 continue;
                             }
                             if dedupe {
-                                let name = card_db.get_card(card).map(|c| {
-                                    crate::card::CardDatabase::normalize_name(&c.name)
-                                });
+                                // `name_key` is already canonical, and ArcStr
+                                // hashes/compares by content — no allocation.
+                                let name = card_db.get_card(card).map(|c| c.name_key.clone());
                                 let accepted = match name {
                                     Some(n) => seen_names.insert(n),
                                     None => true,
@@ -410,7 +411,8 @@ pub fn execute_draw(
                 // nowhere). Dedupe while popping; duplicates stay in the
                 // waitroom. attempts bounds the whole-zone scan.
                 let dedupe = util::distinct_should_dedupe(is_distinct);
-                let mut seen_names = crate::compat::HashSet::<String>::default();
+                let mut seen_names =
+                    crate::compat::HashSet::<crate::core::types::ArcStr>::default();
                 let mut cards: SmallVec<[i16; 8]> = SmallVec::new();
                 let mut attempts = 0;
                 let max_attempts = player.waitroom.cards.len();
@@ -421,11 +423,7 @@ pub fn execute_draw(
                             if dedupe {
                                 let accepted = card_db
                                     .get_card(card)
-                                    .map(|c| {
-                                        seen_names.insert(
-                                            crate::card::CardDatabase::normalize_name(&c.name),
-                                        )
-                                    })
+                                    .map(|c| seen_names.insert(c.name_key.clone()))
                                     .unwrap_or(true);
                                 if !accepted {
                                     log::debug!(

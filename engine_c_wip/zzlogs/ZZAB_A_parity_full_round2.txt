@@ -1,0 +1,22 @@
+make t-nogate: running T=parity_full_round2 WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -c -o src/test_game.o src/test_game.c
+In file included from src/test_game.c:1:
+include/test_game.h:71:52: error: expected declaration specifiers or '...' before '(' token
+   71 | #define test_id(tg, card_no) test_id_TEMPLATE_ONLY((tg), (card_no))
+      |                                                    ^
+src/test_game.c:150:5: note: in expansion of macro 'test_id'
+  150 | int test_id(TestGame *tg, const char *card_no){
+      |     ^~~~~~~
+include/test_game.h:71:58: error: expected declaration specifiers or '...' before '(' token
+   71 | #define test_id(tg, card_no) test_id_TEMPLATE_ONLY((tg), (card_no))
+      |                                                          ^
+src/test_game.c:150:5: note: in expansion of macro 'test_id'
+  150 | int test_id(TestGame *tg, const char *card_no){
+      |     ^~~~~~~
+make[2]: *** [Makefile:591: src/test_game.o] Error 1
+make[1]: *** [Makefile:363: t] Error 2
+make: *** [Makefile:545: t-nogate] Error 2

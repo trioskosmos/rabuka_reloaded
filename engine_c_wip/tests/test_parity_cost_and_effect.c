@@ -509,7 +509,7 @@ static void test_q214_optional_score_energy_pay_and_decline(void)
 
     /* ── case 1: score-2 live, 5 energy, ACCEPT the payment ─────────────── */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int shizuku, filler, filler2;
         if (!need(&tg, &shizuku, "PL!N-bp5-003-R", 1) ||
             !need(&tg, &filler, "PL!-sd1-010-SD", 1)) { CHECK(0, "B1 fixtures"); return; }
@@ -549,7 +549,7 @@ static void test_q214_optional_score_energy_pay_and_decline(void)
 
     /* ── case 2: score-0 live, 1 energy, ACCEPT (pays zero) ─────────────── */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int shizuku, filler;
         if (!need(&tg, &shizuku, "PL!N-bp5-003-R", 1) ||
             !need(&tg, &filler, "PL!-sd1-010-SD", 1)) { CHECK(0, "B2 fixtures"); return; }
@@ -587,7 +587,7 @@ static        TestGame tg; test_game_new(&tg);
 
     /* ── case 4: score-2 live, 5 energy, DECLINE ────────────────────────── */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int shizuku, filler;
         if (!need(&tg, &shizuku, "PL!N-bp5-003-R", 1) ||
             !need(&tg, &filler, "PL!-sd1-010-SD", 1)) { CHECK(0, "B4 fixtures"); return; }
@@ -629,7 +629,7 @@ static        TestGame tg; test_game_new(&tg);
 
 static void test_success_score_gate_offers_no_cost(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     bare_board(&tg);
 
@@ -739,7 +739,7 @@ static            TestGame tg;
 
         /* ── the EFFECT, after the scaled cost has been paid ──────────────── */
         {
-            TestGame tg;
+            static TestGame tg;
             test_game_new(&tg);
             bare_board(&tg);
             int me, lily, filler, mus_live;
@@ -792,7 +792,7 @@ static        TestGame tg;
     }
     /* A non-μ's live card is not retrieved even when the cost is paid in full. */
     {
-        TestGame tg;
+        static TestGame tg;
         test_game_new(&tg);
         bare_board(&tg);
         int me, lily, filler, liella_live;
@@ -1090,7 +1090,7 @@ static    TestGame tg;
 
 static void test_optional_recovery_no_candidate_no_prompt(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
 
     int live, mate, filler;
@@ -1121,7 +1121,7 @@ static void test_optional_energy_placement_accept_and_decline(void)
 
     /* accept */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live, filler, energy_card;
         if (!need(&tg, &live, "PL!SP-bp5-027-L", 1) ||
             !need(&tg, &filler, FILLER_M, 1) ||
@@ -1148,7 +1148,7 @@ static void test_optional_energy_placement_accept_and_decline(void)
 
     /* decline */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live, filler, energy_card;
         if (!need(&tg, &live, "PL!SP-bp5-027-L", 1) ||
             !need(&tg, &filler, FILLER_M, 1) ||
@@ -1182,7 +1182,7 @@ static void test_optional_member_cost_accept_and_decline(void)
 {
     /* accept, single candidate */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live, mus_member, mus_live, filler;
         if (!need(&tg, &live, "PL!-bp6-021-L", 1) ||
             !need(&tg, &mus_member, FILLER_M, 1) ||
@@ -1215,7 +1215,7 @@ static void test_optional_member_cost_accept_and_decline(void)
 
     /* decline, two candidates */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live, m1, m2, mus_live, filler;
         if (!need(&tg, &live, "PL!-bp6-021-L", 1) ||
             !need(&tg, &m1, FILLER_M, 1) ||
@@ -1251,7 +1251,7 @@ static void test_opponent_forced_discard_comply_and_decline(void)
 {
     /* comply */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int yohane, live_hand, filler;
         if (!need(&tg, &yohane, "PL!S-pb1-006-R", 1) ||
             !need(&tg, &live_hand, "PL!-sd1-019-SD", 1) ||
@@ -1273,7 +1273,7 @@ static void test_opponent_forced_discard_comply_and_decline(void)
 
     /* decline */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int yohane, live_hand, filler;
         if (!need(&tg, &yohane, "PL!S-pb1-006-R", 1) ||
             !need(&tg, &live_hand, "PL!-sd1-019-SD", 1) ||
@@ -1332,7 +1332,7 @@ static        TestGame tg; test_game_new(&tg);
 
     /* declined */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int meko, filler, filler2, sblive;
         if (!need(&tg, &meko, "PL!HS-pb1-004-R", 1) ||
             !need(&tg, &filler, FILLER_M, 1) ||
@@ -1364,7 +1364,7 @@ static void test_wait_other_group_cost(void)
 {
     /* unpayable: only 虹ヶ咲 on stage is Helen herself (exclude_self) */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int emma, filler;
         if (!need(&tg, &emma, "PL!N-bp3-008-R＋", 1) ||
             !need(&tg, &filler, FILLER_M, 1)) { CHECK(0, "K1 fixtures"); return; }
@@ -1407,7 +1407,7 @@ static        TestGame tg; test_game_new(&tg);
 
     /* a legal 虹ヶ咲 candidate is auto-waited and the draw follows */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int emma, niji, filler;
         if (!need(&tg, &emma, "PL!N-bp3-008-R＋", 1) ||
             !need(&tg, &niji, "PL!N-sd1-001-SD", 1) ||
@@ -1448,7 +1448,7 @@ static void test_optional_debut_ee_pay_skip_and_multi(void)
 {
     /* pay */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int asuka, filler, live;
         if (!need(&tg, &asuka, "PL!HS-bp2-018-N", 1) ||
             !need(&tg, &filler, FILLER_M, 1) ||
@@ -1470,7 +1470,7 @@ static void test_optional_debut_ee_pay_skip_and_multi(void)
 
     /* skip */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int asuka, filler, live;
         if (!need(&tg, &asuka, "PL!HS-bp2-018-N", 1) ||
             !need(&tg, &filler, FILLER_M, 1) ||
@@ -1492,7 +1492,7 @@ static void test_optional_debut_ee_pay_skip_and_multi(void)
 
     /* two candidates → exactly one is placed */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int asuka, filler, live;
         if (!need(&tg, &asuka, "PL!HS-bp2-018-N", 1) ||
             !need(&tg, &filler, FILLER_M, 1) ||
@@ -1550,7 +1550,7 @@ static void test_optional_two_card_cost_pay_and_skip(void)
 
     /* paid: 2 hand cards, then heart colour, then a stage target */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int izumi, kozue, tsuzuri, filler;
         if (!need(&tg, &izumi, "PL!HS-sd1-008-SD", 1) ||
             !need(&tg, &kozue, "PL!HS-bp1-012-PR", 1) ||
@@ -1621,7 +1621,7 @@ static void test_center_compound_cost_paid_before_effect(void)
 {
     /* basic success */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int yoshiko, chika, riko, hand_card, dia;
         if (!need(&tg, &yoshiko, "PL!S-bp3-006-R＋", 1) ||
             !need(&tg, &chika, "PL!S-bp2-001-R", 1) ||
@@ -1683,7 +1683,7 @@ static        TestGame tg; test_game_new(&tg);
 
     /* empty hand: the mandatory discard clause is unpayable (Q56) */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int yoshiko, chika;
         if (!need(&tg, &yoshiko, "PL!S-bp3-006-R＋", 1) ||
             !need(&tg, &chika, "PL!S-bp2-001-R", 1)) { CHECK(0, "N3 fixtures"); return; }
@@ -1742,7 +1742,7 @@ static        TestGame ids;
 
     /* the printed cost is a hand discard: one card out, no energy spent */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int top[5];
         for (int i = 0; i < 5; i++) top[i] = filler;
         maki_setup(&tg, maki, filler, top, 5);
@@ -1773,7 +1773,7 @@ static        TestGame tg; test_game_new(&tg);
 
     /* 4 of 5 match → the condition fails and no blade is granted */
     {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int top[5] = { ruby, ruby, ruby, ruby, filler };
         maki_setup(&tg, maki, filler, top, 5);
         activate_ability_index(&tg, maki, 0);

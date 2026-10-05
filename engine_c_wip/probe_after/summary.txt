@@ -1,0 +1,5 @@
+parity_zones_position              ok=174    FAIL=26    alias_hits=0    frees_top=178    prompt_open=22     probe=LINKED ran=yes 
+parity_wave1b                      ok=17     FAIL=37    alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+parity_zone_source                 ok=465    FAIL=49    alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+parity_jidou_move_yell             ok=60     FAIL=66    alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+ALIAS_PROBE_TOTAL hits=0 probed=4 unusable=0

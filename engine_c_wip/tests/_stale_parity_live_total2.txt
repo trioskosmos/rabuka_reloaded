@@ -1,0 +1,650 @@
+make t-nogate: running T=parity_live_total2 WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_live_total2 src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_live_total2.c
+./rb_verdict ./rb_engine_t_parity_live_total2 parity_live_total2
+== heart colour mapping (rb_parse_heart_color)
+   heart00 -> 0
+   heart01 -> 1
+   heart02 -> 2
+   heart03 -> 3
+   heart04 -> 4
+   heart05 -> 5
+   heart06 -> 6
+   RB_HEART_PINK=0 RB_HEART_RED=1 RB_HEART_YELLOW=2 RB_HEART_GREEN=3 RB_HEART_BLUE=4 RB_HEART_PURPLE=5 RB_HEART_ORANGE=6 RB_HEART_ALL=7 RB_HEART_DRAW=8 RB_HEART_SCORE=9
+== fixture group / unit (group is SERIES-level by design)
+   PL!-pb2-001-PP     id=411    unit=[Printemps] group=[μ's]
+   PL!-bp3-019-L      id=93     unit=[] group=[μ's]
+   PL!-bp3-020-L      id=95     unit=[] group=[μ's]
+   PL!-bp3-021-L      id=99     unit=[] group=[μ's]
+   PL!-pb2-039-L      id=467    unit=[] group=[μ's]
+   PL!-pb2-003-PP     id=415    unit=[Printemps] group=[μ's]
+   PL!HS-bp2-020-L    id=665    unit=[] group=[蓮ノ空]
+   PL!HS-sd1-001-SD   id=903    unit=[スリーズブーケ] group=[蓮ノ空]
+   PL!HS-sd1-002-SD   id=904    unit=[DOLLCHESTRA] group=[蓮ノ空]
+   PL!HS-sd1-003-SD   id=905    unit=[みらくらぱーく！] group=[蓮ノ空]
+   PL!HS-bp1-001-R    id=571    unit=[スリーズブーケ] group=[蓮ノ空]
+   PL!-pb1-029-SRL    id=355    unit=[lily white] group=[μ's]
+   PL!-pb2-013-P＋   id=435    unit=[lily white] group=[μ's]
+   PL!-pb2-025-N      id=453    unit=[lily white] group=[μ's]
+   PL!-bp6-017-N      id=286    unit=[Printemps] group=[μ's]
+   PL!S-bp5-012-N     id=1736   unit=[AZALEA] group=[Aqours]
+   PL!SP-pb2-045-L    id=2529   unit=[] group=[Liella!]
+   PL!SP-sd1-001-SD   id=2554   unit=[CatChu!] group=[Liella!]
+   PL!SP-sd1-002-SD   id=2555   unit=[KALEIDOSCORE] group=[Liella!]
+   PL!-pb2-041-L      id=469    unit=[lily white] group=[μ's]
+   PL!-pb1-029-SRL    id=355    unit=[lily white] group=[μ's]
+   PL!-bp5-023-SRL    id=231    unit=[lily white] group=[μ's]
+   PL!-bp4-025-SRL    id=169    unit=[lily white] group=[μ's]
+   PL!-sd1-021-SD     id=514    unit=[] group=[μ's]
+   PL!-pb2-039-L      id=467    unit=[] group=[μ's]
+   PL!-pb2-002-PP     id=413    unit=[BiBi] group=[μ's]
+   PL!-bp6-017-N      id=286    unit=[Printemps] group=[μ's]
+   PL!-pb2-003-PP     id=415    unit=[Printemps] group=[μ's]
+   PL!-pb2-038-L      id=466    unit=[] group=[μ's]
+   PL!-bp6-017-N      id=286    unit=[Printemps] group=[μ's]
+   PL!-bp5-012-N      id=215    unit=[Printemps] group=[μ's]
+   PL!-pb1-026-N      id=350    unit=[Printemps] group=[μ's]
+   PL!-sd1-010-SD     id=498    unit=[Printemps] group=[μ's]
+   PL!-sd1-013-SD     id=502    unit=[lilywhite] group=[μ's]
+   PL!-sd1-019-SD     id=509    unit=[] group=[μ's]
+   RUST FIXTURE BUG: rb_find_card_by_no("PL!-bp1-029-SRL") = -1 (the real print is PL!-pb1-029-SRL)
+ok: draw-clause: the 控え室 fixture: card identity is PL!-pb2-003-PP
+ok: draw-clause: 高坂穂乃果: card identity is PL!-pb2-001-PP
+DBG HONOKA: cid=411 no=PL!-pb2-001-PP name=高坂穂乃果 unit=[Printemps] group=[μ's] type=member cost=22 blade=9 score=0 has_special=0 special_color=0 special_count=0
+ok: 高坂穂乃果: CENSUS -- the live-start trigger destroyed or duplicated no card
+     高坂穂乃果 [draw-clause: 高坂穂乃果]: 控え室 1 -> 0, hand=1, success=1
+ok: ドローを持つカードがある場合、自分の控え室から『mu's』のカードを1枚手札に加える -- the ドロー card in the 成功ライブカード置き場 must recover a card
+ok: and the zone holds no スコア card, so the live-total bonus must not be granted -- the three clauses are independent, not a chain
+ok: draw-clause: the 控え室 card really left the 控え室 (it went to hand)
+ok: draw-clause: the recovered card really arrived in hand
+ok: 001_draw_icon_recovers_one_mus_card
+== case 001_draw_icon_recovers_one_mus_card                        assertions=7 failures=0
+ok: score-clause: card identity is PL!-pb2-001-PP
+DBG HONOKA: cid=411 no=PL!-pb2-001-PP name=高坂穂乃果 unit=[Printemps] group=[μ's] type=member cost=22 blade=9 score=0 has_special=0 special_color=0 special_count=0
+ok: 高坂穂乃果: CENSUS -- the live-start trigger destroyed or duplicated no card
+     高坂穂乃果 [score-clause]: 控え室 0 -> 0, hand=0, success=1
+ok: score/all-blade clause: the zone fixture: card identity is PL!-bp3-019-L
+ok: score/all-blade clause: the zone fixture is a LIVE card
+ok: score/all-blade clause: with an EMPTY 控え室 the ドロー clause cannot fire, so waited_draw is 0 -- this is the control that the draw-clause positive is really about the ドロー icon
+ok: MEASURED, not asserted as correct: a スコア / 総合ブレード card in the 成功ライブカード置き場 grants nothing observable here. This test records the value; it does not claim it is right
+     score/all-blade clause: p1_constant_total_score_bonus = 0
+ok: all-blade-clause: card identity is PL!-pb2-001-PP
+DBG HONOKA: cid=411 no=PL!-pb2-001-PP name=高坂穂乃果 unit=[Printemps] group=[μ's] type=member cost=22 blade=9 score=0 has_special=0 special_color=0 special_count=0
+ok: 高坂穂乃果: CENSUS -- the live-start trigger destroyed or duplicated no card
+     高坂穂乃果 [all-blade-clause]: 控え室 0 -> 0, hand=0, success=1
+ok: score/all-blade clause: the zone fixture: card identity is PL!-bp3-020-L
+ok: score/all-blade clause: the zone fixture is a LIVE card
+ok: score/all-blade clause: with an EMPTY 控え室 the ドロー clause cannot fire, so waited_draw is 0 -- this is the control that the draw-clause positive is really about the ドロー icon
+ok: MEASURED, not asserted as correct: a スコア / 総合ブレード card in the 成功ライブカード置き場 grants nothing observable here. This test records the value; it does not claim it is right
+     score/all-blade clause: p1_constant_total_score_bonus = 0
+ok: 001_score_and_all_blade_clauses_produce_nothing
+== case 001_score_and_all_blade_clauses_produce_nothing            assertions=12 failures=0
+ok: no-icon: the zone fixture: card identity is PL!-pb2-039-L
+ok: no-icon control: PL!-pb2-039-L carries no スコア icon
+ok: no-icon control: PL!-pb2-039-L carries no ドロー icon
+ok: no-icon control: PL!-pb2-039-L carries no 全ブレード icon
+ok: no-icon: card identity is PL!-pb2-001-PP
+DBG HONOKA: cid=411 no=PL!-pb2-001-PP name=高坂穂乃果 unit=[Printemps] group=[μ's] type=member cost=22 blade=9 score=0 has_special=0 special_color=0 special_count=0
+ok: 高坂穂乃果: CENSUS -- the live-start trigger destroyed or duplicated no card
+     高坂穂乃果 [no-icon]: 控え室 1 -> 1, hand=0, success=1
+ok: PL!-pb2-039-L carries no スコア, no 全ブレード and no ドロー
+ok: and no ドロー card means no recovery, whatever else is waiting
+ok: no-icon control: the 控え室 card is still there -- nothing was recovered
+ok: 001_card_with_none_of_the_icons_fires_nothing
+== case 001_card_with_none_of_the_icons_fires_nothing              assertions=9 failures=0
+ok: empty-success-zone: card identity is PL!-pb2-001-PP
+DBG HONOKA: cid=411 no=PL!-pb2-001-PP name=高坂穂乃果 unit=[Printemps] group=[μ's] type=member cost=22 blade=9 score=0 has_special=0 special_color=0 special_count=0
+ok: 高坂穂乃果: CENSUS -- the live-start trigger destroyed or duplicated no card
+     高坂穂乃果 [empty-success-zone]: 控え室 1 -> 0, hand=1, success=0
+ok: empty-zone control: the 成功ライブカード置き場 really is empty
+ok: an empty success zone scores nothing
+FAIL:  001_empty_success_zone_fires_nothing
+== case 001_empty_success_zone_fires_nothing                       assertions=5 failures=1
+ok: icon fixture: card identity is PL!-bp3-019-L
+ok: icon fixture: card identity is PL!-bp3-020-L
+ok: icon fixture: card identity is PL!-bp3-021-L
+ok: icon fixture: the 控え室 card: card identity is PL!-pb2-003-PP
+DBG SCORE ICON: cid=93 no=PL!-bp3-019-L name=僕らのLIVE 君とのLIFE unit=[] group=[μ's] type=live cost=0 blade=0 score=0 has_special=1 special_color=9 special_count=1
+DBG BALL ICON: cid=95 no=PL!-bp3-020-L name=Snow halation unit=[] group=[μ's] type=live cost=0 blade=0 score=2 has_special=0 special_color=0 special_count=0
+DBG DRAW ICON: cid=99 no=PL!-bp3-021-L name=愛してるばんざーい! unit=[] group=[μ's] type=live cost=0 blade=0 score=6 has_special=1 special_color=8 special_count=1
+ok: PL!-bp3-019-L must carry スコア
+ok: PL!-bp3-020-L must carry 全ブレード -- and that icon is blade_heart.b_all, NOT special_heart, which only ever holds score and draw
+ok: PL!-bp3-021-L must carry ドロー
+ok: the card in the 控え室: PL!-pb2-003-PP is in the group "μ's"
+ok: 001_fixtures_carry_exactly_the_icon_under_test
+== case 001_fixtures_carry_exactly_the_icon_under_test             assertions=8 failures=0
+ok: link to the FUTURE: card identity is PL!HS-bp2-020-L
+ok: link to the FUTURE stage 0: card identity is PL!HS-sd1-001-SD
+ok: link to the FUTURE stage 1: card identity is PL!HS-sd1-002-SD
+ok: link to the FUTURE stage 2: card identity is PL!HS-sd1-003-SD
+DBG LINK: cid=665 abilities=2
+DBG LINK[0]: triggers=常時 effect action=set_card_identity target=-
+DBG LINK[0]   extra group_names=\xE3\x82\xB9\xE3\x83\xAA\xE3\x83\xBC\xE3\x82\xBA\xE3\x83\x96\xE3\x83\xBC\xE3\x82\xB1,DOLLCHESTRA,\xE3\x81\xBF\xE3\x82\x89\xE3\x81\x8F\xE3\x82\x89\xE3\x81\xB1\xE3\x83\xBC\xE3\x81\x8F\xEF\xBC\x81
+DBG LINK[0]   extra identities=\xE3\x82\xB9\xE3\x83\xAA\xE3\x83\xBC\xE3\x82\xBA\xE3\x83\x96\xE3\x83\xBC\xE3\x82\xB1,DOLLCHESTRA,\xE3\x81\xBF\xE3\x82\x89\xE3\x81\x8F\xE3\x82\x89\xE3\x81\xB1\xE3\x83\xBC\xE3\x81\x8F\xEF\xBC\x81
+DBG LINK[0]   extra all_regions=true
+DBG LINK[0]   extra self_target=true
+DBG LINK[0]   extra all=true
+DBG LINK[1]: triggers=ライブ開始時 effect action=modify_score target=self
+DBG LINK[1]   extra value=2
+DBG LINK[1]   extra operation=add
+DBG LINK[1]   extra self_target=true
+DBG LINK[1]   extra per_unit=true
+DBG LINK[1]   extra per_unit_type=\xE4\xBA\xBA
+DBG LINK[1]   extra group_names=\xE8\x93\xAE\xE3\x83\x8E\xE7\xA9\xBA
+DBG LINK[1]   extra distinct=card_name
+DBG LINK[1]   extra location=stage
+ok: stage 0 fixture: PL!HS-sd1-001-SD is in the group "蓮ノ空"
+ok: stage 1 fixture: PL!HS-sd1-002-SD is in the group "蓮ノ空"
+ok: stage 2 fixture: PL!HS-sd1-003-SD is in the group "蓮ノ空"
+ok: stage 0 vs 1: PL!HS-sd1-001-SD (日野下花帆) and PL!HS-sd1-002-SD (村野さやか) differ by name
+ok: stage 0 vs 2: PL!HS-sd1-001-SD (日野下花帆) and PL!HS-sd1-003-SD (大沢瑠璃乃) differ by name
+ok: stage 1 vs 2: PL!HS-sd1-002-SD (村野さやか) and PL!HS-sd1-003-SD (大沢瑠璃乃) differ by name
+ok: link: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: link control: all three 蓮ノ空 members are still on the stage
+ok: 3 distinct 蓮ノ空 members should give +6 score mod (2 each)
+ok: 020_three_distinct_group_members_add_six
+== case 020_three_distinct_group_members_add_six                   assertions=13 failures=0
+ok: link to the FUTURE, one member: card identity is PL!HS-bp2-020-L
+ok: link to the FUTURE, one member: card identity is PL!HS-bp1-001-R
+ok: the one 蓮ノ空 member: PL!HS-bp1-001-R is in the group "蓮ノ空"
+ok: link one member: CENSUS
+ok: link one member control: exactly one member is on the stage
+ok: 1 蓮ノ空 member should give +2 score mod
+ok: 020_one_group_member_adds_two
+== case 020_one_group_member_adds_two                              assertions=6 failures=0
+ok: link to the FUTURE, no members: card identity is PL!HS-bp2-020-L
+ok: link no members: CENSUS
+ok: link no members control: the stage really is empty
+ok: Score should be 0 when no 蓮ノ空 members on stage
+ok: 020_no_group_members_adds_no_score
+== case 020_no_group_members_adds_no_score                         assertions=4 failures=0
+ok: 029 positive: 園田海未 (fullwidth-plus print): card identity is PL!-pb2-013-P＋
+ok: 029 positive: the stage fixture: PL!-pb2-013-P＋ is in the group "lily white"
+ok: 知らないLove＊教えてLove: card identity is PL!-pb1-029-SRL
+DBG LOVE-029: cid=355 abilities=1
+DBG LOVE-029[0]: triggers=ライブ開始時 effect action=modify_score target=-
+DBG LOVE-029[0]   extra value=1
+DBG LOVE-029[0]   extra operation=add
+DBG LOVE-029[0]   extra self_target=true
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: 成功ライブカード置き場のカードが0枚 and ステージが『lily white』のみ -- both clauses hold, so +1
+ok: 029_empty_zone_and_all_lily_white_scores_plus_one
+== case 029_empty_zone_and_all_lily_white_scores_plus_one          assertions=6 failures=0
+ok: 029 two members: slot 0: card identity is PL!-pb2-013-P＋
+ok: 029 two members: slot 1: card identity is PL!-pb2-025-N
+ok: 029 two members: slot 0: PL!-pb2-013-P＋ is in the group "lily white"
+ok: 029 two members: slot 1: PL!-pb2-025-N is in the group "lily white"
+ok: 029 two members: PL!-pb2-013-P＋ (園田海未) and PL!-pb2-025-N (東條 希) differ by name
+ok: 知らないLove＊教えてLove: card identity is PL!-pb1-029-SRL
+DBG LOVE-029: cid=355 abilities=1
+DBG LOVE-029[0]: triggers=ライブ開始時 effect action=modify_score target=-
+DBG LOVE-029[0]   extra value=1
+DBG LOVE-029[0]   extra operation=add
+DBG LOVE-029[0]   extra self_target=true
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: the effect is a flat +1 on the live, not a per-member count
+ok: 029_two_lily_white_members_still_score_only_one
+== case 029_two_lily_white_members_still_score_only_one            assertions=9 failures=0
+ok: 029 zone-blocks: stage: card identity is PL!-pb2-013-P＋
+ok: 029 zone-blocks: the success-zone card: card identity is PL!-sd1-019-SD
+ok: 029 zone-blocks control: the stage clause still holds
+ok: 知らないLove＊教えてLove: card identity is PL!-pb1-029-SRL
+DBG LOVE-029: cid=355 abilities=1
+DBG LOVE-029[0]: triggers=ライブ開始時 effect action=modify_score target=-
+DBG LOVE-029[0]   extra value=1
+DBG LOVE-029[0]   extra operation=add
+DBG LOVE-029[0]   extra self_target=true
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: 成功ライブカード置き場のカードが0枚 is required -- one card breaks it even though the stage clause still holds
+ok: 029_a_card_in_the_success_zone_blocks_the_bonus
+== case 029_a_card_in_the_success_zone_blocks_the_bonus            assertions=7 failures=0
+ok: 029 mu's-breaks: slot 0: card identity is PL!-pb2-013-P＋
+ok: 029 mu's-breaks: slot 1: card identity is PL!-bp6-017-N
+ok: 029 mu's-breaks: the intruder really is a mu's member: PL!-bp6-017-N is in the group "μ's"
+ok: 知らないLove＊教えてLove: card identity is PL!-pb1-029-SRL
+DBG LOVE-029: cid=355 abilities=1
+DBG LOVE-029[0]: triggers=ライブ開始時 effect action=modify_score target=-
+DBG LOVE-029[0]   extra value=1
+DBG LOVE-029[0]   extra operation=add
+DBG LOVE-029[0]   extra self_target=true
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: メンバーが『lily white』のみ is required -- one mu's member alongside breaks exclusivity even though the success zone is empty
+ok: 029_a_non_lily_white_member_blocks_the_bonus
+== case 029_a_non_lily_white_member_blocks_the_bonus               assertions=7 failures=0
+ok: 029 AZALEA-breaks: slot 0: card identity is PL!-pb2-013-P＋
+ok: 029 AZALEA-breaks: slot 1: card identity is PL!S-bp5-012-N
+ok: 029 AZALEA-breaks: the intruder is an AZALEA member: PL!S-bp5-012-N is in the group "AZALEA"
+ok: 029 AZALEA-breaks control: the intruder is NOT a lily white member -- both its unit and its series differ from the lily white fixtures
+ok: 029 AZALEA-breaks control: the intruder is an Aqours-series card, so this case differs from the previous one by BOTH unit and series
+     029 AZALEA-breaks: PL!S-bp5-012-N unit=[AZALEA] group=[Aqours]
+ok: 知らないLove＊教えてLove: card identity is PL!-pb1-029-SRL
+DBG LOVE-029: cid=355 abilities=1
+DBG LOVE-029[0]: triggers=ライブ開始時 effect action=modify_score target=-
+DBG LOVE-029[0]   extra value=1
+DBG LOVE-029[0]   extra operation=add
+DBG LOVE-029[0]   extra self_target=true
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: exclusivity is over the whole stage, so an unrelated unit also breaks it
+ok: 029_a_non_mus_unit_also_breaks_exclusivity
+== case 029_a_non_mus_unit_also_breaks_exclusivity                 assertions=9 failures=0
+ok: 029 both-broken: stage: card identity is PL!-bp6-017-N
+ok: 029 both-broken: the success-zone card: card identity is PL!-sd1-019-SD
+ok: 知らないLove＊教えてLove: card identity is PL!-pb1-029-SRL
+DBG LOVE-029: cid=355 abilities=1
+DBG LOVE-029[0]: triggers=ライブ開始時 effect action=modify_score target=-
+DBG LOVE-029[0]   extra value=1
+DBG LOVE-029[0]   extra operation=add
+DBG LOVE-029[0]   extra self_target=true
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: neither clause holds, so no bonus
+ok: 029_both_clauses_broken_scores_nothing
+== case 029_both_clauses_broken_scores_nothing                     assertions=6 failures=0
+ok: 029 lone lily white: card identity is PL!-pb2-013-P＋
+ok: 029 lone lily white: PL!-pb2-013-P＋ is in the group "lily white"
+ok: 知らないLove＊教えてLove: card identity is PL!-pb1-029-SRL
+DBG LOVE-029: cid=355 abilities=1
+DBG LOVE-029[0]: triggers=ライブ開始時 effect action=modify_score target=-
+DBG LOVE-029[0]   extra value=1
+DBG LOVE-029[0]   extra operation=add
+DBG LOVE-029[0]   extra self_target=true
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: precondition check for exclusivity: a lone lily white member satisfies のみ
+ok: 029_single_lily_white_alone_qualifies
+== case 029_single_lily_white_alone_qualifies                      assertions=6 failures=0
+ok: 知らないLove＊教えてLove: card identity is PL!-pb1-029-SRL
+DBG LOVE-029: cid=355 abilities=1
+DBG LOVE-029[0]: triggers=ライブ開始時 effect action=modify_score target=-
+DBG LOVE-029[0]   extra value=1
+DBG LOVE-029[0]   extra operation=add
+DBG LOVE-029[0]   extra self_target=true
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: empty stage must resolve to 0 or 1, got 0
+     029 empty stage: のみ over an EMPTY stage resolved to 0 (the card text does not settle this; recorded, not blessed)
+ok: 029_empty_stage_is_recorded_as_vacuous
+== case 029_empty_stage_is_recorded_as_vacuous                     assertions=4 failures=0
+ok: zettai LOVER: card identity is PL!SP-pb2-045-L
+ok: zettai LOVER: 澁谷かのん (4 hearts): card identity is PL!SP-sd1-001-SD
+ok: zettai LOVER: 唐 可可 (3 hearts): card identity is PL!SP-sd1-002-SD
+DBG LOVER: cid=2529 abilities=1
+DBG LOVER[0]: triggers=ライブ開始時 effect action=modify_score target=self
+DBG LOVER[0]   extra value=1
+DBG LOVER[0]   extra operation=add
+DBG LOVER[0]   extra self_target=true
+DBG LOVER[0]   extra per_unit=true
+DBG LOVER[0]   extra per_unit_type=\xE4\xBA\xBA
+DBG LOVER[0]   extra group_names=Liella!
+DBG LOVER[0]   extra location=stage
+DBG LOVER[0]   extra need_heart_total=4
+DBG LOVER[0]   extra need_heart_operator=>=
+ok: 澁谷かのん must carry 4 BASE hearts (qualifies)
+ok: 唐 可可 must carry 3 BASE hearts (does not qualify)
+ok: 澁谷かのん is a Liella! member: PL!SP-sd1-001-SD is in the group "Liella!"
+ok: 唐 可可 is a Liella! member: PL!SP-sd1-002-SD is in the group "Liella!"
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: Live card should have at least +1 score from 1 qualifying member (got 1)
+ok: Live card should have at most +1 score (only 1 member with 4+ hearts, got 1)
+ok: 045_heart4_member_gets_score_one_heart3_not
+== case 045_heart4_member_gets_score_one_heart3_not                assertions=11 failures=0
+ok: zettai LOVER: no member qualifies: card identity is PL!SP-pb2-045-L
+ok: zettai LOVER: 唐 可可: card identity is PL!SP-sd1-002-SD
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: No score bonus when no member has 4+ hearts
+ok: zettai LOVER negative control: exactly one member, and it is the 3-heart one
+ok: 045_no_member_meets_heart_threshold
+== case 045_no_member_meets_heart_threshold                        assertions=6 failures=0
+ok: zettai LOVER: non-Liella excluded: card identity is PL!SP-pb2-045-L
+ok: zettai LOVER: 澁谷かのん: card identity is PL!SP-sd1-001-SD
+ok: zettai LOVER: 高坂 穂乃果 (mu's, NOT Liella!): card identity is PL!-sd1-010-SD
+ok: 澁谷かのん is a Liella! member: PL!SP-sd1-001-SD is in the group "Liella!"
+ok: 高坂 穂乃果 is a mu's member, not Liella!: PL!-sd1-010-SD is in the group "μ's"
+ok: zettai LOVER control: the excluded member really is outside 『Liella!』
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: Only 1 Liella! member should count (non-Liella! excluded)
+ok: 045_non_liella_high_heart_not_counted
+== case 045_non_liella_high_heart_not_counted                      assertions=9 failures=0
+ok: 041 positive: card identity is PL!-pb2-041-L
+ok: 041 positive: the cheap lily white: card identity is PL!-pb1-029-SRL
+ok: 041 positive: the mid lily white: card identity is PL!-bp5-023-SRL
+DBG ROMANTIC: cid=469 abilities=2
+DBG ROMANTIC[0]: triggers=常時 effect action=count_as_multiple target=self
+DBG ROMANTIC[0]   extra duration=as_long_as
+DBG ROMANTIC[0]   extra conditional=true
+DBG ROMANTIC[0]   extra self_target=true
+DBG ROMANTIC[0]   extra count_as=2
+DBG ROMANTIC[0]   extra counted_by=lily white
+DBG ROMANTIC[1]: triggers=ライブ開始時 effect action=modify_score target=-
+DBG ROMANTIC[1]   extra value=1
+DBG ROMANTIC[1]   extra operation=add
+DBG ROMANTIC[1]   extra self_target=true
+ok: RUST FIXTURE BUG: PL!-bp1-029-SRL (as spelled in live_start_lily_white_success_zone_count_pl_pb2_041_l_test.rs:15) does not exist in cards.json; the real print is PL!-pb1-029-SRL, used below
+ok: PL!-pb2-041-L: the ENGINE's decoded score is 7 (cards.json also says 7)
+ok: 041 positive control: two distinct cards
+ok: 041 positive: success-zone fixture: PL!-pb1-029-SRL is in the group "lily white"
+ok: 041 positive: success-zone fixture: PL!-bp5-023-SRL is in the group "lily white"
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: 自分の成功ライブカード置き場に『lily white』のカードが2枚以上ある場合、このカードのスコアを+1する -- two qualifying cards must give exactly +1
+ok: 041_two_lily_white_success_cards_score_plus_one
+== case 041_two_lily_white_success_cards_score_plus_one            assertions=11 failures=0
+ok: 041 one card: card identity is PL!-pb2-041-L
+ok: 041 one card: card identity is PL!-pb1-029-SRL
+ok: 041 one card: the fixture: PL!-pb1-029-SRL is in the group "lily white"
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: the threshold is 2枚以上 -- a single qualifying card must not score
+ok: 041_one_lily_white_success_card_scores_zero
+== case 041_one_lily_white_success_card_scores_zero                assertions=6 failures=0
+ok: 041 three cards: card identity is PL!-pb2-041-L
+ok: 041 three cards: card identity is PL!-pb1-029-SRL
+ok: 041 three cards: card identity is PL!-bp5-023-SRL
+ok: 041 three cards: card identity is PL!-bp4-025-SRL
+ok: 041 three cards: the third fixture: PL!-bp4-025-SRL is in the group "lily white"
+DBG LW_THIRD: cid=169 no=PL!-bp4-025-SRL name=微熱からMystery unit=[lily white] group=[μ's] type=live cost=0 blade=0 score=5 has_special=1 special_color=8 special_count=1
+DBG LW_THIRD: cid=169 abilities=0
+     041 three-cards DIAGNOSTIC: 2 lily white + 1 NON-lily-white in the zone, same walk -> -999 (-999 = the walk stalled again)
+FAIL:  041_three_lily_white_success_cards_still_one
+== case 041_three_lily_white_success_cards_still_one               assertions=6 failures=3
+ok: 041 hand case: card identity is PL!-pb2-041-L
+ok: 041 hand case: card identity is PL!-pb1-029-SRL
+ok: 041 hand case: card identity is PL!-bp5-023-SRL
+ok: 041 hand case: hand fixture: PL!-pb1-029-SRL is in the group "lily white"
+ok: 041 hand case: hand fixture: PL!-bp5-023-SRL is in the group "lily white"
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: the condition reads 自分の成功ライブカード置き場 only -- two lily white cards in hand must not satisfy it
+ok: 041_lily_white_cards_in_hand_do_not_count
+== case 041_lily_white_cards_in_hand_do_not_count                  assertions=8 failures=0
+ok: 041 mu's case: card identity is PL!-pb2-041-L
+ok: 041 mu's case: card identity is PL!-sd1-021-SD
+ok: 041 mu's case: the success-zone fixture: PL!-sd1-021-SD is in the group "μ's"
+ok: 041 mu's case control: the fixture really is outside 『lily white』
+ok: 041 mu's case control: the fixture really is a live card
+ok: 041 mu's case: the Rust pushes the SAME id twice (game.id is not new_id); kept faithful -- the zone holds two entries either way
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: 『lily white』のカードが2枚以上 -- two mu's lives do not satisfy the group filter
+ok: 041_non_lily_white_success_cards_do_not_count
+== case 041_non_lily_white_success_cards_do_not_count              assertions=9 failures=0
+ok: 041 empty zone: card identity is PL!-pb2-041-L
+ok: CENSUS -- the ライブ開始時 window destroyed or duplicated no card
+ok: CENSUS control -- the live card is in the live card zone
+ok: an empty 成功ライブカード置き場 cannot satisfy 2枚以上
+ok: 041_empty_success_zone_scores_zero
+== case 041_empty_success_zone_scores_zero                         assertions=4 failures=0
+ok: 039 fixture: card identity is PL!-pb2-002-PP
+ok: 039 fixture: card identity is PL!-bp6-017-N
+ok: 039 fixture: card identity is PL!-pb2-003-PP
+ok: 039 fixture: must be a mu's member: PL!-pb2-002-PP is in the group "μ's"
+ok: 039 fixture: must be a mu's member: PL!-bp6-017-N is in the group "μ's"
+ok: 039 fixture: must be a mu's member: PL!-pb2-003-PP is in the group "μ's"
+ok: 039 fixture: PL!-pb2-002-PP (絢瀬絵里) and PL!-bp6-017-N (小泉花陽) differ by name
+ok: 039 fixture: PL!-pb2-002-PP (絢瀬絵里) and PL!-pb2-003-PP (南ことり) differ by name
+ok: 039 fixture: PL!-bp6-017-N (小泉花陽) and PL!-pb2-003-PP (南ことり) differ by name
+ok: 039 fixture: the two fixtures sit in DIFFERENT units on purpose, and mu's spans both
+     039 units: PL!-pb2-002-PP = [BiBi], PL!-bp6-017-N = [Printemps]
+ok: 039_fixtures_span_distinct_mus_names
+== case 039_fixtures_span_distinct_mus_names                       assertions=10 failures=0
+ok: 039: the subject live is in the live card zone
+ok: 039: the revealed-card list holds exactly what was placed
+ok: 039: CENSUS -- the live-success trigger destroyed or duplicated no card
+ok: no members at all -- no bonus
+FAIL:  039_an_empty_pool_scores_nothing
+== case 039_an_empty_pool_scores_nothing                           assertions=5 failures=1
+ok: 039 negative: staged: card identity is PL!S-bp5-012-N
+ok: 039 negative control: a staged AZALEA member is NOT mu's (Aqours series)
+ok: 039: the subject live is in the live card zone
+ok: 039: the revealed-card list holds exactly what was placed
+ok: 039: CENSUS -- the live-success trigger destroyed or duplicated no card
+ok: 『mu's』のメンバー -- a staged AZALEA member is not mu's
+ok: 039 negative: revealed: card identity is PL!S-bp5-012-N
+ok: 039 negative control: a revealed AZALEA member is NOT mu's either
+ok: 039: the subject live is in the live card zone
+ok: 039: the revealed-card list holds exactly what was placed
+ok: 039: CENSUS -- the live-success trigger destroyed or duplicated no card
+ok: 『mu's』のメンバー -- a revealed AZALEA member is not mu's either
+FAIL:  039_a_non_mus_member_produces_no_bonus
+== case 039_a_non_mus_member_produces_no_bonus                     assertions=14 failures=2
+ok: 039: the subject live: card identity is PL!-pb2-039-L
+DBG HIKARI: cid=467 abilities=2
+DBG HIKARI[0]: triggers=ライブ開始時 effect action=modify_yell_count target=-
+DBG HIKARI[0]   extra operation=add
+DBG HIKARI[0]   extra duration=live_end
+DBG HIKARI[1]: triggers=ライブ成功時 effect action=modify_score target=self
+DBG HIKARI[1]   extra value=1
+DBG HIKARI[1]   extra operation=add
+DBG HIKARI[1]   extra self_target=true
+DBG HIKARI[1]   extra per_unit=true
+DBG HIKARI[1]   extra per_unit_type=\xE4\xBA\xBA
+DBG HIKARI[1]   extra group_names=\xCE\xBC's
+DBG HIKARI[1]   extra distinct=card_name
+ok: PL!-pb2-039-L must have a ライブ成功時 ability for this file to be about anything
+ok: このカードのスコアを+1する (action=modify_score)
+ok: 1人につき -- per_unit
+ok: 名前の異なる『mu's』のメンバー -- distinct by name
+ok: 039: the subject live is in the live card zone
+ok: 039: the revealed-card list holds exactly what was placed
+ok: 039: CENSUS -- the live-success trigger destroyed or duplicated no card
+     039 POSITIVE CONTROL: 2 distinct mu's members on stage -> score mod 0
+FAIL:  039_the_live_success_harness_fires_the_ability
+== case 039_the_live_success_harness_fires_the_ability             assertions=10 failures=2
+ok: 038 success-zone positive: slot 0: card identity is PL!-bp6-017-N
+ok: 038 success-zone positive: slot 1: card identity is PL!-bp5-012-N
+ok: 038 stage fixture: PL!-bp6-017-N is in the group "μ's"
+ok: 038 stage fixture: PL!-bp5-012-N is in the group "μ's"
+ok: 038: 嵐のなかの恋だから: card identity is PL!-pb2-038-L
+ok: PL!-pb2-038-L: the ENGINE's decoded score is 5 (cards.json also says 5)
+DBG LOVE-038: cid=466 no=PL!-pb2-038-L name=嵐のなかの恋だから unit=[] group=[μ's] type=live cost=0 blade=0 score=5 has_special=1 special_color=8 special_count=1
+DBG LOVE-038: cid=466 abilities=1
+DBG LOVE-038[0]: triggers=常時 effect action=modify_score target=live_total
+DBG LOVE-038[0]   extra value=1
+DBG LOVE-038[0]   extra operation=add
+DBG LOVE-038[0]   extra non_stackable=true
+ok: 038: CENSUS -- recalculate_constants destroyed or duplicated no card
+ok: 成功ライブカード置き場にあり and 2人の『mu's』のメンバーのみ -- both clauses hold
+ok: 038_in_success_zone_with_two_mus_scores_plus_one
+== case 038_in_success_zone_with_two_mus_scores_plus_one           assertions=8 failures=0
+ok: 038 live-zone positive: slot 0: card identity is PL!-bp6-017-N
+ok: 038 live-zone positive: slot 1: card identity is PL!-bp5-012-N
+ok: 038: 嵐のなかの恋だから: card identity is PL!-pb2-038-L
+ok: PL!-pb2-038-L: the ENGINE's decoded score is 5 (cards.json also says 5)
+DBG LOVE-038: cid=466 no=PL!-pb2-038-L name=嵐のなかの恋だから unit=[] group=[μ's] type=live cost=0 blade=0 score=5 has_special=1 special_color=8 special_count=1
+DBG LOVE-038: cid=466 abilities=1
+DBG LOVE-038[0]: triggers=常時 effect action=modify_score target=live_total
+DBG LOVE-038[0]   extra value=1
+DBG LOVE-038[0]   extra operation=add
+DBG LOVE-038[0]   extra non_stackable=true
+ok: 038: CENSUS -- recalculate_constants destroyed or duplicated no card
+FAIL:  038_in_live_zone_with_two_mus_also_plus_one
+== case 038_in_live_zone_with_two_mus_also_plus_one                assertions=6 failures=1
+ok: 038 one member: card identity is PL!-bp6-017-N
+ok: 038: 嵐のなかの恋だから: card identity is PL!-pb2-038-L
+ok: PL!-pb2-038-L: the ENGINE's decoded score is 5 (cards.json also says 5)
+DBG LOVE-038: cid=466 no=PL!-pb2-038-L name=嵐のなかの恋だから unit=[] group=[μ's] type=live cost=0 blade=0 score=5 has_special=1 special_color=8 special_count=1
+DBG LOVE-038: cid=466 abilities=1
+DBG LOVE-038[0]: triggers=常時 effect action=modify_score target=live_total
+DBG LOVE-038[0]   extra value=1
+DBG LOVE-038[0]   extra operation=add
+DBG LOVE-038[0]   extra non_stackable=true
+ok: 038: CENSUS -- recalculate_constants destroyed or duplicated no card
+ok: 2人の『mu's』のメンバーのみ -- a single member does not satisfy 2人
+ok: 038_one_member_is_not_enough
+== case 038_one_member_is_not_enough                               assertions=5 failures=0
+ok: 038 three members: slot 0: card identity is PL!-bp6-017-N
+ok: 038 three members: slot 1: card identity is PL!-bp5-012-N
+ok: 038 three members: slot 2: card identity is PL!-pb1-026-N
+ok: 038 stage fixture: the third mu's member: PL!-pb1-026-N is in the group "μ's"
+ok: 038: 嵐のなかの恋だから: card identity is PL!-pb2-038-L
+ok: PL!-pb2-038-L: the ENGINE's decoded score is 5 (cards.json also says 5)
+DBG LOVE-038: cid=466 no=PL!-pb2-038-L name=嵐のなかの恋だから unit=[] group=[μ's] type=live cost=0 blade=0 score=5 has_special=1 special_color=8 special_count=1
+DBG LOVE-038: cid=466 abilities=1
+DBG LOVE-038[0]: triggers=常時 effect action=modify_score target=live_total
+DBG LOVE-038[0]   extra value=1
+DBG LOVE-038[0]   extra operation=add
+DBG LOVE-038[0]   extra non_stackable=true
+ok: 038: CENSUS -- recalculate_constants destroyed or duplicated no card
+FAIL:  038_three_members_do_not_satisfy_exactly_two
+== case 038_three_members_do_not_satisfy_exactly_two               assertions=8 failures=1
+ok: 038 AZALEA breaks: slot 0: card identity is PL!-bp6-017-N
+ok: 038 AZALEA breaks: slot 1: card identity is PL!S-bp5-012-N
+ok: 038 AZALEA breaks: the intruder is an AZALEA member: PL!S-bp5-012-N is in the group "AZALEA"
+ok: 038: 嵐のなかの恋だから: card identity is PL!-pb2-038-L
+ok: PL!-pb2-038-L: the ENGINE's decoded score is 5 (cards.json also says 5)
+DBG LOVE-038: cid=466 no=PL!-pb2-038-L name=嵐のなかの恋だから unit=[] group=[μ's] type=live cost=0 blade=0 score=5 has_special=1 special_color=8 special_count=1
+DBG LOVE-038: cid=466 abilities=1
+DBG LOVE-038[0]: triggers=常時 effect action=modify_score target=live_total
+DBG LOVE-038[0]   extra value=1
+DBG LOVE-038[0]   extra operation=add
+DBG LOVE-038[0]   extra non_stackable=true
+ok: 038: CENSUS -- recalculate_constants destroyed or duplicated no card
+ok: 『mu's』のメンバーのみ -- an AZALEA member alongside breaks exclusivity
+ok: 038_a_non_mus_member_breaks_exclusivity
+== case 038_a_non_mus_member_breaks_exclusivity                    assertions=7 failures=0
+ok: 038: out of both zones: card identity is PL!-pb2-038-L
+ok: 038: CENSUS
+ok: 038 out-of-zones control: the live card zone really is empty
+ok: 038 out-of-zones control: the success live card zone really is empty
+ok: このカードが自分のライブカード置き場か成功ライブカード置き場にあり -- a card in neither zone is not the subject, so the constant does not apply
+ok: 038_out_of_both_live_zones_grants_nothing
+== case 038_out_of_both_live_zones_grants_nothing                  assertions=5 failures=0
+ok: 038 non-stackable: card identity is PL!-pb2-038-L
+ok: 038 non-stackable: both copies were minted
+ok: 038 non-stackable control: the two copies are DISTINCT card ids (mid(), not test_id())
+ok: precondition: a single copy contributes +1 to ライブの合計スコア
+ok: この効果は重複しない -- a second copy must not raise the total to 2
+ok: 038 non-stackable: CENSUS -- adding the second copy destroyed or duplicated no card
+ok: 038 non-stackable: CENSUS -- exactly one card was added between the two baselines
+ok: 038_two_copies_do_not_stack
+== case 038_two_copies_do_not_stack                                assertions=7 failures=0
+ok: 038 one-per-zone: the performing copy: card identity is PL!-pb2-038-L
+ok: 038 one-per-zone control: the two copies are DISTINCT card ids (mid(), not test_id())
+ok: 038 one-per-zone: CENSUS
+ok: 038 one-per-zone control: one copy really is in the live card zone
+ok: 038 one-per-zone control: one copy really is in the success live card zone
+ok: one copy in ライブカード置き場 and one in 成功ライブカード置き場 -- both satisfy the zone disjunction, but この効果は重複しない, so the total must stay at +1. A value of 2 means non_stackable is de-duplicating per zone rather than per ability
+ok: 038_one_copy_in_each_live_zone_still_scores_one
+== case 038_one_copy_in_each_live_zone_still_scores_one            assertions=6 failures=0
+
+37 cases, 279 assertions, 11 failures
+LIVE TOTAL-2 PARITY: RED
+FAILED: parity_live_total2  [exit=1, 18 result line(s): assert=18 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=7]
+
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=411 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=411 ab=0 queued=1
+[DBG_GAIN] actor=0 host=411 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=μ's self_tgt= nsel=0 cond=0
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=411 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=411 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=411 ab=0 queued=1
+[DBG_GAIN] actor=0 host=411 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=μ's self_tgt= nsel=0 cond=0
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+FAIL: there is nothing in the zone to key on
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=665 ab=1 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=904 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=905 ab=0 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=1 n=3 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=2 n=3 cid=905 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0xa0018b520 eff=0x0 cur=1 n=3 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=0 slot=0 cid=903 target=
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=stage target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0xa0018b520 eff=0x0 cur=2 n=3 state=3 pending=1
+[STAGE_TARGET_RESULT] pick=0 slot=0 cid=903 target=
+[CHOICE_RESUME_END] pending=0 state=0 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=665 ab=1 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=665 ab=1 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=355 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=355 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=355 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=355 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=355 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=355 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=355 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=355 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2529 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2529 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2529 ab=0 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=469 ab=1 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=469 ab=1 queued=1
+DBG advance_to: gave up with no prompt standing; trace Energy(p=0)
+FAIL: live-start driver: never reached the live-card set phase (stopped at Energy)
+     live-start driver zone dump: hand=3 deck=30 energy=0 energy_deck=0 waitroom=0 live=0 success=3 stage=0 active=1 first=0 second=1 turn=1 pending=0
+FAIL: 2枚以上 gates the effect on once -- three qualifying cards must still be +1, not +2 (got -999 expected 1)
+DBG advance_to: gave up with no prompt standing; trace Energy(p=0)
+FAIL: live-start driver: never reached the live-card set phase (stopped at Energy)
+     live-start driver zone dump: hand=3 deck=30 energy=0 energy_deck=0 waitroom=0 live=0 success=3 stage=0 active=1 first=0 second=1 turn=1 pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=4 hand_after=5
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=469 ab=1 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=469 ab=1 queued=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=469 ab=1 queued=1
+FAIL: 039: the ライブ成功時 window is genuinely open (live zone non-empty AND live_success[0] set) -- a zero below cannot be a closed window
+FAIL: 039: the ライブ成功時 window is genuinely open (live zone non-empty AND live_success[0] set) -- a zero below cannot be a closed window
+FAIL: 039: the ライブ成功時 window is genuinely open (live zone non-empty AND live_success[0] set) -- a zero below cannot be a closed window
+FAIL: 039: the ライブ成功時 window is genuinely open (live zone non-empty AND live_success[0] set) -- a zero below cannot be a closed window
+FAIL: POSITIVE CONTROL: 2 differently-named mu's members must give +2 score (Rust records +0 for every case in this file -- see the header; if this line is red, the per-unit + group-filtered modify_score path is still the unfixed general gap the Rust documents) (got 0 expected 2)
+FAIL: ライブカード置き場**か**成功ライブカード置き場 -- the live card zone is the other half of the same disjunction, so it scores too (got 0 expected 1)
+FAIL: 2人のみ is a count of exactly two, so three mu's members must NOT qualify (got 1 expected 0)
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

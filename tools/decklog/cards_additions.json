@@ -1,0 +1,220 @@
+[
+ {
+  "card_no": "PL!-PR-022-PR",
+  "name": "西木野真姫",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!-PR-022-PR.png",
+  "_img": "img/cards/PR/PL!-PR-022-PR.png",
+  "rare": "PR",
+  "type": "メンバー",
+  "cost": 13,
+  "blade": 3,
+  "ability": "{{kidou.png|起動}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：自分のステージに「星空 凛」か「小泉花陽」がいる場合、カードを2枚引き、手札を1枚控え室に置く。2人といる場合、さらにこのメンバーをアクティブにする。"
+ },
+ {
+  "card_no": "PL!-PR-023-PR",
+  "name": "絢瀬絵里",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!-PR-023-PR.png",
+  "_img": "img/cards/PR/PL!-PR-023-PR.png",
+  "rare": "PR",
+  "type": "メンバー",
+  "cost": 11,
+  "blade": 3,
+  "ability": "{{jidou.png|自動}}{{turn2.png|ターン2回}}{{turn1.png|ターン1回}}自分が相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_all.png|ハート}}を得る。\n{{kidou.png|起動}}{{turn1.png|ターン1回}}メンバー1人をウェイトにし、手札を1枚控え室に置く：カードを1枚引く。"
+ },
+ {
+  "card_no": "PL!HS-PR-038-PR",
+  "name": "セラス 柳田 リリエンフェルト",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!HS-PR-038-PR.png",
+  "_img": "img/cards/PR/PL!HS-PR-038-PR.png",
+  "rare": "PR",
+  "type": "メンバー",
+  "cost": 4,
+  "blade": 3,
+  "ability": "{{toujyou.png|登場}}手札以外から登場したとき、ライブ終了時まで、{{icon_all.png|ハート}}を得る。\n{{live_success.png|ライブ成功時}}相手のステージにいるコスト4以下のメンバー1人をウェイトにする。それは次のターンのアクティブフェイズにアクティブにならない。"
+ },
+ {
+  "card_no": "PL!HS-PR-039-PR",
+  "name": "百生吟子",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!HS-PR-039-PR.png",
+  "_img": "img/cards/PR/PL!HS-PR-039-PR.png",
+  "rare": "PR",
+  "type": "メンバー",
+  "cost": 15,
+  "blade": 5,
+  "ability": "{{toujyou.png|登場}}自分のデッキの上から、10から自分の手札の枚数を引いた数に等しい枚数のカードを見る。その中から2枚まで手札に加える。残りを控え室に置く。"
+ },
+ {
+  "card_no": "PL!HS-PR-040-PR",
+  "name": "安養寺姫芽",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!HS-PR-040-PR.png",
+  "_img": "img/cards/PR/PL!HS-PR-040-PR.png",
+  "rare": "PR",
+  "type": "メンバー",
+  "cost": 4,
+  "blade": 1,
+  "ability": null
+ },
+ {
+  "card_no": "PL!HS-PR-041-PR＋",
+  "name": "百生吟子",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!HS-PR-041-PR2.png",
+  "_img": "img/cards/PR/PL!HS-PR-041-PR2.png",
+  "rare": "PR+",
+  "type": "エネルギー",
+  "ability": null
+ },
+ {
+  "card_no": "PL!HS-PR-042-PR＋",
+  "name": "日野下花帆",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!HS-PR-042-PR2.png",
+  "_img": "img/cards/PR/PL!HS-PR-042-PR2.png",
+  "rare": "PR",
+  "type": "エネルギー",
+  "ability": null
+ },
+ {
+  "card_no": "PL!N-PR-035-PR",
+  "name": "上原歩夢",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!N-PR-035-PR.png",
+  "_img": "img/cards/PR/PL!N-PR-035-PR.png",
+  "rare": "PR",
+  "type": "エネルギー",
+  "blade": 0,
+  "ability": ""
+ },
+ {
+  "card_no": "PL!N-PR-035-PR＋",
+  "name": "上原歩夢",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!N-PR-035-PR2.png",
+  "_img": "img/cards/PR/PL!N-PR-035-PR2.png",
+  "rare": "PR",
+  "type": "エネルギー",
+  "blade": 0,
+  "ability": ""
+ },
+ {
+  "card_no": "PL!S-PR-046-PR",
+  "name": "渡辺 曜",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!S-PR-046-PR.png",
+  "_img": "img/cards/PR/PL!S-PR-046-PR.png",
+  "rare": "PR",
+  "type": "メンバー",
+  "cost": 5,
+  "blade": 1,
+  "ability": "{{live_success.png|ライブ成功時}}エールにより公開された相手のカードの中にライブカードがある場合、カードを1枚引く。"
+ },
+ {
+  "card_no": "PL!S-PR-047-PR",
+  "name": "桜内梨子",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!S-PR-047-PR.png",
+  "_img": "img/cards/PR/PL!S-PR-047-PR.png",
+  "rare": "PR",
+  "type": "メンバー",
+  "cost": 4,
+  "blade": 1,
+  "ability": null
+ },
+ {
+  "card_no": "PL!S-PR-048-PR",
+  "name": "黒澤ルビィ",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!S-PR-048-PR.png",
+  "_img": "img/cards/PR/PL!S-PR-048-PR.png",
+  "rare": "PR",
+  "type": "メンバー",
+  "cost": 13,
+  "blade": 6,
+  "ability": "{{live_start.png|ライブ開始時}}自分の控え室にあるカードが9枚以下の場合、自分の控え室にあるライブカードを3枚まで選び、自分のデッキの上に好きな順番で置く。"
+ },
+ {
+  "card_no": "PL!S-PR-049-PR",
+  "name": "高海千歌",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!S-PR-049-PR.png",
+  "_img": "img/cards/PR/PL!S-PR-049-PR.png",
+  "rare": "PR",
+  "type": "エネルギー",
+  "blade": 0,
+  "ability": ""
+ },
+ {
+  "card_no": "PL!S-PR-049-PR＋",
+  "name": "高海千歌",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!S-PR-049-PR2.png",
+  "_img": "img/cards/PR/PL!S-PR-049-PR2.png",
+  "rare": "PR",
+  "type": "エネルギー",
+  "blade": 0,
+  "ability": ""
+ },
+ {
+  "card_no": "PL!S-bp7-999-SEC＋",
+  "name": "国木田花丸",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/BP07/PL!S-bp7-999-SEC2.png",
+  "_img": "img/cards/BP07/PL!S-bp7-999-SEC2.png",
+  "rare": "SEC+",
+  "type": "エネルギー",
+  "blade": 0,
+  "ability": ""
+ },
+ {
+  "card_no": "PL!SP-PR-027-PR",
+  "name": "平安名すみれ",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!SP-PR-027-PR.png",
+  "_img": "img/cards/PR/PL!SP-PR-027-PR.png",
+  "rare": "PR",
+  "type": "メンバー",
+  "cost": 13,
+  "blade": 5,
+  "ability": "{{live_start.png|ライブ開始時}}自分の控え室にあるカードが9枚以下の場合、自分の控え室にあるライブカードを3枚まで選び、自分のデッキの上に好きな順番で置く。"
+ },
+ {
+  "card_no": "PL!SP-PR-028-PR",
+  "name": "米女メイ",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!SP-PR-028-PR.png",
+  "_img": "img/cards/PR/PL!SP-PR-028-PR.png",
+  "rare": "PR",
+  "type": "メンバー",
+  "cost": 15,
+  "blade": 6,
+  "ability": "{{toujyou.png|登場}}自分のデッキの上から、10から自分の手札の枚数を引いた数に等しい枚数のカードを見る。その中から2枚まで手札に加える。残りを控え室に置く。"
+ },
+ {
+  "card_no": "PL!SP-PR-029-PR",
+  "name": "澁谷かのん",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!SP-PR-029-PR.png",
+  "_img": "img/cards/PR/PL!SP-PR-029-PR.png",
+  "rare": "PR",
+  "type": "エネルギー",
+  "blade": 0,
+  "ability": ""
+ },
+ {
+  "card_no": "PL!SP-PR-030-PR",
+  "name": "ゆいがおー",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/PR/PL!SP-PR-030-PR.png",
+  "_img": "img/cards/PR/PL!SP-PR-030-PR.png",
+  "rare": "PR",
+  "type": "エネルギー",
+  "blade": 0,
+  "ability": ""
+ },
+ {
+  "card_no": "PL!SP-bp4-999-SEC＋",
+  "name": "嵐 千砂都",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/BP04/PL!SP-bp4-999-SEC2.png",
+  "_img": "img/cards/BP04/PL!SP-bp4-999-SEC2.png",
+  "rare": "SEC+",
+  "type": "エネルギー",
+  "blade": 0,
+  "ability": ""
+ },
+ {
+  "card_no": "PL!SP-bp7-999-SEC2",
+  "name": "米女メイ",
+  "img": "https://llofficial-cardgame.com/wordpress/wp-content/images/cardlist/BP07/PL!SP-bp7-999-SEC2.png",
+  "_img": "img/cards/BP07/PL!SP-bp7-999-SEC2.png",
+  "rare": "SEC+",
+  "type": "エネルギー",
+  "blade": 0,
+  "ability": ""
+ }
+]

@@ -91,6 +91,13 @@ def load_owner_map(path):
     return out
 
 
+def jaccard(a, b):
+    sa, sb = set(a), set(b)
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
+
+
 def owner_stats(decks, owners):
     """Split a combo's decks by attribution.
 
@@ -170,12 +177,15 @@ def main():
     err = sum(1 for d in decks if d["has_error"])
     say(f"flagged has_error   : {err}")
 
-    legal = [d for d in decks if d["regulation"] == "S"
-             and d["total"] == 60 and d["energy_total"] == 12]
-    say(f"legal S (60+12)     : {len(legal)}  ({100.0*len(legal)/len(decks):.1f}%)")
-    main_ok = [d for d in decks if d["total"] == 60]
-    say(f"60-card main        : {len(main_ok)}")
-    say(f"dropped (not legal) : {len(decks) - len(legal)}")
+    # Energy is deliberately ignored here: every energy card does the same job, so it
+    # never decides whether a list is interesting. Legality is the main deck's size.
+    legal = [d for d in decks if d["regulation"] == "S" and d["total"] == 60]
+    half = [d for d in decks if d["regulation"] == "H" and d["total"] == 30]
+    say(f"legal S (60 main) : {len(legal)}  ({100.0*len(legal)/len(decks):.1f}%)")
+    say(f"half decks (30)   : {len(half)}")
+    main_ok = [d for d in decks if d["total"] in (30, 60)]
+    say(f"main total 30 or 60: {len(main_ok)}")
+    say(f"dropped (other)   : {len(decks) - len(main_ok)}")
 
     pool = legal or main_ok or decks
     say(f"\nanalysing {len(pool)} decks")
@@ -239,7 +249,7 @@ def main():
             freq[cid] += n
     deck_freq = Counter()
     for d in pool:
-        for cid in d["combo"]:
+        for cid, _n in d["combo"]:
             deck_freq[cid] += 1
     say("\n--- most played cards (by copies) ---")
     for cid, n in freq.most_common(25):
@@ -250,16 +260,17 @@ def main():
         known = {base_card(k) for k in db}
         used = set(freq)
         say(f"\n--- coverage vs {CARD_DB} ---")
-        say(f"  cards in db        : {len(known)}")
-        say(f"  distinct cards used: {len(used)}")
+        say(f"  printings in db        : {len(db)}")
+        say(f"  distinct card numbers  : {len(known)}  (rarity collapsed)")
+        say(f"  distinct cards used    : {len(used)}")
         unknown = sorted(used - known)
-        say(f"  used but NOT in db : {len(unknown)}")
+        say(f"  used but NOT in db     : {len(unknown)}")
         for cid in unknown[:15]:
-            say(f"      {cid}  ({freq[cid]} copies)")
+            say(f"      {cid}  ({freq[cid]} copies in {deck_freq[cid]} decks)")
         never = sorted(known - used)
-        say(f"  in db, never used  : {len(never)}")
-        by_series = Counter(c.split("-")[0] for c in never)
-        say(f"      by series      : {dict(by_series.most_common(8))}")
+        say(f"  in db, never played    : {len(never)}")
+        by_series = Counter(c.split("-")[1] if "-" in c else c for c in never)
+        say(f"      by product         : {dict(by_series.most_common(10))}")
 
     energy_used = Counter()
     for d in pool:

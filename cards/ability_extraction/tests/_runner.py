@@ -16,7 +16,34 @@ methods. A test is never skipped silently: discovery is by prefix, so a test
 function that exists is a test function that runs.
 """
 
+import sys
 import traceback
+
+
+def _make_console_lossless():
+    """Stop a non-ASCII test message from killing the report.
+
+    This runner's whole job is to print an actionable diagnostic. Printing a
+    traceback straight to stdout on a cp932/cp936 console raises
+    UnicodeEncodeError the moment the message contains anything non-ASCII — an
+    em-dash, a `』` quoting mark, a card name — and because the print happens
+    inside the failure-reporting loop, that aborts the loop and every
+    REMAINING failure's diagnostic is lost too. The symptom is a bare
+    UnicodeEncodeError instead of the parser bug you were hunting, which is the
+    worst possible trade: a red run that tells you nothing.
+
+    `errors="replace"` keeps the report going and marks the unencodable
+    characters, rather than dropping them silently. Streams without
+    `reconfigure` (pytest capture, StringIO, a closed pipe) are left alone.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(errors="replace")
+        except (ValueError, OSError):
+            pass
 
 
 def _collect(namespace):
@@ -44,6 +71,7 @@ def _invoke(fn):
 
 def run_module(namespace, title=None):
     """Run every test in `namespace`; print a report; return an exit code."""
+    _make_console_lossless()
     tests = _collect(namespace)
     if not tests:
         print(f"FAIL: {title or namespace.get('__name__')}: collected 0 tests")

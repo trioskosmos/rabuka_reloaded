@@ -388,7 +388,7 @@ static void scenario_yell_draw_icons(void){
 }
 
 static void scenario_phase_determinism(void){
-    GameState g1,g2; uint32_t d0[20],d1[20];
+    static GameState g1,g2; uint32_t d0[20],d1[20];
     for(int i=0;i<20;i++){ d0[i]=i; d1[i]=20+i; }
     rb_seed(0xCAFE); rb_game_init(&g1,d0,20,d1,20);
     rb_seed(0xCAFE); rb_game_init(&g2,d0,20,d1,20);

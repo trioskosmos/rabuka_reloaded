@@ -454,7 +454,7 @@ static    TestGame tg;
 
 static void test_wondermates_activates_nothing_without_a_nijigasaki_member(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int wonder = test_id(&tg, "PL!N-sd2-025-P");
     int out_a  = test_id(&tg, "PL!-sd1-010-SD");
@@ -480,7 +480,7 @@ static void test_wondermates_activates_nothing_without_a_nijigasaki_member(void)
 
 static void test_wondermates_leaves_an_already_active_nijigasaki_alone(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int wonder   = test_id(&tg, "PL!N-sd2-025-P");
     int niji     = test_id(&tg, "PL!N-bp1-006-R＋");
@@ -547,7 +547,7 @@ static    TestGame tg;
 
 static void test_pb1_003_paid_self_wait_activates_energy_per_member(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int kotori, p1m, p2m;
     pb1_003_board(&tg, &kotori, &p1m, &p2m);
@@ -603,7 +603,7 @@ static    TestGame tg;
 
 static void test_sayaka_debut_with_cost10_member_waits_cost4_opponent(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int sayaka = test_id(&tg, SAYAKA);
     int big    = test_id(&tg, RUBY);
@@ -626,7 +626,7 @@ static void test_sayaka_debut_with_cost10_member_waits_cost4_opponent(void)
 
 static void test_sayaka_debut_without_cost10_member_leaves_opponent_active(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int sayaka = test_id(&tg, SAYAKA);
     int cheap  = test_id(&tg, FILLER4);
@@ -647,7 +647,7 @@ static void test_sayaka_debut_without_cost10_member_leaves_opponent_active(void)
 
 static void test_sayaka_debut_excludes_cost5_opponent(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int sayaka = test_id(&tg, SAYAKA);
     int big    = test_id(&tg, RUBY);
@@ -668,7 +668,7 @@ static void test_sayaka_debut_excludes_cost5_opponent(void)
 
 static void test_natsumi_live_start_waits_only_low_original_blade_in_center(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int natsumi = test_id(&tg, "PL!SP-bp7-009-R");
     int low     = test_id(&tg, FILLER4);
@@ -1248,7 +1248,7 @@ static    TestGame tg;
 
 static void test_karin_cost_energy_choice_selects_chosen_card(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int karin = karin_setup(&tg, 0);
     int enemy = test_id(&tg, ENEMY_B1);
@@ -1407,7 +1407,7 @@ static    TestGame tg;
 
 static void test_kanon_decline_cost_no_effect(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int card     = test_id(&tg, KANON);
     int opponent = test_id(&tg, "PL!-sd1-010-SD");
@@ -1521,7 +1521,7 @@ static void welcome_board(TestGame *tg, const char *second_member, int *enemy)
 
 static void test_welcome_all_liella_waits_cost2_enemy(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int enemy;
     welcome_board(&tg, LIELLA_B, &enemy);
@@ -1579,7 +1579,7 @@ static    TestGame tg;
 
 static void test_maki_debut_pay_cost_waits_exactly_one_opponent(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int maki = test_id(&tg, MAKI);
     int p2_a = test_id(&tg, MAKI_P2_C2);
@@ -1603,7 +1603,7 @@ static void test_maki_debut_pay_cost_waits_exactly_one_opponent(void)
 
 static void test_maki_debut_skip_cost_no_effect(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int maki = test_id(&tg, MAKI);
     int p2m  = test_id(&tg, "PL!-sd1-010-SD");
@@ -1786,7 +1786,7 @@ static    TestGame tg;
 
 static void test_sp_pr_021_below_five_hearts_no_opponent_wait(void)
 {
-    TestGame tg;
+    static TestGame tg;
     test_game_new(&tg);
     int member      = test_id(&tg, "PL!SP-PR-021-PR");
     int opponent    = test_id(&tg, "PL!-sd1-002-SD");

@@ -90,6 +90,29 @@ const UI_BADGE_EDGE: u16 = 5; // gold diamond nudged right, for badges placed
                               // one tile left of the grid edge (on the card's
                               // visible border instead of the padding)
 
+/// agb's 4bpp BG tile pool, in tiles.
+///
+/// agb splits 0x0600_0040-0x0600_8000 into an affine region (510 tiles) and a
+/// regular region (512 tiles), and `alloc_for_regular` ends in
+/// `.expect("Ran out of video RAM for tiles")` -- a panic, not a slowdown.
+/// `VRAM_MANAGER.gc()` only runs inside `GraphicsFrame::commit()`, so while
+/// frame N is being built frame N-1's tiles are still resident: only half the
+/// pool is available to a single frame.
+///
+/// The baked font alone is 952 glyphs = 840 fullwidth (2x2 = 4 tiles) + 112
+/// halfwidth (2 tiles) = 3,584 tiles, 3.5x the whole pool. So the font must
+/// never be uploaded wholesale through the shared allocator, and a single
+/// frame's text must be capped below this.
+const BG_TILE_POOL: usize = 1022;
+const BG_TILE_BUDGET_PER_FRAME: usize = BG_TILE_POOL / 2;
+
+/// Upper bound on text rows any one screen blits.
+///
+/// A 2x2 Japanese glyph costs 4 tiles, so 9 rows x 30 columns of ability text
+/// can reference well over a thousand distinct tiles on its own. Truncating by
+/// row count alone (the old `ty + 2 > ROWS` check) does not bound that.
+const MAX_TEXT_ROWS: i32 = 8;
+
 /// Layering (GBA: lower number wins; OBJ beats a BG of the SAME number, so
 /// every layer gets its own number):
 /// front text/badges P0 > card sprites P1 > back zone fill P2.
@@ -108,25 +131,21 @@ const DETAIL_PX: (usize, usize) = (96, 144);
 /// Every entry is a legal GBA sprite size; gutters (sprite area outside the
 /// card box) are filled with palette index 0 = transparent.
 ///
-/// These are sized to the *art*, not to the box. Every OBJ tile is 64 bytes
-/// (8bpp), so a part that is wider than the pixels it actually carries is pure
-/// waste against agb's 32KB ceiling -- and OBJ VRAM is the binding constraint
-/// for the whole board, so the waste is what forces evictions and blank slots.
-///
-///  * hand: art is 24x32 = 3 tile columns. Two 16px parts covered 32 columns,
-///    so a quarter of every hand card was transparent padding. 1024B -> 768B.
-///  * live: art is 22x16 = 3 tile columns. The single 32px part carried 9
-///    empty columns. 1024B -> 384B, and 12 slots are live on screen at once.
+/// These deliberately tile the full `*_PX` box even where the art is narrower,
+/// matching the geometry in place since the "actual sprite refactor"
+/// (916f8851). A tighter tiling does save OBJ VRAM -- hand 1024B->768B and
+/// live 1024B->384B -- but it was never verified to rasterise identically, and
+/// a rendering fault is far more expensive than the bytes. Reintroduce only
+/// with a side-by-side capture proving the output matches.
 const HAND_PARTS: &[(Size, usize, usize)] =
-    &[(Size::S16x32, 0, 0), (Size::S8x32, 16, 0)];
+    &[(Size::S16x32, 0, 0), (Size::S16x32, 16, 0)];
 const STAGE_PARTS: &[(Size, usize, usize)] = &[
     (Size::S32x32, 0, 0),
     (Size::S16x32, 32, 0),
     (Size::S32x16, 0, 32),
     (Size::S16x16, 32, 32),
 ];
-const LIVE_PARTS: &[(Size, usize, usize)] =
-    &[(Size::S16x16, 0, 0), (Size::S8x16, 16, 0)];
+const LIVE_PARTS: &[(Size, usize, usize)] = &[(Size::S32x16, 0, 0)];
 // NOTE: waited art (32x24) is centred inside the slot's own box tiling via
 // ox/oy, so it needs no dedicated parts table.
 const DETAIL_PARTS: &[(Size, usize, usize)] = &[
@@ -1321,7 +1340,8 @@ impl<'a> Display<'a> {
         mut ty: i32,
         wrap: bool,
     ) {
-        let draw_ch = |bg: &mut RegularBackground, ch: char, tx: i32, ty: i32| -> i32 {
+        let mut spent = 0usize;
+        let mut draw_ch = |bg: &mut RegularBackground, ch: char, tx: i32, ty: i32| -> i32 {
             let (_, cols) = Self::glyph(ch);
             // Clip on BOTH axes before handing anything to `set_tile`.
             //
@@ -1346,8 +1366,23 @@ impl<'a> Display<'a> {
                 }
                 return -(cols as i32); // signal wrap needed
             }
+            // Tile-pool guard. `set_tile` routes through
+            // `VRAM_MANAGER.add_tile`, and the pool is finite: 1,022 tiles
+            // total, half of it still held by the previous frame because gc
+            // only runs at commit. Overrunning it is not a glitch but
+            // `.expect("Ran out of video RAM for tiles")`, i.e. a panic that
+            // hands the machine to agb's bitmap-3 panic renderer. That is the
+            // main-menu corruption and the deck-select crash.
+            //
+            // Once the budget is gone we still advance `tx` so the layout does
+            // not collapse, we just stop spending tiles.
+            if spent >= BG_TILE_BUDGET_PER_FRAME {
+                return cols as i32;
+            }
+            spent += if cols >= 2 { 4 } else { 2 };
             Self::place_glyph(bg, font_ts, e, ch, tx, ty)
         };
+
         let mut pos = 0usize;
         while pos < text.len() {
             match Self::find_token(text, pos) {
@@ -2050,7 +2085,10 @@ let drawn = self.push_card(
         let mut ty = 0i32;
 
         for line in self.buf.split('\n') {
-            if ty + 2 > ROWS {
+            // `ty + 2 > ROWS` bounded rows but not tiles: each 2x2 Japanese
+            // glyph costs 4 tiles out of a 1,022-tile pool that is half-full
+            // with the previous frame. MAX_TEXT_ROWS is the real limit.
+            if ty + 2 > ROWS || ty / 2 >= MAX_TEXT_ROWS {
                 break;
             }
             Self::blit_text(&mut self.ui_front, &font_ts, &icon_ts, e, line, 0, ty, true);

@@ -1017,20 +1017,22 @@ impl<'a> ConditionContext<'a> {
                 if stage_ids.is_empty() {
                     return format!("不在 {}", position_str).trim().to_string();
                 }
-                let stage_names: Vec<String> = stage_ids
+                // Card side reads the precomputed key; needles are canonical
+                // from the parser, so nothing below normalises.
+                let stage_names: Vec<crate::core::types::ArcStr> = stage_ids
                     .iter()
                     .filter_map(|&cid| {
                         self.game_state
                             .card_database
                             .get_card(cid)
-                            .map(|c| crate::card::CardDatabase::normalize_name(&c.name))
+                            .map(|c| c.name_key.clone())
                     })
                     .collect();
-                // Check character match
+                // Check character match. `chars` is squashed at generation time
+                // and `stage_names` is `name_key`, so no normalisation here.
                 if let Some(chars) = condition.get_characters() {
                     for ch in chars {
-                        let norm = crate::card::CardDatabase::normalize_name(ch);
-                        let found = stage_names.iter().any(|n| n.contains(&norm));
+                        let found = stage_names.iter().any(|n| n.contains(ch.as_str()));
                         if !found {
                             return format!("{}不在 {}", ch, position_str).trim().to_string();
                         }
@@ -1038,21 +1040,18 @@ impl<'a> ConditionContext<'a> {
                     // All matched — check cost_reference
                     if let Some(ref ref_char) = condition.get_cost_reference_character() {
                         let subject = &chars[0];
-                        let norm_sub = crate::card::CardDatabase::normalize_name(subject);
-                        let norm_ref = crate::card::CardDatabase::normalize_name(ref_char);
-                        let cost_of_named = |want: &String| {
+                        let cost_of_named = |want: &str| {
                             stage_ids
                                 .iter()
                                 .filter_map(|&cid| {
                                     let card = self.game_state.card_database.get_card(cid)?;
-                                    let n =
-                                        crate::card::CardDatabase::normalize_name(&card.name);
+                                    let n = &card.name_key;
                                     n.contains(want).then_some(card.cost).flatten()
                                 })
                                 .next()
                         };
-                        let sub_cost = cost_of_named(&norm_sub);
-                        let ref_cost = cost_of_named(&norm_ref);
+                        let sub_cost = cost_of_named(subject);
+                        let ref_cost = cost_of_named(ref_char);
                         let op = condition
                             .get_cost_reference_operator()
                             .map(|o| o.as_str())

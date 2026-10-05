@@ -609,11 +609,23 @@ void rb_clear_movement_tracking(GameState *g) {
     g->n_position_change_events = 0;
 }
 
+/* Definitions at :914 / :937 (Rust abilities.rs:248-251 / :1920-1921). */
+static void rb_set_just_completed(GameState *g, int key);
+static void rb_clear_just_completed(GameState *g);
+
+/* Rust GameState::set_just_completed (abilities.rs:248-251) snapshots the
+ * movement batch ALONGSIDE the key, and the re-scan guard's clear is
+ * `just_completed_ability_key = None; just_completed_moved.clear();`
+ * (abilities.rs:1920-1921). This function is the one C choke point that owns
+ * BOTH halves in this file, and it used to write the bare field twice, which is
+ * precisely the state the twin exists to remove: a key with no batch, so
+ * `just_completed_batch_matches` can never tell a stale re-scan from a fresh
+ * event. Routed through the setter/clearer so the snapshot exists. */
 void rb_process_with_completed_key(GameState *g, int key) {
     if (!g) return;
-    g->just_completed_ability_key = key;
+    rb_set_just_completed(g, key);
     rb_drain_ability_queue(g);
-    g->just_completed_ability_key = -1;
+    rb_clear_just_completed(g);
 }
 
 /* ── Condition helpers ──────────────────────────────────────────────── */
@@ -714,7 +726,15 @@ int rb_hooked_by_foreign_cause(const GameState *g, const AbilityEffect *e,
                                int card_id, int player);
 static void rb_set_just_completed(GameState *g, int key);
 static int rb_just_completed_batch_matches(const GameState *g,
-                                           const int *moved, int n_moved);
+                                            const int *moved, int n_moved);
+
+/* ability_queue.c:714-722, called from rb_emit_auto_ability_choice below.
+ * include/rabuka.h carries `rb_queue_pause_for_choice` (rabuka.h:3050) but NOT
+ * this sibling, so the call at :4270 compiled only while some other
+ * translation unit leaked a declaration into the build. Declared here, in the
+ * one file that calls it, rather than by editing rabuka.h — same idiom as
+ * rb_queue_key / rb_build_ability_queue_entry above. */
+void rb_queue_pause_for_auto_ability_choice(GameState *g, const RbChoice *choice);
 
 /* Number of entries in the condition's `locations` filter, or -1 when the field
    is absent. Mirrors Rust's `Option<&[String]> cond.get_locations()`: the TAS
@@ -942,18 +962,26 @@ static void rb_clear_just_completed(GameState *g) {
 }
 
 static int rb_just_completed_batch_matches(const GameState *g,
-                                          const int *moved, int n_moved) {
+                                           const int *moved, int n_moved) {
     if (!g) return 1;
     int key = g->just_completed_ability_key;
     if (key < 0) return 1;
     int snap_n = 0;
     const int *snap = NULL;
     for (int i = 0; i < s_n_just_completed; i++)
-        if (s_just_completed[i].g == g && s_just_completed[i].key == key) {
+        if (s_just_completed[i].g == g && s_just_completed[i].key == key &&
+            s_just_completed[i].turn == g->turn) {
             snap = s_just_completed[i].moved;
             snap_n = s_just_completed[i].n;
             break;
         }
+    /* `turn` is in the trust test on purpose. Rust keeps `just_completed_moved`
+       INSIDE GameState (mod.rs:338), so a snapshot physically cannot outlive
+       the state it was taken from; this file keeps it in a file-static table
+       that survives every test case, so a later GameState landing on a
+       recycled address with the same key would otherwise read a batch that
+       belongs to a different game. Mismatched turn -> untrusted -> the legacy
+       veto, i.e. the conservative direction. */
     if (!snap) return 1;               /* untrusted snapshot -> legacy caution */
     if (snap_n == 0 || n_moved == 0) return 1;
     if (snap_n != n_moved) return 0;
@@ -962,19 +990,76 @@ static int rb_just_completed_batch_matches(const GameState *g,
     return 1;
 }
 
-/* Mirror GameState::claim_batch_slot (abilities.rs:510-524). Two guards that
-   the stage scan, the live-card scan and the moved-card scan all share, and
-   which must not drift: the just-completed ability re-fires only on a FRESH
-   batch, and nothing already claimed in THIS batch may re-enqueue. Returns 1
-   when the caller may enqueue. */
+/* ── batch_triggered_keys: the one dedupe set, five call sites ─────────────
+ *
+ * Rust core/game_state/mod.rs:343 declares
+ *
+ *     pub this_batch_triggered_ability_ids: SmallVec<[u32; 16]>,
+ *
+ * a HEAP-backed SmallVec: the `16` is the inline capacity, not a ceiling, so
+ * `claim_batch_slot` (abilities.rs:576-590) can `triggered.push(num_key)` an
+ * unbounded number of times and NEVER drops a trigger.
+ *
+ * The C's counterpart is `int batch_triggered_keys[64]` (rabuka.h:1866), a fixed
+ * array with no overflow path at all. The pre-port body of rb_claim_batch_slot
+ * therefore made the capacity check part of the ADMISSION decision:
+ *
+ *     if (g->n_batch_triggered_keys >= cap) return 0;   // DO NOT ENQUEUE
+ *
+ * so a 65th distinct trigger in one movement batch was silently discarded —
+ * the opposite of Rust, and invisible because nothing printed. That single
+ * line is fixed here by making the two decisions SEPARATE, the way Rust's are:
+ * the dedupe set answers "has this key already fired in THIS batch?", and the
+ * capacity answers only "can the dedupe set remember it?". A key that cannot be
+ * remembered is not a reason to drop a trigger; it is a reason to say so.
+ *
+ * The cap itself is unchanged on purpose: `batch_triggered_keys` sits in the
+ * MIDDLE of GameState, sizeof(GameState) is pinned at RB_GAMESTATE_BYTES_PINNED
+ * (tests/test_harness_self.c) and Makefile:3, and a field may only be APPENDED.
+ * Growing the array is therefore a rabuka.h + harness_self change, not this
+ * file's; what this file owns is the behaviour and the loudness.
+ */
+static int rb_batch_key_seen(const GameState *g, int key) {
+    if (!g) return 0;
+    for (int i = 0; i < g->n_batch_triggered_keys; i++)
+        if (g->batch_triggered_keys[i] == key) return 1;
+    return 0;
+}
+
+/* Record `key` as triggered in this batch. Returns 1 when it was stored and 0
+ * when the fixed array is full — and in the 0 case it says so on stderr, which
+ * the old inline `if (n < cap) keys[n++] = key;` never did. */
+static int rb_batch_key_record(GameState *g, int key) {
+    if (!g) return 0;
+    int cap = (int)(sizeof(g->batch_triggered_keys) /
+                    sizeof(g->batch_triggered_keys[0]));
+    if (g->n_batch_triggered_keys >= cap) {
+        fprintf(stderr,
+                "[BATCH_KEY_OVERFLOW] cap=%d key=%d (card=%d ab=%d) NOT RECORDED "
+                "-- Rust this_batch_triggered_ability_ids is a SmallVec and keeps "
+                "it, so the trigger still fires; only the within-batch dedupe is "
+                "lost. A silent drop here is a parity defect, not a capacity.\n",
+                cap, key, key >> 16, key & 0xFFFF);
+        return 0;
+    }
+    g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
+    return 1;
+}
+
+/* Mirror GameState::claim_batch_slot (abilities.rs:569-590). Two guards that
+ * the stage scan, the live-card scan and the moved-card scan all share, and
+ * which must not drift: the just-completed ability re-fires only on a FRESH
+ * batch, and nothing already claimed in THIS batch may re-enqueue. Returns 1
+ * when the caller may enqueue.
+ *
+ * NOTE the capacity is NOT an admission gate here any more: an unremembered key
+ * still enqueues (Rust pushes unconditionally). Only an already-seen key or the
+ * just-completed same-batch veto refuses. */
 static int rb_claim_batch_slot(GameState *g, int num_key, int skip_key,
                                int same_batch_as_completed) {
     if (skip_key == num_key && same_batch_as_completed) return 0;
-    for (int i = 0; i < g->n_batch_triggered_keys; i++)
-        if (g->batch_triggered_keys[i] == num_key) return 0;
-    int cap = (int)(sizeof(g->batch_triggered_keys) / sizeof(g->batch_triggered_keys[0]));
-    if (g->n_batch_triggered_keys >= cap) return 0;
-    g->batch_triggered_keys[g->n_batch_triggered_keys++] = num_key;
+    if (rb_batch_key_seen(g, num_key)) return 0;
+    rb_batch_key_record(g, num_key);
     return 1;
 }
 
@@ -1056,22 +1141,35 @@ static int rb_queue_yell_ability(GameState *g, int pl, int cid, int ability_idx)
     }
     int key = rb_queue_key(cid, ability_idx);
     int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
-    if (key == g->just_completed_ability_key || rb_use_limit_reached(&g->queue, cid, ability_idx, limit, g->turn)) {
+    /* Rust abilities.rs:582-584 -- `skip_key == Some(num_key) &&
+       same_batch_as_completed`. The batch half is NOT `key == just_completed_
+       ability_key`: a DIFFERENT non-empty movement batch is a fresh event and
+       may re-fire the ability (the turn-2+ budget case, abilities.rs:253-259).
+       rb_just_completed_batch_matches returns TRUE when it holds no trusted
+       snapshot — which is the pre-port behaviour — so this is a strict
+       generalisation, not a swap. The scan batch for a yell is the current
+       recently-moved list (abilities.rs:516-517). */
+    if (key == g->just_completed_ability_key &&
+        rb_just_completed_batch_matches(g, g->recently_moved, g->n_recently_moved)) {
         rb_free_ability(&ab);
         return 0;
     }
-    for (int i = 0; i < g->n_batch_triggered_keys; i++) {
-        if (g->batch_triggered_keys[i] == key) {
-            rb_free_ability(&ab);
-            return 0;
-        }
-    }
-    int cap = (int)(sizeof(g->batch_triggered_keys) / sizeof(g->batch_triggered_keys[0]));
-    if (g->n_batch_triggered_keys >= cap || g->queue.n_entries >= RB_QUEUE_DEPTH) {
+    if (rb_use_limit_reached(&g->queue, cid, ability_idx, limit, g->turn)) {
         rb_free_ability(&ab);
         return 0;
     }
-    g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
+    if (rb_batch_key_seen(g, key)) {
+        rb_free_ability(&ab);
+        return 0;
+    }
+    /* Queue depth is a REAL bound (RB_QUEUE_DEPTH entries cannot be exceeded and
+       Rust has no equivalent queue either), so it still refuses. The batch-key
+       capacity is NOT a bound and no longer refuses: see rb_batch_key_record. */
+    if (g->queue.n_entries >= RB_QUEUE_DEPTH) {
+        rb_free_ability(&ab);
+        return 0;
+    }
+    rb_batch_key_record(g, key);
     rb_build_ability_queue_entry(g, cid, ability_idx, "",
                                   pl == 0 ? "p1" : "p2", "yell", NULL, 0, -1);
     /* MIGRATED (site 1 of 5). The enqueue-time `rb_record_use` +
@@ -1565,10 +1663,81 @@ static const char *choice_seat_wire(const char *pid, char *buf, size_t n)
     return buf;
 }
 
+/* The SECOND `choice_player_id` producer — Rust
+ * core/game_state/abilities.rs:2828-2846, the `else` arm of
+ * `inject_choice_ability_context`:
+ *
+ *     } else if let Some(choice) = self.ability_queue.is_waiting_for_choice() {
+ *         if let Choice::SelectAutoAbility { ref player_id, .. }
+ *         | Choice::SelectLiveSuccess { ref player_id, .. } = choice {
+ *             let normalized = match player_id.as_str() {
+ *                 "player1" => "p1", "player2" => "p2", _ => player_id.as_str(),
+ *             };
+ *             obj.insert("choice_player_id".into(), ...normalized...);
+ *         }
+ *     }
+ *
+ * It is reached when `entry_ref` is None, i.e. `current_entry()` yielded no
+ * entry — which in Rust is Idle and WaitingForAutoAbilityChoice
+ * (ability/queue.rs:234-242). Both C states exist and both were mapped to
+ * `return` with an EMPTY string, so the seat that owns an auto-ability-ordering
+ * or live-success prompt was never named. web_server.rs:1243 DROPS the whole
+ * `pending_choice` object when `choice_player_id` is missing, so on that path
+ * the prompt is invisible to BOTH seats and the game waits for an answer that
+ * can never arrive. The C's "" was the safe direction and the wrong answer.
+ *
+ * THE CHOICE'S OWN OWNER. Rust reads `Choice::SelectAutoAbility::player_id`, an
+ * `Option<String>`. The C has no such field: RbFullChoice (rabuka.h:1156) has
+ * no player_id member and `rb_full_choice_to_header` (types.c:515-541) copies
+ * no such key into RbChoice, whose seat field is `actor` (rabuka.h:1001,
+ * "0=p1, 1=p2 - which player made the choice"). That IS the same datum: the
+ * Choice names the seat that must answer it, and
+ * rb_queue_pause_for_auto_ability_choice (ability_queue.c:714-722) stamps
+ * `queue.actor = g->active` for exactly this prompt. So the faithful C reading
+ * is `queue.pending.actor`, with `queue.actor` as the documented fallback for a
+ * pending choice whose own `actor` was never set. types.c:525 collapses
+ * `RB_CC_SELECT_LIVE_SUCCESS` into `RB_CHOICE_SELECT_AUTO_ABILITY`, so ONE kind
+ * test covers both Rust variants — that collapse is the reason this arm is
+ * implementable at all in the C.
+ *
+ * Returns "" when Rust would have inserted nothing: no current entry AND no
+ * waiting choice, or a waiting choice that is neither SelectAutoAbility nor
+ * SelectLiveSuccess. */
+static const char *rb_choice_owning_seat(const GameState *g, char *buf, size_t n) {
+    if (n == 0) return "";
+    buf[0] = '\0';
+    if (!g) return buf;
+    /* Rust: `else if let Some(entry) = entry_ref { .. }` must have FAILED for this
+       arm to run. A live current entry is handled by the 2679-2717 producer. */
+    if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) return buf;
+    /* Rust: `self.ability_queue.is_waiting_for_choice()` (queue.rs:208-214). */
+    if (!g->queue.has_pending || g->queue.state != RB_QUEUE_AWAITING_CHOICE)
+        return buf;
+    /* Rust: only the two variants that carry a `player_id`. */
+    if (g->queue.pending.kind != RB_CHOICE_SELECT_AUTO_ABILITY) return buf;
+    int seat = (g->queue.pending.actor == 0 || g->queue.pending.actor == 1)
+                   ? g->queue.pending.actor
+                   : g->queue.actor;
+    if (seat != 0 && seat != 1) return buf;
+    snprintf(buf, n, "p%d", seat + 1);
+    return buf;
+}
+
 void rb_inject_choice_ability_context(GameState *g, char *json_buf, size_t buf_sz) {
     if (!json_buf || buf_sz == 0) return;
     json_buf[0] = '\0';
-    if (!g || g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) return;
+    if (!g) return;
+    /* The `else` arm runs FIRST and yields "" whenever the entry arm applies, so
+       the two producers cannot both fire. */
+    char owner[16];
+    rb_choice_owning_seat(g, owner, sizeof owner);
+    if (g->queue.cur < 0 || g->queue.cur >= g->queue.n_entries) {
+        /* Rust abilities.rs:2828-2846 — the else arm. The only key it inserts is
+           choice_player_id; everything else belongs to the entry arm below. */
+        if (owner[0]) snprintf(json_buf, buf_sz,
+                               "{\"choice_player_id\":\"%s\"}", owner);
+        return;
+    }
     const RbQueueEntry *e = &g->queue.entries[g->queue.cur];
     int cid = e->card_id;
     const char *card_no = "";
@@ -1632,10 +1801,18 @@ void rb_inject_choice_ability_context(GameState *g, char *json_buf, size_t buf_s
 const char *rb_wire_pending_choice_player_id(const GameState *g)
 {
     static char norm[16];
+    static char owner[16];
     const char *pid = "";
-    if (g && g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
-        const RbQueueEntry *e = &g->queue.entries[g->queue.cur];
-        pid = e->choice_player_id[0] ? e->choice_player_id : e->player_id;
+    if (g) {
+        /* The `else` arm (Rust abilities.rs:2828-2846) first: it yields "" when a
+           current entry exists, so it can never shadow the entry producer. */
+        rb_choice_owning_seat(g, owner, sizeof owner);
+        if (owner[0])
+            return choice_seat_wire(owner, norm, sizeof norm);
+        if (g->queue.cur >= 0 && g->queue.cur < g->queue.n_entries) {
+            const RbQueueEntry *e = &g->queue.entries[g->queue.cur];
+            pid = e->choice_player_id[0] ? e->choice_player_id : e->player_id;
+        }
     }
     return choice_seat_wire(pid, norm, sizeof norm);
 }
@@ -2201,15 +2378,16 @@ static int queue_zone_abilities(GameState *g, int actor, const int *ids, int n,
             }
             int key = rb_queue_key(cid, a);
             int limit = ab.use_limit < 0 ? 99 : ab.use_limit;
-            if (key == g->just_completed_ability_key) { rb_free_ability(&ab); continue; }
+            /* abilities.rs:582-584 -- key AND batch, not key alone. */
+            if (key == g->just_completed_ability_key &&
+                rb_just_completed_batch_matches(g, moved_cards, n_moved))
+                { rb_free_ability(&ab); continue; }
             if (rb_use_limit_reached(&g->queue, cid, a, limit, g->turn)) { rb_free_ability(&ab); continue; }
-            int dup = 0;
-            for (int b = 0; b < g->n_batch_triggered_keys; b++)
-                if (g->batch_triggered_keys[b] == key) { dup = 1; break; }
+            int dup = rb_batch_key_seen(g, key);
             if (!dup) {
-                int cap = (int)(sizeof(g->batch_triggered_keys)/sizeof(g->batch_triggered_keys[0]));
-                if (g->n_batch_triggered_keys < cap)
-                    g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
+                /* NOT an admission gate: an unremembered key still enqueues, as
+                   Rust's SmallVec push does. See rb_batch_key_record. */
+                rb_batch_key_record(g, key);
                 /* abilities.rs:594-598 + :676-678 -- §9.7.2.1: a
                    `preceding_moved` card_count condition creates one standby
                    entry PER matching moved card; every other shape creates a
@@ -2275,14 +2453,16 @@ static int queue_moved_cards_abilities(GameState *g, const int *moved_cards, int
                 if (!passes) { rb_free_ability(&ab); continue; }
             }
             int key = rb_queue_key(moved_card_id, a);
-            if (key == g->just_completed_ability_key) { rb_free_ability(&ab); continue; }
-            int dup = 0;
-            for (int b = 0; b < g->n_batch_triggered_keys; b++)
-                if (g->batch_triggered_keys[b] == key) { dup = 1; break; }
+            /* abilities.rs:582-584 -- key AND batch. A re-scan showing a
+               DIFFERENT non-empty batch is a fresh event and must re-fire; the
+               bare key equality this replaced swallowed every second event of a
+               turn (abilities.rs:255-259). */
+            if (key == g->just_completed_ability_key &&
+                rb_just_completed_batch_matches(g, moved_cards, n_moved))
+                { rb_free_ability(&ab); continue; }
+            int dup = rb_batch_key_seen(g, key);
             if (!dup) {
-                int cap = (int)(sizeof(g->batch_triggered_keys)/sizeof(g->batch_triggered_keys[0]));
-                if (g->n_batch_triggered_keys < cap)
-                    g->batch_triggered_keys[g->n_batch_triggered_keys++] = key;
+                rb_batch_key_record(g, key);
                 rb_build_ability_queue_entry(g, moved_card_id, a, "", player_id_clone,
                                             trigger, moved_cards, n_moved, -1);
                 /* MIGRATED (site 3 of 5) — see the note on rb_queue_yell_ability
@@ -2516,15 +2696,12 @@ void rb_fire_opponent_cause_watchers_for_move(GameState *g, int moved_card_id,
                skip suppressed that second arming. Duplicate suppression
                against the generic scan is the scan's own claim_batch_slot plus
                rb_hooked_by_foreign_cause, not this side. */
-            int already_claimed = 0;
-            for (int b = 0; b < g->n_batch_triggered_keys; b++)
-                if (g->batch_triggered_keys[b] == num_key) { already_claimed = 1; break; }
+            int already_claimed = rb_batch_key_seen(g, num_key);
             {
                 if (!already_claimed) {
-                    int cap = (int)(sizeof(g->batch_triggered_keys) /
-                                    sizeof(g->batch_triggered_keys[0]));
-                    if (g->n_batch_triggered_keys < cap)
-                        g->batch_triggered_keys[g->n_batch_triggered_keys++] = num_key;
+                    /* abilities.rs:1163-1168 ADDS the plain batch key. Not an
+                       admission gate — see rb_batch_key_record. */
+                    rb_batch_key_record(g, num_key);
                 }
                 /* abilities.rs:1175-1183 — the enqueue carries the move as
                    the watcher's trigger batch. */
@@ -2705,7 +2882,12 @@ void rb_trigger_auto_abilities_for_movement_current(GameState *g) {
 int rb_trigger_auto_abilities(GameState *g, int actor, const char *trigger) {
     int queued = rb_queue_trigger_abilities(g, actor, trigger);
     if (queued > 0) rb_drain_ability_queue(g);
-    g->just_completed_ability_key = -1;
+    /* Rust abilities.rs:1917-1921 -- "the re-scan guard's scope is ONE batch.
+       Once drained, the key must not survive into the next player action, or it
+       vetoes that action's fresh event." The C wrote only the bare field, which
+       left the snapshot table holding a batch for a guard that no longer
+       existed; rb_clear_just_completed drops both halves. */
+    rb_clear_just_completed(g);
     return queued;
 }
 
@@ -3963,6 +4145,145 @@ int rb_queue_trigger_abilities(GameState *g, int pl, const char *trigger) {
 
 /* ─- process_player_abilities_depth (full loop) ─────────────────────── */
 
+/* Rule 9.5.3 -- build the AutoAbilityOption list and park the ordering prompt.
+   Rust, core/game_state/abilities.rs:1755-1788, inside
+   process_player_abilities_depth:
+
+       if let Some(second) = second {
+           let options = once(idx).chain(once(second)).chain(available_indices)
+               .filter_map(|idx| {
+                   let entry = self.ability_queue.get_entry(idx)?;
+                   let cid = entry.card_id.unwrap_or(0);
+                   let card_name = self.card_database.get_card(cid)
+                       .map(|c| c.name.to_string())
+                       .unwrap_or_else(|| entry.card_no.to_string());
+                   Some(AutoAbilityOption { card_name,
+                       ability_text: entry.ability.full_text.clone(),
+                       queue_index: idx, card_id: entry.card_id })
+               }).collect();
+           let choice = Choice::SelectAutoAbility {
+               player_id: player_id.to_string(), options,
+               description: "...順番を選択してください。".to_string(),
+               description_en: Some("Multiple auto abilities triggered simultaneously. \
+                                    Choose the order to use them.".to_string()),
+               description_ja: Some("...順番を選択してください。".to_string()),
+           };
+           self.ability_queue.pause_for_auto_ability_choice(choice);
+           break;
+       }
+
+   Three things about that are load-bearing, and each is reproduced rather than
+   approximated.
+
+   (1) The list is over AVAILABLE entries of THIS player only. Rust filters on
+       `is_entry_available(i) && entry_player_id(i) == Some(player_id)`, so an
+       entry belonging to the other seat is never an option even when it sits
+       between two of this seat's entries in the queue.
+
+   (2) `first` and `second` are drawn off the SAME filtered iterator, so the head
+       of the list is the entry that WOULD have been promoted had there been no
+       tie -- `promote_entry_by_abs(idx)` sits on the line immediately after this
+       branch (abilities.rs:1789). That is what makes "the player reorders the
+       tie, and only the tie" true rather than accidental.
+
+   (3) `player_id` here is the NORMALISED id ("p1"/"p2"), not the raw
+       "player1"/"player2" the public entry point takes -- the same
+       normalisation at abilities.rs:1711-1715.
+
+   `queue.cur = 0` is the one thing Rust does not do, and it is a representation
+   choice, not a behaviour change. `cur` is unread for the whole park:
+   rb_queue_current_entry_mut and rb_queue_has_resolver both bail while
+   `auto_ability` is set, which is how the C reproduces Rust's
+   "WaitingForAutoAbilityChoice yields no current_entry". The answer path
+   (rb_resolver_handle_auto_ability_selection, src/ability/choice.c) has to turn
+   a selected OPTION into a queue index, and it computes `queue.cur + selected`
+   with a fallback to `selected` as an absolute index. With cur = 0 that is
+   `selected`, i.e. the absolute queue index recorded in auto_option_queue_index,
+   and the swap it performs leaves the chosen entry at the head -- which is the
+   whole of Rust's effect here, because the scan that runs after the answer
+   re-derives `first` from scratch over the reordered queue. Nothing downstream
+   can observe the 0. */
+static void rb_emit_auto_ability_choice(GameState *g, const char *player_id,
+                                        const int *idxs, int n) {
+    if (!g || !idxs || n < 2) return;
+    if (n > RB_MAX_AUTO_ABILITY_OPTIONS) n = RB_MAX_AUTO_ABILITY_OPTIONS;
+
+    AutoAbilityOption opts[RB_MAX_AUTO_ABILITY_OPTIONS];
+    memset(opts, 0, sizeof opts);
+
+    RbChoice ch;
+    memset(&ch, 0, sizeof ch);
+    ch.kind       = RB_CHOICE_SELECT_AUTO_ABILITY;
+    ch.actor      = (player_id[1] == '2') ? 1 : 0;
+    snprintf(ch.target_player_id, sizeof ch.target_player_id, "%s", player_id);
+    snprintf(ch.description, sizeof ch.description, "%s",
+             "複数の自動能力が同時に発動しました。使用する順番を選択してください。");
+    snprintf(ch.description_en, sizeof ch.description_en, "%s",
+             "Multiple auto abilities triggered simultaneously. Choose the order to use them.");
+    snprintf(ch.description_ja, sizeof ch.description_ja, "%s",
+             "複数の自動能力が同時に発動しました。使用する順番を選択してください。");
+
+    int n_opts = 0;
+    for (int i = 0; i < n; i++) {
+        const RbQueueEntry *e = &g->queue.entries[idxs[i]];
+        AutoAbilityOption *o = &opts[n_opts];
+        int cid = e->card_id;
+
+        /* Rust reads the card_name from the SAME database read the menu uses, and
+           falls back to `entry.card_no.to_string()` when the id has no record. The
+           C queue entry carries no card_no field (RbQueueEntry has card_id and
+           ability_idx only), so the fallback is recovered from the card_no string
+           on the record; an id with no record at all yields "". */
+        char card_no[32];
+        card_no[0] = '\0';
+        Card card;
+        int have_card = (cid >= 0) && rb_card_get_card_by_id(cid, &card);
+        if (have_card) {
+            const char *nm = rb_card_string(card.name_idx);
+            snprintf(o->card_name, sizeof o->card_name, "%s", nm ? nm : "");
+            const char *no = rb_card_string(card.card_no_idx);
+            snprintf(card_no, sizeof card_no, "%s", no ? no : "");
+        }
+        rb_free_card(&card);
+        if (!have_card) snprintf(o->card_name, sizeof o->card_name, "%s", card_no);
+        o->card_id     = have_card ? cid : -1;
+        o->has_card_id = have_card;
+        o->queue_index = idxs[i];
+
+        /* `entry.ability.full_text`, decoded through the same call
+           rb_process_current_ability uses (:2926) so the option text and the
+           resolved text cannot come from two different decoders. */
+        if (cid >= 0) {
+            Ability ab;
+            if (rb_decode_card_ability((uint32_t)cid, e->ability_idx, &ab)) {
+                if (ab.full_text)
+                    snprintf(o->ability_text, sizeof o->ability_text, "%s", ab.full_text);
+                rb_free_ability(&ab);
+            }
+        }
+
+        /* The one-line option label. game_setup.rs:1458 renders
+           `action_desc!("{}: {}", opt.card_name, description)`; description here
+           is the JA ordering prompt, which is the same string already in
+           ch.description, so this is byte-identical to the Rust label as far as
+           the C's carrier goes. The explicit precisions are load-bearing and not
+           cosmetic: RbChoice.characters is char[16][32], so Rust's unbounded
+           label does not fit, and without them GCC warns that the copy may be
+           truncated. What is dropped is the tail of a 512-byte prompt; what is
+           kept is the card name, which is the part the player is actually
+           choosing between. */
+        snprintf(ch.characters[n_opts], sizeof ch.characters[n_opts], "%.12s: %.16s",
+                 o->card_name, ch.description);
+        ch.auto_option_queue_index[n_opts] = o->queue_index;
+        n_opts++;
+    }
+    ch.n_characters   = n_opts;
+    ch.n_auto_options = n_opts;
+
+    g->queue.cur = 0;
+    rb_queue_pause_for_auto_ability_choice(g, &ch);
+}
+
 int rb_process_player_abilities_depth_full(GameState *g, int pl, int max_depth) {
     if (!g || max_depth <= 0) return 0;
     const char *player_id = (pl == 0) ? "player1" : "player2";
@@ -3972,15 +4293,28 @@ int rb_process_player_abilities_depth_full(GameState *g, int pl, int max_depth) 
         depth++;
         int pre_len = g->queue.n_entries;
         int available = 0;
+        int avail_idx[RB_QUEUE_DEPTH];
+        int n_avail = 0;
         for (int i = 0; i < g->queue.n_entries; i++)
             if (!g->queue.entries[i].completed &&
                 (g->queue.entries[i].player_id[0] == '\0' ||
                  !strcmp(g->queue.entries[i].player_id, player_id) ||
-                 !strcmp(g->queue.entries[i].player_id, (pl == 0) ? "p1" : "p2")))
+                 !strcmp(g->queue.entries[i].player_id, (pl == 0) ? "p1" : "p2"))) {
                 available++;
+                if (n_avail < RB_QUEUE_DEPTH) avail_idx[n_avail++] = i;
+            }
         if (available == 0) break;
-        if (available > 1) {
-            /* Multiple auto abilities — would emit a choice; just process first */
+        if (n_avail >= 2) {
+            /* Rule 9.5.3 (abilities.rs:1755-1788): a tie is the PLAYER's to
+               order. The pre-Rule-9.5.3 body resolved the first available entry
+               silently, which silently discarded every other tied ability's
+               ordering -- and, because the whole scan then returned on the open
+               prompt, it also discarded the OTHER entries' ability to resolve at
+               all until something answered. */
+            rb_emit_auto_ability_choice(g, (pl == 0) ? "p1" : "p2",
+                                        avail_idx, n_avail);
+            g->queue.state = RB_QUEUE_AWAITING_CHOICE;
+            return processed;
         }
         for (int i = 0; i < g->queue.n_entries; i++) {
             if (g->queue.entries[i].completed) continue;

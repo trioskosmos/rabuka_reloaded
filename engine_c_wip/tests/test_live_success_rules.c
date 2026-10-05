@@ -273,7 +273,7 @@ static    TestGame tg;
 
 static void test_daydream_mermaid_choices(void) {
     for (int with_niji = 0; with_niji <= 1; with_niji++) {
-        TestGame tg; test_game_new(&tg);
+        static TestGame tg; test_game_new(&tg);
         int live = test_id(&tg, "PL!N-bp4-030-L");
         int h05 = test_id(&tg, "PL!S-bp2-015-PR");
         int h06a = test_id(&tg, "PL!-sd1-003-SD");

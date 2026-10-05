@@ -130,7 +130,8 @@ rest is below.
 |---|---|---|
 | `card_no` | `card_number` | keeps fullwidth `＋` |
 | `img` / `_img` | `picture` | `_img` = `img/cards/<picture>`; the filename uses `2` for `＋` |
-| `name` | `card_name` | |
+| `name` | `card_name` | display string, keeps its spacing |
+| `name_key` | — | **derived, not scraped** — `name_key()` in `cards/scrape_expansion.py` (whitespace stripped, `＆` → `&`). No API field corresponds to it; a card added by hand may omit it and the engine derives it at load. Backfill with `python cards/normalise_names.py`. |
 | `product` | `expansion_name` | **strip `-` and whitespace**: ブースターパック MELLOW MOMENT → ブースターパックMELLOWMOMENT |
 | `type` | `card_kind` | メンバー / ライブ / エネルギー |
 | `series` | derived from card number | order matters, see below |

@@ -1,0 +1,183 @@
+make t-nogate: running T=parity_hearts_constants WITHOUT the `make data` install gate.
+  This is a MEASUREMENT path, not a ship path: no gate is weakened and
+  nothing is copied, because src/ already matches gen_data.c. If the
+  tree is genuinely mid-regeneration, fix it with: bash tools/regen_all.sh
+make --no-print-directory t GATE_DEP=
+cc -std=c11 -O2 -Wall -Iinclude -Isrc -Isrc/core/generated -Wl,--stack,33554432 -o rb_engine_t_parity_hearts_constants src/ability/enums.o src/ability/types.o src/ability/vm.o src/ability/condition.o src/ability/choice.o src/ability/ability_queue.o src/ability/dynamic_count.o src/ability/util.o src/ability/cost.o src/ability/compound.o src/ability/resolver.o src/ability/effects/executor.o src/ability/effects/ability_effects.o src/ability/effects/custom.o src/ability/effects/move.o src/ability/effects/move_missing.o src/ability/effects/rules.o src/ability/effects/look.o src/ability/effects/state.o src/ability/effects/ability.o src/ability/effects/misc.o src/ability/effects/draw.o src/ability/effects/score.o src/ability/log.o src/ability/debug.o src/ability/abilities_gen.o src/ability/describe.o src/ability/choice_renderer.o src/game/deck_parser.o src/game/deck_builder.o src/game/game_setup.o src/core/card.o src/core/data.o src/core/alloc.o src/core/game_state_core.o src/core/modifiers.o src/core/stats_pipeline.o src/core/game_state_abilities.o src/core/tracking.o src/core/zones.o src/bytecode_data.o src/core/generated/bytecode_blob.o src/core/generated/gen_data.o src/core/gen_data_rom.o src/turn/phase.o src/turn/live.o src/turn/triggers.o src/engine.o src/test_game.o src/web_server.o tests/test_parity_hearts_constants.c
+./rb_verdict ./rb_engine_t_parity_hearts_constants parity_hearts_constants
+ok: 12 energy >= 10 -> +2 heart06
+FAIL:  test_ten_energy_constant_heart06
+ok: exactly 10 active energy -> +2 heart06
+ok: 9 active energy (< 10) -> 0 heart06
+ok: 0 energy -> 0 heart06
+ok: 5 energy (<6) -> 0 heart06
+ok: 6 energy (>=6) -> 1 heart06
+ok: 7 energy (>=6, <8) -> 1 heart06
+ok: 8 energy (>=6, >=8) -> 2 heart06
+ok: 10 energy (>=6, >=8) -> 2 heart06
+ok: 10 energy -> heart02 must stay 0
+ok: precondition: 10 energy -> 2 heart06
+ok: dropping to 5 energy -> 0 heart06
+ok: raising to 7 energy -> 1 heart06
+ok: Ren: 5 energy (<6) -> no heart03
+ok: Ren: 6 energy (>=6, <8) -> exactly one heart03
+ok: Ren: 7 energy (<8) -> still one heart03
+ok: Ren: 8 energy (>=8) -> both heart03
+ok: Kanon: 5 energy -> 0 heart02
+ok: Kanon: energy 7 >= 6 -> one heart02
+ok: Kanon: energy 8 >= 8 -> one more heart02 (total 2)
+FAIL:  test_combined_energy_fifteen_heart02
+ok: combined energy < 15 -> no heart02
+ok: precondition: 15 total energy cards
+ok: Hanayo: combined energy = 14 -> no heart02
+ok: P print: center cost ties the left -> no heart03
+ok: lone left member with an empty center -> no heart03
+ok: center 11 > left 9 -> exactly one heart03
+ok: empty center with a lone member -> no heart03
+ok: all three cost 9 -> center not strictly highest, no heart03
+ok: center 11 above both cost-4 sides -> one heart03
+ok: left 11 outranks center 10 -> no heart03
+ok: center lowest with high sides -> no heart03
+ok: no members on stage -> no heart03
+ok: P print: center highest with left self -> one heart03
+ok: P print: tied center cost with left self -> no heart03
+ok: self at right with center highest -> one heart03
+ok: empty center with two side members -> no heart03
+ok: right 11 above center 10 -> no heart03
+ok: center 4 below left 9 -> no heart03
+ok: lone self at center is trivially highest -> one heart03
+ok: center 4 lowest, right 10 -> no heart03
+ok: edges: center 11 > self 9 and right 4 -> +1 heart03 on recalc
+ok: edges: center 7 < self 9 -> no heart03
+ok: edges: center 9 == self 9 -> strict > means no heart03
+ok: edges: center 11 above 9 and 10 -> +1 heart03
+ok: edges: center 8 < self 9 < right 10 -> no heart03
+ok: edges: two members only, center 11 > 9 -> +1 heart03
+ok: edges: self at center 9 above two cost-4 sides -> +1 heart03
+ok: edges: center 11 > self 9 > right 8 -> +1 heart03
+ok: edges: center tied with right -> not strictly highest, no heart03
+ok: empty stage leaves the source without a heart03 bonus
+ok: single center member is highest by default -> 1 heart03
+ok: Honoka: 3 distinct names on stage grants heart03
+ok: Honoka: only 2 distinct names on stage -> no heart03
+ok: Honoka: exactly 3 distinct-named members -> +1 heart03
+ok: Honoka: only 2 distinct members -> no heart03
+ok: Honoka: 2 copies of the same member are not 3 distinct names
+ok: Honoka: precondition, 3 distinct names -> 1
+ok: Honoka: the 3-name heart03 clears when the source leaves the stage
+ok: Kanon: empty live zone -> condition fails, heart03 = 0
+ok: Kanon: Liella! live card with need_heart 8 -> +1 heart03
+ok: Kanon: Liella! live card need_heart 4 (<8) -> no heart03
+ok: Kanon: a non-Liella! live card fails the group filter -> no heart03
+ok: Kanon: two Liella! live cards (4+4=8) -> +1 heart03
+ok: Kanon: a card in the success zone is the wrong zone -> heart03 = 0
+ok: Kanon: precondition, live card grants +1
+ok: Kanon: the bonus is removed once the live card leaves the zone
+FAIL:  test_combined_stage_count_constant_heart
+ok: Karin identity: PL!N-PR-027-PR resolves to the right card
+ok: Karin: 5 combined members -> 0 heart02
+ok: Karin: 5 combined members -> 0 heart05
+ok: Karin: no collateral heart01
+ok: Karin: back to 5 members -> 0 heart02
+ok: Karin: back to 5 members -> 0 heart05
+ok: Karin copies are distinct instances
+ok: Karin copies are distinct instances
+ok: Karin copies are distinct instances
+ok: Karin copies are distinct instances
+ok: Karin copies are distinct instances
+ok: Karin x5: no heart02 below the 6-member gate
+ok: Karin x5: no heart05 below the 6-member gate
+ok: opponent energy ahead -> heart02 granted
+ok: tied energy -> no heart02 (strict >)
+ok: no other A-RISE member means no heart05 (self is excluded)
+ok: 1 other A-RISE member grants exactly 1 heart05
+ok: two other A-RISE members -> exactly +2 heart05
+ok: two copies of the same A-RISE member still grant +2 heart05
+ok: 2 under-member energies grant exactly +2 heart02
+ok: energy under a DIFFERENT area plus a member under center -> still 0
+ok: ab#0: no energy under and energy <= 6 -> no heart02
+ok: ab#0: 2 energy cards under -> 2 heart02
+ok: ab#1: energy == 6 -> no heart02
+ok: ab#1: energy < 6 -> no heart02
+FAIL:  test_setsuna_under_member_and_energy_over_six
+ok: ab#1: 7 - 6 = 1 heart02
+ok: ab#1: back to 6 energy -> 0 heart02
+FAIL:  test_per_waited_opponent_member_constant_heart06
+ok: setup guard: the constant source is in play
+ok: left -> +3 heart02
+ok: left -> heart03 must be 0
+ok: left -> heart05 must be 0
+ok: center -> +3 heart03
+ok: center -> the left heart02 grant is replaced
+ok: right -> +3 heart05
+ok: right -> the center heart03 grant is replaced
+ok: natsumi identity: PL!SP-bp7-009-R resolves to the right card
+ok: center is neither 左サイド nor 右サイド -> no heart02
+ok: 左サイド -> heart02 +1, exactly one
+ok: 右サイド -> heart02 +1 again, exactly one
+ok: a waited self on the parallel print gains 1 heart05
+ok: a waited self gains 1 heart05
+ok: reactivating a waited self removes the constant heart05
+ok: a cost-15 member on stage -> self gains heart03
+ok: no cost-13+ member on stage -> no heart03
+ok: score total 3 < 6 -> no heart03
+ok: score total exactly 6 -> +2 heart03
+ok: stage-aggregate heart03 grows by exactly the constant's 2
+ok: the as_long_as bonus is removed once the total drops below 6
+ok: total 9 >= 6 still grants exactly +2
+ok: no collateral heart01
+ok: no collateral blade either
+ok: the opponent's success-zone total must not count for you
+ok: precondition: six live cards in the success zone
+ok: six score-0 lives give a score sum of 0 < 6 -> no hearts
+ok: the constant only works while its source is on the stage
+ok: each of two copies independently gets +2 heart03
+ok: each of two copies independently gets +2 heart03
+ok: a Printemps live in the success zone -> exactly +1 heart03
+ok: a Printemps live in the success zone -> exactly +1 heart03
+ok: a Printemps live in the success zone -> exactly +1 heart03
+ok: a lilywhite live in the success zone -> exactly +1 heart01
+ok: a lilywhite live in the success zone -> exactly +1 heart01
+ok: a lilywhite live in the success zone -> exactly +1 heart01
+ok: a BiBi live in the success zone -> exactly +1 heart06
+ok: a BiBi live in the success zone -> exactly +1 heart06
+ok: a BiBi live in the success zone -> exactly +1 heart06
+ok: no icon_all heart modifier outside the live phase
+ok: PL!N-pb1-007-R is in the database
+ok: PL!N-pb1-007-R identity: the resolved card matches its number
+ok: PL!N-pb1-007-R has at least one ability
+FAIL:  test_six_heart_types_constant_all_heart
+ok: PL!N-pb1-007-P＋ (the P＋ variant) is in the database
+ok: PL!N-pb1-007-P＋ and PL!N-pb1-007-R are distinct card records
+ok: PL!N-pb1-007-P＋ has at least one ability
+
+372 assertions, 17 failures
+FAILED: parity_hearts_constants  [exit=1, 23 result line(s): assert=23 vacuous=0 setup-bug=0 crash=0 test-bug=0 fatal=0 renormalised=6]
+
+tests/test_parity_hearts_constants.c: In function 'dump_val':
+tests/test_parity_hearts_constants.c:1319:41: warning: format '%d' expects argument of type 'int', but argument 2 has type 'int64_t' {aka 'long int'} [-Wformat=]
+ 1319 |     case RB_TAG_OBJVAR: printf("objvar(%d)", v->i); break;
+      |                                        ~^    ~~~~
+      |                                         |     |
+      |                                         int   int64_t {aka long int}
+      |                                        %ld
+FAIL: spending back below the 10-energy threshold removes the heart06 gain (got 2 expected 0)
+FAIL: combined energy >= 15 -> +2 heart02 (got 0 expected 2)
+FAIL: 15 total cards incl. wait-state energy -> +2 heart02 (got 0 expected 2)
+FAIL: Hanayo: combined energy = 15 -> +2 heart02 (got 0 expected 2)
+FAIL: SP-PR-022: 6 combined members -> heart02
+FAIL: SP-PR-022: 6 combined members -> heart03
+FAIL: S-PR-042: 6 staged members -> heart02
+FAIL: S-PR-042: 6 staged members -> heart04
+FAIL: Karin: exactly 6 members -> +1 heart02 (got 0 expected 1)
+FAIL: Karin: exactly 6 members -> +1 heart05 (got 0 expected 1)
+FAIL: Karin x6: +1 heart02 across both stages (got 0 expected 1)
+FAIL: Karin x6: +1 heart05 across both stages (got 0 expected 1)
+FAIL: ab#1: 8 - 6 = 2 heart02 (got 1 expected 2)
+FAIL: ab#1: 12 - 6 = 6 heart02 (got 1 expected 6)
+FAIL: ab#1: 12 - 6 = 6 heart02 after the gain rises (got 1 expected 6)
+FAIL: one waited opponent member -> exactly +1 heart06 (got 0 expected 1)
+FAIL: the all-six-heart-types ability grants the icon_all (heart_color=all) heart
+make[2]: *** [Makefile:515: t-run] Error 1
+make[1]: *** [Makefile:354: t] Error 2
+make: *** [Makefile:536: t-nogate] Error 2

@@ -209,7 +209,7 @@ static void push_area_move(TestGame *tg, int card, int cause_player, int effect_
 
 static void test_kanan_grants_only_at_exactly_two_members(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int kanan = test_id(&game, KANAN);
@@ -394,7 +394,7 @@ static    TestGame game;
 
 static void test_tomari_jidou_self_move_triggers(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int tomari = test_id(&game, TOMARI);
@@ -410,7 +410,7 @@ static void test_tomari_jidou_self_move_triggers(void)
 
 static void test_tomari_jidou_opponent_move_triggers(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int tomari = test_id(&game, TOMARI);
@@ -442,7 +442,7 @@ static    TestGame game;
 
 static void test_keke_jidou_effect_only_false_no_trigger(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int keke = test_id(&game, KEKE);
@@ -459,7 +459,7 @@ static void test_keke_jidou_effect_only_false_no_trigger(void)
 
 static void test_keke_jidou_self_effect_move_triggers(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int keke = test_id(&game, KEKE);
@@ -563,7 +563,7 @@ static    TestGame game;
 static void test_energy_watcher_twice_per_turn_own_effect_gains_blade(void)
 {
     /* PL!SP-bp7-005-R＋ ab#1 (ターン2回) */
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int blade = 0;
     energy_watch_scenario(&game, REN_TWICE, &blade);
@@ -574,7 +574,7 @@ static void test_energy_watcher_twice_per_turn_own_effect_gains_blade(void)
 static void test_energy_watcher_no_energy_placed_no_blade(void)
 {
     for (int which = 0; which < 2; which++) {
-        TestGame game;
+        static TestGame game;
         test_game_new(&game);
         int watcher = test_id(&game, which ? REN_TWICE : REN_ONCE);
         int filler = test_id(&game, FILLER);
@@ -594,7 +594,7 @@ static void test_energy_watcher_no_energy_placed_no_blade(void)
 
 static void test_energy_watcher_opponent_effect_no_blade(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int ren = test_id(&game, REN_TWICE);
@@ -625,7 +625,7 @@ static void test_energy_watcher_opponent_effect_no_blade(void)
 
 static void test_own_effect_area_swap_does_not_trigger_energy_placement_blade(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int ren = test_new_id(&game, REN_TWICE);
@@ -733,7 +733,7 @@ static void dive_live_zone_scenario(TestGame *tg, int in_live, int in_hand,
 
 static void test_dive_live_zone_only_ab1_triggers(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int blade = 0;
     dive_live_zone_scenario(&game, 1, 0, 1, &blade);
@@ -743,7 +743,7 @@ static void test_dive_live_zone_only_ab1_triggers(void)
 
 static void test_dive_not_in_live_zone_no_trigger(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int blade = 0;
     dive_live_zone_scenario(&game, 0, 1, 1, &blade);
@@ -752,7 +752,7 @@ static void test_dive_not_in_live_zone_no_trigger(void)
 
 static void test_dive_no_niji_no_target(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int blade = 0;
     dive_live_zone_scenario(&game, 1, 0, 0, &blade);
@@ -789,7 +789,7 @@ static void rurino_scan(TestGame *tg, const int *moved, int n, int expect_heart)
 
 static void test_rurino_discard_triggers_heart_and_blade(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int f = test_id(&game, FILLER);
     int moved[1] = { f };
@@ -798,7 +798,7 @@ static void test_rurino_discard_triggers_heart_and_blade(void)
 
 static void test_rurino_no_discard_no_trigger(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int none[1] = { -1 };
     rurino_scan(&game, none, 0, 0);
@@ -806,7 +806,7 @@ static void test_rurino_no_discard_no_trigger(void)
 
 static void test_rurino_q241_multiple_cards_discarded_fires_once(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     int f1 = test_id(&game, FILLER);
     int f2 = test_new_id(&game, FILLER);
@@ -816,7 +816,7 @@ static void test_rurino_q241_multiple_cards_discarded_fires_once(void)
 
 static void test_rurino_ozora_discard_cross_card_triggers_watcher(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
 
     int watcher = test_id(&game, RURINO_W);
@@ -899,13 +899,13 @@ static void under_member_for_seat(TestGame *tg, int pl, int *out_left, int *out_
 static void test_under_member_tuck_works_for_both_players(void)
 {
     int l1 = 0, c1 = 0;
-    TestGame g1;
+    static TestGame g1;
     test_game_new(&g1);
     under_member_for_seat(&g1, 0, &l1, &c1);
     CHECK(l1 || c1, "P1: a 『Liella!』 member is tucked under きな子");
 
     int l2 = 0, c2 = 0;
-    TestGame g2;
+    static TestGame g2;
     test_game_new(&g2);
     under_member_for_seat(&g2, 1, &l2, &c2);
     CHECK(l2 || c2, "P2: a 『Liella!』 member is tucked under きな子");
@@ -954,14 +954,14 @@ static void natsuka_yell_scenario(TestGame *tg, const char *deck_card_no,
 
 static void test_yell_without_blade_heart_reveal_grants_heart02(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     natsuka_yell_scenario(&game, NO_BLADE_HEART, 1);
 }
 
 static void test_yell_with_blade_heart_reveal_does_not_grant_heart02(void)
 {
-    TestGame game;
+    static TestGame game;
     test_game_new(&game);
     natsuka_yell_scenario(&game, FILLER, 0);
 }

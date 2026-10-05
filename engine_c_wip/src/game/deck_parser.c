@@ -167,6 +167,71 @@ static char *strip_html(const char *content)
     return result;
 }
 
+/* ── THE THREE WIDENINGS rb_parse_deck_content HAS OVER parse_line ──────────
+ *
+ * rb_parse_deck_content does NOT call Rust's parse_line. Rust's
+ * parse_deck_content (deck_parser.rs:161-198) strips a FIXED list of HTML tags,
+ * splits on '\n', skips blank and "//"-prefixed lines, and calls
+ * Self::parse_line (:191) on the rest. rb_parse_deck_content (:170-217) strips
+ * HTML GENERICALLY (strip_html, :141-168) and then calls rb_parse_deck_line
+ * (:187), which is already three widenings wider than parse_line (those are
+ * pinned by tests/test_deck_parser.c::test_parse_line_divergences_from_rust).
+ *
+ * On top of those, the content path adds three more, and each was MEASURED
+ * rather than reasoned about. All three are handled correctly here already; what
+ * was missing is that the divergences were implicit, so they read as parity.
+ * Naming them is the whole point of this block.
+ *
+ *   W1  RUST: NO tag-interior deletion, and the fold is unconditional.
+ *       deck_parser.rs:164-172 replaces a FIXED list -- <br>, <br/>, <br />,
+ *       </tr>, </div> to "\n", <td>, </td>, <th>, </th> to " ". deck_parser.rs:
+ *       173-183 then folds, mapping '<' to a newline and DROPPING '>' plus any
+ *       '\n' that directly follows another '\n' -- but every other character,
+ *       INCLUDING a tag's interior text, is kept.
+ *       C: strip_html (:149-165) sets in_tag on '<' and discards everything up
+ *       to the matching '>', so <table>/<tr>/<b> interiors vanish.
+ *       The fold itself matches Rust's: '<' -> '\n' (:152-153), '>' dropped
+ *       (:154-156), duplicate '\n' collapsed (:163).
+ *       CONSEQUENCE: text that is merely BETWEEN two tags is content to Rust and
+ *       markup to the C. Measured: "<b>PL!-sd1-010-SD</b>" yields the bare card
+ *       number in C; Rust yields the line "bPL!-sd1-010-SD" (the fold keeps
+ *       `b`, drops both angle brackets) and its bare-card arm would accept that
+ *       as a card number. A CLEANER card, not a different card -- which is why
+ *       this widening is benign and was not "fixed".
+ *
+ *   W2  RUST: <td> and </td> become a SPACE, not a newline.
+ *       deck_parser.rs:169-172 maps <td>/</td>/<th>/</th> to " ", so two cells
+ *       in one row arrive at parse_line as ONE line joined by a space.
+ *       C: strip_html has no per-tag table; every '<' becomes '\n' (:152-153),
+ *       so each cell becomes its own line.
+ *       CONSEQUENCE: the C reads a table row as N lines. Measured: the C returns
+ *       the right count for "<td>2 x PL!-sd1-010-SD</td><td>2</td>"; Rust joins
+ *       them to " 2 x PL!-sd1-010-SD  2 ", whose " x " split yields
+ *       ("PL!-sd1-010-SD  2", 2) -- the quantity cell is swallowed INTO the card
+ *       number as trailing text. The C is right where Rust is wrong, and this is
+ *       recorded rather than ported.
+ *
+ *   W3  RUST: parse_line skips only lines that start_with("//").
+ *       deck_parser.rs:188 and :214. Nothing in the Rust path removes an inline
+ *       comment, and nothing treats '#' as a comment at all.
+ *       C: strip_inline_comment (:75-81), reached from rb_parse_deck_line:91,
+ *       truncates the line at the first "//" OR the first '#', wherever either
+ *       appears.
+ *       CONSEQUENCE: an inline comment of either kind is stripped by the C. For
+ *       "//" that is inert in the common case (Rust skips those lines anyway when
+ *       they lead the line); for '#' Rust has no concept, so "PL!-sd1-010-SD # x"
+ *       keeps its comment, gains a space, and fails Rust's bare-card arm's
+ *       `!line.contains(' ')`. Measured: the C returns the card with quantity 1.
+ *
+ * NOT PORTED, DELIBERATELY, on the same rule the rest of this tree uses: rb_
+ * parse_deck_content is the WEB SERVER's deck-text entry point
+ * (web_server.rs normalises every JSON card number before handing it over), and
+ * these three widenings are what lets a user paste a table row or annotate a
+ * line and have it work. Narrowing them to Rust's exact behaviour would make the
+ * product worse to fix a divergence whose C side is the more correct of the two
+ * (W2) or is inert (W1, W3-'//'). Each is pinned as a divergence by
+ * tests/test_deck_parser.c rather than left to read as parity.
+ */
 int rb_parse_deck_content(const char *content, char ***card_numbers, size_t *card_count)
 {
     char *cleaned;

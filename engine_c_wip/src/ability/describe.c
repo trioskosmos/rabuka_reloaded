@@ -47,33 +47,72 @@
  *                                        726831 B  sha256 89204df0bbde08a0...  STALE
  *
  * abilities_gen.rs:55 include_bytes! the cards/build blob, so RUST held the
- * canonical 726671-byte table and the C held the stale 726831-byte one. The
- * layer-3 regen has since closed that skew, so the divergence this paragraph
- * used to excuse NO LONGER EXISTS and both engines now read the same 726671
- * bytes: src/abilities_strings.bin and cards/build/abilities_strings.bin are
- * byte-identical at sha256 32fa1a69c0ba9bc2..., and the two offset tables agree
- * (RBKA_OFFSET_DELTAS, gen_data.c:7, sums to 98782 == RBKA_BYTECODE_LEN, against
- * OFFSET_DELTAS, abilities_gen.rs:25, over the same 98782-byte payload in
- * cards/build/abilities.bin; RBKA_STRINGS_TABLE_LEN, gen_data.c:579, is 726671
- * for both). tests/test_artifacts_consistent.c section 6 now fails if that stops
- * being true, so it cannot rot silently a second time.
+ * canonical 726671-byte table and the C held the stale 726831-byte one.
+ *
+ * ⛔ THE SKEW IS BACK (2026-10-05), and the fix is NOT to edit this file or the
+ * C's blob. The paragraph above ended by declaring the divergence resolved:
+ * "NO LONGER EXISTS", "both engines now read the same 726671 bytes ... and the
+ * two offset tables agree". MEASURED 2026-10-05, that is FALSE again:
+ *
+ *   cards/build/abilities_strings.bin   726742 B  FNV-1a 32 = 1858760114
+ *   engine_c_wip/src/abilities_strings.bin  726671 B  sha256 32fa1a69c0ba9bc2...
+ *   RBKA_STRINGS_TABLE_LEN (gen_data.c)      726671
+ *
+ * So cards/build moved upstream (726671 -> 726742, +71 B) and the C tree did
+ * not follow. The three cross-generation assertions in
+ * tests/test_artifacts_consistent.c are RED on exactly this, and they are the
+ * tripwire that is doing its job: "23 checks, 3 failed". The remedy is
+ * `bash tools/regen_all.sh` plus committing cards/build/abilities_strings.bin,
+ * src/core/generated/gen_data.c and bytecode_blob.c TOGETHER — NOT hand-editing
+ * a length here, and NOT weakening the three assertions.
+ *
+ * The DIRECTION of the original claim was right and stays: Rust is the
+ * canonical side at 726671 B / 32fa1a69..., and the C was the divergent one.
+ * It was already corrected above on 2026-10-04; what needed correcting today was
+ * the "no longer exists" tail, not the polarity.
  *
  * CONSEQUENCE FOR ABILITY 325: the old text said "Do NOT 'fix' this file for
  * ability 325." That instruction is WITHDRAWN -- 325 renders identically in both
  * languages now, because its slice changed (159 -> 149 bytes) and the C's
  * render tracked it.
  *
- * ⛔ ABILITY 327 IS NOT CLAIMED AS FIXED OR AS A DEFECT IN THIS FILE.
- * tests/test_describe_golden.c is now RED on exactly one ability, 327
+ * ⛔ ABILITY 327 IS NOT CLAIMED AS FIXED, BUT IT IS NO LONGER AN INFERENCE.
+ * tests/test_describe_golden.c is RED on exactly one ability, 327
  * (`PL!-pb2-014-P+`/`-R`, whose slice changed 113 -> 141 bytes -- the largest
- * length change in the corpus). Measured: the C renders two actions ("Place 1
- * live card from selected cards to success_live_zone; then Place 1 live card
- * from selected cards to success_live_zone") and the golden records one. The
- * golden is a fixture of Rust's PRE-regen output, so this is a stale fixture
- * rather than a rendering defect -- but that is an INFERENCE, not a measurement:
- * re-deriving the fixture needs the Rust dumper, and `cargo` was not run. Until
- * someone regenerates it, treat 327 as OPEN and do not "fix" describe.c for it
- * either. Suite state as measured: 1394 checks, 1 failure.
+ * length change in the corpus). Until 2026-10-05 the note below called the
+ * divergence a stale fixture on the reasoning that "re-deriving the fixture
+ * needs the Rust dumper, and `cargo` was not run". The rendering itself has now
+ * been MEASURED from both sides, from the tree's own bytes:
+ *
+ *   golden (Rust, pre-regen)  EN: "Place 1 live card from selected_cards to
+ *                                     success_live_zone"
+ *   this file, TODAY          EN: "Place 1 live card from success_live_zone to
+ *                                     hand; then Place 1 live card from
+ *                                     selected_cards to success_live_zone"
+ *
+ * The decoded tree for 327 is `sequential` over a `move_cards` primary and a
+ * `move_cards` followup, plus a `reveal` cost with extras
+ * {group_names: lily white, optional: true}. The printed text agrees with the
+ * C's TWO clauses and not with the golden's one:
+ *   「…自分の成功ライブカード置き場にあるカードを1枚手札に加える。そうしたとき、
+ *     これにより公開したカードを自分の成功ライブカード置き場に置く。」
+ * — take one from the success zone into hand, THEN (「そうしたとき」, the
+ * same condition) put the REVEALED card into the success zone. A one-clause
+ * render drops the 「そうしたとき」 step entirely.
+ *
+ * So the C is right, the fixture is stale, and this file must NOT be "fixed" for
+ * 327. `cargo` was still not run, so the fixture is NOT regenerated here; that
+ * needs a Rust dumper run, and it belongs with the regen above.
+ *
+ * SUITE STATE AS MEASURED 2026-10-05 -- and the old "983 of 985" phrasing is
+ * wrong in a way that hides a number. tests/test_describe_golden.c prints:
+ *   info: abilities=985 with_effect=983 compared=983 excluded=2 fallback=0
+ *   RED: 1394 checks, 1 failures
+ * `compared=983` is the number of abilities actually compared, NOT the number
+ * that agreed. The true split of the 985 is
+ *   982 identical + 1 divergent (327) + 2 excluded = 985
+ * and the fixture holds 1394 checks over those 983 compared abilities in both
+ * languages. "983/985" reads as 983 passing and is wrong twice over.
  *
  * The `gain_resource` shorthand the old header described IS real and IS in this
  * file (the arm at the bottom, mirroring describe.rs:303-311): Rust emits a bare

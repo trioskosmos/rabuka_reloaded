@@ -496,7 +496,12 @@ void rb_gsc_set_recently_moved_cards(GameState *g, const int *cards, int n) {
     if (!g) return;
     if (n < 0) n = 0;
     if (n > RB_MAX_RECENTLY_MOVED) n = RB_MAX_RECENTLY_MOVED;
-    memcpy(g->recently_moved, cards, (size_t)n * sizeof(int));
+    /* A NULL `cards` with n > 0 is a caller bug, but Rust's `Vec<i16>`
+       (mod.rs:1018) cannot express it at all, so the C must not invent a
+       source address for it. Collapse to the empty batch, which is what
+       `recently_moved_cards()` reads back as n == 0. */
+    if (!cards) n = 0;
+    if (n > 0) memcpy(g->recently_moved, cards, (size_t)n * sizeof(int));
     g->n_recently_moved = n;
 }
 

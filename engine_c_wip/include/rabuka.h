@@ -888,6 +888,40 @@ typedef enum {
     RB_CHOICE_SELECT_AUTO_ABILITY /* auto-ability ordering */
 } RbChoiceKind;
 
+/* ── AutoAbilityOption (engine/src/ability/types.rs:313-318) ───────────────
+   Rust:
+       pub struct AutoAbilityOption {
+           pub card_name: String,
+           pub ability_text: String,
+           pub queue_index: usize,
+           pub card_id: Option<i16>,
+       }
+
+   ONE producer: core/game_state/abilities.rs:1755-1788, the Rule 9.5.3 branch
+   of process_player_abilities_depth — when two or more standby auto abilities
+   of the SAME player are available it builds `options` from the available queue
+   entries and hands them to `Choice::SelectAutoAbility`
+   (types.rs:214-228). ONE consumer of the answer:
+   `ChoiceResult::AutoAbilitySelected { queue_index }` (types.rs:331).
+
+   `card_id` is `Option<i16>`, not `i16`: a gained/spawned ability is enqueued
+   with no card id (the `Option` is None), so `has_card_id` carries the
+   discriminant and `card_id` is meaningless when `has_card_id` is 0.
+
+   The capacity is RB_QUEUE_DEPTH (16) because the list can never be longer than
+   the queue it is built from; that is why the emitter can bound it without a
+   dynamic allocation and why the answer path can index it directly. */
+#define RB_MAX_AUTO_ABILITY_OPTIONS 16
+#define RB_AUTO_ABILITY_NAME_SZ     48
+#define RB_AUTO_ABILITY_TEXT_SZ     192
+typedef struct {
+    char card_name[RB_AUTO_ABILITY_NAME_SZ];
+    char ability_text[RB_AUTO_ABILITY_TEXT_SZ];
+    int  queue_index;
+    int  card_id;
+    int  has_card_id;
+} AutoAbilityOption;
+
 /* ChoiceRoute  Emirrors engine/src/ability/types.rs::ChoiceRoute. Tags which
    cost/choice gate produced a pending choice so resume can route correctly. */
 typedef enum {
@@ -999,6 +1033,27 @@ typedef struct {
     int  blind;
     int  is_reveal;
     int  actor;  /* 0=p1, 1=p2 - which player made the choice */
+    /* Rule 9.5.3 ordering options (types.rs:216 `options: Vec<AutoAbilityOption>`).
+       APPENDED after `actor` — see the append rule above this file's header.
+
+       What is retained here is deliberately NOT a copy of the AutoAbilityOption
+       values. The answer path is rb_resolver_handle_auto_ability_selection
+       (src/ability/choice.c), which resolves a selection as `queue.cur +
+       selected` with a fallback to `selected` as an ABSOLUTE index; the emitter
+       therefore sets `queue.cur = 0` before parking (see
+       rb_emit_auto_ability_choice in src/core/game_state_abilities.c), which
+       makes `selected` the absolute queue index and lands the chosen entry at
+       the head of the queue — exactly Rust's outcome, where the following scan
+       re-derives `first` over the reordered queue. So the ABSOLUTE indices are
+       all that has to survive the pause, and 16 ints instead of 16 full structs
+       keeps this struct ~3.4 KB smaller on a path GameState embeds 17 times
+       (queue.pending + one pending_choice per RB_QUEUE_DEPTH entry).
+
+       `n_auto_options == 0` for the OTHER producer of
+       RB_CHOICE_SELECT_AUTO_ABILITY (the Rule 8.4.7 live-success list), which
+       does not use this field. */
+    int  auto_option_queue_index[RB_MAX_AUTO_ABILITY_OPTIONS];
+    int  n_auto_options;
 } RbChoice;
 
 /* ── Queue entry (mirrors engine/src/ability/ability_queue.rs::AbilityQueueEntry) ── */
@@ -1287,9 +1342,31 @@ typedef struct {
     int n_pending_deferred_costs;
 } RbAbilityQueue;
 
+/* rb_queue_push_with_trigger and rb_queue_save_pending_actions: DECLARATIONS
+ * REMOVED 2026-10-05.
+ *
+ * Both DEFINITIONS were already gone -- ability_queue.c:322 and :363 carry full
+ * TOMBSTONEs for them dated 2026-10-05 -- and both prototypes survived here. The
+ * first tombstone says so in as many words ("removing it would mean editing a
+ * header this change does not own"), which is exactly the trap this header is in:
+ * a prototype that outlives its definition is a documented API that is a LINK
+ * ERROR. `bash tools/zz_proto.py` reported both by name.
+ *
+ * The tombstones' Rust arguments stand, and they are worth keeping next to the
+ * declarations they refer to:
+ *   - push_with_trigger: no Rust free function has this shape. Every Rust
+ *     enqueue goes through trigger_auto_ability (core/game_state/abilities.rs:
+ *     1239-1293) into enqueue_printed_ability (:1282-1326) or
+ *     enqueue_gained_ability (:1331-1376), and BOTH take `player_id: String` and
+ *     BOTH write it. "Push an entry and stamp a trigger on it" is not a
+ *     capability Rust left behind.
+ *   - save_pending_actions: its Rust twin IS live
+ *     (queue.rs:544, called from compound/conditional_on.rs:43) and the C site is
+ *     live too (compound.c:693-699, rb_compound_conditional_on_result), but the C
+ *     counterpart there is rb_queue_extend_pending_actions, Rust's
+ *     `pending_actions.extend(actions)` at queue.rs:546. The count-only signature
+ *     cannot name WHICH effects to append, so no site needs it. */
 int  rb_queue_push(RbAbilityQueue *q, int card_id, int ability_idx);
-int  rb_queue_push_with_trigger(RbAbilityQueue *q, int card_id, int ability_idx,
-                                const char *trigger, const int *moved_cards, int n_moved);
 void rb_queue_set_entry_trigger(struct GameState *g, int entry_index, const char *trigger,
                                 const int *moved_cards, int n_moved);
 void rb_queue_clear(RbAbilityQueue *q);
@@ -2087,7 +2164,6 @@ void rb_queue_promote_entry_by_abs(GameState *g, int absolute);
 void rb_queue_set_current_entry(GameState *g, int absolute);
 int rb_queue_has_pending_actions(const GameState *g);
 void rb_queue_set_pending_actions(GameState *g, int count);
-void rb_queue_save_pending_actions(GameState *g, int count);
 void rb_queue_store_pending_actions(GameState *g, AbilityEffect *const *actions, int count);
 int rb_queue_resume_pending_actions(GameState *g);
 int rb_queue_take_pending_actions(GameState *g);
@@ -2211,7 +2287,25 @@ const char *rb_member_area_to_str(int idx);
    Dispatches UseAbility → activate ability, Pass → advance phase, etc. */
 int rb_execute_main_phase_action(GameState *g, int action_type, int card_id,
                                  int target_player, int target_idx, int target_zone);
-int  rb_play_card(GameState *g, int pl, int hand_idx);
+/* rb_play_card and heart_color_of: DECLARATIONS REMOVED 2026-10-05.
+ *
+ * Both DEFINITIONS were already gone -- engine.c:1488 and engine.c:223 carry
+ * full TOMBSTONEs for them dated 2026-10-04, naming them as dead globals with
+ * no Rust twin. What survived was their PROTOTYPE, here, which is the exact
+ * shape the C5 warning describes: a documented API whose definition no longer
+ * exists, i.e. a LINK ERROR waiting for the first caller. MEASURED with
+ * `bash tools/zz_nm.sh rb_play_card heart_color_of`: "NOT DEFINED in any .o"
+ * across all 52 objects in the tree; `bash tools/zz_refs.sh` finds 0
+ * references outside those two tombstones; and Rust has no twin of either
+ * (`grep -rn 'fn heart_color_of\|fn play_card' ../engine/src` -> 0 hits;
+ * Rust parses an effect's heart_color through HeartColor::from_str,
+ * core/card.rs:4554, and has no play_card at all).
+ *
+ * heart_color_of is the sharper of the two: its removed body mapped the
+ * string "b_all" to RB_HEART_ALL (index 7), while Rust's heart_color_table!
+ * (core/card.rs:4460-4476) spells "b_all" as HeartColor::BAll, index 0, and
+ * index 7 is All/"all". engine.c:223-262 documents the whole table skew. A
+ * declaration that outlives that body is a way back to it. */
 int  rb_play_member(GameState *g, int pl, int hand_idx, int stage_pos); /* to stage */
 int  rb_complete_play_with_cost(GameState *g, int pl, int accept); /* answer a paused play-time alt-cost */
 int  rb_activate_ability(GameState *g, int pl, int hand_idx);
@@ -2647,7 +2741,6 @@ int rb_effect_count(const GameState *g, int actor, int host_cid, const AbilityEf
 /* ── Shared card/zone/comparison helpers (engine/src/ability/util.rs) ── */
 int  rb_compare_counts(const char *operator, int actual, int expected);
 /* Decode a heart_color from an effect's extra fields (engine.c). */
-int heart_color_of(AbilityEffect *e, int dflt);
 int  rb_card_matches_type(int card_id, const char *filter);
 /* util.rs helpers (effect-field readers / target resolution / cost-threshold) */
 int  rb_heart_gain_per_entry(int total, int n_colors);
@@ -2980,14 +3073,36 @@ int rb_pay_deferred_costs(GameState *g, int actor, const AbilityEffect *cost);
    because they are outside this change's scope. (rb_load_rom is NOT one of
    these: its declaration is correctly wrapped in the same #ifdef RB_ROM_STRINGS
    as its definition.) */
+/* C6 reader for the stage-select intent. The writers are the two
+   pay_cost_change_state prompt sites in cost.c (Rust handlers.rs:965-966 and
+   :1571-1572 set `awaiting.stage_select_intent = Some(ChangeStateWait)`);
+   Rust READS it once, choice.rs:2174, with `.take()`, in
+   handle_stage_selection's is_select_action branch. Returns 1 for
+   ChangeStateWait and CLEARS the latch (Rust's `.take()`), so it is consumed by
+   the first stage-selection answer and cannot be applied twice. 1 is the only
+   intent this port can express today; a producer for a second intent needs a
+   second value here. */
+int rb_cost_take_stage_select_intent(void);
 int rb_handle_optional_cost_payment(GameState *g, int actor, const AbilityEffect *cost, int pay);
 int rb_handle_pay_cost_all_discard(GameState *g, int actor, const char *selected);
-int rb_cost_has_skip_prompt(const AbilityEffect *cost);
 int rb_compute_play_cost(const GameState *g, int actor, int card_id, int set_override);
-int rb_get_change_state_candidates(const GameState *g, int actor,
-                                   int *out_positions, int max);
-int rb_pay_cost_move_cards(GameState *g, int actor, const AbilityEffect *cost,
-                           int host_cid, int is_activation);
+/* NOT deleted, unlike its three former neighbours above: MEASURED 3 live callers,
+   tests/test_parity_conc_cost_card.c:296, :331 and :349, whose oracle is
+   handlers.rs:936-949. Its host_cid / is_activation arguments are not Rust's --
+   handlers.rs:858 `pay_cost_change_state(&mut self, gs, cost)` takes neither,
+   so this is the one remaining C-only spelling of the group.
+
+   DELETED 2026-10-05, each in the SAME edit as its cost.c definition:
+   rb_cost_has_skip_prompt, rb_get_change_state_candidates, rb_pay_cost_move_cards.
+   All three were one-line forwarders to the file-local statics that Rust
+   declares private at handlers.rs:45, :54 and :778, and each measured 0
+   references outside src/ability/cost.c (bash tools/zz_refs.sh <name>).
+   rb_cost_has_skip_prompt carried a tombstone here already, on the grounds that
+   deleting the exported spelling "changes nothing else" -- true of the
+   DEFINITION, not of the DECLARATION: a prototype that outlives its definition
+   is a link error, and a forwarder that outlives its only caller is not API.
+   bash tools/zz_proto.py re-runs the whole cross-check against every .o in the
+   tree; bash tools/zz_nm.sh <name> re-checks a single symbol. */
 int rb_pay_cost_change_state(GameState *g, int actor, const AbilityEffect *cost,
                              int host_cid, int is_activation);
 int rb_effect_place_energy_under_member_non_optional(GameState *g, int actor, const AbilityEffect *e);
