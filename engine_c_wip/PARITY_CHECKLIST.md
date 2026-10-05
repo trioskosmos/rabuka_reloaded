@@ -2274,6 +2274,130 @@ blocks the conversion). Negative control: **22 hits** with it set, **0** without
 
 ---
 
+## ⚖️ `^FAIL:` AND THE SUITE SUMMARY DISAGREE BY 1.4–4×. QUOTE BOTH.
+
+The harness emits a **per-assertion** line *and* a **per-case** `FAILED <name>` line, and
+its own summary counts **only the latter**. Measured on the current tree:
+`parity_card_score`, `parity_cost_discount`, `parity_zone_source`, `parity_sequential`,
+`parity_small_clusters`, `parity_cce_gaps`, `parity_recover_live` all print `^FAIL:`
+counts **1.4–4× their reported failure count**.
+
+- Reading the **summary** under-counts (it misses per-assertion detail).
+- Reading **`^FAIL:`** over-counts (it includes the case rollups and, in FLAT suites,
+  the same failure more than once).
+**Neither is a defect count. Report both, labelled, and say which question each answers.**
+20 suites print no machine-readable case total at all — **do not read those as passes.**
+
+`mechanics` prints `ALL MECHANIC CHECKS PASSED` with **no total**, which is exactly the
+"reads as zero failures" shape. It has 30 `ok:` lines but no case count to assert.
+
+---
+
+## ✅ STALE: "the six `RbCardFilter` carriers have 0 producers" — **FALSE**
+
+All six are produced by `card_filter_from_effect` (`src/core/card.c:1006-1075`), verified
+per carrier against Rust:
+
+| carrier | Rust | corpus |
+|---|---|---|
+| `exclude_group_names` | `util.rs:1884` | 4 |
+| `groups[]` (whole list) | `util.rs:1874` | 605 |
+| `cost_limit_min` / `cost_limit_max` | `util.rs:1878` / `:1879` | 1 / 1 |
+| `original_heart_total` + operator (defaults `<=`) | `util.rs:1924-1925` | 5 |
+| `exclude_cards` / `exclude_names` | **no producer BY DESIGN** — Rust quotes literal `None` at `util.rs:1926-1927`; filled programmatically post-construction, and `has_filter` deliberately does not count them (`util.rs:1456-1477`) | 0 |
+
+**Do NOT delete `exclude_cards`/`exclude_names`** — the matchers read them and Rust's
+`matches` does too. `RECONCILIATION.md:61` still carries the wrong "0 producers" claim.
+
+Also settled: **`map_series_to_group` passes on every group and every series form** —
+all 5 groups, both 蓮ノ空 spellings (`card.rs:927-931`), the `_ => ""` default (`:934`),
+and `rb_map_series_to_group` agrees with `rb_card_matches_group_str`'s helper on all six
+forms. `rb_card_matches_group_str` was **not touched** (118 755 pairs, 0 disagreements).
+
+---
+
+## ⚠️ CORRECTION — THE "RUST CARD-LOSS" CLAIM WAS REAL BUT **I CITED THE WRONG LINES**
+
+I told many agents *"confirmed Rust card-loss at `turn/phases.rs:846-851`."* **Those
+lines are parameter handling and a `log::debug!`.** An agent following them found
+nothing and correctly refused to endorse the claim — which is the correct outcome for
+bad coordinates.
+
+**THE ACTUAL BUG — `phases.rs:865-871`:**
+```rust
+:867  let card = player.hand.cards.remove(idx);   // removed from hand
+:868  player.live_card_zone.face_up = false;
+:869  let live_cards = &mut player.live_card_zone.cards;
+:870  if live_cards.len() >= MAX_LIVE_CARDS {
+:871      return Err("Live card zone is full")    // errors WITH the card already gone
+```
+**The divergence is real: Rust removes from hand and THEN rejects on capacity.**
+
+**The C is correct** — `phase.c:1543` refuses on `P->live.n >= RB_MAX_LIVE_CARDS`
+**before** `rb_hand_remove_card` at `:1544`, with the divergence documented in place at
+`:1550`. **Do NOT "fix" the C to match Rust here** — that would introduce a card-loss
+bug. Rust is the side that is wrong.
+
+Filed against Rust. Cite `:865-871`, never `:846-851`.
+
+---
+
+## ⚠️ `make warnings-audit` IS **RED** — A REAL REGRESSION, NOT A DISK ARTEFACT
+
+1 NEW at `src/ability/effects/look.c:1577`, 1 stale pin at `:1486`. Verified
+independently with disk never below 36 GB. **Re-baseline honestly: delete a pin for a
+warning that no longer exists; add one for a warning that now exists.**
+
+---
+
+## 📏 TWO MORE OUTPUT-FORMAT TRAPS — BOTH HAVE PRODUCED A WRONG "ZERO"
+
+1. **THE SUMMARY GOES TO `stderr`.** Without `2>&1` (or separate capture) the
+   summary line is invisible.
+2. **MOST SUITES DO NOT PRINT `assertions=N failures=M`.** They print
+   `==== N cases passed, M cases failed ====`. A scanner keyed to the
+   `assertions, failures` shape therefore reads **`FAIL=0` for every suite** while
+   `parity_zone_source` actually had **29 failing cases**. This produced a
+   whole-suite zero that was entirely an artefact.
+**RULE: match BOTH shapes, and sanity-check that a suite with known failures is
+not reading zero.** A blanket zero across the corpus is a scanner bug until proven
+otherwise.
+
+Related and already recorded: `^FAIL:` and the suite's own summary **disagree by
+1.4–4×**; a broken build reads as zero; and a suite printing "ALL PASSED" with no
+total is broken, not green.
+
+---
+
+## ✅ ROTATION — THE PRESCRIBED FIX WAS WRONG. THE REAL DEFECT WAS `"both"` NOT RECURSING.
+
+I prescribed *"hoist `misc.c:1624` above the `:1588` destination arm."* **That would
+have broken correct code.** Rust checks `destination` **first** (`position.rs:190`) and
+reaches rotation **later** (`:319`) — the C's order already matched. And chisato
+(`PL!SP-pb1-003-R` ab#0) has **no `destination` key at all**, so the destination arm
+could not have fired.
+
+**THE REAL DEFECT:** chisato's `target` is `"both"`, and `misc.c:1621` collapsed the
+whole `both` branch into a single `position_destination_prompt(…, "opponent", "select")`
+— neither recursing nor consulting `multiple_targets`. Rust (`position.rs:291-317`)
+**recurses with a retargeted clone**, which is the only way the rotation arm becomes
+reachable. Fixed to mirror Rust (opponent pass, then self inline or parked).
+
+**Second defect, found as a regression it caused and traced:** `RbPlayer *P` was bound
+to the raw `actor`, where Rust resolves via `gs.resolve_target_player(target)` with the
+**recursion's** `target`. On the opponent pass every below-`both` arm read the **master's**
+stage — which is what suppressed `PL!SP-bp5-010-*`'s opponent choice.
+
+`parity_zones_position`: **176 assertions / 36 failures → 185 / 28.** All 20 other
+listed suites byte-identical.
+
+Also settled: **`deck_top_or_bottom` and `front` are already CORRECT — do NOT port
+them.** `Zone::from_str` maps both to real variants, but Rust's `place_card_in_zone` has
+no arm for either, so they hit the `_` catch-all (`util.rs:2548-2555`) → **hand**, and
+the C's `rb_hand_add` is exactly that. Porting would **diverge**.
+
+---
+
 ## Definition of done
 
 ### Measured baseline — `BASELINE.md`, two runs agreed EXACTLY (no nondeterminism)

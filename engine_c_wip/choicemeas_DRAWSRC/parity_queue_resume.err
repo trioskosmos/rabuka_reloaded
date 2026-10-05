@@ -1,0 +1,27 @@
+FAIL: the tail keeps its order (got 0 expected 102)
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001965d0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001965d0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198b20 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019a150 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001965d0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001965d0 cur=0 n=0 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: the drained entry is still in the queue after the skip
+FAIL: the drained entry is marked effect_started so it is not re-run (got -1 expected 1)
+[TEST_BATON_TOUCH] test_play_to_stage(910, area 1): area 1 already holds card 2125, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00197680 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0

@@ -2601,7 +2601,13 @@ int rb_resolver_handle_hand_selection(RbAbilityResolver *self, GameState *g, con
                 int cid = g->keep_shuffle_under_snapshot[0][i];
                 /* remove from current hand if present */
                 for(int j=0;j<P->hand.n;j++) if(P->hand.cards[j]==cid){ for(int k=j;k<P->hand.n-1;k++) P->hand.cards[k]=P->hand.cards[k+1]; P->hand.n--; break; }
-                P->deck.cards[P->deck.n++]=cid;
+                /* BOUND: every other deck writer in the tree guards this with
+                   `n < RB_MAX_ZONE` (draw.c:821, draw.c:828 and others). These two
+                   C6 keep-N-shuffle-under writes did not, so a full deck walks off
+                   the end of RbBag.cards[RB_MAX_ZONE]. The cards are moved
+                   SNAPSHOT order (Rust choice.rs:1151/1176 iterates the snapshot),
+                   so bounding loses nothing. */
+                if (P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++]=cid;
             }
             g->keep_shuffle_under_selected_n=0;
             /* Snapshot opponent hand before prompting (choice.rs:1154) */
@@ -2628,7 +2634,13 @@ int rb_resolver_handle_hand_selection(RbAbilityResolver *self, GameState *g, con
             for(int i=snap_n-1;i>=0;i--) if(!keep_set[i]) {
                 int cid = g->keep_shuffle_under_snapshot[1][i];
                 for(int j=0;j<P->hand.n;j++) if(P->hand.cards[j]==cid){ for(int k=j;k<P->hand.n-1;k++) P->hand.cards[k]=P->hand.cards[k+1]; P->hand.n--; break; }
-                P->deck.cards[P->deck.n++]=cid;
+                /* BOUND: every other deck writer in the tree guards this with
+                   `n < RB_MAX_ZONE` (draw.c:821, draw.c:828 and others). These two
+                   C6 keep-N-shuffle-under writes did not, so a full deck walks off
+                   the end of RbBag.cards[RB_MAX_ZONE]. The cards are moved
+                   SNAPSHOT order (Rust choice.rs:1151/1176 iterates the snapshot),
+                   so bounding loses nothing. */
+                if (P->deck.n < RB_MAX_ZONE) P->deck.cards[P->deck.n++]=cid;
             }
             g->keep_shuffle_under_phase=0;
             g->keep_shuffle_under_snapshot_n[0]=0; g->keep_shuffle_under_snapshot_n[1]=0;
@@ -5362,7 +5374,11 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
            not replayed. */
         if (!declined) rb_resolver_continue_siblings(g, actor, host, cont, cont_from);
     } else if (mode == 5) {         /* C6 keep-shuffle-under re-entry */
-        if (!was_skip && eff) {
+        /* `eff` (g->queue.resume_eff) is NOT passed on: the node that raised the
+           prompt is decoded on the trigger handler's stack and is dead here, so
+           forwarding it dereferences freed stack. Phases 1/2 read their keep-N
+           count from g->keep_shuffle_under_count instead (draw.c). */
+        if (!was_skip) {
             /* capture the chosen card id (index into the answerer's hand) so the
                 re-entered keep-shuffle phase can tell kept from moved. */
             int pl = g->queue.actor;
@@ -5372,7 +5388,7 @@ static int rb_resume_with_choice_indices_internal(GameState *g, const int *selec
                     g->selected_cards[g->n_selected_cards++] = P->hand.cards[selected_idx];
                 }
             }
-            rb_effect_both_hand_keep_shuffle_under(g, host, eff, host);
+            rb_effect_both_hand_keep_shuffle_under(g, pl, NULL, host);
         }
     } else {                         /* generic: route by choice kind to the
                                          resolver handlers (mirrors Rust

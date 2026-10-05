@@ -80,6 +80,33 @@ which the random-policy engine sweep executes. So a plain two-process
 before/after is *sound* provided `total_actions` matches. The
 cross-process caveat that does survive is the one already in §1: other
 commits landing mid-run.
+### Measurement reliability on this machine — read before trusting any number here
+
+The `--ab` harness controls for **arm order** and **game identity**. It does not
+control for **machine load**, and on this box that is the dominant term:
+
+| build | runs (`mean_aps`, identical games) | spread |
+|---|---|---|
+| no `profiling`, quiet period | 78,003 · 78,477 | ±0.3% |
+| no `profiling`, later | 72,547 · 64,733 | **±12%** |
+
+Same binaries, same seed, same `total_actions` (171,481). So the noise floor is
+**±12% and time-varying**, not a fixed constant. Two consequences, both
+uncomfortable:
+
+- **Every speed claim below ~10% on this machine is unreliable**, including the
+  `CardDatabase` type bitset's −0.5%. That change was kept because its mechanism is
+  sound (an array index replacing a hash lookup on a path measured at ~1.1M
+  calls/sweep) and its three readings all favoured it — not because the number
+  settles it. Treat it as "very likely a small win", not as a measured one.
+- **An A/B is only trustworthy when the two arms are close in time.** The
+  interleaving in `sim_bench --ab` alternates arms within one run precisely so
+  this matters less; if a run takes long enough for the machine's load to drift,
+  even that degrades. Re-run a suspicious result before believing it.
+
+`profiling` itself costs **30–40%** (47.6k–58.6k aps with it, 78k without), so
+`mean_aps` must always be quoted from a non-profiling build.
+
 **Arm-order bias is real and is not in the contract.** Whichever arm runs
 FIRST in a pair pays cold-cache and first-touch costs. A single on/off pair
 reported +25%, +42% and +21% for one unchanged build. Interleaving the arms

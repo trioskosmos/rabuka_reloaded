@@ -201,12 +201,38 @@ pub fn evaluate_state(gs: &GameState, me: u8, w: &StrategyWeights) -> f64 {
     };
 
     let success_diff = my.success_count as f64 - opp.success_count as f64;
+    combine(
+        &my,
+        &opp,
+        w,
+        urgency,
+        success_diff,
+    )
+}
 
+/// The linear board-score combination, split out of [`evaluate_state`] so the
+/// arithmetic is reachable without building a `GameState` and a `CardDatabase`.
+///
+/// EVERY difference below is cast to `f64` BEFORE subtracting, not after.
+/// `(a - b) as f64` evaluates `a - b` in the integer type first, and
+/// `active_energy`/`hand_size`/`success_count`/`hand_live_cards` are `u8`: any
+/// state where the opponent had more of one of those underflowed. Debug builds
+/// panicked outright ("attempt to subtract with overflow"); release wrapped, so
+/// the energy term contributed e.g. `(0 - 3) as f64 * 3.0 == +759` instead of
+/// `-9` — a swing larger than the entire `success_card` weight, which made the
+/// policy prefer having LESS energy.
+fn combine(
+    my: &SideView,
+    opp: &SideView,
+    w: &StrategyWeights,
+    urgency: f64,
+    success_diff: f64,
+) -> f64 {
     (success_diff * w.success_card) * urgency
-        + ((my.stage_total_cost - opp.stage_total_cost) as f64) * w.stage_cost
-        + ((my.stage_hearts - opp.stage_hearts) as f64) * w.heart
-        + ((my.stage_blades - opp.stage_blades) as f64) * w.blade
-        + ((my.active_energy - opp.active_energy) as f64) * w.active_energy
+        + (my.stage_total_cost as f64 - opp.stage_total_cost as f64) * w.stage_cost
+        + (my.stage_hearts as f64 - opp.stage_hearts as f64) * w.heart
+        + (my.stage_blades as f64 - opp.stage_blades as f64) * w.blade
+        + (my.active_energy as f64 - opp.active_energy as f64) * w.active_energy
         + (my.hand_size as f64 - opp.hand_size as f64) * w.hand_size
         + (my.hand_live_cards as f64) * w.hand_live_card
         + if my.is_first_attacker { w.first_attacker } else { 0.0 }
@@ -283,4 +309,132 @@ pub fn choose_action_heuristic(gs: &GameState, actions: &[Action], me: u8) -> Ac
     }
 
     actions[best_idx].clone()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn view() -> SideView {
+        SideView {
+            success_count: 0,
+            stage_total_cost: 0,
+            stage_hearts: 0,
+            stage_blades: 0,
+            active_energy: 0,
+            hand_size: 0,
+            hand_live_cards: 0,
+            is_first_attacker: false,
+        }
+    }
+
+    fn eval(my: &SideView, opp: &SideView) -> f64 {
+        let w = StrategyWeights::fair();
+        combine(
+            my,
+            opp,
+            &w,
+            1.0,
+            my.success_count as f64 - opp.success_count as f64,
+        )
+    }
+
+    /// Every field `combine` differences must contribute with its true sign.
+    ///
+    /// The evaluator used to write these as `(my.x - opp.x) as f64`, which
+    /// subtracts in the *integer* type first. Four of the fields are `u8`, so
+    /// every position where the opponent held more of one underflowed: debug
+    /// builds panicked, release wrapped, and `0 - 3` became `+759` points —
+    /// larger than the whole `success_card` weight, so the policy came out
+    /// preferring LESS energy. Asserting the sign on both sides of the
+    /// subtraction is what makes that unreintroducible: it does not care what
+    /// the weights are, only that more is better and less is worse.
+    #[test]
+    fn evaluator_differences_keep_their_sign() {
+        let fields: [(&str, fn(&mut SideView, u8), f64); 6] = [
+            (
+                "success_count",
+                |v, x| v.success_count = x,
+                StrategyWeights::fair().success_card,
+            ),
+            (
+                "stage_total_cost",
+                |v, x| v.stage_total_cost = i16::from(x),
+                StrategyWeights::fair().stage_cost,
+            ),
+            (
+                "stage_hearts",
+                |v, x| v.stage_hearts = i16::from(x),
+                StrategyWeights::fair().heart,
+            ),
+            (
+                "stage_blades",
+                |v, x| v.stage_blades = i16::from(x),
+                StrategyWeights::fair().blade,
+            ),
+            (
+                "active_energy",
+                |v, x| v.active_energy = x,
+                StrategyWeights::fair().active_energy,
+            ),
+            (
+                "hand_size",
+                |v, x| v.hand_size = x,
+                StrategyWeights::fair().hand_size,
+            ),
+        ];
+
+        for (name, set, weight) in fields {
+            let mine_ahead = {
+                let mut v = view();
+                set(&mut v, 5);
+                v
+            };
+            let opponent_ahead = {
+                let mut v = view();
+                set(&mut v, 5);
+                v
+            };
+            let opponent_level = view();
+            let mine_level = view();
+
+            let ahead = eval(&mine_ahead, &opponent_level);
+            let behind = eval(&mine_level, &opponent_ahead);
+            assert!(
+                ahead > behind,
+                "`{name}` is scored backwards: holding 5 scores {ahead}, \
+                 holding 0 against 5 scores {behind}. A `(a - b) as f64` on an \
+                 unsigned field wraps instead of going negative."
+            );
+            // 5 ahead vs 5 behind is a swing of 2 * 5 * weight.
+            let want = 10.0 * weight;
+            assert!(
+                (ahead - behind - want).abs() < 1e-9,
+                "`{name}` swing is {}, expected {want}",
+                ahead - behind
+            );
+        }
+    }
+
+    /// `hand_live_cards` is the one field scored without a difference (it only
+    /// ever rewards our own side), so it must not be double-counted or sign-
+    /// flipped by the same class of edit.
+    #[test]
+    fn own_hand_live_cards_only_ever_helps() {
+        let with = {
+            let mut v = view();
+            v.hand_live_cards = 3;
+            eval(&v, &view())
+        };
+        let without = eval(&view(), &view());
+        assert!(
+            with > without,
+            "live cards in our own hand must raise our score: {with} vs {without}"
+        );
+        assert_eq!(
+            (with - without - 3.0 * StrategyWeights::fair().hand_live_card).abs(),
+            0.0,
+            "own-hand live cards must contribute exactly count * weight"
+        );
+    }
 }

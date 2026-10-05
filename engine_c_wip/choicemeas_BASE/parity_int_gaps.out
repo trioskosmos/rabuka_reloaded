@@ -1,0 +1,111 @@
+heart colour mapping from the engine (rb_heart_color_as_str):
+   RB_HEART_* 0 -> heart00   (parse_heart_color("heart00") = 0)
+   RB_HEART_* 1 -> heart01   (parse_heart_color("heart01") = 1)
+   RB_HEART_* 2 -> heart02   (parse_heart_color("heart02") = 2)
+   RB_HEART_* 3 -> heart03   (parse_heart_color("heart03") = 3)
+   RB_HEART_* 4 -> heart04   (parse_heart_color("heart04") = 4)
+   RB_HEART_* 5 -> heart05   (parse_heart_color("heart05") = 5)
+   RB_HEART_* 6 -> heart06   (parse_heart_color("heart06") = 6)
+   RB_HEART_* 7 -> all   (parse_heart_color("all") = 7)
+
+== test_parity_int_gaps ==
+--- A: PL!S-bp5-023-L, the ANSWERING half of the deck-top ability ---
+        a1_fewer_than_four_lands_on_deck: 14 assertion(s), 5 failure(s)
+FAILED   a1_fewer_than_four_lands_on_deck
+        a2_select_one_of_four: 8 assertion(s), 3 failure(s)
+FAILED   a2_select_one_of_four
+        a3_skip_full_pool_moves_nothing: 7 assertion(s), 1 failure(s)
+FAILED   a3_skip_full_pool_moves_nothing
+        a4_only_saintsnow_does_not_fire: 5 assertion(s), 0 failure(s)
+ok       a4_only_saintsnow_does_not_fire
+--- B: PL!SP-pb2-011-R 鬼塚冬毬 own-LS reposition -> own 自動 ---
+EXPECTED_GAP(1): the 自動's 「以下から1つを選ぶ」 3-option list (blade x2 / wait an opponent member with ≤2 blades / draw 1) is not selectable in C: the shim raises ONE SelectAutoAbility with no per-option payload, so the DRAW bullet that Rust picks (and the +1 hand) is unreachable. The CHAIN itself -- her ライブ開始時 reposition leaving centre -- IS asserted strictly above, and the same 自動 firing after a real area move is the paired positive in b2.
+        b1_toubatsu_live_start_chain: 7 assertion(s), 1 failure(s)
+FAILED   b1_toubatsu_live_start_chain
+--- C: PL!SP-pb2-006-R きな子, the ライブ成功時 tuck arm ---
+        c1_kinako_live_success_tuck: 15 assertion(s), 5 failure(s)
+FAILED   c1_kinako_live_success_tuck
+--- D: PL!SP-bp4-023-L Dazzling Game Q187 exclude_selected ---
+EXPECTED_GAP(2): the step-2 exclusion is UNOBSERVABLE, but NOT because the field is undecoded -- the dump above shows `extra exclude_selected = true` IS carried in AbilityEffect::extra_k/extra_v. The real gap is upstream: the same select decodes as `src=(null) dst=(null) tgt=(null)`, i.e. AbilityEffect has NO source/target field, and the prompt it raises is offered over zone="hand" instead of the stage (the assertion above). A hand-offered pool has no notion of the already-chosen STAGE member, so `exclude_selected` cannot be honoured. The step-1 blade grant is asserted strictly as the paired positive that proves the fixture is live; the exclusion is NOT claimed as a pass. A second CSV is also in play here: `extra characters = 澁谷かのん,ウィーン・マルガレーテ,鬼塚冬毬`.
+        d1_dazzling_first_selection: 16 assertion(s), 4 failure(s)
+FAILED   d1_dazzling_first_selection
+--- E: PL!N-bp5-004-R 果林, the ちょうど4つ exact gate ---
+        e1_karin_blade4_exact_gate: 10 assertion(s), 0 failure(s)
+ok       e1_karin_blade4_exact_gate
+--- F: PL!S-bp7-010-N 千歌, 4th-from-the-top INDEX ---
+        f1_chika_examined_to_index3: 22 assertion(s), 2 failure(s)
+FAILED   f1_chika_examined_to_index3
+--- R: effects/replacement_generic_rule_9_10 (rule 9/10) ---
+        r0_paired_positive_plain_draw: 5 assertion(s), 0 failure(s)
+ok       r0_paired_positive_plain_draw
+        r1_mandatory_replacement: 7 assertion(s), 2 failure(s)
+FAILED   r1_mandatory_replacement
+        r2_accepted_optional: 5 assertion(s), 3 failure(s)
+FAILED   r2_accepted_optional
+        r3_declined_optional: 3 assertion(s), 0 failure(s)
+ok       r3_declined_optional
+        r4_applies_at_most_once: 5 assertion(s), 2 failure(s)
+FAILED   r4_applies_at_most_once
+        r5_two_registrations: 6 assertion(s), 2 failure(s)
+FAILED   r5_two_registrations
+
+NOT ATTEMPTED (with reasons):
+  integration/per_card  multi_card            -- 3 files/18 tests; the
+      per_card half (q203/q204/q218, hard_tier, live_end_expiry) is
+      ALREADY ported in test_parity_integration.c and
+      test_parity_integration_extra.c section B (B_T1..B_Q218, all in
+      its main() run list); multi_card was left to avoid racing the
+      agent already working that cluster.
+  effects/score/per_card  (14 files/59, 15 uncovered)
+  effects/gain/blades/per_card (14/56, 11 uncovered)
+  effects/recover/per_card  (14/68, 22 uncovered)
+  effects/deploy  (15 files/61, 5 uncovered)
+  effects/ability_mod  (14/69, 10 uncovered)
+  effects/choice/per_card  (9/29, 16 uncovered)
+      -- NOT ATTEMPTED: each is a 14-file grid needing its own
+      body-level coverage audit, and the whole batch exceeds one
+      agent's budget. Uncovered, and visible as such.
+  effects/live_start/dazzling_game_test.rs (3 tests)
+      -- PARTIALLY taken: test 3 (Q187 exclude_selected) is ported as
+      d1. Tests 1 and 2 assert a PER-YELL-CARD blade_hearts[8] array
+      read off PerformanceSnapshot.yell_cards[i].blade_hearts. C's
+      RbLiveSnapshot has only ONE flat yell_blade_hearts[8] plus a
+      n_yell_cards/yell_cards list with NO per-card heart array, so
+      the assertion is not expressible in C. Rust FIXTURE NOTE: the
+      file's run_dazzling_yell stages PL!HS-pb1-023-N as the 'host',
+      and cards.json proves PL!HS-pb1-023-N is セラス 柳田
+      リリエンフェルト (cost 15, EdelNote) -- NOT 桜内梨子. The header
+      comment's name is wrong; the number is real and resolves. The
+      bp4-023 vs bp1-023 'transposition' the survey describes is not
+      present in this file: PL!SP-bp4-023-L is Dazzling Game and
+      PL!HS-pb1-023-N is a different card used only as scenery.
+  jidou/movement/ability_chain_combo pb2006 x2 + special_color x2
+      -- ALREADY COVERED, verified by body:
+      test_parity_jidou_move_yell.c section 10, lines 1434-1559.
+  jidou/movement/under_member_placement x2
+      -- ALREADY COVERED, verified by body: both_players ->
+      test_parity_jidou_extra.c section I; position_change ->
+      test_parity_jidou_move_yell.c test_kinako_tucks_group_member_
+      under_self_on_area_move (1566).
+  jidou/yell/live_success_from_yell_reveal (5 tests)
+      -- ALREADY COVERED, verified by body: jimo_ai_draw_{0,1,2} ->
+      test_parity_jidou_move_yell.c Y8; jimo_ai_draw_3 (hand-limited)
+      -> test_parity_yell.c E; miracle_wave_excess_heart_scores_four
+      -> test_parity_jidou_move_yell.c Y9.
+  effects/look_select root (5 files/9 tests)
+      -- ALREADY COVERED, verified by body: hanao (both arms) ->
+      test_parity_look_and_filter.c G; mei (both arms) ->
+      test_parity_reveal_extra.c; chika -> test_parity_look_per_card.c F
+      (only the 4th-from-top INDEX was thin -- ported here as f1);
+      honoka (both arms) -> test_parity_mill_deck.c; nozomi ->
+      test_parity_search_reorder.c.
+  integration/per_card T1 and T3 (live_end_expiry...)
+      -- ALREADY COVERED: test_parity_integration.c
+      test_live_end_grant_expires_through_rollover and
+      test_ginko_debut_cost_gate, both in main()'s call list. T2's
+      exact-gate NEGATIVE arm was thin; re-ported as the paired
+      negative in e1 rather than as a separate test.
+
+== parity_int_gaps: 4 ok, 11 failed, 0 crashed
+== EXPECTED_GAP records are printed inline above (one per fork, so they are not aggregated here)
+== case assertion/failure counts are printed per case above; the parent's totals do not cross the fork boundary

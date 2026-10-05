@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-04T15:59:03.734056+00:00",
+  "generated_at": "2026-10-05T09:13:10.359409+00:00",
   "stats": {
     "total_cards": 2639,
     "cards_with_abilities": 1650,
     "total_abilities": 2116,
     "unique_abilities": 985
   },
-  "n_files": 1010,
-  "n_tests": 4177,
+  "n_files": 1012,
+  "n_tests": 4180,
   "total_cards": 809,
   "covered_cards": 809,
   "abilities_on_covered": 985,
@@ -439,8 +439,14 @@
       "rows": []
     },
     "assert_only_counts": {
-      "count": 1,
+      "count": 2,
       "rows": [
+        {
+          "file": "engine/tests/test_modules/characterization/seed_reproduces_game_test.rs",
+          "test": "each_replayed_game_reaches_a_terminal_result",
+          "line": 363,
+          "detail": ""
+        },
         {
           "file": "engine/tests/test_modules/effects/recover/to_hand/pb2_kidou_self_to_waitroom_recover_mus_live_then_energy_per_mus_pl_pb2_007_pp_test.rs",
           "test": "a_mus_live_is_recovered_from_the_waitroom",
@@ -1019,8 +1025,15 @@
       ]
     },
     "count_inequality_only": {
-      "count": 0,
-      "rows": []
+      "count": 1,
+      "rows": [
+        {
+          "file": "engine/tests/test_modules/characterization/seed_reproduces_game_test.rs",
+          "test": "each_replayed_game_reaches_a_terminal_result",
+          "line": 363,
+          "detail": "2 inequality assertion(s) on a count, vs baseline+threshold"
+        }
+      ]
     },
     "unresolvable_card_id": {
       "count": 1,
@@ -1034,7 +1047,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4177,
+  "n_test_fns_parsed": 4180,
   "abilities": [
     {
       "idx": 0,

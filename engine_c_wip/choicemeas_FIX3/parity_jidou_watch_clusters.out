@@ -1,0 +1,452 @@
+--- Section A  ability_watch / constant_grant_lifecycle_test.rs ---
+ok: A1: both fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=497 exposes >= 1 ability/abilities
+ok: fixture cid=497 carries the trigger (hex: E3 83 A9 E3 82 A4 E3 83 96 E9 96 8B E5 A7 8B E6 99 82)
+ok: A1 precondition: 25 mu's cards really sit in the waitroom
+ok: A1: the ライブ開始時 is queued for 矢澤にこ
+ok: A1 precondition: with 25 mu's cards in the waitroom the ライブ開始時 must grant the 常時 +1 — a constant aggregate of 0 makes every idempotence round below vacuous
+ok: A1 precondition: exactly one granted ability is registered
+ok: A1 round 1: the grant must stay a SINGLE +1 — a registration that re-appends takes it to +2
+ok: A1 round 1: the granted-ability list must hold exactly one entry, which IS the statement 'not appended'
+ok: A1 round 2: the grant must stay a SINGLE +1 — a registration that re-appends takes it to +2
+ok: A1 round 2: the granted-ability list must hold exactly one entry, which IS the statement 'not appended'
+ok: A1 round 3: the grant must stay a SINGLE +1 — a registration that re-appends takes it to +2
+ok: A1 round 3: the granted-ability list must hold exactly one entry, which IS the statement 'not appended'
+ok: A1 round 4: the grant must stay a SINGLE +1 — a registration that re-appends takes it to +2
+ok: A1 round 4: the granted-ability list must hold exactly one entry, which IS the statement 'not appended'
+ok: A1 round 5: the grant must stay a SINGLE +1 — a registration that re-appends takes it to +2
+ok: A1 round 5: the granted-ability list must hold exactly one entry, which IS the statement 'not appended'
+ok: A1 round 6: the grant must stay a SINGLE +1 — a registration that re-appends takes it to +2
+ok: A1 round 6: the granted-ability list must hold exactly one entry, which IS the statement 'not appended'
+        a1_niko_grant_stays_single_across_repeated_scans: 20 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       a1_niko_grant_stays_single_across_repeated_scans
+ok: A2: both fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: A2: the ライブ開始時 fires
+ok: A2 precondition: the grant is live
+ok: A2 precondition: exactly one card short of the 25枚以上 threshold
+ok: 「ライブ終了時まで」 runs from the moment the trigger fired: the 25枚以上 condition is assessed ONCE, at ライブ開始時, and is not re-checked. Revoking here would take a legally held grant away.
+ok: A2: the registration must be untouched by a condition that no longer applies — an engine that re-evaluated the latch passes a1 and fails here
+        a2_niko_grant_latches_at_live_start: 7 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       a2_niko_grant_latches_at_live_start
+ok: A3: both fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: A3: the ライブ開始時 fires
+ok: A3 precondition: the grant is live
+ok: A3: the live fixture resolves
+ok: A3 precondition: the walk reaches the live-card-set phase
+ok: A3 precondition: the live card really is seated
+ok: A3 precondition: the walk crossed the victory-determination rollover (live-end is where the printed duration is meant to end)
+ok: A3 precondition: the 25枚以上 condition STILL holds at the rollover, so only the printed ライブ終了時まで can be what ended the grant — the next turn's Draw may have refilled the waitroom, which only strengthens it
+ok: ライブ終了時まで is the whole duration: the grant must NOT survive the live that granted it
+ok: A3: the registration must be cleared by the rollover too — an expired grant still registered is one anything consulting the store can re-read
+        a3_niko_grant_expires_at_live_end: 11 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       a3_niko_grant_expires_at_live_end
+ok: A4: the 宮下愛 fixture builds
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=1057 exposes >= 1 ability/abilities
+ok: fixture cid=1057 carries the trigger (hex: E3 83 A9 E3 82 A4 E3 83 96 E9 96 8B E5 A7 8B E6 99 82)
+ok: A4 precondition: three members are staged this turn
+ok: A4 precondition: the debut counter really reached 3, which is the 「このターン…2回以上」 clause the grant is conditioned on
+ok: A4: the ライブ開始時 fires
+ok: A4 precondition: arming must not itself roll the turn over
+ok: 「2回以上」 is a threshold, not a counter: three debuts past it must still grant a flat +1, never +2
+ok: A4 precondition: exactly one granted ability
+ok: A4 round 1: the grant must not accumulate as scans repeat
+ok: A4 round 1: exactly one granted ability
+ok: A4 round 2: the grant must not accumulate as scans repeat
+ok: A4 round 2: exactly one granted ability
+ok: A4 round 3: the grant must not accumulate as scans repeat
+ok: A4 round 3: exactly one granted ability
+ok: A4 round 4: the grant must not accumulate as scans repeat
+ok: A4 round 4: exactly one granted ability
+        a4_ai_grant_is_a_flat_bonus_past_its_threshold: 18 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       a4_ai_grant_is_a_flat_bonus_past_its_threshold
+ok: A5: the 宮下愛 fixture builds
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: A5: the ライブ開始時 fires
+ok: A5 precondition: the grant is live
+ok: A5: the live fixture resolves
+ok: A5 precondition: the walk reaches the live-card-set phase
+ok: A5 precondition: the walk crossed the live-end rollover
+ok: A5 precondition: both debuts are STILL on stage, so the このターン condition is unchanged and only the duration can have ended the grant
+ok: A5: the grant must not outlive ライブ終了時
+ok: A5: the registration must be cleared as well as the score
+        a5_ai_grant_expires_at_live_end: 10 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       a5_ai_grant_expires_at_live_end
+ok: A6: the 乙宗梢 fixture resolves
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=577 exposes >= 1 ability/abilities
+ok: fixture cid=577 carries the trigger (hex: E5 B8 B8 E6 99 82)
+ok: A6: both 蓮ノ空 partner fixtures resolve
+ok: A6 precondition: 名前が異なる means the three must be three DIFFERENT cards — two copies of one name would fail the clause for the wrong reason
+ok: A6 precondition: all three areas hold 『蓮ノ空』 members of DIFFERENT names, so the 常時 +1 must be live
+GAP: A6: the Rust test also reads a REGISTRATION count for this printed constant grant, and C has no field for that triggerless TEXT half at all. GameState.gained_card_abilities is the RESOLVED-ABILITY half, which a printed constant never populates, because the constant scan evaluates the card's own printed ability numerically. The score assertions above and below ARE the parity claim and they hold; this registration count is not expressible in C on this path.
+ok: 「エリアすべて」 means every area: ONE empty area must WITHDRAW the grant
+ok: A6: on this C path the registration half is structurally absent, so this reads 0 whether or not anything was withdrawn -- it is kept as a documented no-op rather than silently counted as evidence
+ok: A6: the refill fixture resolves
+ok: A6 round 1: refilling the empty area re-grants EXACTLY one +1 — not two, not zero
+ok: A6 round 2: refilling the empty area re-grants EXACTLY one +1 — not two, not zero
+ok: A6 round 3: refilling the empty area re-grants EXACTLY one +1 — not two, not zero
+ok: A6 round 4: refilling the empty area re-grants EXACTLY one +1 — not two, not zero
+        a6_koto_grant_withdrawn_and_regranted: 15 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       a6_koto_grant_withdrawn_and_regranted
+ok: A7: all three fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: A7 precondition: the two right-hand slots hold DISTINCT physical cards of one print — a single id stamped into two slots would alias the zones
+ok: 「名前が異なる」 is PART of the condition: three areas holding only TWO distinct names must NOT grant. Without this, a6 could be passing on area coverage alone and never exercising the name clause at all.
+ok (gap closed): A7: the same registration half as A6 -- not expressible in C for a printed constant grant, so the name-clause verdict rests entirely on the score assertion directly above
+        a7_koto_grant_requires_distinct_names: 5 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       a7_koto_grant_requires_distinct_names
+ok: A8: the 乙宗梢 fixture resolves
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: A6: both 蓮ノ空 partner fixtures resolve
+ok: A6 precondition: 名前が異なる means the three must be three DIFFERENT cards — two copies of one name would fail the clause for the wrong reason
+ok: A8 precondition: the grant is live
+GAP: A8: the same registration half as A6/A7 -- not expressible in C for a printed constant grant, so the zone-exit verdict rests entirely on the score assertion at the end of this case
+ok: rule 4.1.4: a host that left the stage must carry NO grant — a zone change makes the card new, and a surviving +1 would score for a card on no board
+ok: A8: the same registration half as A6/A7 -- structurally absent in C, so this reads 0 either way and the zone-exit claim is carried by the score assertion immediately above
+        a8_koto_grant_does_not_outlive_host_zone_exit: 8 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       a8_koto_grant_does_not_outlive_host_zone_exit
+--- Section B  ability_watch / lifecycle_tail_idempotence_test.rs ---
+ok: B precondition: the three cost cards really are three DIFFERENT prints — two copies of one name would satisfy the cost condition for the wrong reason
+ok: B1: the 歩夢/かのん/花帆 fixture builds
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=17 exposes >= 1 ability/abilities
+ok: fixture cid=17 carries the trigger (hex: E3 83 A9 E3 82 A4 E3 83 96 E9 96 8B E5 A7 8B E6 99 82)
+ok: B1: the ライブ開始時 fires
+ok: B1: the OPTIONAL cost must really have been offered — a case that paid nothing would not be about the grant's lifecycle at all
+ok: B1 precondition: discarding all three named cards must grant the flat +3
+ok: B1 precondition: exactly one granted ability
+ok: B1 round 1: the grant must stay +3. A DUPLICATED registration reads +6, which is the whole reason this card is the cleanest idempotence probe in the family
+ok: B1 round 1: exactly one granted ability
+ok: B1 round 2: the grant must stay +3. A DUPLICATED registration reads +6, which is the whole reason this card is the cleanest idempotence probe in the family
+ok: B1 round 2: exactly one granted ability
+ok: B1 round 3: the grant must stay +3. A DUPLICATED registration reads +6, which is the whole reason this card is the cleanest idempotence probe in the family
+ok: B1 round 3: exactly one granted ability
+ok: B1 round 4: the grant must stay +3. A DUPLICATED registration reads +6, which is the whole reason this card is the cleanest idempotence probe in the family
+ok: B1 round 4: exactly one granted ability
+ok: B1 round 5: the grant must stay +3. A DUPLICATED registration reads +6, which is the whole reason this card is the cleanest idempotence probe in the family
+ok: B1 round 5: exactly one granted ability
+ok: B1 round 6: the grant must stay +3. A DUPLICATED registration reads +6, which is the whole reason this card is the cleanest idempotence probe in the family
+ok: B1 round 6: exactly one granted ability
+        b1_joint_grant_stays_single_across_scans: 21 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       b1_joint_grant_stays_single_across_scans
+ok: B precondition: the three cost cards really are three DIFFERENT prints — two copies of one name would satisfy the cost condition for the wrong reason
+ok: B2: the 歩夢/かのん/花帆 fixture builds
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: B2: the live fixture resolves
+ok: B2 precondition: the walk reaches the live-card-set phase
+ok: B2: the ライブ開始時 fires
+ok: B2 precondition: the grant is live
+        b2_joint_grant_expires_at_live_end: 10 assertion(s), 3 failure(s), 0 setup bug(s)
+FAILED   b2_joint_grant_expires_at_live_end
+ok: B3: every fixture resolves
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=141 exposes >= 1 ability/abilities
+ok: fixture cid=141 carries the trigger (hex: E7 99 BB E5 A0 B4)
+ok: B3 precondition: p1's success zone really holds exactly one card
+ok: B3 precondition: the walk reaches the live-card-set phase
+ok: B3: the 登場 fires
+ok: B3 precondition: a success zone holding one 1-point card must grant the +1
+ok: B3 round 1: the grant must not accumulate as scans repeat
+ok: B3 round 1: exactly one granted ability
+ok: B3 round 2: the grant must not accumulate as scans repeat
+ok: B3 round 2: exactly one granted ability
+ok: B3 round 3: the grant must not accumulate as scans repeat
+ok: B3 round 3: exactly one granted ability
+ok: B3 round 4: the grant must not accumulate as scans repeat
+ok: B3 round 4: exactly one granted ability
+ok: B3 round 5: the grant must not accumulate as scans repeat
+ok: B3 round 5: exactly one granted ability
+ok: the condition LATCHED at 登場: emptying the success zone mid-live must not revoke a grant the card says runs to ライブ終了時 — revoking here would take a legally held bonus away
+ok: but the DURATION still ends it: ライブ終了時まで must clear the grant
+ok: B3: the registration must be cleared by the rollover too
+        b3_nozomi_grant_stays_single_then_expires: 21 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       b3_nozomi_grant_stays_single_then_expires
+ok: B4 precondition: 花丸 and her 『Aqours』 friend really are two DIFFERENT names — two copies of one card would satisfy 「『Aqours』のメンバー」 for the wrong reason, which is exactly why the Rust file pins them apart
+ok: B4: the fixture builds
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=1783 exposes >= 1 ability/abilities
+ok: fixture cid=1783 carries the trigger (hex: E3 83 A9 E3 82 A4 E3 83 96 E9 96 8B E5 A7 8B E6 99 82)
+ok: B4 precondition: p2's success zone really holds 2
+ok: B4: the ライブ開始時 fires
+ok: B4 precondition: the condition holds, so BOTH 『Aqours』 members gain +1 — the non-『Aqours』 member on the right is not counted
+ok: B4 precondition: the BENEFICIARY holds one granted ability — this card grants to an 『Aqours』 member, so the registration is on the recipient
+ok: B4 round 1: the grant must not accumulate as scans repeat
+ok: B4 round 1: exactly one granted ability on the RECIPIENT
+ok: B4 round 2: the grant must not accumulate as scans repeat
+ok: B4 round 2: exactly one granted ability on the RECIPIENT
+ok: B4 round 3: the grant must not accumulate as scans repeat
+ok: B4 round 3: exactly one granted ability on the RECIPIENT
+ok: B4 round 4: the grant must not accumulate as scans repeat
+ok: B4 round 4: exactly one granted ability on the RECIPIENT
+ok: B4 round 5: the grant must not accumulate as scans repeat
+ok: B4 round 5: exactly one granted ability on the RECIPIENT
+ok: B4 precondition: the walk reaches the live-card-set phase
+        b4_hanamaru_grant_stays_single_then_expires: 23 assertion(s), 3 failure(s), 0 setup bug(s)
+FAILED   b4_hanamaru_grant_stays_single_then_expires
+ok: B5: every fixture resolves
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=54 exposes >= 1 ability/abilities
+ok: fixture cid=54 carries the trigger (hex: E3 83 A9 E3 82 A4 E3 83 96 E9 96 8B E5 A7 8B E6 99 82)
+ok: B5 precondition: the live zone really holds 3 cards
+ok: B5 precondition: the walk must reach the phase whose entry dispatches ライブ開始時
+ok: rule 4.1.4: zone exit makes the card new, so the grant must not outlive it
+ok: B5: the registration must be cleared by the zone exit
+        b5_honoka_grant_is_permanent_and_leaves_only_on_zone_exit: 16 assertion(s), 8 failure(s), 0 setup bug(s)
+FAILED   b5_honoka_grant_is_permanent_and_leaves_only_on_zone_exit
+ok: B6: every fixture resolves
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=1899 exposes >= 1 ability/abilities
+ok: fixture cid=1899 carries the trigger (hex: E3 83 A9 E3 82 A4 E3 83 96 E9 96 8B E5 A7 8B E6 99 82)
+ok: B6 precondition: the two heart-holders really are two DISTINCT cards — one id in two slots would make the heart02 total ambiguous
+ok: B6 precondition: the two heart-holders really are two DISTINCT cards — one id in two slots would make the heart02 total ambiguous
+ok: B6 PRECONDITION: the staged 『Aqours』 members must really hold 6+ heart02 between them, or the invalidation condition is never met and the negative below would pass for the wrong reason (got 10)
+ok: B6 precondition: the walk reaches the live-card-set phase
+ok: B6 precondition: 元気全開 really is the live card
+ok: B6 precondition: the walk reaches the performance phase, which is where ライブ開始時 is dispatched
+ok: B6 precondition: a real performance snapshot exists — without one the ライブ成功時 dispatch below never runs and the case proves nothing
+ok: B6 precondition: with 6+ heart02 on stage the ライブ開始時 must invalidate the live card's own ライブ成功時
+ok: B6 round 1: the invalidation must remain a SINGLE standing suppression, not be withdrawn by a re-derivation and not compound into a stronger one
+ok: B6 round 2: the invalidation must remain a SINGLE standing suppression, not be withdrawn by a re-derivation and not compound into a stronger one
+ok: B6 round 3: the invalidation must remain a SINGLE standing suppression, not be withdrawn by a re-derivation and not compound into a stronger one
+ok: B6 round 4: the invalidation must remain a SINGLE standing suppression, not be withdrawn by a re-derivation and not compound into a stronger one
+ok: B6 round 5: the invalidation must remain a SINGLE standing suppression, not be withdrawn by a re-derivation and not compound into a stronger one
+ok: B6 recorded limitation: the behavioural half (an invalidated ライブ成功時 places nothing) is NOT asserted, because it is only meaningful on a live that SUCCEEDS and no fixture here is known to produce one — asserting it through the gated dispatch would hold identically on a FAILED live, i.e. vacuously. What IS established is the half that needs no window: the invalidation is registered by ライブ開始時 and survives repeated re-derivation as a single standing record.
+        b6_genki_invalidation_survives_repeated_derivation: 18 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       b6_genki_invalidation_survives_repeated_derivation
+ok: B7: every fixture resolves
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=2530 exposes >= 1 ability/abilities
+ok: fixture cid=2530 carries the trigger (hex: E5 B8 B8 E6 99 82)
+ok: B7 precondition: Butterfly Wing really is the live card
+ok: B7 precondition: the 常時 suppression must be live while Butterfly Wing is the live card — a precondition that fails would make the six rounds below a test of nothing at all
+ok: B7 precondition: p2 is NOT suppressed, which is what the 自分のステージ scope means and what the per-round negative re-checks
+ok: B7 round 1: re-deriving the 常時 must leave the suppression in place — it is a STANDING effect, not a one-shot registration
+ok: B7 round 1: the suppression is 自分のステージ only, so p2 must be unaffected on EVERY derivation
+ok: B7 round 2: re-deriving the 常時 must leave the suppression in place — it is a STANDING effect, not a one-shot registration
+ok: B7 round 2: the suppression is 自分のステージ only, so p2 must be unaffected on EVERY derivation
+ok: B7 round 3: re-deriving the 常時 must leave the suppression in place — it is a STANDING effect, not a one-shot registration
+ok: B7 round 3: the suppression is 自分のステージ only, so p2 must be unaffected on EVERY derivation
+ok: B7 round 4: re-deriving the 常時 must leave the suppression in place — it is a STANDING effect, not a one-shot registration
+ok: B7 round 4: the suppression is 自分のステージ only, so p2 must be unaffected on EVERY derivation
+ok: B7 round 5: re-deriving the 常時 must leave the suppression in place — it is a STANDING effect, not a one-shot registration
+ok: B7 round 5: the suppression is 自分のステージ only, so p2 must be unaffected on EVERY derivation
+ok: B7 round 6: re-deriving the 常時 must leave the suppression in place — it is a STANDING effect, not a one-shot registration
+ok: B7 round 6: the suppression is 自分のステージ only, so p2 must be unaffected on EVERY derivation
+ok: once Butterfly Wing leaves the live zone the suppression must be gone, and the next scan must not resurrect it from a stale registration
+        b7_butterfly_suppression_survives_repeated_scans: 20 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       b7_butterfly_suppression_survives_repeated_scans
+--- Section C  ability_watch / invalidated_live_start_restores_next_live ---
+ok: C1: every fixture resolves
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: C1: the silenced target really is inside the series-wide group Kanon's picker filters on, not merely her own unit
+ok: C1 precondition: p1 really holds a live card
+ok: C precondition: both zones hold 4 active energy
+ok: C precondition: BOTH seats keep WAITED energy, so a +2 activation has something to activate. A p2 zone with none would read 0 for a reason unrelated to whatever is under test.
+ok: C precondition: both energy DECKs are empty, so no Energy phase inside the live window can refill a zone and be charged to the trigger
+ok: C1 precondition: the walk reached the trigger dispatch (stopped at FirstAttackerPerformance)
+ok: C1: the control run completed
+ok: C1 CONTROL: MEI's live-start must move the active counter by 2. Without this, every negative in section C would also pass for a target whose ability never fires at all.
+        c1_mei_live_start_activates_two_energy: 10 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       c1_mei_live_start_activates_two_energy
+ok: C1: every fixture resolves
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: C1: the silenced target really is inside the series-wide group Kanon's picker filters on, not merely her own unit
+ok: C1 precondition: p1 really holds a live card
+ok: C precondition: both zones hold 4 active energy
+ok: C precondition: BOTH seats keep WAITED energy, so a +2 activation has something to activate. A p2 zone with none would read 0 for a reason unrelated to whatever is under test.
+ok: C precondition: both energy DECKs are empty, so no Energy phase inside the live window can refill a zone and be charged to the trigger
+ok: C1 precondition: the walk reached the trigger dispatch (stopped at FirstAttackerPerformance)
+ok: C2 CONTROL: the untouched board really does fire +2
+ok: C2: every fixture resolves
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: C2: both the invalidator and the silenced target are inside the group
+ok: C2 precondition: the recovery card is in the waitroom
+ok: C2: Kanon debuts to Center
+ok: C2 precondition: the invalidation must actually be REGISTERED on MEI
+ok: C precondition: both zones hold 4 active energy
+ok: C precondition: BOTH seats keep WAITED energy, so a +2 activation has something to activate. A p2 zone with none would read 0 for a reason unrelated to whatever is under test.
+ok: C precondition: both energy DECKs are empty, so no Energy phase inside the live window can refill a zone and be charged to the trigger
+ok: C2: the walk reached the dispatch in live 1 (stopped at FirstAttackerPerformance)
+ok: C2: the invalidated live-start must NOT activate energy -- and the control above proved the same board moves the counter by 2
+ok: C2: the invalidation is live-end scoped, so it must STILL hold inside the live
+ok: C2: the walk really crossed the live-end rollover
+ok: C2: the live-end duration is the whole scope -- the invalidation must be gone
+ok: C2 precondition: nothing may RE-ARM the invalidation between the lives
+ok: C precondition: both zones hold 4 active energy
+ok: C precondition: BOTH seats keep WAITED energy, so a +2 activation has something to activate. A p2 zone with none would read 0 for a reason unrelated to whatever is under test.
+ok: C precondition: both energy DECKs are empty, so no Energy phase inside the live window can refill a zone and be charged to the trigger
+ok: C2: the walk reached the dispatch in live 2 (stopped at FirstAttackerPerformance)
+ok: C2: the next live must run MEI's live-start again. An invalidation that is removed-but-not-forgotten, and one that outlives the live end, BOTH show up here and nowhere else.
+        c2_kanon_invalidation_silences_then_restores: 32 assertion(s), 2 failure(s), 0 setup bug(s)
+FAILED   c2_kanon_invalidation_silences_then_restores
+ok: C3: every fixture resolves
+ok: C3 precondition: the two stages must hold two DISTINCT card instances -- one id in two zones would make the scoping assertion vacuous
+ok: C3 precondition: p2 really holds a live card
+ok: C3: Kanon debuts to Center
+ok: C3 precondition: p1's instance must be invalidated
+ok: C3: the invalidation is scoped to the OWNER's stage, so p2's instance of the SAME print must be untouched
+ok: C3 precondition: p2's instance really is on p2's stage
+ok: C3 precondition: p1's instance really is STILL on p1's stage -- Kanon debuted to Center, so the Left slot must be untouched
+ok: C precondition: both zones hold 4 active energy
+ok: C precondition: BOTH seats keep WAITED energy, so a +2 activation has something to activate. A p2 zone with none would read 0 for a reason unrelated to whatever is under test.
+ok: C precondition: both energy DECKs are empty, so no Energy phase inside the live window can refill a zone and be charged to the trigger
+ok: C3: the walk reached the dispatch (stopped at FirstAttackerPerformance)
+ok: C3: the invalidated member's live-start must not activate p1's energy
+ok: C3: the OPPONENT's identical printed live-start must still resolve -- this is the same shared measurement the C1 control uses, so a 2 here means exactly what a 2 means there
+        c3_kanon_invalidation_is_scoped_to_own_stage: 15 assertion(s), 1 failure(s), 0 setup bug(s)
+FAILED   c3_kanon_invalidation_is_scoped_to_own_stage
+--- Section D  debut_watch / the three unported cases ---
+ok: D: both fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: D1: both physical cards resolve
+ok: D1 precondition: the opponent really holds the arriver
+ok: D1: the OPPONENT's baton-touch arrival really happened -- without this the absence below is unfalsified
+ok: D1: the arrival is on p2's center
+ok: D1: an arrival on the OPPONENT's stage must not fire our watcher -- the printed clause scopes it to our OWN stage
+ok: D1: and no use is recorded for it
+        d1_setsuna_opponent_stage_arrival_does_not_fire: 8 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       d1_setsuna_opponent_stage_arrival_does_not_fire
+ok: D2: every fixture resolves for the qualifying board
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: D2 precondition: the qualifying partner really costs >= 10, which is the gate the printed clause puts on the incoming member (got 10)
+ok: D2 PRECONDITION: the qualifying and non-qualifying partners must print the SAME cost, or the two boards differ by their play cost as well as by the ability and the comparison below is meaningless (qualifying 10, non-qualifying 10)
+ok: D2 PRECONDITION: the qualifying partner really is inside the printed group -- without this the board is not qualifying at all and the Q167 delta below measures nothing
+ok: D2 precondition: 20 active energy to measure against
+ok: D2: the incoming member really baton-touches HANAFU off Center
+ok: D2: the incoming member really is at Center
+ok: D2 precondition: HANAFU really did leave the stage, which is what the watcher is keyed on
+ok: D2: every fixture resolves for the non-qualifying board
+ok: D2 precondition: 20 active energy to measure against
+ok: D2: the incoming member really baton-touches HANAFU off Center
+ok: D2: the incoming member really is at Center
+ok: D2 precondition: HANAFU really did leave the stage, which is what the watcher is keyed on
+ok: D2: both boards ran
+ok: D2 precondition: BOTH plays really happened -- otherwise the comparison below is between a board that moved and a board that did not
+        d2_baton_touch_activates_energy_q167: 18 assertion(s), 2 failure(s), 0 setup bug(s)
+FAILED   d2_baton_touch_activates_energy_q167
+ok: D3: every fixture resolves
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=760 exposes >= 1 ability/abilities
+ok: fixture cid=760 carries the trigger (hex: E8 87 AA E5 8B 95)
+ok: D3: the watcher really is an EdelNote member, which is the group its printed clause filters on
+ok: D3: the arriving print's cost resolves from the database
+ok: D3 precondition: the opponent member starts ACTIVE
+ok: D3: the EdelNote print really debuted to Right
+ok: D3: the arriver is on p1's Right
+ok: D3: the watcher's own appearance trigger must put the OPPONENT's lone active member to WAIT -- this is the Q250 effect driven through a real play rather than a synthesised trigger
+        d3_edelnote_appearance_waits_opponent: 11 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       d3_edelnote_appearance_waits_opponent
+--- Section E  discard_watch / Q269-Q277 refresh + mill edges ---
+ok: E: both fixtures resolve
+ok: E1 PRECONDITION: the yell really did reveal MIA among the 3. This is the non-vacuity licence for every negative below: the card under test really was in the reveal, so its absence afterwards is about the trigger and not about a card the yell never touched.
+ok: E1 PRECONDITION: MIA is recorded in the revealed-card list, which is what a yell produces -- a reveal, and specifically NOT a deck-to-waitroom movement event
+ok: Q269: a mid-pool yell reveal must ALSO not trigger ab#0, not just a top-of-deck one
+ok: Q269: MIA is not recovered to hand by a mid-pool reveal
+ok: Q269: and nothing is discarded from hand
+        e1_q269_yell_reveal_mid_pool_does_not_trigger: 6 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       e1_q269_yell_reveal_mid_pool_does_not_trigger
+ok: E: both fixtures resolve
+ok: E2 PRECONDITION: the two MIA copies are DISTINCT instances -- one id would make 'neither copy is recovered' trivially true
+ok: E2 PRECONDITION: the yell really did reveal a MIA
+ok: Q269: revealing a MIA by yell must not fire ab#0 EVEN WITH a MIA already sitting in the waitroom -- the trigger needs a deck-to-waitroom movement, and a reveal is not one
+ok: Q269: NEITHER MIA copy is recovered to hand
+ok: Q269: no recover and no discard happened
+        e2_q269_yell_reveal_does_not_recover_waitroom_copy: 6 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       e2_q269_yell_reveal_does_not_recover_waitroom_copy
+ok: E3: fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: E3 PRECONDITION: MIA really is in the waitroom
+ok: E3 CONTROL: with NO refresh, MIA's ab#0 must offer its optional -- this is what proves the e4 absence is about the refresh and not about a dead scan
+        e3_q277_control_no_refresh_recovers_milled_self: 5 assertion(s), 1 failure(s), 0 setup bug(s)
+FAILED   e3_q277_control_no_refresh_recovers_milled_self
+ok: E4: fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: E4 PRECONDITION: the refresh really moved MIA out of the waitroom into the deck -- if it did not, the negative below would assert nothing
+ok: Q277: the refresh before the auto resolves removes MIA from the waitroom, so it can no longer be recovered to hand
+ok: Q277: after the refresh MIA is in the DECK, not the waitroom
+        e4_q277_refresh_before_auto_resolve_prevents_recover: 5 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       e4_q277_refresh_before_auto_resolve_prevents_recover
+ok: E5: fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=1977 exposes >= 1 ability/abilities
+ok: fixture cid=1977 carries the trigger (hex: E7 99 BB E5 A0 B4)
+ok: E5: DIAYA's real debut mill exists and is queued
+ok: E5: DIAYA's real mill must record a movement event naming MIA -- this is the precondition e4 synthesises by hand, and here it must come from the engine's own move path
+ok: Q277: the automatic ability must not resolve before the refresh
+        e5_q277_real_mill_refreshes_before_mia_auto_resolves: 8 assertion(s), 1 failure(s), 0 setup bug(s)
+FAILED   e5_q277_real_mill_refreshes_before_mia_auto_resolves
+ok: E6: fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: E6 PRECONDITION: two hand cards, so the optional discard COULD be paid and the decline is a real choice
+ok: E6: DIAYA's real debut mill exists and is queued
+ok: E6 PRECONDITION: the real mill really did put MIA in the waitroom -- otherwise the decline asserts nothing
+ok: declining must leave MIA in the waitroom, not recovered
+ok: E6: MIA stays in the waitroom after the decline
+        e6_real_deck_top_mill_declined_leaves_self_in_waitroom: 8 assertion(s), 1 failure(s), 0 setup bug(s)
+FAILED   e6_real_deck_top_mill_declined_leaves_self_in_waitroom
+ok: E7: fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: fixture cid=823 exposes >= 1 ability/abilities
+ok: fixture cid=823 carries the trigger (hex: E7 99 BB E5 A0 B4)
+ok: E7 PRECONDITION: two distinct candidates
+ok: E7 PRECONDITION: the candidate is a real member print (it holds hearts), so the hand-discard ability has something it can legally pick
+ok: E7: the host really debuted to Center
+        e7_q241_one_discarded_fires_once: 11 assertion(s), 4 failure(s), 0 setup bug(s)
+FAILED   e7_q241_one_discarded_fires_once
+--- Section F  discard_watch / the two Q252 files, unported cases ---
+ok: F: fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: F1: the live fixture resolves
+ok: F1 PRECONDITION: the card really is inside the group the ability filters on -- otherwise the group filter is never exercised
+GAP: the placement prompt carries its deck_top / deck_bottom options: the flat RbChoice struct has no options list (only n_heart_options), so no destination is observable from C and the answer index is read as an absolute area
+        f1_selected_aqours_live_moves_to_deck: 10 assertion(s), 5 failure(s), 0 setup bug(s)
+FAILED   f1_selected_aqours_live_moves_to_deck
+ok: F: fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: F2 PRECONDITION: two DISTINCT live instances -- one id in two waitroom slots would make 'only the first is taken' trivially true
+ok: F2: and the FIRST card is left in the waitroom -- the ability takes ONE card per batch, not all matching ones
+        f2_simultaneous_moves_only_first_selected: 7 assertion(s), 3 failure(s), 0 setup bug(s)
+FAILED   f2_simultaneous_moves_only_first_selected
+ok: F: fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: F3: fixture resolves
+ok: F3: a SECOND distinct live resolves
+ok: F3: a second trigger in the same turn is BLOCKED by the per-turn limit, so no second placement is offered
+ok: F3: the second card stays in the waitroom untouched
+        f3_second_trigger_offers_no_choice: 11 assertion(s), 5 failure(s), 0 setup bug(s)
+FAILED   f3_second_trigger_offers_no_choice
+ok: F: fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: F4: every fixture resolves
+ok: F4 PRECONDITION: the live and the member are both inside the group
+ok: F4 PRECONDITION: the outsider is genuinely outside the group, or the group filter is never exercised in the negative direction
+ok: F4: the group-matching MEMBER remains -- the clause is about live cards, not about any card in the group
+ok: F4: the non-group live also remains
+        f4_mixed_types_keeps_member_and_non_group: 10 assertion(s), 3 failure(s), 0 setup bug(s)
+FAILED   f4_mixed_types_keeps_member_and_non_group
+ok: F: fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: F5: fixture resolves
+ok: F5 PRECONDITION: the card really is a group-matching live
+ok: F5 PRECONDITION: it really sits in the live zone
+ok: F5: a live card that is merely IN the live zone, with no waitroom movement, produces no placement offer -- the clause is about leaving the live zone, not about occupancy
+ok: F5: the card is untouched in the live zone
+        f5_live_in_live_zone_no_discard_no_effect: 7 assertion(s), 0 failure(s), 0 setup bug(s)
+ok       f5_live_in_live_zone_no_discard_no_effect
+ok: F: fixtures resolve
+ok: fixture cid is byte-exactly the printed card_no under test
+ok: F6: all three resolve
+ok: F6 PRECONDITION: three DISTINCT instances -- one id in three slots would make 'only one is taken' trivially true
+ok: F6: the second card is untouched
+ok: F6: the third card is untouched
+        f6_batch_of_three_first_only_taken: 10 assertion(s), 4 failure(s), 0 setup bug(s)
+FAILED   f6_batch_of_three_first_only_taken
+
+==== parity_jidou_watch_clusters: 34 test case(s) run ====
+     19 ok, 15 FAILED, 0 CRASHED, 0 SETUPBUG

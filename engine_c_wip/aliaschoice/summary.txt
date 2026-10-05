@@ -1,0 +1,11 @@
+parity_cce_gaps                    ok=35     FAIL=82    alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+parity_sequential                  ok=23     FAIL=142   alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+parity_small_clusters              ok=849    FAIL=101   alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+parity_under_member                ok=56     FAIL=81    alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+parity_integration                 ok=138    FAIL=39    alias_hits=0    frees_top=2445   prompt_open=123    probe=LINKED ran=yes 
+parity_queue_resume                ok=143    FAIL=5     alias_hits=0    frees_top=39     prompt_open=12     probe=LINKED ran=yes 
+parity_choice_routing              ok=0      FAIL=0     alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=NO-CASES 
+parity_int_gaps                    ok=4      FAIL=41    alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+mechanics                          ok=30     FAIL=0     alias_hits=0    frees_top=78     prompt_open=0      probe=LINKED ran=yes 
+alias_ownership                    ok=16     FAIL=0     alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+ALIAS_PROBE_TOTAL hits=0 probed=9 unusable=1

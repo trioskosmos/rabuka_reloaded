@@ -1028,6 +1028,134 @@ static void test_jidou_fires_after_position_change(void)
              "the moved member's jidou ability places exactly one energy card");
 }
 
+/* ---- 15. REGRESSION: target="both" position_change really RECURSES -------
+ *
+ * Rust position.rs:291-317 does not collapse the target="both" branch into a
+ * single prompt. It clones the effect, rewrites target to "opponent", and
+ * RECURSES into execute_position_change; because the clone's target is a real
+ * player, `target_member` defaults to "this_member" and the arm at
+ * position.rs:319-326 is reachable. Only when that first pass leaves no
+ * awaiting choice does it recurse again for "self".
+ *
+ * The C used to answer the whole branch with one position_destination_prompt,
+ * so EVERY target="both" position_change stopped at a prompt and never rotated.
+ * These assertions pin the recursion itself, on an effect built by hand rather
+ * than through card play, so they fail if the branch is ever re-collapsed.
+ */
+static void test_both_position_change_recurses_into_rotation(void)
+{
+    static TestGame tg;
+    test_game_new(&tg);
+    clear_p1(&tg);
+    int a = test_new_id(&tg, "PL!-sd1-010-SD");
+    int b = test_new_id(&tg, "PL!-sd1-013-SD");
+    int c = test_new_id(&tg, "PL!-sd1-014-SD");
+    int oa = test_new_id(&tg, "PL!-sd1-016-SD");
+    int ob = test_new_id(&tg, "PL!-sd1-017-SD");
+    int oc = test_new_id(&tg, "PL!-sd1-018-SD");
+    if (a < 0 || b < 0 || c < 0 || oa < 0 || ob < 0 || oc < 0) {
+        CHECK(0, "both-rotation fixtures resolve");
+        return;
+    }
+    tg.state.p[0].stage[AREA_LEFT] = a;
+    tg.state.p[0].stage[AREA_CENTER] = b;
+    tg.state.p[0].stage[AREA_RIGHT] = c;
+    set_p2_stage(&tg, oa, ob, oc);
+
+    /* Exactly chisato's shape (cards/abilities.json PL!SP-pb1-003-R ab#0):
+       target="both", multiple_targets=true, position="left_side", and NO
+       `destination` key at all. */
+    AbilityEffect e;
+    memset(&e, 0, sizeof(e));
+    e.action = (char *)"position_change";
+    e.target = (char *)"both";
+    /* position="left_side" AND multiple_targets are both load-bearing: the
+       rotation arm at position.rs:321-326 requires BOTH, and with
+       multiple_targets absent the same effect falls through to the
+       formation_plan branch at position.rs:328-411, which DOES prompt. */
+    e.extra_k[0] = (char *)"position";
+    e.extra_v[0] = (char *)"left_side";
+    e.extra_k[1] = (char *)"multiple_targets";
+    e.extra_v[1] = (char *)"true";
+    e.n_extra = 2;
+    rb_execute_misc_effect(&tg.state, 0, &tg.state.p[0], &e, NULL);
+
+    /* position.rs:325 execute_rotation, rot_map {2,0,1}: Left->RightSide,
+       Center->LeftSide, RightSide->Center. Rust asserts this map by rotating
+       BOTH stages — the opponent pass is not optional and is not a prompt. */
+    CHECK_EQ(tg.state.p[0].stage[AREA_LEFT], b,
+             "position.rs:319-326: target=both recursion rotates self — Center must land on LeftSide");
+    CHECK_EQ(tg.state.p[0].stage[AREA_CENTER], c,
+             "position.rs:319-326: target=both recursion rotates self — RightSide must land in Center");
+    CHECK_EQ(tg.state.p[0].stage[AREA_RIGHT], a,
+             "position.rs:319-326: target=both recursion rotates self — LeftSide must land on RightSide");
+    CHECK_EQ(tg.state.p[1].stage[AREA_LEFT], ob,
+             "position.rs:291-300: the opponent arm recurses too, so P2 Center must land on P2 LeftSide");
+    CHECK_EQ(tg.state.p[1].stage[AREA_CENTER], oc,
+             "position.rs:319-326: the opponent arm rotates P2 — P2 RightSide must land in P2 Center");
+    CHECK_EQ(tg.state.p[1].stage[AREA_RIGHT], oa,
+             "position.rs:319-326: the opponent arm rotates P2 — P2 LeftSide must land on P2 RightSide");
+    /* The regression that the old arm caused: it answered "both" with a
+       prompt, so a purely automatic rotation asked the human a question. */
+    CHECK(!rb_has_pending_choice(&tg.state),
+          "position.rs:301-315: a rotation raises no choice, so the self arm must run inline rather than park");
+}
+
+/* ---- 16. REGRESSION: the opponent pass reads the OPPONENT's stage -------
+ *
+ * Rust reads the stage through `gs.resolve_target_player(target)` at every use
+ * inside execute_position_change (position.rs:129 / :332 / :361 / :417), and
+ * `target` is the recursion's parameter. The C bound its RbPlayer* to the raw
+ * actor, so on the opponent pass every below-the-both arm inspected the MASTER's
+ * stage. That is what suppressed PL!SP-bp5-010-*'s opponent choice: the
+ * emptiness test at position.rs:419 read P1's Center, which is empty here, so
+ * it returned Ok(()) without ever asking.
+ */
+static void test_both_position_change_opponent_pass_reads_opponent_stage(void)
+{
+    static TestGame tg;
+    test_game_new(&tg);
+    clear_p1(&tg);
+    int p1_right = test_new_id(&tg, "PL!-sd1-010-SD");
+    int p2_center = test_new_id(&tg, "PL!-sd1-013-SD");
+    if (p1_right < 0 || p2_center < 0) {
+        CHECK(0, "both-opponent-stage fixtures resolve");
+        return;
+    }
+    /* P1 Center is EMPTY, P2 Center is OCCUPIED — the exact shape that made
+       the old binding skip the opponent's prompt. */
+    tg.state.p[0].stage[AREA_RIGHT] = p1_right;
+    set_p2_stage(&tg, RB_EMPTY_SLOT, p2_center, RB_EMPTY_SLOT);
+
+    /* bp5-010's shape: target="both", source_position="center", and NO
+       multiple_targets, so position.rs:321's rotation test is false and the
+       source-position arm at position.rs:413-454 runs instead. */
+    AbilityEffect e;
+    memset(&e, 0, sizeof(e));
+    e.action = (char *)"position_change";
+    e.target = (char *)"both";
+    /* extras are plain char* pairs on the struct (include/rabuka.h:107-109);
+       the literals are static so no ownership question arises. */
+    e.extra_k[0] = (char *)"source_position";
+    e.extra_v[0] = (char *)"center";
+    e.n_extra = 1;
+    rb_execute_misc_effect(&tg.state, 0, &tg.state.p[0], &e, NULL);
+
+    /* position.rs:419 `if player.stage.stage[pos_idx] == -1 { return Ok(()) }`
+       is evaluated against the OPPONENT on the opponent pass, so P2's occupied
+       Center must produce the SelectTarget prompt. */
+    CHECK(rb_has_pending_choice(&tg.state),
+          "position.rs:417-421: the opponent pass must read the OPPONENT's Center, not the master's");
+
+    /* One prompt, not two. Rust position.rs:301-315 defers the self arm because
+       the opponent pass left an awaiting choice; the self arm would find P1's
+       Center empty and raise nothing (position.rs:419-420). So exactly one
+       choice exists here. The old collapsed arm also emitted one, but from the
+       master's seat and with a "select" tail — see the note on test 15. */
+    CHECK(tg.state.queue.n_entries == 0 || tg.state.queue.cur >= 0,
+          "the opponent pass parked rather than losing the entry");
+}
+
 int main(void)
 {
     if (rb_load("src") != 0) {
@@ -1060,6 +1188,8 @@ int main(void)
     test_chisato_rotates_both_stages();
     test_seira_position_change_swaps_and_records();
     test_jidou_fires_after_position_change();
+    test_both_position_change_recurses_into_rotation();
+    test_both_position_change_opponent_pass_reads_opponent_stage();
     rb_unload();
     printf("\nparity_zones_position: %d assertions, %d failures\n", assertions, failures);
     if (failures) return 1;

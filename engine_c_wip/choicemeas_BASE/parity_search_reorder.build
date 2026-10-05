@@ -1,0 +1,19 @@
+tests/test_parity_search_reorder.c: In function 'test_any_number_partial_selection':
+tests/test_parity_search_reorder.c:1927:9: warning: unused variable 'ginko' [-Wunused-variable]
+ 1927 |     int ginko = ginko_board(&tg, c);
+      |         ^~~~~
+tests/test_parity_search_reorder.c: In function 'test_ginko_refresh_preserves_top_and_recovers_waitroom':
+tests/test_parity_search_reorder.c:2017:9: warning: unused variable 'pool_exp' [-Wunused-variable]
+ 2017 |     int pool_exp[2] = { top, recycled };
+      |         ^~~~~~~~
+tests/test_parity_search_reorder.c: In function 'test_surplus_one_partial_routes_remainder_to_waitroom':
+tests/test_parity_search_reorder.c:2341:9: warning: unused variable 'pool_exp' [-Wunused-variable]
+ 2341 |     int pool_exp[2] = { c[0], c[1] };
+      |         ^~~~~~~~
+tests/test_parity_search_reorder.c: At top level:
+tests/test_parity_search_reorder.c:559:12: warning: 'fire_trigger' defined but not used [-Wunused-function]
+  559 | static int fire_trigger(TestGame *tg, int cid, const char *trig)
+      |            ^~~~~~~~~~~~
+tests/test_parity_search_reorder.c:392:13: warning: 'fill_decks_to' defined but not used [-Wunused-function]
+  392 | static void fill_decks_to(TestGame *tg, int filler, int total)
+      |             ^~~~~~~~~~~~~

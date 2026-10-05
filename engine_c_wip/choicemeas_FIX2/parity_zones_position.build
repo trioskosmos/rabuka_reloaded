@@ -1,0 +1,4 @@
+tests/test_parity_zones_position.c:71:53: warning: '/*' within comment [-Wcomment]
+   71 |  * `trig.contains("センター")`, and every engine/src/*.rs occurrence of that
+tests/test_parity_zones_position.c:73:48: warning: '/*' within comment [-Wcomment]
+   73 |  * NOWHERE in cards/cards.json or in engine/src/*.rs, so the center arm of

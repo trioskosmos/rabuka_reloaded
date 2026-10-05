@@ -1,0 +1,140 @@
+[RESUME_ANY] kind=5 zone= target=center,right_side route=0 mode=1 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+FAIL [N1_positive_exact_path]: N1: the opponent prompt is addressed to P2 (target=both): the queue entry's choice_player_id names p2 (got 0 expected 1)
+[RESUME_ANY] kind=5 zone= target=left_side,center,right_side route=0 mode=1 idx=2
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL [N2b_positive_twin_of_N2]: N2b arm 2: THE ONE ADDED COST-2 CARD MAKES THE ABILITY ASK — the discard is read, so N2's skip is the rule and not an inert engine
+FAIL [N2b_positive_twin_of_N2]: N2b arm 2: the standing prompt is P1's: the standing prompt is LABELLED for p1 (got -1 expected 0)
+FAIL [N2b_positive_twin_of_N2]: N2b arm 2: the standing prompt is P1's: the queue entry's choice_player_id names p1 (got -1 expected 0)
+FAIL [N2b_positive_twin_of_N2]: N2b arm 2: the opponent half follows
+FAIL [N3_sync_opponent_gets_choice]: N3: the SelectCard is routed to P2 — P1 had no eligible card at all: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[RESUME_ANY] kind=1 zone=discard target=opponent route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x7ffffb880 cur=0 n=1 state=4 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='opponent' ptp='opponent' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=2 clo='<=' ctot=0 ctoto='' grp='' ct='member_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=1 first=0 available=2 count=1 mapped=1 sub_choice=0 dst='empty_area' state_change='-' p0_discard=1 p1_discard=2
+[DISCARD_MOVE] selected=2642 of 1 available=2 moved=1 destination=empty_area state_change=- seat=1
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL [N3_sync_opponent_gets_choice]: N3: a position prompt follows the selection
+FAIL [N3_sync_opponent_gets_choice]: N3: P2's stage is empty (3 slots) so the placement asks for a position
+FAIL [N3_sync_opponent_gets_choice]: N3: the position prompt is P2's: the standing prompt is LABELLED for p2 (got -1 expected 1)
+FAIL [N3_sync_opponent_gets_choice]: N3: the position prompt is P2's: the queue entry's choice_player_id names p2 (got 0 expected 1)
+FAIL [N3_sync_opponent_gets_choice]: N3: the card P2 selected is at P2 left (got -1 expected 2642)
+FAIL [N3_sync_opponent_gets_choice]: N3: P2's appeared member is in WAIT state
+[RESUME_ANY] kind=5 zone= target=center,right_side route=0 mode=1 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+FAIL [N4_q170_turn_player_first]: N4: the OPPONENT (P2) is asked second: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[RESUME_ANY] kind=5 zone= target=left_side,center,right_side route=0 mode=1 idx=2
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL [N5_requires_empty_area_self]: N5: the standing prompt belongs to P2: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[RESUME_ANY] kind=5 zone= target=left_side,center,right_side route=0 mode=1 idx=2
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL [N5_requires_empty_area_self]: N5: P2's OWN discard card is untouched — the pick must be read from the seat the prompt is labelled for, not from the actor
+FAIL [N6_cost_filter_only_eligible]: N6: the prompt carries the ability's 「コスト2以下」 limit (got 0 expected 2)
+FAIL [N6_cost_filter_only_eligible]: N6: only ONE candidate is offered — the cost-9 card is filtered out (got 0 expected 1)
+[RESUME_ANY] kind=5 zone= target=center,right_side route=0 mode=1 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+FAIL [N6_cost_filter_only_eligible]: N6: the opponent prompt is P2's: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[RESUME_ANY] kind=5 zone= target=left_side,center,right_side route=0 mode=1 idx=2
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=5 zone= target=center,right_side route=0 mode=1 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+FAIL [N7_q169_occupies_area]: N7: the second prompt is P2's: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[RESUME_ANY] kind=5 zone= target=left_side,center,right_side route=0 mode=1 idx=2
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x7ffffb160 cur=0 n=1 state=4 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=2 clo='<=' ctot=0 ctoto='' grp='' ct='member_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=2 count=1 mapped=1 sub_choice=0 dst='empty_area' state_change='-' p0_discard=2 p1_discard=1
+[DISCARD_MOVE] selected=2641 of 1 available=2 moved=1 destination=empty_area state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+FAIL [N8_prompt_path_two_eligible]: N8: the position prompt is still P1's: the standing prompt is LABELLED for p1 (got 1 expected 0)
+FAIL [N8_prompt_path_two_eligible]: N8: the position prompt is still P1's: the queue entry's choice_player_id names p1 (got 1 expected 0)
+[RESUME_ANY] kind=5 zone= target=left_side,center,right_side route=0 mode=1 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL [N8_prompt_path_two_eligible]: N8: the OPPONENT half prompts next
+FAIL [N8_prompt_path_two_eligible]: N8: P2 had ONE eligible card (Exact) so it goes straight to a position
+FAIL [N8_prompt_path_two_eligible]: N8: the third prompt is P2's: the standing prompt is LABELLED for p2 (got -1 expected 1)
+FAIL [N8_prompt_path_two_eligible]: N8: P1's appeared card is in WAIT state
+FAIL [N8_prompt_path_two_eligible]: N8: the card P1 did NOT select is still in the discard
+FAIL [N8_prompt_path_two_eligible]: N8: P2's card appeared at P2 right (got -1 expected 2643)
+FAIL [N8_prompt_path_two_eligible]: N8: P2's appeared card is in WAIT state
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x7ffffb150 cur=0 n=1 state=4 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=2 clo='<=' ctot=0 ctoto='' grp='' ct='member_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=2 count=1 mapped=1 sub_choice=0 dst='empty_area' state_change='-' p0_discard=2 p1_discard=2
+[DISCARD_MOVE] selected=2641 of 1 available=2 moved=1 destination=empty_area state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+FAIL [N9_both_two_eligible]: N9: prompt 2 is P1's: the standing prompt is LABELLED for p1 (got 1 expected 0)
+FAIL [N9_both_two_eligible]: N9: prompt 2 is P1's: the queue entry's choice_player_id names p1 (got 1 expected 0)
+[RESUME_ANY] kind=5 zone= target=left_side,center,right_side route=0 mode=1 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL [N9_both_two_eligible]: N9: prompt 3 is standing
+FAIL [N9_both_two_eligible]: N9: P2's TWO eligible cards raise their own SelectCard (not P1's again)
+FAIL [N9_both_two_eligible]: N9: prompt 3 is P2's: the standing prompt is LABELLED for p2 (got -1 expected 1)
+FAIL [N9_both_two_eligible]: N9: prompt 4 is standing
+FAIL [N9_both_two_eligible]: N9: prompt 4 is P2's SelectPosition
+FAIL [N9_both_two_eligible]: N9: prompt 4 is P2's: the standing prompt is LABELLED for p2 (got -1 expected 1)
+FAIL [N9_both_two_eligible]: N9: P2 centre is still empty (got 2642 expected -1)
+FAIL [N9_both_two_eligible]: N9: P2's selected card at P2 right (got -1 expected 2643)
+FAIL [N9_both_two_eligible]: N9: P1's appeared card is in WAIT state
+FAIL [N9_both_two_eligible]: N9: P2's appeared card is in WAIT state
+FAIL [N9_both_two_eligible]: N9: P1's unselected card is still in the discard
+[TEST_BATON_TOUCH] test_play_to_stage(2639, area 1): area 1 already holds card 2644, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x7ffffb160 cur=0 n=1 state=4 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=2 clo='<=' ctot=0 ctoto='' grp='' ct='member_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=3 count=1 mapped=1 sub_choice=0 dst='empty_area' state_change='-' p0_discard=3 p1_discard=1
+[DISCARD_MOVE] selected=2640 of 1 available=3 moved=1 destination=empty_area state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=5 zone= target=left_side,center,right_side route=0 mode=1 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL [N10_direct_placement_wait]: N10: P2's card appeared at P2 left (got 2641 expected 2642)
+FAIL [N10_direct_placement_wait]: N10: P1's DIRECTLY placed card is STILL in wait state
+FAIL [N10_direct_placement_wait]: N10: P2's appeared card is in wait state
+FAIL [N10_direct_placement_wait]: N10: P1's unselected card is still in the discard
+FAIL [N11_full_stage_then_prompt]: N11: the only prompt that appears belongs to P2: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[RESUME_ANY] kind=5 zone= target=left_side,center,right_side route=0 mode=1 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=5 zone= target=center,right_side route=0 mode=1 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+FAIL [N12_q181_area_freed]: N12: P2 is asked second: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[RESUME_ANY] kind=5 zone= target=left_side,center,right_side route=0 mode=1 idx=2
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=5 zone= target=center,right_side route=0 mode=1 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+FAIL [N13_placed_debuts_fire]: N13: the opponent is asked second: the queue entry's choice_player_id names p2 (got 0 expected 1)
+[RESUME_ANY] kind=5 zone= target=left_side,center,right_side route=0 mode=1 idx=2
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=2 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[QUEUE_EXEC] idx=1 n=3 cid=2641 ab=0 actor=0 action=look_and_select
+[QUEUE_EXEC] idx=2 n=3 cid=2642 ab=0 actor=1 action=look_and_select
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=look_and_select
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=11 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=11 ab=0 actor=0 action=choice
+[CHOICE_C] options=3 any_number=0 pending_options=3
+FAIL [S1_ai_screeam_answer_both_blade]: S1: the OPPONENT answers 「相手に何が好き？」 (Rust: entry p2): the standing prompt is LABELLED for p2 (got -1 expected 1)
+[RESUME_ANY] kind=2 zone= target=choice route=5 mode=0 idx=2
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESULT] selected=2 available=3 reprompt=0

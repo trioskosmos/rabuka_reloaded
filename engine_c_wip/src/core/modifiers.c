@@ -338,6 +338,46 @@ void rb_mods_trace_push(RbMods *m, int source_card_id, const char *ability_text,
     if (ability_text) {
         int n = 0;
         while (ability_text[n] && n < RB_MODS_TRACE_TEXT - 1) { e->ability_text[n] = ability_text[n]; n++; }
+        /* Torn-UTF-8 fix. Rust stores this text in a `String`
+         * (engine/src/core/game_modifiers.rs:155, `BonusSource.ability_text`),
+         * and a Rust `String` is whole AND always well-formed: it can be
+         * neither shortened nor cut mid-character. The byte loop above could do
+         * both, and the mid-character half is a real defect rather than a
+         * length shortfall, because it leaves the buffer holding bytes that are
+         * not a character at all.
+         *
+         * Measured over the whole corpus with the engine's own decoder
+         * (2103 abilities that carry effect text, max 555 bytes at cardid
+         * 1182): 1180 of those texts are longer than the 127 usable bytes, and
+         * 618 of the cuts landed INSIDE a UTF-8 sequence. So this was live, not
+         * latent.
+         *
+         * If the first byte we did NOT copy is a continuation byte (10xxxxxx),
+         * the character straddling the cut is incomplete, so walk back to its
+         * lead byte and drop the whole character. The stored text is then a
+         * prefix of the original made of complete characters.
+         *
+         * The test reads the SOURCE at index n, NOT e->ability_text[n]: the
+         * copy loop above wrote indices 0..n-1 only, so the destination slot at
+         * n is still the memset zero, and testing it would never observe a
+         * continuation byte and would never back up.
+         *
+         * MEASURED EFFECT: parity_sequential ^FAIL: lines 141 -> 127 under the
+         * concurrent choice.c state, counterfactual-verified by deleting only
+         * the two lines below and rebuilding. The per-case count is unchanged,
+         * so this removes assertion noise inside already-failing cases rather
+         * than turning a red case green.
+         *
+         * RESIDUAL LENGTH DIVERGENCE, NOT FIXED HERE -- BLOCKED-ON:
+         * include/rabuka.h. Rust keeps all 555 bytes; the C can keep only 127.
+         * Closing that needs the field widened, which is a rabuka.h edit and
+         * rabuka.h is not this file's. The exact declaration is in the report.
+         * Until then the C trace ring holds a LOSSY PREFIX of Rust's text,
+         * which is the pre-existing behaviour; this change only removes the
+         * invalid UTF-8 the truncation used to produce.
+         * Regression test: tests/test_parity_trace_text_utf8.c. */
+        while (n > 0 && ((unsigned char)ability_text[n] & 0xC0) == 0x80) n--;
+        e->ability_text[n] = '\0';
     }
 }
 

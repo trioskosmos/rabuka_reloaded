@@ -1,0 +1,233 @@
+[TEST_BATON_TOUCH] test_play_to_stage(2639, area 1): area 1 already holds card 2642, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[TEST_BATON_TOUCH] test_play_to_stage(2639, area 1): area 1 already holds card 2642, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[TEST_BATON_TOUCH] test_play_to_stage(2639, area 1): area 1 already holds card 2642, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[TEST_BATON_TOUCH] test_play_to_stage(2639, area 1): area 1 already holds card 2642, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[TEST_BATON_TOUCH] test_play_to_stage(2639, area 1): area 1 already holds card 2642, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00199450 cur=0 n=1 state=3 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=3 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=3 p1_discard=0
+[DISCARD_MOVE] selected=2640 of 1 available=3 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: b: 『Aqours』 score>=6 fetched -> activate 4 (2+4=6) (got 2 expected 6)
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00199450 cur=0 n=1 state=3 pending=1
+[DISCARD_RESULT] selected=1 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=1 available=3 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=3 p1_discard=0
+[DISCARD_MOVE] selected=2641 of 1 available=3 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00199450 cur=0 n=1 state=3 pending=1
+[DISCARD_RESULT] selected=1 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=1 available=3 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=3 p1_discard=0
+[DISCARD_MOVE] selected=2648 of 1 available=3 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00199450 cur=0 n=1 state=3 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=4 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=4 p1_discard=0
+[DISCARD_MOVE] selected=2640 of 1 available=4 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00199450 cur=0 n=1 state=3 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=3 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=3 p1_discard=0
+[DISCARD_MOVE] selected=2640 of 1 available=3 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: b: activate 4 requested but only 2 waited energies exist -> Q167 partial resolution activates those 2 (1+2=3) (got 1 expected 3)
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001968c0 cur=0 n=1 state=3 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=3 clo='<=' ctot=0 ctoto='' grp='蓮ノ空' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=2 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=2 p1_discard=0
+[DISCARD_MOVE] selected=2641 of 1 available=2 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: c: nothing was recovered
+FAIL: c: the live card did not reach the hand
+FAIL: [VACUOUS]  c: the activation must have reached the engine before a 'score 7 was not recovered' claim means anything - only 0 prompt(s) were offered, need 1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=move_cards
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=move_cards
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[DEBUT_COST_PENDING] card=2639 deferred=0xa00196850 eff=0xa00196850 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00196850 target=0x0 eff=0xa00196850 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa00196850 action=move_cards is_cost=0 host=2639
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=2639 deferred=0xa00196850 eff=0xa00196850 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00196850 target=0x0 eff=0xa00196850 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa00196850 action=move_cards is_cost=0 host=2639
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=2639 deferred=0xa00196850 eff=0xa00196850 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00196850 target=0x0 eff=0xa00196850 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa00196850 action=move_cards is_cost=0 host=2639
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=2639 deferred=0xa00196850 eff=0xa00196850 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00196850 target=0x0 eff=0xa00196850 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa00196850 action=move_cards is_cost=0 host=2639
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+  STATE f:same_series: pending=0 type= prompts=2
+    hand:
+    wait: PL!SP-bp1-004-PR PL!-sd1-010-SD
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00199da0 cur=0 n=0 state=0 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00199da0 cur=0 n=0 state=3 pending=1
+[DISCARD_RESULT] selected=1 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=1 cl=0 clo='' ctot=0 ctoto='' grp='スリーズブーケ' ct='member_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=1 available=7 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=7 p1_discard=0
+[DISCARD_MOVE] selected=2642 of 1 available=7 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198370 cur=0 n=0 state=3 pending=1
+[DISCARD_RESULT] selected=3 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=1 cl=0 clo='' ctot=0 ctoto='' grp='蓮ノ空' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=3 available=6 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=6 p1_discard=0
+[DISCARD_MOVE] selected=2644 of 1 available=6 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00199da0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=2639 deferred=0xa00197900 eff=0xa00197900 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00197900 target=0x0 eff=0xa00197900 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa00197900 action=move_cards is_cost=0 host=2639
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: h: the recovery selection must be offered after the cost is paid
+FAIL: h: expected a SelectCard recovery (got )
+[DEBUT_COST_PENDING] card=2639 deferred=0xa00197900 eff=0xa00197900 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0xa00197900 target=0x0 eff=0xa00197900 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=2639 deferred=0xa00197900 eff=0xa00197900 cur=0 n=0 state=3
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00197900 target=0x0 eff=0xa00197900 cur=0 n=0 state=0 pending=1
+[RESUME_EXEC] def=0xa00197900 action=move_cards is_cost=0 host=2639
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[DEBUT_COST_PENDING] card=2639 deferred=0xa001968b0 eff=0xa001968b0 cur=0 n=0 state=3
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0xa001968b0 target=0x0 eff=0xa001968b0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: h: paying must open the recovery selection
+FAIL: h: DEFECT - the optional E answered with PAY was not tapped (got 5 expected 4)
+[DEBUT_COST_PENDING] card=2639 deferred=0xa001968b0 eff=0xa001968b0 cur=0 n=0 state=3
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa001968b0 target=0x0 eff=0xa001968b0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: h: declined -> the card stays in the waitroom
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00196880 cur=0 n=1 state=3 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='蓮ノ空' ct='' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=2 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=2 p1_discard=0
+[DISCARD_MOVE] selected=2640 of 1 available=2 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00196090 cur=0 n=1 state=3 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='' ct='' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=2 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=2 p1_discard=0
+[DISCARD_MOVE] selected=2640 of 1 available=2 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+FAIL: k: Q237: PL!HS-bp1-019-L must NOT be recovered from PL!HS-bp5-017-L
+FAIL: k: Q237: the target stays in the waitroom
+FAIL: k: Q237 cross-variant: PL!HS-bp5-017-L must NOT be recovered from PL!HS-sd1-018-SD
+FAIL: k: Q237 cross-variant: the target stays in the waitroom
+FAIL: k: Q237 cross-variant reverse: PL!HS-sd1-018-SD must NOT be recovered from PL!HS-bp5-017-L
+FAIL: k: Q237 cross-variant reverse: the target stays in the waitroom
+FAIL: k: Butterfly Wing -> Butterfly: PL!N-bp1-028-L must NOT be recovered from PL!SP-pb2-046-L
+FAIL: k: Butterfly Wing -> Butterfly: the target stays in the waitroom
+FAIL: k: Link to the FUTURE 104 -> base: PL!HS-bp2-020-L must NOT be recovered from PL!HS-sd1-020-SD
+FAIL: k: Link to the FUTURE 104 -> base: the target stays in the waitroom
+FAIL: k: a mismatched live card should not be recovered
+FAIL: k: the mismatched live stays in the waitroom
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=move_cards
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=move_cards
+FAIL: l: only the 2 cost cards left the hand (got 1 expected 2)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=move_cards
+FAIL: l: the hand ends with the 2 unrecovered cost cards (got 1 expected 2)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=move_cards
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=move_cards
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00196860 cur=0 n=1 state=3 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='' ct='live_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=4 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=4 p1_discard=0
+[DISCARD_MOVE] selected=2644 of 1 available=4 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: m: the ab#1 optional must be offered after a 虹ヶ咲 live is moved
+FAIL: m: accepting adds the 虹ヶ咲 live card to hand
+FAIL: m: accepting grants +1 score (got 0 expected 1)
+FAIL: m: exactly one copy of the 虹ヶ咲 live card is in hand (got 0 expected 1)
+  STATE m:treasure: pending=0 type= prompts=0
+    hand:
+    wait: PL!N-bp1-026-L
+FAIL: m: ab#1 must present its optional even when declined
+FAIL: n2: the recovery prompt must open
+FAIL: n2: DEFECT - every waitroom card is a candidate, including the member; only 0 live cards exist (got 0 expected 2)
+FAIL: n2: DEFECT - a member card IS offered as a candidate slot
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+FAIL: n4: DEFECT - a μ's card was recovered even though the stage holds a μ's member; group_reference=different_group_names is not implemented on the move path, so the card_type=card filter matches the whole waitroom (got 0 expected 1)
+PARITY RECOVER LIVE: 19 failing test(s) - every FAIL line is a strict
+Rust expectation the C engine does not meet, or a SETUP BUG naming a
+print the engine cannot resolve. Not a bug in this file.

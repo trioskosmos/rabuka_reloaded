@@ -1,0 +1,68 @@
+[DBG mill3] kind=2 route=4 zone= target=position|destination cnt=1 nfid=0 fids=[] desc= host=2652 actor=0 resume_mode=0 resume_eff=0x0
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: LeftSide empties after the position change (got 2654 expected -1)  [tests/test_parity_zones_position.c:557]
+FAIL: Q234: the member reaches RightSide (got -1 expected 2652)  [tests/test_parity_zones_position.c:559]
+FAIL: the center member is not disturbed by a move into an empty area (got 2652 expected 2654)  [tests/test_parity_zones_position.c:561]
+FAIL: a two-card deck with an empty waitroom cannot pay the cost  [tests/test_parity_zones_position.c:584]
+FAIL: the unpayable activation draws nothing (got 0 expected 2)  [tests/test_parity_zones_position.c:588]
+FAIL: a two-card deck with an empty waitroom cannot pay the cost  [tests/test_parity_zones_position.c:584]
+FAIL: the unpayable activation draws nothing (got 0 expected 2)  [tests/test_parity_zones_position.c:588]
+FAIL: a two-card deck with an empty waitroom cannot pay the cost  [tests/test_parity_zones_position.c:584]
+FAIL: the unpayable activation draws nothing (got 0 expected 2)  [tests/test_parity_zones_position.c:588]
+FAIL: no position choice when both deck and waitroom are empty  [tests/test_parity_zones_position.c:604]
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2662 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2662 ab=0 actor=0 action=position_change
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2666 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2666 ab=0 actor=0 action=position_change
+[RESUME_ANY] kind=2 zone= target=position_change:opponent:front route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=2 zone= target=position_change:opponent:front route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: front of left is the mirrored RightSide (Rule 4.5.7) (got 2675 expected 2674)  [tests/test_parity_zones_position.c:722]
+[RESUME_ANY] kind=2 zone= target=position_change:opponent:front route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: front of right is the mirrored LeftSide (Rule 4.5.7) (got -1 expected 2678)  [tests/test_parity_zones_position.c:740]
+FAIL: an empty opponent stage offers no front-area target  [tests/test_parity_zones_position.c:758]
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: the opponent's center member moves to the chosen LeftSide (got -1 expected 2685)  [tests/test_parity_zones_position.c:812]
+FAIL: P2 Center empties (got 2685 expected -1)  [tests/test_parity_zones_position.c:814]
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+FAIL: choosing an occupied area swaps the two opponent members (got 2689 expected 2688)  [tests/test_parity_zones_position.c:840]
+FAIL: the displaced opponent member takes the vacated Center (got 2688 expected 2689)  [tests/test_parity_zones_position.c:842]
+[RESUME_ANY] kind=1 zone=energy_zone target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001a4ec0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: one energy is returned to the energy deck (got 0 expected 1)  [tests/test_parity_zones_position.c:869]
+FAIL: the energy zone loses the energy that paid the cost (got 5 expected 4)  [tests/test_parity_zones_position.c:871]
+FAIL: the member no longer sits in the center after the position change  [tests/test_parity_zones_position.c:873]
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the displaced member takes the vacated center (got 2700 expected 2701)  [tests/test_parity_zones_position.c:971]
+FAIL: the moving member lands on the right after the position change (got 2701 expected 2700)  [tests/test_parity_zones_position.c:973]
+FAIL: the moving member is recorded as having moved this turn  [tests/test_parity_zones_position.c:977]
+FAIL: the swapped member is recorded as having moved this turn  [tests/test_parity_zones_position.c:979]
+FAIL: position_change_occurred_this_turn is set by the swap  [tests/test_parity_zones_position.c:983]
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the moving member is recorded as moved  [tests/test_parity_zones_position.c:1025]
+FAIL: the swapped member is recorded as moved  [tests/test_parity_zones_position.c:1026]
+FAIL: the moved member's jidou ability places exactly one energy card (got 20 expected 21)  [tests/test_parity_zones_position.c:1027]

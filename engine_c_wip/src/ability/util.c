@@ -1487,10 +1487,23 @@ int rb_place_card_in_zone(GameState *g, int pl, int card_id, const char *zone,
          * from "destroyed"; only the census can.
          *
          * Corpus destinations that reach this arm, because Zone::from_str
-         * (enums.rs:89-122) has a variant for them but place_card_in_zone has
-         * no arm: deck_top_or_bottom x3 (e.g. PL!S-bp6-002-P), front x1
-         * (PL!HS-pb1-014-P+), and "" -- plus every non-zone marker the corpus
-         * may route through here. Rust has no failure arm anywhere in
+         * (enums.rs:89-122) maps them to a real variant that
+         * place_card_in_zone has no dedicated arm for: deck_top_or_bottom x3
+         * (e.g. PL!S-bp6-002-P) and front x1 (PL!HS-pb1-014-P+). This is
+         * FAITHFUL, not a gap: Rust's own match ends in the same catch-all
+         * (engine/src/ability/util.rs:2548-2555) and sends BOTH to
+         * `player.hand.add_card(card_id)` — `_ =>` fires because neither
+         * DeckTopOrBottom nor Front appears in the arms above it. So the C's
+         * hand destination is what Rust does, and porting a dedicated
+         * deck_top/front arm here would DIVERGE.
+         *
+         * An earlier version of this comment also listed `""` as a corpus
+         * destination reaching this arm. That was wrong: `destination: ""`
+         * measures 0 unique abilities and 0 cards, so no corpus node carries
+         * it. The `zone && !zone[0]` branch below is still correct and still
+         * needed — it is Rust's `if destination.is_empty()` at util.rs:2549,
+         * reachable only from a non-corpus caller — but it is not, and never
+         * was, a corpus destination. Rust has no failure arm anywhere in
          * place_card_in_zone, so no destination string can delete a card. */
         if (zone && !zone[0]) {
             if (P->discard.n < RB_MAX_ZONE)

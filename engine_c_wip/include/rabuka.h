@@ -1213,6 +1213,20 @@ typedef struct {
     AbilityEffect *resume_eff;
     int      resume_actor;
     int      resume_host;
+    /* DEDICATED slot for the success-zone replacement card, added 2026-10-05.
+     *
+     * Rust keeps it in its own field: set at `turn/actions/mod.rs:894` (`.take()`)
+     * and `turn/live.rs:1761`. The C instead overloaded the SHARED `resume_host`
+     * (`live.c:1638`), and that slot is clobbered between the prompt being raised
+     * and the answer arriving — measured on the corpus as 7 of 13 prompt/result
+     * pairs carrying `prompt_original=293` but `result_original=494`. The
+     * replacement therefore read the wrong card, which is
+     * "CROSSROADS is in the waitroom (replaced)" in `parity_zone_source`.
+     *
+     * This mirrors Rust rather than fixing the symptom. -1 is the "no pending
+     * replacement" sentinel; use `>= 0` to test it, because 0 is a legal card
+     * index. APPENDED — never inserted (see the field-order note above). */
+    int      pending_success_replacement_card_id;   /* -1 = none */
     int      resume_active;    /* 1 while re-running a resumed effect node */
     int      auto_ability;     /* 1 if pending choice is an auto-ability (drainable) */
     int      choice_result;    /* selected index stored for the resumed node */

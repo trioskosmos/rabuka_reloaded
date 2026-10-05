@@ -1,0 +1,169 @@
+ok: MemberArea::from_str("left") maps to index 0
+ok: MemberArea::from_str("center") maps to index 1
+ok: MemberArea::from_str("right") maps to index 2
+ok: MemberArea::from_str rejects an unknown area
+ok: MemberArea::from_str rejects a missing area
+ok: from_index(0) is LeftSide
+ok: from_index(1) is Center
+ok: from_index(2) is RightSide
+ok: from_index rejects an out-of-range slot
+ok: from_index rejects a negative slot
+ok: as_str(LeftSide) is "left"
+ok: as_str(Center) is "center"
+ok: as_str(RightSide) is "right"
+ok: as_str of an unknown slot is the placeholder
+ok: front_area(LeftSide) is RightSide
+ok: front_area(Center) is Center
+ok: front_area(RightSide) is LeftSide
+ok: front_area rejects an unknown area
+ok: to_tag(LeftSide) is 1
+ok: to_tag(Center) is 2
+ok: to_tag(RightSide) is 3
+ok: to_tag of an unknown slot is 0
+ok: from_tag(1) is LeftSide
+ok: from_tag(2) is Center
+ok: from_tag(3) is RightSide
+ok: from_tag(0) is rejected
+ok: from_tag(4) is rejected
+ok: Q143: a missing trigger string constrains nothing
+ok: an empty trigger string constrains nothing
+ok: left-side trigger is satisfied at LeftSide
+ok: left-side trigger rejects Center
+ok: right-side trigger is satisfied at RightSide
+ok: right-side trigger rejects LeftSide
+ok: center trigger is satisfied at Center
+ok: center trigger rejects RightSide
+ok: a trigger naming both sides is unsatisfiable at LeftSide
+ok: a trigger naming both sides is unsatisfiable at RightSide
+ok: a non-position trigger constrains nothing
+ok: a missing activation_position constrains nothing
+ok: activation_position "center" matches Center
+ok: activation_position "center" rejects LeftSide
+ok: activation_position "left" matches LeftSide
+ok: activation_position "left" rejects RightSide
+ok: activation_position "right" matches RightSide
+ok: activation_position "right" rejects Center
+ok: activation_position "left_side" matches LeftSide
+ok: activation_position "left_side" rejects Center
+ok: activation_position "right_side" matches RightSide
+ok: activation_position "right_side" rejects LeftSide
+ok: an unrecognised activation_position constrains nothing at LeftSide
+ok: an unrecognised activation_position constrains nothing at Center
+ok: an unrecognised activation_position constrains nothing at RightSide
+ok: comma list "left_side,right_side" matches LeftSide
+ok: comma list "left_side,right_side" rejects Center
+ok: comma list "left_side,right_side" matches RightSide
+ok: comma list trims surrounding whitespace before matching
+ok: whitespace-trimmed comma list still rejects Center
+ok: comma list "left,center" matches Center
+ok: comma list "left,center" rejects RightSide
+ok: an all-unknown comma list matches nothing
+ok: get_area returns the member in LeftSide
+ok: get_area yields None for an empty area
+ok: get_area returns the member in RightSide
+ok: get_area yields None for an out-of-range area
+ok: get_area yields None for a negative area
+ok: set_area fills the requested slot
+ok: set_area ignores an out-of-range area
+ok: set_area ignores a negative area
+ok: position_change into an empty area moves the member
+ok: position_change empties the source area
+ok: position_change fills the destination
+ok: position_change into an occupied area returns the moving member
+ok: the moving member lands on the destination
+ok: the displaced member takes the source slot
+ok: position_change from an empty area is refused
+ok: a refused position_change leaves the board alone
+ok: position_change to the same area is refused
+ok: position_change from a negative area is refused
+ok: position_change to an out-of-range area is refused
+ok: out-of-range position_change is a no-op
+ok: formation_change accepts a full three-member rotation
+ok: formation rotation puts c on the left (a answered right)
+ok: formation rotation keeps b in the center (b answered center)
+ok: formation rotation puts a on the right (c answered left)
+ok: formation_change refuses two members targeting one area
+ok: a rejected formation leaves the source area
+ok: a rejected formation leaves the second member
+ok: a rejected formation fills nothing
+ok: formation_change refuses a member staying in its own area
+ok: formation_change refuses an empty source area
+ok: formation_change refuses an out-of-range destination
+ok: formation_change swaps the two occupied side areas
+ok: the right-side member's under-card moved to LeftSide
+ok: LeftSide keeps the under-card that came with its new member
+ok: the left-side member's two under-cards moved to RightSide
+ok: RightSide keeps the first under-card in order
+ok: RightSide keeps the energy under-card in order
+ok: recycle_under_cards reports every under-card moved
+ok: member under-cards route to the waitroom
+ok: energy under-cards route to the energy deck
+ok: waitroom under-cards keep their relative order
+ok: the energy under-card is the energy-deck card
+ok: recycle_under_cards empties the source stack
+ok: recycling an empty stack moves nothing
+ok: a member card may be placed on the stage
+ok: a live card may not be placed on the stage (Rule 8.2.2)
+ok: an unknown card id places nowhere
+ok: an out-of-range card id places nowhere
+ok: Q234: the top three deck cards pay the activation cost
+ok: position_change offers a destination choice after the cost
+FAILED: test_mill_three_deck_four
+FAILED: test_mill_three_deck_two_no_waitroom
+ok: the unpayable activation leaves the member in place
+ok: the unpayable activation leaves the member in place
+ok: the unpayable activation leaves the member in place
+FAILED: test_mill_three_deck_and_waitroom_empty
+ok: the member remains at the original position when the cost fails
+ok: two subunit members unlock the live-start formation choice
+ok: live-start formation asks for a SelectTarget destination
+ok: the live-start formation resolves after every destination is chosen
+ok: the opponent stage is untouched by our formation change
+ok: a single subunit member does not unlock formation
+ok: the threshold case leaves LeftSide alone
+ok: the threshold case leaves Center alone
+ok: the threshold case leaves RightSide alone
+ok: front of center is center: the selected LeftSide member lands in Center
+FAILED: test_himeno_front_area_shapes
+FAILED: test_himeno_front_no_opponent_members
+ok: an empty center on both sides means no position change at all
+ok: wien stays at LeftSide
+ok: P1 Center stays empty
+ok: P1 RightSide keeps its member
+ok: P2 RightSide keeps its member
+ok: Q223: the opponent owns the destination choice for their center member
+FAILED: test_wien_opponent_center_only
+ok: an empty P1 Center means there is no self-side choice
+ok: the opponent gets the destination choice
+FAILED: test_wien_opponent_swap_on_occupied_destination
+FAILED: test_tomari_activation_returns_energy
+ok: an unpayable mandatory cost leaves the member on stage
+ok: an unpayable mandatory cost creates no position choice
+ok: chisato rotation puts the former Center member on the left
+ok: chisato lands in the center
+ok: chisato rotation sends the former LeftSide member to the right
+ok: the opponent center member rotates to LeftSide
+ok: the opponent right-side member rotates to Center
+ok: the opponent left-side member rotates to RightSide
+ok: chisato's automatic rotation asks nothing
+ok: activating the position_change ability offers a destination choice
+FAILED: test_seira_position_change_swaps_and_records
+ok: the left-side filler is not disturbed
+ok: an untouched member is not recorded as having moved
+ok: the jidou member is deployed to LeftSide
+ok: the position_change member is deployed to RightSide
+ok: the top-three cost resolves into a position destination choice
+ok: the moving member lands on the left
+ok: the swapped member lands on the right
+FAILED: test_jidou_fires_after_position_change
+ok: position.rs:319-326: target=both recursion rotates self — Center must land on LeftSide
+ok: position.rs:319-326: target=both recursion rotates self — RightSide must land in Center
+ok: position.rs:319-326: target=both recursion rotates self — LeftSide must land on RightSide
+ok: position.rs:291-300: the opponent arm recurses too, so P2 Center must land on P2 LeftSide
+ok: position.rs:319-326: the opponent arm rotates P2 — P2 RightSide must land in P2 Center
+ok: position.rs:319-326: the opponent arm rotates P2 — P2 LeftSide must land on P2 RightSide
+ok: position.rs:301-315: a rotation raises no choice, so the self arm must run inline rather than park
+ok: position.rs:417-421: the opponent pass must read the OPPONENT's Center, not the master's
+ok: the opponent pass parked rather than losing the entry
+
+parity_zones_position: 185 assertions, 28 failures

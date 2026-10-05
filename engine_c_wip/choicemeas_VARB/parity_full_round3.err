@@ -1,0 +1,206 @@
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00195fe0 cur=0 n=0 state=0 pending=1
+[DISCARD_RESULT] selected=0 n=1 count=1 reprompt=0 pz='discard' pt='self' ptp='self' pdesc='Select 1 card(s) from the waiting room' nf=2 cl=0 clo='' ctot=0 ctoto='' grp='' ct='member_card' route=3
+[DISCARD_PICK] answering=0 n_answered=1 seat=0 first=0 available=2 count=1 mapped=1 sub_choice=0 dst='hand' state_change='-' p0_discard=2 p1_discard=0
+[DISCARD_MOVE] selected=498 of 1 available=2 moved=1 destination=hand state_change=- seat=0
+[CHOICE_EPILOGUE] pending=1 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=17 ab=1 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=17 ab=1 actor=0 action=gain_ability
+[DBG_GAIN] actor=0 host=17 act=gain_ability ag=【常時】ライブの合計スコアを+3する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=0
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=3 nex=3
+[DBG_GAIN_INNER_KV] value = 3
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=0 revealed=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,0,0,0,0,0]
+[EARLY_SEAT] pl=0 won=0 no_excess=0 surplus=-1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[CAN_PLACE_DECODE] cid=1092 ability=0 constant=0 trigger=ライブ成功時 action=move_cards dest=energy_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=1092 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_WAITROOM_BATCH] n=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=6
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,1,7,4,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,3,2,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=8
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=1092 ab=0 occurrence=0 use_limit=-1 effect=move_cards options=0
+[LIVE_SUCCESS_QUEUE] cid=1092 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=1 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,1,7,4,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,3,2,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=2 p2=0
+[CAN_PLACE_DECODE] cid=1092 ability=0 constant=0 trigger=ライブ成功時 action=move_cards dest=energy_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=1092 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=3
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,2,0,1,2,2]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,2,2,1,2,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=2
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=1092 ab=0 occurrence=0 use_limit=-1 effect=move_cards options=0
+[LIVE_SUCCESS_QUEUE] cid=1092 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=1 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,2,0,1,2,2]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,2,2,1,2,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=2 p2=0
+[CAN_PLACE_DECODE] cid=1092 ability=0 constant=0 trigger=ライブ成功時 action=move_cards dest=energy_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=1092 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=6
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,1,5,4,1,0,2]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,3,2,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=8
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=1092 ab=0 occurrence=0 use_limit=-1 effect=move_cards options=0
+[LIVE_SUCCESS_QUEUE] cid=1092 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=1 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,1,5,4,1,0,2]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,3,2,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=2 p2=0
+[CAN_PLACE_DECODE] cid=1092 ability=0 constant=0 trigger=ライブ成功時 action=move_cards dest=energy_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=1092 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=6
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,1,7,4,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,3,2,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=8
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=1092 ab=0 occurrence=0 use_limit=-1 effect=move_cards options=0
+[LIVE_SUCCESS_QUEUE] cid=1092 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=1 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,1,7,4,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,3,2,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=2 p2=0
+[CAN_PLACE_DECODE] cid=1092 ability=0 constant=0 trigger=ライブ成功時 action=move_cards dest=energy_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=1092 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=6
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,1,7,4,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,3,2,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=8
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=1092 ab=0 occurrence=0 use_limit=-1 effect=move_cards options=0
+[LIVE_SUCCESS_QUEUE] cid=1092 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=1 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,1,7,4,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,2,2,0,0,0] filled=[0,0,0,3,2,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=2 p2=0
+[CAN_PLACE_DECODE] cid=1092 ability=0 constant=0 trigger=ライブ成功時 action=move_cards dest=energy_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=1092 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=827 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=827 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=4 zone= target=choice_number route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019d310 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=0 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=827 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=827 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=4 zone= target=choice_number route=0 mode=0 idx=9
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019d310 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=0 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL [K2_choose_number_gains_blade]: K2: the revealed card is NOT in hand -- the chosen number exceeded its cost
+FAIL [K2_choose_number_gains_blade]: K2: the revealed card was returned to the TOP of the deck
+FAIL [K2_choose_number_gains_blade]: K2: blade WAS gained on Kosuzu
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=827 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=827 ab=0 actor=0 action=sequential
+[RESUME_ANY] kind=4 zone= target=choice_number route=0 mode=0 idx=3
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa0019d310 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=0 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL [K3_equal_choice_both]: K3: the EQUAL case ALSO gains blade -- both halves fire
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2639 ab=1 occurrence=0 use_limit=-1 effect=modify_score options=0
+[LIVE_SUCCESS_QUEUE] cid=2639 ab=1 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=3
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,0,4,0,0,1,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,1,0,4,0,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=2
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,0,4,0,0,1,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,1,0,4,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=2 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=511 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2076 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2076 ab=0 actor=0 action=modify_required_hearts
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2076 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2076 ab=0 actor=0 action=modify_required_hearts
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2076 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2076 ab=0 actor=0 action=modify_required_hearts
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=19 ab=2 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=19 ab=2 actor=0 action=gain_resource
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=19 ab=2 queued=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=19 ab=2 actor=0 action=gain_resource
+FAIL [Y3_abilityless_not_in_choice]: Y3: after paying once the optional cost RE-ASKS (still under the 3-card cap)
+FAIL [C1_choice_discard_flow]: C1: two choice_condition cost options are offered (Rust asserts two ChoiceOption actions) (got 0, expected 2)
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2235 target=self count=1
+FAIL [C1_choice_discard_flow]: C1: the choice_condition cost raises its option prompt
+FAIL [C1_choice_discard_flow]: C1: the option labels carry the real cost text (ウェイト), not Yes/No
+FAIL [C1_choice_discard_flow]: C1: the discard option creates a SelectCard prompt (got 0, expected 1)
+FAIL [C1_choice_discard_flow]: C1: the selected card really is in the waitroom
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2235 target=self count=1
+FAIL [C2_choice_wait_option]: C2: the choice_condition cost raises its option prompt
+FAIL [C2_choice_wait_option]: C2: Kanon is in WAIT state after taking the wait option

@@ -1,0 +1,15 @@
+tests/test_parity_small_clusters.c: In function 'd_miyashita_hand_almost_full_skips_cost':
+tests/test_parity_small_clusters.c:3119:9: warning: unused variable 'disc_pre' [-Wunused-variable]
+ 3119 |     int disc_pre  = disc_len(&tg, 0);
+      |         ^~~~~~~~
+tests/test_parity_small_clusters.c:3118:9: warning: unused variable 'deck_pre' [-Wunused-variable]
+ 3118 |     int deck_pre  = deck_len(&tg, 0);
+      |         ^~~~~~~~
+tests/test_parity_small_clusters.c: In function 'd_miyashita_hand_at_seven_skips_cost':
+tests/test_parity_small_clusters.c:3151:9: warning: unused variable 'deck_pre' [-Wunused-variable]
+ 3151 |     int deck_pre = deck_len(&tg, 0);
+      |         ^~~~~~~~
+tests/test_parity_small_clusters.c: At top level:
+tests/test_parity_small_clusters.c:539:12: warning: 'n_abilities' defined but not used [-Wunused-function]
+  539 | static int n_abilities(int cid)
+      |            ^~~~~~~~~~~

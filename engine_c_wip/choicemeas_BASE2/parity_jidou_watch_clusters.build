@@ -1,0 +1,3 @@
+tests/test_parity_jidou_watch_clusters.c: In function 'q167_energy_after':
+tests/test_parity_jidou_watch_clusters.c:2196:52: warning: '/*' within comment [-Wcomment]
+ 2196 |              * in cards/cards.json or in engine/src/*.rs. src/core/card.c:374 and

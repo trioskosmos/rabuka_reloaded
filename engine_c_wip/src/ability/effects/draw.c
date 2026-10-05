@@ -655,7 +655,14 @@ void rb_effect_select_effect(GameState *g, int actor, AbilityEffect *e, int host
     const char *heart_colors_arr[8];
     int n_hc = draw_heart_colors(e, heart_colors_arr, 8);
     int has_heart_colors = n_hc > 0;
-    const char *src   = draw_extra(e, "source");
+    /* Rust selection.rs:45 `effect.source_any()` reads the DECODED `source`
+       FIELD, not an extras-table row. vm.c:735 is the only writer and it
+       assigns `e->source`, so `draw_extra(e, "source")` was ALWAYS NULL
+       (measured corpus-wide: 39 of 73 select nodes carry `source` in the
+       struct field and 0 in the extras table). Every such node therefore took
+       the area_select arm at draw.c:664 instead of execute_select. */
+    const char *src   = (e->source && *e->source) ? e->source
+                                                   : draw_extra(e, "source");
     const char *or_ct = draw_extra(e, "or_card_types");
     const char *chars = draw_extra(e, "characters");
     const char *group = draw_extra(e, "group_names");
@@ -711,9 +718,16 @@ void rb_effect_select_effect(GameState *g, int actor, AbilityEffect *e, int host
 void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor,
                                              AbilityEffect *e, int host_cid) {
     (void)host_cid;
-    if (!g || !e) return;
-    int count = e->count >= 0 ? e->count : 1;
+    if (!g) return;
     int phase = g->keep_shuffle_under_phase;
+    /* Phases >= 1 are RE-ENTERED from choice.c:5393 with NO effect node: the
+       node that opened the prompt is decoded on the trigger handler STACK and is
+       dead by the time the prompt is answered, so forwarding it dereferences
+       freed stack. The keep-N count is the only thing phases 1/2 read off it and
+       the GameState has a home for that. */
+    int count = (phase == 0)
+                  ? ((e && e->count >= 0) ? e->count : 1)
+                  : (g->keep_shuffle_under_count > 0 ? g->keep_shuffle_under_count : 1);
 
     if (phase == 0) {
         int pl = actor;
@@ -727,7 +741,14 @@ void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor,
                        pick > 0 ? pick : 1, 1, "keep_shuffle_under");
     rb_queue_pause_for_choice(g, &g->queue.pending);
         g->queue.resume_mode = 5;
-        g->queue.resume_eff = e;
+        /* NOT `g->queue.resume_eff = e`. `e` is the node inside the ability
+           tree this prompt was raised from, and for a trigger-driven activation
+           that tree is decoded onto the STACK of the trigger handler and is dead
+           by the time the prompt is answered (measured: RESUME_CAPTURE printed
+           eff=0x7ffff9d20, and choice.c:5393 then dereferenced it). The keep-N
+           count is the only thing phases 1/2 read off the node, and the
+           GameState already has a home for it. */
+        g->keep_shuffle_under_count = count;
         g->queue.resume_actor = actor;
         g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
         g->keep_shuffle_under_phase = 1;
@@ -780,7 +801,14 @@ void rb_effect_both_hand_keep_shuffle_under(GameState *g, int actor,
                        pick2 > 0 ? pick2 : 1, 1, "keep_shuffle_under");
     rb_queue_pause_for_choice(g, &g->queue.pending);
         g->queue.resume_mode = 5;
-        g->queue.resume_eff = e;
+        /* NOT `g->queue.resume_eff = e`. `e` is the node inside the ability
+           tree this prompt was raised from, and for a trigger-driven activation
+           that tree is decoded onto the STACK of the trigger handler and is dead
+           by the time the prompt is answered (measured: RESUME_CAPTURE printed
+           eff=0x7ffff9d20, and choice.c:5393 then dereferenced it). The keep-N
+           count is the only thing phases 1/2 read off the node, and the
+           GameState already has a home for it. */
+        g->keep_shuffle_under_count = count;
         g->queue.resume_actor = actor;
         g->queue.resume_host = g->queue.resume_host >= 0 ? g->queue.resume_host : actor;
         g->keep_shuffle_under_phase = 2;

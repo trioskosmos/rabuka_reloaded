@@ -53,3 +53,7 @@ diag-spriteraw = []
 # so anything else inside a glyph is foreign data; this turns the
 # "rainbow speckles in glyphs" symptom into an unambiguous marker.
 diag-bgspeck = []
+# Composite the presented frame into SRAM so a host tool can render it.
+# See src/shot.rs: mGBA will not serve VRAM/OAM over GDB, so this is the only
+# way to see what the port actually draws. Diagnostic builds only.
+diag-shot = []

@@ -1,0 +1,2 @@
+/opt/devkitpro/msys2/usr/bin/../lib/gcc/x86_64-pc-cygwin/15.3.0/../../../../x86_64-pc-cygwin/bin/ld: cannot find src/ability/cost.o: No such file or directory
+collect2: error: ld returned 1 exit status

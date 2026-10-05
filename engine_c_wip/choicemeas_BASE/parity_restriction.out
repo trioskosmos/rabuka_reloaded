@@ -1,0 +1,162 @@
+ok: identity PL!SP-bp1-001-P
+ok: identity PL!-sd1-002-SD
+        restriction/alone_sets_cannot_live: 6 check(s), 0 failure(s)
+ok       restriction/alone_sets_cannot_live
+ok: identity PL!SP-bp1-001-P
+ok: identity PL!-sd1-002-SD
+        restriction/other_member_prevents_cannot_live: 5 check(s), 0 failure(s)
+ok       restriction/other_member_prevents_cannot_live
+ok: identity PL!HS-bp6-006-R＋
+ok: identity PL!-sd1-010-SD
+        restriction/delayed_cannot_active_one_owner_tick: 6 check(s), 0 failure(s)
+ok       restriction/delayed_cannot_active_one_owner_tick
+ok: identity PL!HS-bp6-006-R＋
+        restriction/delayed_cannot_active_twice_one_tick: 3 check(s), 0 failure(s)
+ok       restriction/delayed_cannot_active_twice_one_tick
+ok: identity PL!HS-pb1-008-R
+ok: identity PL!-sd1-010-SD
+        restriction/active_phase_lock_p1_targets_p2: 5 check(s), 1 failure(s)
+FAILED   restriction/active_phase_lock_p1_targets_p2
+ok: identity PL!HS-pb1-008-R
+ok: identity PL!-sd1-010-SD
+        restriction/active_phase_lock_p2_targets_p1: 5 check(s), 1 failure(s)
+FAILED   restriction/active_phase_lock_p2_targets_p1
+ok: identity PL!HS-pb1-008-R
+ok: identity PL!-sd1-010-SD
+        restriction/active_phase_lock_excludes_owner: 7 check(s), 0 failure(s)
+ok       restriction/active_phase_lock_excludes_owner
+ok: identity PL!S-bp2-024-L
+ok: identity PL!-sd1-010-SD
+ok: identity PL!S-bp2-015-PR
+        restriction/kagayaiteru_live_success_draw_then_discard: 9 check(s), 0 failure(s)
+ok       restriction/kagayaiteru_live_success_draw_then_discard
+ok: identity PL!S-bp2-024-L
+ok: identity PL!-sd1-010-SD
+ok: identity PL!S-bp2-015-PR
+        restriction/kagayaiteru_q125_cannot_place_in_success_zone: 12 check(s), 0 failure(s)
+ok       restriction/kagayaiteru_q125_cannot_place_in_success_zone
+ok: identity PL!S-bp2-024-L
+ok: identity PL!N-sd1-016-PRproteinbar
+ok: identity PL!-sd1-010-SD
+        restriction/live_success_both_sides_advances_turn: 11 check(s), 3 failure(s)
+FAILED   restriction/live_success_both_sides_advances_turn
+ok: identity PL!S-pb1-022-L
+ok: identity PL!S-pb1-022-L
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!-sd1-010-SD
+        restriction/mebius_tied_blocks_both: 16 check(s), 2 failure(s)
+FAILED   restriction/mebius_tied_blocks_both
+ok: identity PL!S-pb1-022-L
+ok: identity PL!N-bp1-028-L
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+        restriction/mebius_untied_allows_p1: 13 check(s), 0 failure(s)
+ok       restriction/mebius_untied_allows_p1
+ok: identity PL!S-pb1-022-L
+ok: identity PL!S-pb1-022-L
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!S-bp2-024-L
+        restriction/mebius_expires_next_live: 17 check(s), 2 failure(s)
+FAILED   restriction/mebius_expires_next_live
+ok: identity PL!S-pb1-022-L
+ok: identity PL!N-bp1-028-L
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+ok: identity PL!HS-bp2-001-R
+        restriction/mebius_tie_when_both_fail: 11 check(s), 0 failure(s)
+ok       restriction/mebius_tie_when_both_fail
+ok: identity PL!-sd1-010-SD
+ok: identity PL!N-pb1-034-N
+ok: identity PL!-sd1-010-SD
+        cc/shioriko_first_heart03_bystander_unchanged: 8 check(s), 3 failure(s)
+FAILED   cc/shioriko_first_heart03_bystander_unchanged
+ok: identity PL!-sd1-010-SD
+ok: identity PL!N-pb1-034-N
+ok: identity PL!-sd1-010-SD
+        cc/shioriko_last_heart05: 6 check(s), 3 failure(s)
+FAILED   cc/shioriko_last_heart05
+ok: identity PL!-sd1-010-SD
+ok: identity PL!N-pb1-034-N
+ok: identity PL!-sd1-010-SD
+        cc/shioriko_mid_heart04: 6 check(s), 3 failure(s)
+FAILED   cc/shioriko_mid_heart04
+ok: identity PL!-sd1-010-SD
+ok: identity PL!N-pb1-036-N
+ok: identity PL!-sd1-010-SD
+        cc/lanzhu_last_heart06: 6 check(s), 3 failure(s)
+FAILED   cc/lanzhu_last_heart06
+ok: identity PL!-sd1-010-SD
+ok: identity PL!SP-pb2-030-N
+ok: identity PL!-sd1-010-SD
+        cc/pb2_030_first_heart02: 5 check(s), 2 failure(s)
+FAILED   cc/pb2_030_first_heart02
+ok: identity PL!-sd1-010-SD
+ok: identity PL!SP-pb2-030-N
+ok: identity PL!-sd1-010-SD
+        cc/pb2_030_third_heart06_only_self: 6 check(s), 2 failure(s)
+FAILED   cc/pb2_030_third_heart06_only_self
+ok: identity PL!N-bp3-014-N
+        cc/kasumi_replacement_not_grant: 8 check(s), 2 failure(s)
+FAILED   cc/kasumi_replacement_not_grant
+ok: identity PL!N-pb1-034-N
+        cc/shioriko_unchosen_printed_superseded: 6 check(s), 2 failure(s)
+FAILED   cc/shioriko_unchosen_printed_superseded
+ok: identity PL!N-bp3-014-N
+ok: identity PL!-sd1-019-SD
+        cc/kasumi_override_does_not_survive_live: 7 check(s), 3 failure(s)
+FAILED   cc/kasumi_override_does_not_survive_live
+ok: identity PL!N-bp1-003-R＋
+ok: identity PL!-sd1-010-SD
+ok: identity PL!-sd1-020-SD
+        cc/shizuku_optional_energy_chosen_heart: 9 check(s), 1 failure(s)
+FAILED   cc/shizuku_optional_energy_chosen_heart
+ok: identity PL!-bp3-009-R＋
+        cc/nico_activation_self_wait_only_chosen: 6 check(s), 3 failure(s)
+FAILED   cc/nico_activation_self_wait_only_chosen
+ok: identity PL!N-bp3-002-R
+ok: identity PL!N-bp1-006-R＋
+ok: identity PL!S-bp5-009-R
+        cc/kasumi_quartz_discard_cost_other_nijigasaki: 19 check(s), 0 failure(s)
+ok       cc/kasumi_quartz_discard_cost_other_nijigasaki
+ok: identity PL!N-sd2-005-SD2
+        cc/sd2_005_discard2_two_hearts_one_color: 6 check(s), 0 failure(s)
+ok       cc/sd2_005_discard2_two_hearts_one_color
+ok: identity PL!N-sd1-010-SD
+ok: identity PL!N-bp7-012-R
+        cc/aran_bp7_012_energy_heart01: 5 check(s), 1 failure(s)
+FAILED   cc/aran_bp7_012_energy_heart01
+ok: identity PL!-bp5-011-N
+ok: identity PL!-sd1-019-SD
+        cc/eli_bp5_011_heart05_x2_success: 6 check(s), 3 failure(s)
+FAILED   cc/eli_bp5_011_heart05_x2_success
+ok: identity PL!-bp3-012-PR
+ok: identity PL!-sd1-010-SD
+        cc/kotori_bp3_012_zero_success_zero_hearts: 6 check(s), 2 failure(s)
+FAILED   cc/kotori_bp3_012_zero_success_zero_hearts
+ok: identity PL!-sd1-010-SD
+ok: identity PL!N-pb1-034-N
+ok: identity PL!-sd1-010-SD
+GAP: no pending choice at all: a select+heart_colors ability emitted nothing to answer
+        cc/gap_heart_option_labels: 4 check(s), 0 failure(s)
+ok       cc/gap_heart_option_labels
+
+==== test_parity_restriction: 31 cases ====
+12 ok, 19 failed, 0 crashed, 1 expected gaps
+245 checks, 42 failures

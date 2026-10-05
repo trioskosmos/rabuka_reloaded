@@ -1,0 +1,373 @@
+FAIL: opponent (P2) should be in the cannot_activate set
+  phase-gate probe: from RB_PHASE_ACTIVE the lock sets player_cannot_activate = [0,1]
+FAIL: P1 should be in the cannot_activate set (P2's opponent)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=1
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,1,1,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,0,0,1,0,0] filled=[0,0,0,1,0,1,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=1
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2639 ab=0 occurrence=0 use_limit=-1 effect=sequential options=0
+[LIVE_SUCCESS_QUEUE] cid=2639 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=0 pending=1
+[LIVE_VICTORY_PHASE] initial pending=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001976e0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=1
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,1,1,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,0,0,1,0,0] filled=[0,0,0,1,0,1,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=1
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2639 ab=0 occurrence=0 use_limit=-1 effect=sequential options=0
+[LIVE_SUCCESS_QUEUE] cid=2639 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=0 pending=1
+[LIVE_VICTORY_PHASE] initial pending=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001976e0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=1
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,1,1,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,0,0,1,0,0] filled=[0,0,0,1,0,1,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[CAN_PLACE_DECODE] cid=2639 ability=0 constant=0 trigger=ライブ成功時 action=sequential dest=-
+[CAN_PLACE_DECODE] cid=2639 ability=1 constant=1 trigger=常時 action=restriction dest=success_live_zone
+[CAN_PLACE] cid=2639 zone=success_live_zone result=0 reason=cannot_place
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=2639 can_place=0 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_WAITROOM_BATCH] n=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] resume pending=0
+[CAN_PLACE_DECODE] cid=2639 ability=0 constant=0 trigger=ライブ成功時 action=sequential dest=-
+[CAN_PLACE_DECODE] cid=2639 ability=1 constant=1 trigger=常時 action=restriction dest=success_live_zone
+[CAN_PLACE] cid=2639 zone=success_live_zone result=0 reason=cannot_place
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=1 hand_before=3 hand_after=4
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=3
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,1,1,3,0,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,0,0,1,0,0] filled=[0,0,0,1,0,1,0,0]
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=3
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,1,1,3,0,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,0,0,1,0,0] filled=[0,0,0,1,0,1,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=5
+[EARLY_SEAT] pl=1 won=1 no_excess=0 surplus=5
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2639 ab=0 occurrence=0 use_limit=-1 effect=sequential options=0
+[LIVE_SUCCESS_QUEUE] cid=2639 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=0 pending=1
+[LIVE_VICTORY_PHASE] initial pending=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001976e0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+  baselines @ pass 4 phase=8: p1 hand=4 discard=4 | p2 hand=4 discard=3
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=5
+[EARLY_SEAT] pl=1 won=1 no_excess=0 surplus=5
+[LIVE_SUCCESS_TRIGGER] pl=1 owner=0 cid=2639 ab=0 occurrence=0 use_limit=-1 effect=sequential options=0
+[LIVE_SUCCESS_QUEUE] cid=2639 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=1 queue=1->2 processed=0 pending=1
+[LIVE_VICTORY_PHASE] resume pending=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001976e0 cur=1 n=2 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=5
+[EARLY_SEAT] pl=1 won=1 no_excess=0 surplus=5
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,1,1,3,0,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,0,0,1,0,0] filled=[0,0,0,1,0,1,0,0]
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,1,1,3,0,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,0,0,1,0,0] filled=[0,0,0,1,0,1,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[CAN_PLACE_DECODE] cid=2639 ability=0 constant=0 trigger=ライブ成功時 action=sequential dest=-
+[CAN_PLACE_DECODE] cid=2639 ability=1 constant=1 trigger=常時 action=restriction dest=success_live_zone
+[CAN_PLACE] cid=2639 zone=success_live_zone result=0 reason=cannot_place
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=2639 can_place=0 live=1
+[CAN_PLACE_DECODE] cid=2639 ability=0 constant=0 trigger=ライブ成功時 action=sequential dest=-
+[CAN_PLACE_DECODE] cid=2639 ability=1 constant=1 trigger=常時 action=restriction dest=success_live_zone
+[CAN_PLACE] cid=2639 zone=success_live_zone result=0 reason=cannot_place
+[LIVE_SUCCESS_RESULT] pl=1 won=1 must_skip=0 card=2639 can_place=0 live=1
+[LIVE_WAITROOM_BATCH] n=2
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=1 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] resume pending=0
+  final phase=2: p1 hand=6 discard=5 | p2 hand=3 discard=5
+FAIL: P1: draw 2 - discard 1 = net +1 (got 6 expected 5)
+FAIL: P2: draw 2 - discard 1 = net +1 (got 3 expected 5)
+FAIL: P1: ability discard + restricted live card (got 5 expected 6)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=1 hand_before=1 hand_after=2
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=12
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=12
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=21
+[EARLY_SEAT] pl=1 won=1 no_excess=0 surplus=21
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2639 ab=0 occurrence=0 use_limit=-1 effect=restriction options=0
+[LIVE_SUCCESS_QUEUE] cid=2639 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=1 pending=0
+[LIVE_SUCCESS_TRIGGER] pl=1 owner=1 cid=2640 ab=0 occurrence=0 use_limit=-1 effect=restriction options=0
+[LIVE_SUCCESS_QUEUE] cid=2640 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=1 queue=1->2 processed=1 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[LIVE_SCORE] p1=2 p2=2
+[CAN_PLACE_DECODE] cid=2639 ability=0 constant=0 trigger=ライブ成功時 action=restriction dest=success_live_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=2639 can_place=1 live=1
+[CAN_PLACE_DECODE] cid=2640 ability=0 constant=0 trigger=ライブ成功時 action=restriction dest=success_live_zone
+[LIVE_SUCCESS_RESULT] pl=1 won=1 must_skip=0 card=2640 can_place=1 live=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=1 p2_added=1
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=1 p1_succ=1(+1) p2_succ=1(+1)
+[LIVE_VICTORY_PHASE] initial pending=0
+FAIL: tied: P1 Mebius must be blocked from the success zone
+FAIL: tied: P2 Mebius must be blocked from the success zone
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=1 hand_before=1 hand_after=2
+[LIVE_START_SCAN] pl=1 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=12
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=12
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[7,0,0,0,0,0,5,0] filled=[0,0,0,12,0,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=21
+[EARLY_SEAT] pl=1 won=0 no_excess=0 surplus=-1
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2639 ab=0 occurrence=0 use_limit=-1 effect=restriction options=0
+[LIVE_SUCCESS_QUEUE] cid=2639 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=1 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[7,0,0,0,0,0,5,0] filled=[0,0,0,12,0,0,0,0]
+[LIVE_SCORE] p1=2 p2=5
+[CAN_PLACE_DECODE] cid=2639 ability=0 constant=0 trigger=ライブ成功時 action=restriction dest=success_live_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=2639 can_place=1 live=1
+[CAN_PLACE_DECODE] cid=2640 ability=0 constant=0 trigger=ライブ開始時 action=modify_score dest=-
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=2640 can_place=1 live=1
+[LIVE_WAITROOM_BATCH] n=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=1 hand_before=1 hand_after=2
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=12
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=12
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=21
+[EARLY_SEAT] pl=1 won=1 no_excess=0 surplus=21
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2639 ab=0 occurrence=0 use_limit=-1 effect=restriction options=0
+[LIVE_SUCCESS_QUEUE] cid=2639 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=1 pending=0
+[LIVE_SUCCESS_TRIGGER] pl=1 owner=1 cid=2640 ab=0 occurrence=0 use_limit=-1 effect=restriction options=0
+[LIVE_SUCCESS_QUEUE] cid=2640 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=1 queue=1->2 processed=1 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[LIVE_SCORE] p1=2 p2=2
+[CAN_PLACE_DECODE] cid=2639 ability=0 constant=0 trigger=ライブ成功時 action=restriction dest=success_live_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=2639 can_place=1 live=1
+[CAN_PLACE_DECODE] cid=2640 ability=0 constant=0 trigger=ライブ成功時 action=restriction dest=success_live_zone
+[LIVE_SUCCESS_RESULT] pl=1 won=1 must_skip=0 card=2640 can_place=1 live=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=1 p2_added=1
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=1 p1_succ=1(+1) p2_succ=1(+1)
+[LIVE_VICTORY_PHASE] initial pending=0
+FAIL: first tied live should block P1's Mebius
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=2 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=3 hand_after=3
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=12
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,0,0,1,0,0] filled=[0,0,0,1,0,1,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=25
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2648 ab=0 occurrence=0 use_limit=-1 effect=sequential options=0
+[LIVE_SUCCESS_QUEUE] cid=2648 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=0 pending=1
+[LIVE_VICTORY_PHASE] initial pending=1
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001976e0 cur=0 n=1 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=25
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,24,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[1,0,0,0,0,1,0,0] filled=[0,0,0,1,0,1,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[CAN_PLACE_DECODE] cid=2648 ability=0 constant=0 trigger=ライブ成功時 action=sequential dest=-
+[CAN_PLACE_DECODE] cid=2648 ability=1 constant=1 trigger=常時 action=restriction dest=success_live_zone
+[CAN_PLACE] cid=2648 zone=success_live_zone result=0 reason=cannot_place
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=2648 can_place=0 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_WAITROOM_BATCH] n=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+0) p2_succ=1(+0)
+[LIVE_VICTORY_PHASE] resume pending=0
+FAIL: restriction should have expired - success zone empty after live_end (got 1 expected 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=1 hand_before=1 hand_after=2
+[LIVE_START_SCAN] pl=1 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2640 ab=0 queued=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=12
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=12
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[7,0,0,0,0,0,5,0] filled=[0,0,0,12,0,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=21
+[EARLY_SEAT] pl=1 won=0 no_excess=0 surplus=-1
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2639 ab=0 occurrence=0 use_limit=-1 effect=restriction options=0
+[LIVE_SUCCESS_QUEUE] cid=2639 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=1 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,0,0,0,3,0,0,0] filled=[0,0,0,3,3,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=1 hearts=[0,3,0,12,9,3,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[7,0,0,0,0,0,5,0] filled=[0,0,0,12,0,0,0,0]
+[LIVE_SCORE] p1=2 p2=5
+[CAN_PLACE_DECODE] cid=2639 ability=0 constant=0 trigger=ライブ成功時 action=restriction dest=success_live_zone
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=2639 can_place=1 live=1
+[CAN_PLACE_DECODE] cid=2640 ability=0 constant=0 trigger=ライブ開始時 action=modify_score dest=-
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=2640 can_place=1 live=1
+[LIVE_WAITROOM_BATCH] n=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+DEBUG [SET_HEART_APPLIED] heart_type=heart00 duration=live_end host_cid=2640
+DEBUG [SET_HEART_APPLIED] applied cid=2640 col=0 ht=heart00
+FAIL: precondition: the heart-colour choice prompt must be offered
+  shioriko[opt0] PL!N-pb1-034-N: wild(pink)=0 heart01=0 heart02=0 heart03=0 heart04=0 heart05=0 heart06=0  multiplier=0
+FAIL: chose heart03 -> original hearts become heart03 (got 0 expected 3)
+FAIL: vacuity control: Shioriko's colour choice must really be offered (a prompt really was offered)
+DEBUG [SET_HEART_APPLIED] heart_type=heart00 duration=live_end host_cid=2640
+DEBUG [SET_HEART_APPLIED] applied cid=2640 col=0 ht=heart00
+FAIL: colour choice must be offered
+  shioriko[opt2] PL!N-pb1-034-N: wild(pink)=0 heart01=0 heart02=0 heart03=0 heart04=0 heart05=0 heart06=0  multiplier=0
+FAIL: chose heart05 -> original hearts become heart05 (got 0 expected 5)
+FAIL: vacuity control: Shioriko's colour choice must really be offered (a prompt really was offered)
+DEBUG [SET_HEART_APPLIED] heart_type=heart00 duration=live_end host_cid=2640
+DEBUG [SET_HEART_APPLIED] applied cid=2640 col=0 ht=heart00
+FAIL: colour choice must be offered
+  shioriko[opt1] PL!N-pb1-034-N: wild(pink)=0 heart01=0 heart02=0 heart03=0 heart04=0 heart05=0 heart06=0  multiplier=0
+FAIL: chose heart04 (got 0 expected 4)
+FAIL: vacuity control: Shioriko's colour choice must really be offered (a prompt really was offered)
+DEBUG [SET_HEART_APPLIED] heart_type=heart00 duration=live_end host_cid=2640
+DEBUG [SET_HEART_APPLIED] applied cid=2640 col=0 ht=heart00
+FAIL: colour choice must be offered
+  lanzhu[opt2] PL!N-pb1-036-N: wild(pink)=0 heart01=0 heart02=0 heart03=0 heart04=0 heart05=0 heart06=0  multiplier=0
+FAIL: twin card's third option is heart06 (got 0 expected 6)
+FAIL: vacuity control: Lanzhu's colour choice must really be offered (a prompt really was offered)
+DEBUG [SET_HEART_APPLIED] heart_type=heart00 duration=live_end host_cid=2640
+DEBUG [SET_HEART_APPLIED] applied cid=2640 col=0 ht=heart00
+  wakana[opt0] PL!SP-pb2-030-N: wild(pink)=0 heart01=0 heart02=0 heart03=0 heart04=0 heart05=0 heart06=0  multiplier=0
+FAIL: chose heart02 -> original hearts become heart02 (got 0 expected 2)
+FAIL: vacuity control: Wakana's colour choice must really be offered (a prompt really was offered)
+DEBUG [SET_HEART_APPLIED] heart_type=heart00 duration=live_end host_cid=2640
+DEBUG [SET_HEART_APPLIED] applied cid=2640 col=0 ht=heart00
+  wakana[opt2] PL!SP-pb2-030-N: wild(pink)=0 heart01=0 heart02=0 heart03=0 heart04=0 heart05=0 heart06=0  multiplier=0
+FAIL: chose heart06 -> original hearts become heart06 (got 0 expected 6)
+FAIL: vacuity control: Wakana's colour choice must really be offered (a prompt really was offered)
+DEBUG [SET_HEART_APPLIED] heart_type=heart00 duration=live_end host_cid=2639
+DEBUG [SET_HEART_APPLIED] applied cid=2639 col=0 ht=heart00
+FAIL: precondition: the heart-colour choice prompt must be offered
+  kasumi[opt0] PL!N-bp3-014-N: wild(pink)=0 heart01=0 heart02=0 heart03=0 heart04=0 heart05=0 heart06=0  multiplier=0
+FAIL: vacuity control: Kasumi's colour choice must really be offered (a prompt really was offered)
+DEBUG [SET_HEART_APPLIED] heart_type=heart00 duration=live_end host_cid=2639
+DEBUG [SET_HEART_APPLIED] applied cid=2639 col=0 ht=heart00
+FAIL: colour choice must be offered
+FAIL: vacuity control: Shioriko's colour choice must really be offered (a prompt really was offered)
+DEBUG [SET_HEART_APPLIED] heart_type=heart00 duration=live_end host_cid=2639
+DEBUG [SET_HEART_APPLIED] applied cid=2639 col=0 ht=heart00
+FAIL: colour choice must be offered
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+  kasumi[after live] PL!N-bp3-014-N: wild(pink)=0 heart01=0 heart02=0 heart03=0 heart04=0 heart05=0 heart06=0  multiplier=0
+FAIL: until live end - the override does not survive its live (got 0 expected -1)
+FAIL: vacuity control: Kasumi's colour choice must really be offered (a prompt really was offered)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=1 queued=1
+  shizuku: first prompt is SelectTarget/pay_optional_cost:skip, P1 active energy = 20
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[CHOICE_RESUME_END] pending=1 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=3
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+  shizuku: P1 active energy after the cost = 19
+  shizuku PL!N-bp1-003-R＋: wild(pink)=0 heart01=0 heart02=0 heart03=0 heart04=0 heart05=0 heart06=0  multiplier=-1
+FAIL: heart04 should have +1 modifier (got 0 expected 1)
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2639 target=self count=-1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=0 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2639 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2639 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=2639 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=2639 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+FAIL: heart colour choice should be pending
+  nico[opt1] PL!-bp3-009-R＋: wild(pink)=2 heart01=1 heart02=1 heart03=1 heart04=1 heart05=1 heart06=1  multiplier=-1
+FAIL: unchosen colours are not granted (got 1 expected 0)
+FAIL: vacuity control: Nico's activation must really offer the colour choice (a prompt really was offered)
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=4
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[SELECT_CARD_MULTI] n=2 count=2 zone=hand target=
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=2640 ab=0 actor=0 action=sequential
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=3
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=pay_optional_cost:skip route=1 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+DEBUG [SPECIFY_HEART] entry: choice_any=1 action=self
+[CHOICE_RESUME_END] pending=1 state=1 options=0 reprompt=0
+[RESUME_ANY] kind=3 zone= target= route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+  aran[opt0] PL!N-bp7-012-R: wild(pink)=0 heart01=0 heart02=0 heart03=0 heart04=0 heart05=0 heart06=0  multiplier=-1
+FAIL: first offered color gained until live end (got 0 expected 1)
+FAIL: colour choice must be asked
+  eli[opt1] PL!-bp5-011-N: wild(pink)=4 heart01=2 heart02=2 heart03=2 heart04=2 heart05=2 heart06=2  multiplier=-1
+FAIL: unchosen colours are not granted (got 2 expected 0)
+FAIL: vacuity control: Eli's colour choice must really be offered (a prompt really was offered)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=2 hand_after=2
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+FAIL: Should prompt for heart color
+  kotori[0 success] PL!-bp3-012-PR: wild(pink)=0 heart01=0 heart02=0 heart03=0 heart04=0 heart05=0 heart06=0  multiplier=-1
+FAIL: vacuity control: Kotori's colour choice must really be offered (a prompt really was offered)
+DEBUG [SET_HEART_APPLIED] heart_type=heart00 duration=live_end host_cid=2640
+DEBUG [SET_HEART_APPLIED] applied cid=2640 col=0 ht=heart00

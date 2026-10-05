@@ -1798,6 +1798,101 @@ static        TestGame tg; test_game_new(&tg);
  *    The behavioural block A above routes around this by paying the root through
  *    rb_pay_cost first; this block keeps the bridge bug itself pinned.
  * ══════════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════
+ * Q: 「デッキの上からカードを3枚控え室に置く」 as a MANDATORY `count: 3`
+ *    move_cards cost (PL!N-bp7-006-R＋ 近江彼方 ab#1).
+ *
+ *    Rust cost/handlers.rs:846 gates every non-hand source through
+ *    `check_zone_cost_availability`, whose count is
+ *    handlers.rs:735 `util::count_in_zone(player, zone_name, &filter, card_db)`
+ *    with zone_name collapsed deck_top -> "deck" at handlers.rs:730-734. And
+ *    util.rs:2218 maps it:
+ *        Some(Zone::Deck) | Some(Zone::DeckTop) | Some(Zone::DeckBottom)
+ *            => &player.main_deck.cards
+ *    so the gate COUNTS THE DECK and an 8-card deck satisfies `count: 3`.
+ *
+ *    The C's gate counted the deck as ZERO (its shared zone helper has no deck
+ *    arm, correctly — validate_leaf_cost_for must NOT validate a deck source,
+ *    handlers.rs:209-214 gates that arm to Hand|Stage|Waitroom|Energy), so the
+ *    cost was REFUSED and nothing was milled at all. Measured on
+ *    parity_zone_source G_cost_mills_three: "the cost mills exactly the top 3
+ *    deck cards (got 8 expected 5)" and "the 3 milled cards are in the
+ *    waitroom (got 0 expected 3)".
+ *
+ *    The negative twin below is the NON-VACUITY control: with a deck of 2 and
+ *    `count: 3`, Rust's own loop bound (mod.rs:894,
+ *    `attempts < count + main_deck.cards.len() + 10`) plus the
+ *    `if let Some(card) = main_deck.draw() { .. } else { break }` at
+ *    mod.rs:922-924 stops at 2, so the same gate must NOT be read as "a deck
+ *    source is always free". Both halves together are what makes the first
+ *    one mean "the deck is counted" rather than "the gate is a no-op".
+ * ══════════════════════════════════════════════════════════════════════════ */
+static void test_deck_top_mill_cost_counts_the_deck(void)
+{
+    /* POSITIVE: an 8-card deck satisfies `count: 3` and exactly 3 are milled. */
+    {
+        static TestGame tg; test_game_new(&tg);
+        int kanata, filler, niji_live;
+        if (!need(&tg, &kanata, "PL!N-bp7-006-R＋", 1) ||
+            !need(&tg, &filler, FILLER_M, 1) ||
+            !need(&tg, &niji_live, "PL!N-bp1-026-L", 1)) {
+            CHECK(0, "Q+: fixtures (util.rs:2218)"); return;
+        }
+        bare_board(&tg);
+        tg.state.p[0].stage[1] = kanata;
+        tg.state.p[0].deck.n = 0;
+        tg.state.p[0].deck.cards[tg.state.p[0].deck.n++] = niji_live;
+        for (int i = 0; i < 5; i++)
+            tg.state.p[0].deck.cards[tg.state.p[0].deck.n++] = filler;
+        tg.state.p[0].deck.cards[tg.state.p[0].deck.n++] = filler;
+        tg.state.p[0].deck.cards[tg.state.p[0].deck.n++] = filler;
+        int deck_before = tg.state.p[0].deck.n;
+        int wr_before   = tg.state.p[0].discard.n;
+
+        activate_ability_index(&tg, kanata, 1);
+        drain_accept(&tg);
+
+        CHECK_EQ(deck_before, 8,
+                 "Q+: the fixture really holds 8 deck cards (util.rs:2218 counts them)");
+        CHECK_EQ(tg.state.p[0].deck.n, deck_before - 3,
+                 "Q+: a `count: 3` mill against an 8-card deck moves exactly 3 "
+                 "(cost/handlers.rs:846 + util.rs:2218)");
+        CHECK_EQ(tg.state.p[0].discard.n, wr_before + 3,
+                 "Q+: the 3 milled cards are in the waitroom "
+                 "(cost/handlers.rs:846 + util.rs:2218)");
+    }
+
+    /* NEGATIVE TWIN (non-vacuity control): a 2-card deck with an empty waitroom
+     * gives `matching + waitroom_matching == 2 < 3`, and Rust REFUSES the whole
+     * cost there (handlers.rs:763-772) rather than milling a partial 2. So this
+     * half asserts the refusal, which is the other direction the deck count can
+     * be wrong in — together the two halves pin "the deck is counted at its
+     * real size" instead of "the deck gate is a no-op". */
+    {
+        static TestGame tg; test_game_new(&tg);
+        int kanata, filler;
+        if (!need(&tg, &kanata, "PL!N-bp7-006-R＋", 1) ||
+            !need(&tg, &filler, FILLER_M, 1)) {
+            CHECK(0, "Q-: fixtures"); return;
+        }
+        bare_board(&tg);
+        tg.state.p[0].stage[1] = kanata;
+        fill_zone(&tg.state.p[0].deck, filler, 2);
+        int deck_before = tg.state.p[0].deck.n;
+        int wr_before   = tg.state.p[0].discard.n;
+
+        activate_ability_index(&tg, kanata, 1);
+        drain_accept(&tg);
+
+        CHECK_EQ(deck_before, 2, "Q-: the fixture really holds only 2 deck cards");
+        CHECK_EQ(tg.state.p[0].discard.n, wr_before,
+                 "Q-: a 2-card deck against `count: 3` REFUSES the cost — "
+                 "nothing is milled (handlers.rs:763-772)");
+        CHECK_EQ(tg.state.p[0].deck.n, deck_before,
+                 "Q-: the refused cost leaves the deck untouched (handlers.rs:763-772)");
+    }
+}
+
 static void test_gap_sequential_cost_root_dropped_by_bridge(void)
 {
 static    TestGame tg;
@@ -1890,6 +1985,7 @@ int main(void)
     test_optional_two_card_cost_pay_and_skip();
     test_center_compound_cost_paid_before_effect();
     test_maki_cost_discard_and_all_match_blade();
+    test_deck_top_mill_cost_counts_the_deck();
     test_gap_sequential_cost_root_dropped_by_bridge();
 
     rb_unload();

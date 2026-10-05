@@ -141,6 +141,10 @@ const DETAIL_PARTS: &[(Size, usize, usize)] = &[
     (Size::S32x16, 64, 128),
 ];
 
+/// Presents to skip before diag-shot captures, so the filmstrip shows the
+/// menus and board rather than the blank first screen.
+const SHOT_SKIP: u32 = 40;
+
 /// Upper bound on cached card placements. Board steady state is ~28 keys;
 /// anything far above that is a screen-transition leak, so drop everything
 /// and re-upload (one hitch beats an OBJ-VRAM OOM panic).
@@ -1512,6 +1516,10 @@ impl<'a> Display<'a> {
         }
         self.ui_front.show(&mut f);
         f.commit();
+        // Snapshot the frame that was actually presented. Must come after the
+        // commit, or OAM still holds the previous frame.
+        #[cfg(feature = "diag-shot")]
+        crate::shot::maybe_capture(SHOT_SKIP, 30);
         // One priming frame is spent per `gfx.frame()` above, so the outgoing
         // screen's pins are gone by the time the next frame builds. See
         // `enter_screen`.

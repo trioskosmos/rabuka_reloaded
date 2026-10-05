@@ -48,25 +48,49 @@ int rb_zone_invariant(const GameState *g) {
     }
     return 1;
 }
-int rb_zone_total_blades(const GameState *g, int pl, int include_waited) {
-    if (!g) return 0;
-    const RbPlayer *P = &g->p[pl];
-    int total = 0;
-    for (int s = 0; s < RB_STAGE_SIZE; s++) {
-        int cid = P->stage[s];
-        if (cid == RB_EMPTY_SLOT) continue;
-        if (!include_waited) {
-            const char *orientation = rb_mods_get_orientation((RbMods *)&g->mods, cid);
-            if (P->stage_wait[s] || (orientation && !strcmp(orientation, "wait"))) continue;
-        }
-        Card c; if (!rb_decode_card_by_index((uint32_t)cid, &c)) continue;
-        int eff = (int)c.blade + rb_mods_get_blade((RbMods *)&g->mods, cid);
-        rb_free_card(&c);
-        if (eff < 0) eff = 0; if (eff > 255) eff = 255;
-        total += eff;
-    }
-    return total;
-}
+/* DELETED 2026-10-05: rb_zone_total_blades.
+ *
+ * ZERO CALLERS. Verified by name across src/ (all 54 .c), tests/ (all .c and
+ * .h) and include/rabuka.h: the only occurrence in the tree was this
+ * definition. It was never declared in the header, so it was not reachable
+ * from outside the translation unit either. Deleting it removes a divergent
+ * dead function without changing one reachable behaviour.
+ *
+ * WHY IT WAS DIVERGENT (not merely dead)
+ * --------------------------------------
+ * It skipped a member when EITHER of two sources said "waited":
+ *
+ *     if (P->stage_wait[s] || (orientation && !strcmp(orientation, "wait")))
+ *
+ * Rust's Stage::total_blades (engine/src/core/zones.rs:424-456) has ONE source:
+ * `orientation_modifiers: HashMap<i16, CardOrientation>`, read per CARD at
+ * zones.rs:434-441:
+ *
+ *     if !include_waited
+ *         && orientation_modifiers.get(&card_id)
+ *            .map(|o| *o == CardOrientation::Wait)
+ *            .unwrap_or(false)
+ *     { continue; }
+ *
+ * Rust has no per-AREA waited array at all -- `stage_wait` is a C-only
+ * representation, the same one that forces rb_stage_position_change_core
+ * (zones.c:246-257) to cross the flag explicitly. So a member that is weighed
+ * in the C's P->stage_wait but absent from orientation_modifiers is EXCLUDED
+ * here and COUNTED by Rust: the two engines disagree for exactly that card.
+ *
+ * That disagreement is real but UNREACHABLE, because nothing calls this
+ * function. Had it stayed live it would have been a latent parity bug that no
+ * test could see and no later caller could inherit safely.
+ *
+ * What a future caller must do instead: use the per-CARD orientation map, the
+ * same way zones.rs:434-441 does. Re-deriving a total-blades helper on top of
+ * P->stage_wait reintroduces this exact divergence, because the two sources are
+ * not equivalent in the C.
+ *
+ * Rust cite: engine/src/core/zones.rs:424-456 (Stage::total_blades).
+ * Regression coverage for the tombstone and for the helpers that DID stay:
+ * tests/test_parity_zones_helpers.c (57 assertions, all green).
+ */
 int rb_zone_draw(GameState *g, int pl) {
     if (!g) return -1;
     RbBag *deck = &g->p[pl].deck;

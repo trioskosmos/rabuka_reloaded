@@ -1,0 +1,585 @@
+[QUEUE_PID_NORMALIZE] entry=0 card=2103 ab=0 'player1' -> 'p1'
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=2
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: 千砂都 moved, so her 自動 places one energy (got 20 expected 21)
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the real 起動 position change grants heart06 x1 via ab#1 (got 0 expected 1)
+FAIL: 「(対戦相手のカードの効果でも発動する。)」 — an opponent-caused move grants heart06 (got 0 expected 1)
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: precondition: the first move granted heart06 x1 (got 0 expected 1)
+FAIL: 「{{ターン1回}}」 — a second area move in the same turn adds nothing (got 0 expected 1)
+[QUEUE_PID_NORMALIZE] entry=0 card=2621 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=2631 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=2621 ab=0 'player1' -> 'p1'
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=1
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,2,1,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,0,2,1,0,0,0,0]
+[EARLY_SEAT] pl=0 won=0 no_excess=0 surplus=-1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,2,1,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,0,2,1,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=511 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_WAITROOM_BATCH] n=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[QUEUE_PID_NORMALIZE] entry=0 card=2631 ab=0 'player1' -> 'p1'
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=1
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,3,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,0,0,3,0,0,0,0]
+[EARLY_SEAT] pl=0 won=0 no_excess=0 surplus=-1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,3,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,0,0,3,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=511 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_WAITROOM_BATCH] n=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+FAIL: Q94: the 登場 leg grants blade x2 (got 0 expected 2)
+FAIL: precondition: the debut granted blade x2 (got 0 expected 2)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,0,2,1,0,0,1,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+FAIL: the grant survives UNTIL LiveVictoryDetermination ends (got 0 expected 2)
+FAIL: the debut leg: +2 (got 0 expected 2)
+FAIL: the OTHER member's debut must not touch the watcher (got 0 expected 2)
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: Q94 CORE: debut (+2) + area move (+2) = exactly +4 (got 0 expected 4)
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: an area move grants this card blade x2 (got 0 expected 2)
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: an area move grants this card heart02 x1 (got 0 expected 1)
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: an area move grants this card heart03 x1 (got 0 expected 1)
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: 米女メイ ab#0 recovers a score≤3 『Liella!』 live card from the waitroom
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2331 target=self count=-1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=0 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2331 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2331 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=2331 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=2331 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: 若菜四季 ab#1 自動 reactivates a ウェイト状態 member that area-moved
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2331 target=self count=-1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=0 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2331 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2331 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=2331 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=2331 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2331 target=self count=-1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=self count=0 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=2331 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=2331 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=2331 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=2331 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: ab#1 自動 reactivates a ウェイト状態 member that area-moved
+FAIL: the second, unarmed move: the swap must actually move her out of 0 (she is now at 0)
+FAIL: with the waited state already consumed, a second move leaves her as the 自動 left her
+FAIL: each 起動 activation draws exactly one card (got 1 expected 2)
+FAIL: the re-armed move: the swap must actually move her out of 0 (she is now at 0)
+FAIL: the re-armed 自動 must fire on the next self-move — a gate that latches shut would leave her ウェイト状態 forever
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=0 state=0 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2636 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2636 ab=0 actor=0 action=gain_resource
+FAIL: a moved 『Liella!』 member gains blade (got 0 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2636 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2636 ab=0 actor=0 action=gain_resource
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2636 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2636 ab=0 actor=0 action=gain_resource
+FAIL: the moved 『Liella!』 member gains blade (got 0 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2636 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2636 ab=0 actor=0 action=gain_resource
+FAIL: the 登場 leg waits exactly one opponent member whose blade is ≤ 3 (got 0 expected 1)
+[QUEUE_PID_NORMALIZE] entry=0 card=2192 ab=0 'player1' -> 'p1'
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2192 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+FAIL: the area-move leg waits the same single opponent member (got 0 expected 1)
+FAIL: an already-ウェイト member is filtered out, so the other candidate is taken
+[QUEUE_PID_NORMALIZE] entry=0 card=2474 ab=1 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=2474 ab=1 'player1' -> 'p1'
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2210 ab=1 occurrence=0 use_limit=-1 effect=modify_score options=0
+[LIVE_SUCCESS_QUEUE] cid=2210 ab=1 occurrence=0 limit=99 reached=0 completed=0
+FAIL: ab#0: the centre 『Liella!』 member has her blades set to 3 (got 0 expected 3)
+FAIL: ab#1: the centre 『Liella!』 member moved this turn -> +1 score (got 0 expected 1)
+FAIL: ab#0's blade set persists alongside ab#1's score (got 0 expected 3)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=2210 ab=1 occurrence=0 use_limit=-1 effect=modify_score options=0
+[LIVE_SUCCESS_QUEUE] cid=2210 ab=1 occurrence=0 limit=99 reached=0 completed=0
+[QUEUE_PID_NORMALIZE] entry=0 card=2474 ab=1 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2474 ab=1 actor=0 action=move_cards
+[QUEUE_PID_NORMALIZE] entry=1 card=2474 ab=1 'player1' -> 'p1'
+[QUEUE_EXEC] idx=1 n=2 cid=2474 ab=1 actor=0 action=move_cards
+[RESUME_ANY] kind=2 zone= target=position|destination route=4 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=2 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: the 『Liella!』 card must have left the waitroom via the 自動
+FAIL: the 『Liella!』 card must be tucked under the subject after the move
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1748 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1748 ab=0 actor=0 action=move_cards
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1748 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1748 ab=0 actor=0 action=move_cards
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1748 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1748 ab=0 actor=0 action=move_cards
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1748 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1748 ab=0 actor=0 action=move_cards
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1748 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1748 ab=0 actor=0 action=move_cards
+[RESUME_ANY] kind=1 zone=discard target=self route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa001961e0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1748 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1748 ab=0 actor=0 action=move_cards
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1748 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1748 ab=0 actor=0 action=move_cards
+FAIL: the prompt is raised
+[QUEUE_PID_NORMALIZE] entry=0 card=2129 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=1 card=2135 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_ENTER] host=2129 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=1
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_COND] host=2129 occurred=1 revealed=1 result=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_ENTER] host=2135 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_COND] host=2135 occurred=1 revealed=1 result=1
+[QUEUE_PID_NORMALIZE] entry=0 card=2129 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=1 card=2135 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!-pb1-014-R num_blade=1 base=3 hearts=4 has=1
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!-pb1-014-R num_blade=1 base=3 hearts=4 has=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!-pb1-014-R num_blade=1 base=3 hearts=4 has=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!-pb1-014-R num_blade=1 base=3 hearts=4 has=1
+[QUEUE_PID_NORMALIZE] entry=0 card=2129 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=1 card=2135 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!HS-PR-010-PR num_blade=1 base=0 hearts=3 has=1
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!HS-PR-010-PR num_blade=1 base=0 hearts=3 has=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!HS-PR-010-PR num_blade=1 base=0 hearts=3 has=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!HS-PR-010-PR num_blade=1 base=0 hearts=3 has=1
+[QUEUE_PID_NORMALIZE] entry=0 card=2129 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=1 card=2135 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=2 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_PROPERTY] id=2640 no=PL!-pb1-014-R num_blade=1 base=3 hearts=4 has=1
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=2 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_PROPERTY] id=2640 no=PL!-pb1-014-R num_blade=1 base=3 hearts=4 has=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=2 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_PROPERTY] id=2640 no=PL!-pb1-014-R num_blade=1 base=3 hearts=4 has=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=2 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_PROPERTY] id=2640 no=PL!-pb1-014-R num_blade=1 base=3 hearts=4 has=1
+[QUEUE_PID_NORMALIZE] entry=0 card=2129 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=1 card=2135 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=2 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_PROPERTY] id=2640 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=2 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_PROPERTY] id=2640 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_ENTER] host=2129 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=2
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=2 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_PROPERTY] id=2640 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_COND] host=2129 occurred=1 revealed=2 result=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=2 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_PROPERTY] id=2640 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=2 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_PROPERTY] id=2640 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_ENTER] host=2135 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=2
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=2 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_PROPERTY] id=2640 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_COND] host=2135 occurred=1 revealed=2 result=1
+[QUEUE_PID_NORMALIZE] entry=0 card=2129 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=1 card=2135 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_ENTER] host=2129 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=1
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_COND] host=2129 occurred=1 revealed=1 result=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_ENTER] host=2135 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_COND] host=2135 occurred=1 revealed=1 result=1
+[QUEUE_PID_NORMALIZE] entry=0 card=2129 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=1 card=2135 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_ENTER] host=2129 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=1
+[YELL_COND] host=2129 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_COND] host=2129 occurred=1 revealed=1 result=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_ENTER] host=2135 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_COND] host=2135 occurred=1 revealed=1 result=1
+[QUEUE_PID_NORMALIZE] entry=0 card=2135 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_ENTER] host=2135 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=1
+[YELL_COND] host=2135 loc=revealed_cards occurred=1 revealed=1 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2639 no=PL!S-bp2-002-R num_blade=0 base=1 hearts=1 has=0
+[YELL_EXEC_COND] host=2135 occurred=1 revealed=1 result=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+FAIL: a real yell revealing no blade heart grants heart03 DURING the live (got 0 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=0 revealed=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,1,0,1,1,0,0] filled=[0,0,0,0,0,0,0,0]
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=2
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,0,4,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,1,0,1,1,0,0] filled=[0,0,0,0,0,0,0,0]
+FAIL: 「1枚以上公開」 + 「2枚以下」 -> the discard prompt appears (got 0 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=5
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,3,0,8,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,1,0,1,1,0,0] filled=[0,0,0,0,0,0,0,0]
+FAIL: 3 stage members -> 3 revealed cards (got 5 expected 3)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=2
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,0,2,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,1,0,1,1,0,0] filled=[0,0,0,0,0,0,0,0]
+FAIL: 0 blade hearts ≤ 2 -> the discard prompt appears
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=2
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,0,4,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,1,0,1,1,0,0] filled=[0,0,0,0,0,0,0,0]
+FAIL: the discard prompt appears
+FAIL: accepting the discard discards the revealed cards and re-yells (got 0 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=2
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,0,4,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,1,0,1,1,0,0] filled=[0,0,0,0,0,0,0,0]
+FAIL: the discard prompt appears
+[QUEUE_PID_NORMALIZE] entry=0 card=2502 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_EXEC_ENTER] host=2502 action=sequential has_cond=1 pending=0 occurred=1 revealed=2
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_EXEC_ENTER] host=2502 action=move_cards has_cond=0 pending=0 occurred=1 revealed=2
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198b20 cur=0 n=1 state=4 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[YELL_EXEC_ENTER] host=2502 action=perform_yell has_cond=0 pending=0 occurred=1 revealed=2
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_PID_NORMALIZE] entry=0 card=2502 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_EXEC_ENTER] host=2502 action=sequential has_cond=1 pending=0 occurred=1 revealed=2
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_EXEC_ENTER] host=2502 action=move_cards has_cond=0 pending=0 occurred=1 revealed=2
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=-1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198b20 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_PID_NORMALIZE] entry=0 card=2502 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_EXEC_ENTER] host=2502 action=sequential has_cond=1 pending=0 occurred=1 revealed=2
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_EXEC_ENTER] host=2502 action=move_cards has_cond=0 pending=0 occurred=1 revealed=2
+[QUEUE_PID_NORMALIZE] entry=0 card=2502 ab=0 'player1' -> 'p1'
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_EXEC_ENTER] host=2502 action=sequential has_cond=1 pending=0 occurred=1 revealed=2
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_COND] host=2502 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_EXEC_ENTER] host=2502 action=move_cards has_cond=0 pending=0 occurred=1 revealed=2
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198b20 cur=0 n=1 state=4 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=1 resolver_pending=0
+[YELL_EXEC_ENTER] host=2502 action=perform_yell has_cond=0 pending=0 occurred=1 revealed=2
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_PID_NORMALIZE] entry=0 card=1184 ab=0 'player1' -> 'p1'
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=1 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=1 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=sequential has_cond=1 pending=0 occurred=1 revealed=1
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=1 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=1 property=- negation=0
+[QUEUE_PID_NORMALIZE] entry=0 card=1184 ab=0 'player1' -> 'p1'
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=sequential has_cond=1 pending=0 occurred=1 revealed=2
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=2 property=- negation=0
+[QUEUE_PID_NORMALIZE] entry=0 card=1184 ab=0 'player1' -> 'p1'
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=sequential has_cond=1 pending=0 occurred=1 revealed=3
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=gain_resource has_cond=0 pending=0 occurred=1 revealed=3
+[QUEUE_PID_NORMALIZE] entry=0 card=1184 ab=0 'player1' -> 'p1'
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=5 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=5 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=sequential has_cond=1 pending=0 occurred=1 revealed=5
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=5 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=5 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=gain_resource has_cond=0 pending=0 occurred=1 revealed=5
+[QUEUE_PID_NORMALIZE] entry=0 card=1184 ab=0 'player1' -> 'p1'
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=sequential has_cond=1 pending=0 occurred=1 revealed=6
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=6 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=gain_resource has_cond=0 pending=0 occurred=1 revealed=6
+[YELL_EXEC_ENTER] host=1184 action=gain_ability has_cond=0 pending=0 occurred=1 revealed=6
+[DBG_GAIN] actor=0 host=1184 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=0
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[QUEUE_PID_NORMALIZE] entry=0 card=1184 ab=0 'player1' -> 'p1'
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=7 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=7 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=sequential has_cond=1 pending=0 occurred=1 revealed=7
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=7 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=7 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=gain_resource has_cond=0 pending=0 occurred=1 revealed=7
+[YELL_EXEC_ENTER] host=1184 action=gain_ability has_cond=0 pending=0 occurred=1 revealed=7
+[DBG_GAIN] actor=0 host=1184 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=0
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[QUEUE_PID_NORMALIZE] entry=0 card=1184 ab=0 'player1' -> 'p1'
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=sequential has_cond=1 pending=0 occurred=1 revealed=3
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=gain_resource has_cond=0 pending=0 occurred=1 revealed=3
+FAIL: cards with base_heart but NO blade_heart must NOT count toward the blade-heart-type condition (got 1 expected 0)
+[QUEUE_PID_NORMALIZE] entry=0 card=1184 ab=0 'player1' -> 'p1'
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=5 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=5 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=sequential has_cond=1 pending=0 occurred=1 revealed=5
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=5 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=5 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=gain_resource has_cond=0 pending=0 occurred=1 revealed=5
+[QUEUE_PID_NORMALIZE] entry=0 card=1184 ab=0 'player1' -> 'p1'
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=sequential has_cond=1 pending=0 occurred=1 revealed=3
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_COND] host=1184 loc=revealed_cards occurred=1 revealed=3 property=- negation=0
+[YELL_EXEC_ENTER] host=1184 action=gain_resource has_cond=0 pending=0 occurred=1 revealed=3
+FAIL: 3 cards but only 2 DISTINCT blade-heart colours -> the threshold of 3 is not met (got 1 expected 0)
+[QUEUE_PID_NORMALIZE] entry=0 card=196 ab=1 'player1' -> 'p1'
+[YELL_EXEC_ENTER] host=196 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=3
+[YELL_EXEC_COND] host=196 occurred=1 revealed=3 result=1
+[QUEUE_PID_NORMALIZE] entry=0 card=196 ab=1 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=196 ab=1 'player1' -> 'p1'
+[YELL_EXEC_ENTER] host=196 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=2
+[YELL_EXEC_COND] host=196 occurred=1 revealed=2 result=1
+FAIL: only two qualifying members must not set HeartColor::All (got 1 expected 0)
+[QUEUE_PID_NORMALIZE] entry=0 card=1609 ab=0 'player1' -> 'p1'
+[YELL_EXEC_ENTER] host=1609 action=draw_card has_cond=1 pending=0 occurred=1 revealed=1
+[QUEUE_PID_NORMALIZE] entry=0 card=1609 ab=0 'player1' -> 'p1'
+[YELL_EXEC_ENTER] host=1609 action=draw_card has_cond=1 pending=0 occurred=1 revealed=1
+FAIL: the reveal must not draw when the hand already holds 8 (got 1 expected 0)
+[QUEUE_PID_NORMALIZE] entry=0 card=1609 ab=0 'player1' -> 'p1'
+FAIL: 2 『Aqours』 members -> draw 2 (got 0 expected 2)
+FAIL: 1 『Aqours』 member -> draw 1 (got 0 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=12 property=- negation=0
+[YELL_QUEUE] cid=1965 ability=0 passes=1 occurred=1 revealed=12
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=12 property=- negation=0
+[YELL_QUEUE] cid=2639 ability=0 passes=1 occurred=1 revealed=12
+[YELL_PERFORM] queued=2 entries=2 state=0 occurred=1 revealed=12
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=12 property=- negation=0
+[QUEUE_EXEC] idx=0 n=2 cid=1965 ab=0 actor=0 action=gain_resource
+[YELL_DRAIN] cid=1965 action=gain_resource has_cond=1 cond=0xa00196bc0 pending=0
+[YELL_EXEC_ENTER] host=1965 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=12
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=12 property=- negation=0
+[YELL_EXEC_COND] host=1965 occurred=1 revealed=12 result=1
+[YELL_COND] host=1965 loc=revealed_cards occurred=1 revealed=12 property=- negation=0
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=12 property=- negation=0
+[QUEUE_EXEC] idx=1 n=2 cid=2639 ab=0 actor=0 action=gain_resource
+[YELL_DRAIN] cid=2639 action=gain_resource has_cond=1 cond=0xa00196bc0 pending=0
+[YELL_EXEC_ENTER] host=2639 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=12
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=12 property=- negation=0
+[YELL_EXEC_COND] host=2639 occurred=1 revealed=12 result=1
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=12 property=- negation=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,6,12,4,4,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,4,0,4,4,0,0] filled=[0,0,4,0,4,4,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=14
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=1685 ab=0 occurrence=0 use_limit=-1 effect=modify_score options=0
+[LIVE_SUCCESS_QUEUE] cid=1685 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=1 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,6,12,4,4,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,4,0,4,4,0,0] filled=[0,0,4,0,4,4,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=11 p2=0
+[CAN_PLACE_DECODE] cid=1685 ability=0 constant=0 trigger=ライブ成功時 action=modify_score dest=-
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=1685 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+FAIL: Q182: excess heart ≥ 2 -> the live scores exactly 4 (got 11 expected 4)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=5
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,2,7,2,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,1,0,4,0,0,0,0]
+FAIL: no LIVE card among the revealed -> the optional discard prompt
+FAIL: Q107: accepting the discard makes the re-yell follow (got 0 expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=5
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,2,7,2,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,1,0,4,0,0,0,0]
+FAIL: the optional discard prompt is raised

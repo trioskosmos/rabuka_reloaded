@@ -17,6 +17,8 @@ pub mod diag;
 mod display;
 mod font_tiles_gen;
 mod overlay;
+#[cfg(feature = "diag-shot")]
+pub mod shot;
 pub mod sram;
 mod texticons_gen;
 

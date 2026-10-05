@@ -1,0 +1,5 @@
+parity_cce_gaps                    ok=33     FAIL=88    alias_hits=21   frees_top=0      prompt_open=0      probe=LINKED ran=yes SUMMARY-DISAGREES(forked children: log=21 parent_summary=0)
+parity_sequential                  ok=23     FAIL=142   alias_hits=0    frees_top=0      prompt_open=0      probe=LINKED ran=yes 
+parity_small_clusters              ok=849    FAIL=101   alias_hits=3    frees_top=0      prompt_open=0      probe=LINKED ran=yes SUMMARY-DISAGREES(forked children: log=3 parent_summary=0)
+parity_under_member                ok=56     FAIL=81    alias_hits=5    frees_top=0      prompt_open=0      probe=LINKED ran=yes SUMMARY-DISAGREES(forked children: log=5 parent_summary=0)
+ALIAS_PROBE_TOTAL hits=29 probed=4 unusable=0

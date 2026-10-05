@@ -1,0 +1,201 @@
+--- M1: 嵐千砂都 PL!SP-bp2-003-R area move -> waited energy ---
+        chisato_position_change_places_waited_energy: 3 assertion(s), 0 failure(s)
+ok       chisato_position_change_places_waited_energy
+        chisato_leaving_stage_does_not_place_energy: 2 assertion(s), 0 failure(s)
+ok       chisato_leaving_stage_does_not_place_energy
+        chisato_no_energy_when_another_card_debuts: 2 assertion(s), 0 failure(s)
+ok       chisato_no_energy_when_another_card_debuts
+        chisato_no_energy_for_a_third_member_swap: 8 assertion(s), 0 failure(s)
+ok       chisato_no_energy_for_a_third_member_swap
+        chisato_gains_energy_when_she_is_swapped: 9 assertion(s), 1 failure(s)
+FAILED   chisato_gains_energy_when_she_is_swapped
+--- M2: 唐 可可 heart06 自動 ---
+        keke_kidou_position_change_grants_heart06: 7 assertion(s), 1 failure(s)
+FAILED   keke_kidou_position_change_grants_heart06
+        keke_opponent_effect_area_move_triggers_heart06: 1 assertion(s), 1 failure(s)
+FAILED   keke_opponent_effect_area_move_triggers_heart06
+        keke_natural_move_grants_nothing: 1 assertion(s), 0 failure(s)
+ok       keke_natural_move_grants_nothing
+        keke_turn1_blocks_a_second_area_move: 2 assertion(s), 2 failure(s)
+FAILED   keke_turn1_blocks_a_second_area_move
+--- M3: ターン1回 cap and ライブ終了時まで expiry ---
+        kanon_turn1_blocks_a_second_area_move: 2 assertion(s), 0 failure(s)
+ok       kanon_turn1_blocks_a_second_area_move
+        fuyumari_turn1_blocks_a_second_area_move: 2 assertion(s), 0 failure(s)
+ok       fuyumari_turn1_blocks_a_second_area_move
+        kanon_heart02_does_not_survive_the_live: 3 assertion(s), 0 failure(s)
+ok       kanon_heart02_does_not_survive_the_live
+        fuyumari_heart03_does_not_survive_the_live: 3 assertion(s), 0 failure(s)
+ok       fuyumari_heart03_does_not_survive_the_live
+--- M4: 桜小路きな子 PL!SP-pb1-006-R debut/move +2 blade ---
+        kinako_q94_debut_grants_two_blades: 4 assertion(s), 1 failure(s)
+FAILED   kinako_q94_debut_grants_two_blades
+        kinako_q94_debut_blades_expire_at_live_victory: 6 assertion(s), 2 failure(s)
+FAILED   kinako_q94_debut_blades_expire_at_live_victory
+        kinako_q94_debut_then_swap_stacks_four_blades: 9 assertion(s), 3 failure(s)
+FAILED   kinako_q94_debut_then_swap_stacks_four_blades
+--- M5: real 起動 swaps arm three area-move 自動 ---
+        area_swap_grants_self_two_blades: 4 assertion(s), 1 failure(s)
+FAILED   area_swap_grants_self_two_blades
+        area_swap_grants_self_heart02: 4 assertion(s), 1 failure(s)
+FAILED   area_swap_grants_self_heart02
+        area_swap_grants_self_heart03: 4 assertion(s), 1 failure(s)
+FAILED   area_swap_grants_self_heart03
+        area_swap_recovers_low_score_group_live: 3 assertion(s), 1 failure(s)
+FAILED   area_swap_recovers_low_score_group_live
+        shiki_wait_activation_then_area_swap_clears_wait: 4 assertion(s), 1 failure(s)
+FAILED   shiki_wait_activation_then_area_swap_clears_wait
+--- M6: 若菜四季's wait gate / cycle / draw ---
+        shiki_kidou_waits_her_and_draws_exactly_one: 4 assertion(s), 0 failure(s)
+ok       shiki_kidou_waits_her_and_draws_exactly_one
+        shiki_auto_does_not_fire_while_she_is_active: 6 assertion(s), 0 failure(s)
+ok       shiki_auto_does_not_fire_while_she_is_active
+        shiki_auto_is_one_shot_per_waited_state: 16 assertion(s), 6 failure(s)
+FAILED   shiki_auto_is_one_shot_per_waited_state
+--- M7: root cause probe for the position|destination answer ---
+        position_destination_answer_performs_the_swap: 5 assertion(s), 0 failure(s)
+ok       position_destination_answer_performs_the_swap
+--- M8: Aspire PL!SP-sd2-025-P timing condition on the blade ---
+        aspire_moved_liella_gains_blade_only: 4 assertion(s), 1 failure(s)
+FAILED   aspire_moved_liella_gains_blade_only
+        aspire_only_non_liella_moved_no_blade: 2 assertion(s), 0 failure(s)
+ok       aspire_only_non_liella_moved_no_blade
+        aspire_liella_and_non_liella_moved_only_liella_gains: 3 assertion(s), 1 failure(s)
+FAILED   aspire_liella_and_non_liella_moved_only_liella_gains
+        aspire_no_movement_no_blade: 2 assertion(s), 0 failure(s)
+ok       aspire_no_movement_no_blade
+--- M9: 鬼塚冬毬 PL!SP-bp4-011-R＋ 登場/area-move opponent wait ---
+        fuyumari_appear_triggers_opponent_wait: 4 assertion(s), 1 failure(s)
+FAILED   fuyumari_appear_triggers_opponent_wait
+        fuyumari_area_move_triggers_opponent_wait: 4 assertion(s), 1 failure(s)
+FAILED   fuyumari_area_move_triggers_opponent_wait
+        fuyumari_blade_limit_excludes_high_blade: 2 assertion(s), 0 failure(s)
+ok       fuyumari_blade_limit_excludes_high_blade
+        fuyumari_already_wait_excluded_from_candidates: 2 assertion(s), 1 failure(s)
+FAILED   fuyumari_already_wait_excluded_from_candidates
+--- M10: ability chains (jidou feeds 常時) ---
+        pb2006_jidou_placement_feeds_constant_cost_up: 7 assertion(s), 0 failure(s)
+ok       pb2006_jidou_placement_feeds_constant_cost_up
+        pb2006_jidou_once_per_turn_no_second_placement: 2 assertion(s), 0 failure(s)
+ok       pb2006_jidou_once_per_turn_no_second_placement
+        special_color_set_blades_and_score_twin_in_one_live: 5 assertion(s), 3 failure(s)
+FAILED   special_color_set_blades_and_score_twin_in_one_live
+        special_color_no_score_when_moved_liella_left_center: 3 assertion(s), 0 failure(s)
+ok       special_color_no_score_when_moved_liella_left_center
+--- M11: under-member placement on her own area move ---
+        kinako_tucks_group_member_under_self_on_area_move: 9 assertion(s), 2 failure(s)
+FAILED   kinako_tucks_group_member_under_self_on_area_move
+--- M12: PL!S-bp5-023-L ab#0 waitroom lives -> deck top ---
+        awaken_happy_path_prompts_for_four_cards: 3 assertion(s), 0 failure(s)
+ok       awaken_happy_path_prompts_for_four_cards
+        awaken_no_saintsnow_does_not_fire: 1 assertion(s), 0 failure(s)
+ok       awaken_no_saintsnow_does_not_fire
+        awaken_cost_below_20_does_not_fire: 3 assertion(s), 0 failure(s)
+ok       awaken_cost_below_20_does_not_fire
+        awaken_cost_at_least_20_fires: 1 assertion(s), 0 failure(s)
+ok       awaken_cost_at_least_20_fires
+        awaken_can_skip: 2 assertion(s), 0 failure(s)
+ok       awaken_can_skip
+        awaken_no_matching_live_in_waitroom_skips: 2 assertion(s), 0 failure(s)
+ok       awaken_no_matching_live_in_waitroom_skips
+        awaken_only_matching_lives_are_filtered: 1 assertion(s), 1 failure(s)
+FAILED   awaken_only_matching_lives_are_filtered
+--- Y1: yell-reveal blade-heart absence (heart06 / heart03) ---
+        yell_no_blade_heart_grants_heart06_and_heart03: 4 assertion(s), 0 failure(s)
+ok       yell_no_blade_heart_grants_heart06_and_heart03
+        yell_with_blade_heart_blocks_both_watchers: 5 assertion(s), 0 failure(s)
+ok       yell_with_blade_heart_blocks_both_watchers
+        yell_all_blade_blocks_both_watchers: 5 assertion(s), 0 failure(s)
+ok       yell_all_blade_blocks_both_watchers
+        yell_mixed_blade_and_no_blade_still_blocks: 4 assertion(s), 0 failure(s)
+ok       yell_mixed_blade_and_no_blade_still_blocks
+        yell_two_no_blade_cards_still_grants: 4 assertion(s), 0 failure(s)
+ok       yell_two_no_blade_cards_still_grants
+        yell_empty_revealed_no_gain: 4 assertion(s), 0 failure(s)
+ok       yell_empty_revealed_no_gain
+        yell_turn1_blocks_a_second_trigger: 7 assertion(s), 0 failure(s)
+ok       yell_turn1_blocks_a_second_trigger
+        yell_turn_limit_resets_next_turn: 4 assertion(s), 0 failure(s)
+ok       yell_turn_limit_resets_next_turn
+        yell_only_one_present_triggers_self_only: 4 assertion(s), 0 failure(s)
+ok       yell_only_one_present_triggers_self_only
+--- Y2: ウィーン's heart03 through a REAL yell ---
+        wien_q112_real_yell_no_blade_heart_grants_heart03: 2 assertion(s), 1 failure(s)
+FAILED   wien_q112_real_yell_no_blade_heart_grants_heart03
+        wien_q112_real_yell_with_blade_heart_no_gain: 2 assertion(s), 0 failure(s)
+ok       wien_q112_real_yell_with_blade_heart_no_gain
+        wien_q113_zero_score_live_yields_no_yell: 2 assertion(s), 0 failure(s)
+ok       wien_q113_zero_score_live_yields_no_yell
+--- Y3: ダイスキだったらダイジョウブ！ re-yell (≤2 blade hearts) ---
+        daisuki_zero_stage_no_reveal_no_trigger: 3 assertion(s), 0 failure(s)
+ok       daisuki_zero_stage_no_reveal_no_trigger
+        daisuki_two_blade_hearts_prompts: 3 assertion(s), 1 failure(s)
+FAILED   daisuki_two_blade_hearts_prompts
+        daisuki_three_blade_hearts_blocks: 4 assertion(s), 1 failure(s)
+FAILED   daisuki_three_blade_hearts_blocks
+        daisuki_zero_blade_hearts_prompts: 2 assertion(s), 1 failure(s)
+FAILED   daisuki_zero_blade_hearts_prompts
+        daisuki_accept_discard_then_re_yells: 3 assertion(s), 2 failure(s)
+FAILED   daisuki_accept_discard_then_re_yells
+        daisuki_skip_discard_no_re_yell: 3 assertion(s), 1 failure(s)
+FAILED   daisuki_skip_discard_no_re_yell
+--- Y4: 鬼塚夏美 yell -> discard a 『Liella!』 live, re-yell x2 ---
+        natsumi_discards_liella_live_for_two_extra_yells: 7 assertion(s), 0 failure(s)
+ok       natsumi_discards_liella_live_for_two_extra_yells
+        natsumi_decline_discard_no_extra_yells: 5 assertion(s), 0 failure(s)
+ok       natsumi_decline_discard_no_extra_yells
+        natsumi_no_liella_live_in_hand_no_prompt: 3 assertion(s), 0 failure(s)
+ok       natsumi_no_liella_live_in_hand_no_prompt
+        natsumi_use_limit_blocks_a_second_yell: 7 assertion(s), 0 failure(s)
+ok       natsumi_use_limit_blocks_a_second_yell
+--- Y5: distinct blade-heart type thresholds (3 and 6) ---
+        threshold_zero_blade_heart_types_no_effect: 3 assertion(s), 0 failure(s)
+ok       threshold_zero_blade_heart_types_no_effect
+        threshold_two_blade_heart_types_no_effect: 3 assertion(s), 0 failure(s)
+ok       threshold_two_blade_heart_types_no_effect
+        threshold_three_blade_heart_types_grants_heart01: 3 assertion(s), 0 failure(s)
+ok       threshold_three_blade_heart_types_grants_heart01
+        threshold_five_blade_heart_types_heart01_only: 3 assertion(s), 0 failure(s)
+ok       threshold_five_blade_heart_types_heart01_only
+        threshold_six_blade_heart_types_grants_both: 3 assertion(s), 0 failure(s)
+ok       threshold_six_blade_heart_types_grants_both
+        threshold_all_blade_heart_types_with_b_all_grants_both: 3 assertion(s), 0 failure(s)
+ok       threshold_all_blade_heart_types_with_b_all_grants_both
+        threshold_base_heart_only_does_not_count: 2 assertion(s), 1 failure(s)
+FAILED   threshold_base_heart_only_does_not_count
+        threshold_blade_hearts_count_base_hearts_ignored: 2 assertion(s), 0 failure(s)
+ok       threshold_blade_hearts_count_base_hearts_ignored
+        threshold_duplicate_blade_heart_colors_do_not_stack: 2 assertion(s), 1 failure(s)
+FAILED   threshold_duplicate_blade_heart_colors_do_not_stack
+--- Y6: three blade-heartless reveals set HeartColor::All ---
+        yell_three_blade_heartless_members_set_all_heart: 5 assertion(s), 0 failure(s)
+ok       yell_three_blade_heartless_members_set_all_heart
+        yell_three_blade_heart_members_do_not_set_all_heart: 2 assertion(s), 0 failure(s)
+ok       yell_three_blade_heart_members_do_not_set_all_heart
+        yell_two_blade_heartless_members_do_not_set_all_heart: 2 assertion(s), 1 failure(s)
+FAILED   yell_two_blade_heartless_members_do_not_set_all_heart
+--- Y7: a revealed LIVE card draws 1 (hand <= 7) ---
+        live_revealed_draws_one_with_empty_hand: 3 assertion(s), 0 failure(s)
+ok       live_revealed_draws_one_with_empty_hand
+        live_revealed_with_eight_hand_cards_does_not_draw: 2 assertion(s), 1 failure(s)
+FAILED   live_revealed_with_eight_hand_cards_does_not_draw
+        yell_without_live_card_does_not_draw: 2 assertion(s), 0 failure(s)
+ok       yell_without_live_card_does_not_draw
+--- Y8: JIMO-AI Dash! draw N then discard N ---
+        jimoai_draw_2_discard_2: 3 assertion(s), 1 failure(s)
+FAILED   jimoai_draw_2_discard_2
+        jimoai_draw_1_discard_1: 3 assertion(s), 1 failure(s)
+FAILED   jimoai_draw_1_discard_1
+        jimoai_draw_0_no_discard: 3 assertion(s), 0 failure(s)
+ok       jimoai_draw_0_no_discard
+--- Y9: MIRACLE WAVE scores 4 on surplus heart >= 2 ---
+        miracle_wave_excess_heart_scores_four: 5 assertion(s), 1 failure(s)
+FAILED   miracle_wave_excess_heart_scores_four
+--- Y10: 黒澤ダイヤ no-live-card re-yell ---
+        dia_re_yell_works: 4 assertion(s), 2 failure(s)
+FAILED   dia_re_yell_works
+        dia_skip_discard_no_followup: 3 assertion(s), 1 failure(s)
+FAILED   dia_skip_discard_no_followup
+
+== parity_jidou_move_yell: 52 ok, 36 failed, 0 crashed (case in flight: (none))
+== 0 assertions total, 0 assertion failures

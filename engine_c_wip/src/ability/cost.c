@@ -1132,6 +1132,29 @@ static int check_zone_cost_availability(GameState *g, int actor,
     const char *zone_name = is_deck_top ? "deck" : source;
     int n_cards = 0;
     const int *cards = cost_zone_cards(P, zone_name, &n_cards);
+    /* Rust util.rs:2218 — `Some(Zone::Deck) | Some(Zone::DeckTop) |
+       Some(Zone::DeckBottom) => &player.main_deck.cards`, so
+       handlers.rs:735's `count_in_zone(player, zone_name, ..)` COUNTS THE DECK.
+       cost_zone_cards deliberately has no deck arm because its OTHER caller,
+       validate_leaf_cost_for, must return Ok(()) for a deck-sourced cost
+       (handlers.rs:209-214 gates that arm to Hand|Stage|Waitroom|Energy only) —
+       widening the shared helper would make that path validate deck costs Rust
+       never validates. So the deck is resolved HERE, at the one site that
+       counts it, exactly as Rust's zone_cards does.
+
+       Without this, a `count: 3` mill against a 8-card deck read
+       matching == 0 and the gate REFUSED, so nothing was milled at all:
+       G_cost_mills_three read "the cost mills exactly the top 3 deck cards
+       (got 8 expected 5)" and "the 3 milled cards are in the waitroom
+       (got 0 expected 3)" — both lines of ONE case, PL!N-bp7-006-R＋ ab#1
+       (cards/abilities.json:4241-4248, source deck_top / count 3 /
+       destination discard), whose printed text is 「デッキの上からカードを3枚
+       控え室に置く」. */
+    if (!cards && (!strcmp(zone_name, "deck") || !strcmp(zone_name, "deck_top") ||
+                   !strcmp(zone_name, "deck_bottom") || !strcmp(zone_name, "main_deck"))) {
+        cards = P->deck.cards;
+        n_cards = P->deck.n;
+    }
     int matching = cards ? rb_count_matching_filter(&filter, cards, n_cards) : 0;
     if (matching >= count) return 1;
     if (!is_deck_top) return 0;
@@ -1555,25 +1578,39 @@ static int pay_cost_change_state(GameState *g, int actor, const AbilityEffect *c
         return 1;
     }
 
+    /* handlers.rs:917 -- `if state_change == "wait" {`. The MANDATORY arm is
+     * gated on that exact string, so a change_state cost whose state_change is
+     * anything else does NOTHING in Rust and falls through to Ok(()) at
+     * handlers.rs:970. The C ran the candidate scan unconditionally and
+     * carried a second, Rust-absent `rest`/`rested` branch that wrote
+     * orientation "rest" -- a state the cost vocabulary never produces and that
+     * no Rust site writes from a cost. Both halves go here so the C matches: a
+     * non-"wait" state_change is a no-op that reports success.
+     *
+     * REACHABILITY, measured over cards/abilities.json (985 unique abilities;
+     * nested cost+effect keys walked, NOT a top-level key census):
+     * state_change on a COST node is "wait" 53 of 53; "active" appears 59 times
+     * and every one of those is on an EFFECT node; 0 nodes anywhere in the
+     * corpus carry "rest" or "rested". So VERIFIED-NOOP: 0 -- the arms were
+     * dead, not merely rare. The guard is still Rust's, so a regenerated corpus
+     * cannot make the C write a state Rust cannot. */
+    if (strcmp(state_change, "wait") != 0) return 1;
+
     /* Mandatory cost: resolve all eligible candidates */
     int pos[RB_STAGE_SIZE];
     int n = get_change_state_candidates(g, tpl, target, card_type,
                                         group_names, exclude_self,
                                         self_cost, 1, "active",
                                         pos, RB_STAGE_SIZE);
-    if (n == 0) return 0;   /* cannot pay — no matching members */
+    if (n == 0) return 0;   /* handlers.rs:936-938 -- Err, the cost cannot be paid */
 
     if (n <= count) {
-        /* Auto-wait all candidates */
+        /* handlers.rs:940-949 -- with no more than `count` candidates every one
+         * of them is waited, and each joins last_cost_waited_members. */
         for (int i = 0; i < n; i++) {
             int cid = pos[i];
-            if (!strcmp(state_change, "wait")) {
-                rb_mods_set_orientation(&g->mods, cid, "wait");
-                g->last_cost_waited_members[g->n_last_cost_waited_members++] = (int16_t)cid;
-            } else if (!strcmp(state_change, "rest") || !strcmp(state_change, "rested")) {
-                rb_mods_set_orientation(&g->mods, cid, "rest");
-                g->last_cost_waited_members[g->n_last_cost_waited_members++] = (int16_t)cid;
-            }
+            rb_mods_set_orientation(&g->mods, cid, "wait");
+            g->last_cost_waited_members[g->n_last_cost_waited_members++] = (int16_t)cid;
         }
     } else {
         /* Emit select_cards choice for player to pick exactly `count` members */

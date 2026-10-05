@@ -1,0 +1,3 @@
+tests/test_parity_recover_live.c:578:12: warning: 'wait_index_of' defined but not used [-Wunused-function]
+  578 | static int wait_index_of(TestGame *tg, int cid)
+      |            ^~~~~~~~~~~~~

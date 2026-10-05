@@ -1,0 +1,31 @@
+ok: live-total test card exists
+ok: gained constant live-total bonus is applied
+ok: gained ability is stored
+ok: expired gained live-total bonus is removed
+ok: expired gained ability is removed
+ok: direct live-total effect updates the player bonus
+ok: live score test card exists
+ok: live score test card decodes
+ok: live score includes the constant total bonus
+ok: invalid live member leaves the live zone
+ok: invalid live member goes to the waitroom
+ok: invalid live movement records the card movement
+ok: invalid energy leaves the live zone
+ok: invalid live energy returns to the energy deck
+ok: movement tracking records a card
+ok: movement tracking clears at turn start
+ok: performance pipeline fixtures exist
+ok: performance creates one snapshot
+ok: snapshot records performance hearts
+ok: snapshot records a positive score
+ok: snapshot records the performed live card
+ok: live failure fixtures exist
+ok: insufficient hearts do not enter success
+ok: failed live enters the waitroom
+ok: two-live fixtures exist
+ok: first attacker places the tied live
+ok: second attacker also places the tied live
+ok: single-live fixtures exist
+ok: unopposed live is placed
+ok: unopposed live leaves the opponent empty
+ALL MECHANIC CHECKS PASSED

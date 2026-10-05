@@ -34,19 +34,19 @@ def main():
         page.goto("https://decklog.bushiroad.com/search?c=11",
                   wait_until="domcontentloaded", timeout=60000)
         try:
-            for i in range(180):
+            print("waiting as long as it takes - log in whenever you are ready")
+            for i in range(900):
                 page.wait_for_timeout(2000)
                 try:
                     if "is_logined" in page.content():
-                        print("session detected - you can close the window")
+                        print("\nsession detected - closing the window")
                         ctx.close()
                         return 0
                 except Exception:
                     pass
-                if i % 15 == 14:
-                    print(f"  still waiting ({30 + i * 2}s)")
-            print("no login detected after 6 minutes")
-            ctx.close()
+                if i % 30 == 29:
+                    print(f"  still waiting ({(i + 1) * 2 // 60} min)")
+            print("still no login; leaving the window open anyway")
             return 1
         except KeyboardInterrupt:
             ctx.close()

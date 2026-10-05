@@ -1,79 +1,102 @@
-# PARITY VERDICT - C engine vs Rust engine
-
-**HEAD `c9da256e5470d2fe4a47dff7daf2bb231f968e57`** | manifest `694c9ffc06d440871d87a2d64e51af7120f32dbcf6a2f2cc43300ccbade292c3` (262 files)
-Both full passes agreed **EXACTLY** (0/166 suites differ, 23 386 verdict lines identical). Numbers are deterministic, not a snapshot of a moving tree.
-
-## VERDICT: NOT AT PARITY. The evidence does not support an "at parity" claim.
-
-### 1. What fraction is actually verified equivalent
-
-| basis | number |
+﻿# PARITY VERDICT - C engine vs the Rust reference
+Measured 2026-10-05 against `aed8bd0d6`, 172 suites, two sequential runs that
+agreed **exactly**. Evidence: `BASELINE4.md`, `BASELINE4_top25.txt`,
+`BASELINE4_manifest_sha256.txt` (269 files,
+manifest-sha256 `a022f5431015ad9ee509ad0af59aeda573e6698bfefc3c099bedca21283dd4d2`).
+**VERDICT: NOT AT PARITY.** A large, flat, unresolved divergence remains.
+---
+## 1. What fraction of recorded assertions is verified equivalent, and on what basis
+| view | suites | cases | failing | **verified equivalent** |
+|---|---|---|---|---|
+| A - all | 172 | 5 316 | 1 204 | **4 112 (77.35 %)** |
+| B - minus the 2 non-metrics | 170 | 5 264 | 1 193 | **4 071 (77.34 %)** |
+| C - minus those + the 6 gen-pinned | 164 | 5 125 | 1 157 | **3 968 (77.42 %)** |
+**Basis.** A case counts as verified equivalent when the C engine produces the
+same observable outcome the Rust reference is asserted to produce, recorded by a
+suite that **asserts a case count** (170/172 do) and reaches a **verdict decided
+on a non-zero result-line count** (not exit code - 12 suites exit 0 carrying FAIL
+lines, and 1 exits 139 carrying none).
+**This is a floor, not a proof of equivalence.** It is agreement on the *observed
+outputs the harness compares*. It is **not** proof that the two engines are
+behaviourally identical: a passing assertion bounds one input, and the corpus is
+characterisation-heavy rather than exhaustive. **Read 77 % as "77 % of recorded
+assertions agree", never as "77 % of the engine agrees".**
+## 2. What is KNOWN not to be at parity
+* **1 157 failing cases / 2 420 failing assertions in view C (22.6 %).** No
+  clustering: the largest single failing signature occurs **5** times, and the
+  top-25 cover **3.7 %**. This is a broad front, not a few bugs.
+* **Concentrated by module:** `core/zones` 26.5 %, `ability/choice` 21.5 %,
+  `modifiers` 15.7 %, `ability/cost` 8.9 % - **72.6 %** of all failing detail
+  lines sit in four modules.
+* **`audit_conditions` is BROKEN:** exits 2 on `cannot load card db`, **0
+  assertions run**. Whatever it was going to check is unchecked.
+* **`make warnings-audit` is RED:** one genuinely new bug-predicting diagnostic
+  (`src/ability/effects/look.c:1577`, verified by direct compile) and one stale
+  pin (`look.c:1486`). The gate that exists to predict crashes is itself red.
+* **Alias-class lifetime errors are NOT cleared: 6 hits across 4 suites.** The
+  mandatory negative control changes nothing (3/1/1/1 with and without the fix
+  reverted), so these 6 are **unexplained**, not explained by the known-reverted
+  `pca_resolve_entry` defect. Plus 4 suites where forked-child and parent
+  summaries disagree, and 12 probe arms that ran no cases at all.
+* **Japanese text is emitted as mojibake** (UTF-8 read as Shift-JIS) throughout
+  the C suite output, e.g. `郢晢ｽｩ郢ｧ・､郢晏､懷ｹ戊沂蛹ｺ蜃ｾ`. Logs are not human-reviewable and
+  any text-based audit of them is reading garbage.
+## 3. What CANNOT be claimed at all, because its oracle never ran
+The instruction not to run `cargo` was honoured, so **every Rust item below is a
+source reading, not a measurement.** Four of the five premises in the brief were
+**confirmed**; two were **wrong and are corrected**.
+| claim | status |
 |---|---|
-| suites green (of 164 metric-bearing) | **29 / 164 = 17.7 %** |
-| recorded assertions passing (46 structured suites) | **913 / 1557 = 58.6 %** |
-| failing assertions, corpus | **2 485** (2 387 also excluding the 6 generation-pinned suites) |
-| suites red / unverified / broken | **115 / 19 / 1** |
-
-**58.6 % of recorded assertions pass** is the most defensible figure, and it is a floor, not a
-ceiling: 19 suites emit **no verdict line at all** and `audit_conditions` exits 2 silently, so their
-behaviour is **unmeasured, not passing**. The 17.7 % suite figure is *not* a parity figure - a green
-suite only means the C matches the expectations recorded in it.
-
-### 2. Known NOT to be at parity
-
-* **2 385 failing assertions across 109 red suites**, and the distribution is **flat**: top-25
-  assertion signatures = **4.2 %**, largest single lexical cause = 5.3 %. There is no small set of
-  defects left; this is a broad, unfinished surface.
-* Concentrated by **Rust module**: `core/zones` 19.8 %, `ability/choice` 18.5 %,
-  `core/game_state/modifiers` 15.1 % - **1 331 lines, 53.4 %**. **238 lines (9.5 %) match no module
-  at all** and are owned by nobody.
-* **Rust is wrong on at least one path, and C correctly does not inherit it** - a confirmed
-  **card-loss bug at `turn/phases.rs:846-851`**: the card is `remove`d from the hand (846) *before*
-  the `MAX_LIVE_CARDS` check (849), so the `Err` return at 850 **destroys the card**. The C checks
-  capacity first (`src/turn/phase.c:1543`) and correctly leaves the card in hand. Any parity claim on
-  that path is impossible until Rust is fixed. (The brief cited this at 831-836; those lines are a
-  `log::debug!` block - the line numbers are stale, the bug is real.)
-* **The Q213 citation is stale.** `turn/actions/mod.rs:1734` is the `face_up` gate that the
-  surrounding comment says was the *original* defect; eviction has been split out into
-  `evict_non_live_from_live_slot`, so this looks **already fixed at HEAD**. I could not run cargo to
-  confirm.
-* `FAIL: [VACUOUS] ... only 0 prompt(s) were offered` (46 lines, 12 suites) = the C raises **no
-  prompt at all** where Rust does. E.g. **MIRAI `PL!S-bp6-021-L`**: its 自動/ターン1回 yell trigger
-  fires **0 prompts** in C across every case in `parity_look_per_card`. Missing C behaviour, not a
-  test artefact.
-
-### 3. Cannot be claimed at all - the oracle never runs
-
-| oracle | verified state |
-|---|---|
-| `bytecode_deep_compare_test.rs` | 7 763 B, tracked, and declared in `characterization/mod.rs` - but behind **`#[cfg(feature = "bytecode_abilities")]`, a non-default feature**. Its entire content is absent from any default `cargo test`. **Not "compiled to nothing" because it is empty - because it is feature-gated.** |
-| `unique_abilities_test.rs` | **1 byte**, **not in the main tree** (only in a worktree), and **not declared** in `characterization/mod.rs`. No oracle at all. |
-| `pvp_room_test.rs` | **Not in the main tree at all** (worktree only, 12 041 B), and **not declared** in `integration/mod.rs`. No oracle at all. |
-| "three phantom `mod.rs` absent from all of git" | **FALSE as stated.** **141 `mod.rs` are git-tracked.** I first measured 0 - that was **my own CRLF bug** in the PowerShell filter, not a repo fact. `mod.rs` files are near-universally *legitimately empty* Rust module declarations, which is almost certainly what produced the "phantom" reading. |
-| "34.8 % of lines had no Rust twin" | **Text-match artefact, not reproducible.** Same cause: grepping `mod.rs` for symbols. |
-| "1 236 lines of C TEST EXISTS BUT WEAKENS" | **Not reproducible**; I could not reconstruct the method. **I do not endorse this number.** |
-
-### 4. What a defensible "at parity" claim would require
-
-1. **Zero red assertions** on a metric-bearing corpus. Today: 2 385. There is no shortcut - the flat
-   distribution means this is ~2 385 individually-diagnosed divergences, not a handful.
-2. **Close the 19 unverified suites + `audit_conditions`** so every suite emits a verdict. Until then
-   a whole slice of behaviour is unmeasured and any percentage is a denominator fiction.
-3. **Unify the verdict vocabulary.** 47 suites emit `name: N assertion(s), M failure(s)`; 119 emit
-   `ok:`/`FAILED`. I needed two independent counting paths to cross-check; a machine-readable
-   per-suite result would make the number trustworthy by construction.
-4. **Re-point the 6 generation-pinned suites to derive their figures** (not new literals) - and note
-   they carry **134 `FAIL` lines, not the +26 predicted**, so they are not purely pinned.
-5. **Fix the Rust card-loss bug** (or document it as an intentional divergence) before any
-   live-card-set path can be called equivalent.
-6. **Run `cargo test` with `--features bytecode_abilities`**, and put `unique_abilities_test` and
-   `pvp_room_test` into the tree and into `mod.rs`, or delete them. An oracle that cannot run is not
-   evidence.
-7. **Fix `t-run`/`OBJ_LIB`**: `t-run` still depends on `data`, and `OBJ_LIB` names a
-   `src/web_server.o` that `make all` never builds - so `make t` only links when a stale object from
-   a prior `make web` happens to be present. That is the STALE-LINK trap, live.
-
-**Bottom line: ~58.6 % of recorded assertions are verified equivalent. The remaining ~41 % is a flat
-long tail, the measurement itself has 19 blind spots, three oracles cannot run, and one confirmed
-Rust-side card-loss bug means at least one path can never be at parity until Rust changes. I am not
-calling this at parity, and the gap should not be rounded off.**
+| `pvp_room_test` could not compile - sole `choice_player_id` oracle | **CONFIRMED, sharper:** `pvp_room_test.rs` does **not exist anywhere** in the main tree. `choice_player_id` appears only in *production* code (`src/ability/queue.rs` x10, `src/ability/effects/choice.rs`). **There is no test for it at all**, so that behaviour has no oracle. |
+| `bytecode_deep_compare_test` compiles to nothing | **CORRECTED.** The file **exists**, 193 lines, with a real `#[test] fn bytecode_deep_matches_json_path` and two `assert_eq!`. It compiles to nothing because it is **`#[cfg(feature = "bytecode_abilities")]`-gated** in `tests/test_modules/characterization/mod.rs`, not because it is empty. **The same gate hides 5 more modules, including `src/ability/vm.rs` itself** (`bytecode_abilities`, `compact_card_data` x2, `server`). A default build compiles the entire VM module to nothing. |
+| `unique_abilities_test.rs` effectively empty | **CORRECTED:** it does **not exist** in the main tree. Only `engine/baked/decks/bp7_unique_abilities.bin` exists - a data blob with no test. |
+| three `mod.rs` named modules absent from git | **PARTLY CORRECTED, and the mechanism is OneDrive.** 133 `mod.rs` on disk vs 135 tracked; the 2 "absent" files (`effects/choice/target_player/mod.rs`, `rules/targeting/mod.rs`) **materialised between two checks minutes apart** - a sync race, not a real absence. Exactly **one** named module genuinely cannot resolve: **`src/ability/effects/move_cards`**, declared in `src/ability/effects/mod.rs` with no such directory. |
+| the Q213 test **cannot fail** (`after_waitroom >= before_waitroom`) | **NO LONGER TRUE.** That tautology is gone. The test now carries three real assertions, including `waitroom.cards.contains(&member)` and `!live_card_zone.cards.contains(&member)`. It is falsifiable. |
+So the un-runnable surface is: **no `choice_player_id` oracle, no
+`unique_abilities` test, one unresolvable module, and 6 feature-gated modules
+(including the whole VM) invisible to a default `cargo test`.** Any parity claim
+about those behaviours is **vacuous**, not weak.
+## 4. Where card text and the reference disagree, and the reference is wrong
+**"At parity with Rust" and "correct" are different targets.** Two places where
+the C engine is right and Rust is not:
+**(a) Q213 - Rust defers the eviction one phase late. CONFIRMED, and
+self-documented.** `src/ability/turn/actions/mod.rs` (the brief's `:1734` is
+**stale** - line 1734 is now a bare `}`). `check_invalid_live_cards` (`:1746`)
+gates `evict_non_live_from_live_slot` behind `live_card_zone.face_up` (`:1751`),
+and `face_up` is set at the top of `execute_performance_phase`, which runs
+**after** `trigger_live_start_abilities`. Its own comment at `:1758-1760` says so:
+the eviction "used to be reachable only behind `face_up` ... which runs *after*
+`trigger_live_start_abilities`". The card text requires the member to be in the
+waitroom **before** live-start abilities resolve. **The C engine correctly does
+not inherit this ordering bug**, so the C suite is red here *because the reference
+is wrong*.
+**(b) The card-loss at `turn/phases.rs:846-851`: NOT RE-CONFIRMED.** The cited
+range has moved; `:843-856` is now `handle_set_live_card` - a null-check, a debug
+log, and `hand.cards.remove(idx)` at `:867`. I could not locate the described
+card-loss at the cited lines and I am **not** endorsing that claim. It may have
+been fixed, or the citation was stale. **This needs a re-locate before anyone
+relies on it.**
+## 5. What would have to happen for a defensible "at parity" claim
+Not a rounding-off. Six concrete pieces of work:
+1. **Clear 1 157 failing cases / 2 420 assertions**, starting with the four
+   modules holding 72.6 % of the mass (`core/zones`, `ability/choice`,
+   `modifiers`, `ability/cost`). The flat distribution means no shortcut.
+2. **Fix `audit_conditions`** so it loads the card DB and asserts something.
+   Today its 0 assertions are silently excluded from every total.
+3. **Make `warnings-audit` green** - re-pin `FT-6` to `look.c:1577` and prove
+   that diagnostic benign, or fix it. Do not silence it.
+4. **Triage the 6 alias hits + 4 summary disagreements + 12 no-case probe arms.**
+   Extend the negative control until it actually separates, so "alias-clean"
+   means something.
+5. **Close the oracle holes**: add a `choice_player_id` test; add a
+   `unique_abilities` test or retire the blob; resolve
+   `src/ability/effects/move_cards`; and decide whether the 6 feature-gated
+   modules - **including `vm.rs`** - are meant to be invisible. If not, the
+   default `cargo test` is not testing the engine it ships.
+6. **Run `cargo test` on both sides and compare the same corpus**, and re-locate
+   the `phases.rs` card-loss claim. Until Rust is executed, "parity" has no
+   oracle behind it at all.
+**Plus one thing that is not work but must be said:** the "card text vs reference"
+axis needs its own column. Several C failures are cases where **Rust is wrong**.
+Converging on Rust would make the engine *wrong*. Q213 is one confirmed case;
+a defect-for-defect port to a buggy reference is a regression dressed as parity.

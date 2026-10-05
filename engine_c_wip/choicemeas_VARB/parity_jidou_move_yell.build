@@ -1,0 +1,49 @@
+tests/test_parity_jidou_move_yell.c: In function 'test_chisato_no_energy_when_another_card_debuts':
+tests/test_parity_jidou_move_yell.c:585:9: warning: unused variable 'filler' [-Wunused-variable]
+  585 |     int filler   = test_id(&game, FILLER);
+      |         ^~~~~~
+tests/test_parity_jidou_move_yell.c: In function 'test_kinako_q94_debut_blades_expire_at_live_victory':
+tests/test_parity_jidou_move_yell.c:916:9: warning: unused variable 'filler' [-Wunused-variable]
+  916 |     int filler = test_id(&game, FILLER);
+      |         ^~~~~~
+tests/test_parity_jidou_move_yell.c: In function 'special_color_scenario':
+tests/test_parity_jidou_move_yell.c:1504:9: warning: unused variable 'filler' [-Wunused-variable]
+ 1504 |     int filler  = test_id(tg, FILLER);
+      |         ^~~~~~
+tests/test_parity_jidou_move_yell.c: In function 'test_awaken_no_saintsnow_does_not_fire':
+tests/test_parity_jidou_move_yell.c:1658:19: warning: unused variable 'fx' [-Wunused-variable]
+ 1658 |     AwakenFixture fx = { AQ_CHIKA, AQ_CHIKA, AQ_LIVE, AQ_LIVE, AQ_LIVE, AQ_LIVE };
+      |                   ^~
+tests/test_parity_jidou_move_yell.c: In function 'test_awaken_cost_below_20_does_not_fire':
+tests/test_parity_jidou_move_yell.c:1677:19: warning: unused variable 'fx' [-Wunused-variable]
+ 1677 |     AwakenFixture fx = { AQ_YO, SS_111, AQ_LIVE, AQ_LIVE, AQ_LIVE, AQ_LIVE };
+      |                   ^~
+tests/test_parity_jidou_move_yell.c: In function 'test_awaken_no_matching_live_in_waitroom_skips':
+tests/test_parity_jidou_move_yell.c:1729:19: warning: unused variable 'fx' [-Wunused-variable]
+ 1729 |     AwakenFixture fx = { AQ_CHIKA, SS_222, NIJI_LIVE, NIJI_LIVE, NIJI_LIVE, NIJI_LIVE };
+      |                   ^~
+tests/test_parity_jidou_move_yell.c: In function 'wien_real_live_scenario':
+tests/test_parity_jidou_move_yell.c:1927:9: warning: unused variable 'filler' [-Wunused-variable]
+ 1927 |     int filler = test_id(tg, FILLER);
+      |         ^~~~~~
+tests/test_parity_jidou_move_yell.c: In function 'daisuki_scenario':
+tests/test_parity_jidou_move_yell.c:2006:9: warning: unused variable 'filler' [-Wunused-variable]
+ 2006 |     int filler  = test_new_id(tg, FILLER);
+      |         ^~~~~~
+tests/test_parity_jidou_move_yell.c: In function 'jimoai_scenario':
+tests/test_parity_jidou_move_yell.c:2496:9: warning: unused variable 'hand_before' [-Wunused-variable]
+ 2496 |     int hand_before = test_hand_len(tg);
+      |         ^~~~~~~~~~~
+tests/test_parity_jidou_move_yell.c: At top level:
+tests/test_parity_jidou_move_yell.c:402:13: warning: 'tas_and_settle' defined but not used [-Wunused-function]
+  402 | static void tas_and_settle(TestGame *tg, int pl)
+      |             ^~~~~~~~~~~~~~
+tests/test_parity_jidou_move_yell.c:356:12: warning: 'deck_has' defined but not used [-Wunused-function]
+  356 | static int deck_has(TestGame *tg, int cid)     { return bag_has(&tg->state.p[0].deck, cid); }
+      |            ^~~~~~~~
+tests/test_parity_jidou_move_yell.c:332:12: warning: 'p1_members' defined but not used [-Wunused-function]
+  332 | static int p1_members(TestGame *tg)
+      |            ^~~~~~~~~~
+tests/test_parity_jidou_move_yell.c:320:13: warning: 'take_all_first' defined but not used [-Wunused-function]
+  320 | static void take_all_first(TestGame *tg)
+      |             ^~~~~~~~~~~~~~

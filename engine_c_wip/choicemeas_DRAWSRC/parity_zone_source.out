@@ -1,0 +1,557 @@
+--- A. success_zone_live_card_count_alternative (PL!-pb1-004-R) ---
+ok: identity PL!-pb1-004-R
+ok: identity PL!-sd1-019-SD
+ok: identity PL!-bp4-022-SECL
+ok: A: both success-zone fixtures really print a score icon
+ok: 2 scoring μ's cards -> +2 instead of +1
+        A_fixture_identity                                                 5 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-004-R
+ok: A: nagisa fixtures resolve
+ok: A: the play to CENTER succeeds
+        A_one_card_plus_one                                                4 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   A_one_card_plus_one
+ok: identity PL!-pb1-004-R
+ok: A CONTROL: the debut ran (the member is on CENTER)
+        A_zero_cards_nothing                                               4 assertion(s), 2 failure(s), 0 harness gap(s)
+FAILED   A_zero_cards_nothing
+ok: identity PL!-pb1-004-R
+ok: identity PL!-sd1-019-SD
+ok: identity PL!-bp4-022-SECL
+ok: A: both success-zone fixtures really print a score icon
+ok: 2 scoring μ's cards -> +2 instead of +1
+        A_two_cards_plus_two                                               5 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-004-R
+ok: A CONTROL: the LEFT-side play really happened
+        A_not_at_center                                                    3 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   A_not_at_center
+ok: identity PL!-pb1-004-R
+ok: A: +2 before the clear
+ok: A CONTROL: the gained 常時 is registered before the clear
+ok: the gained live-total bonus is cleared
+        A_expires_on_clear                                                 4 assertion(s), 0 failure(s), 0 harness gap(s)
+--- B. umi_reveal_live_card_gains_live_total_score (PL!-pb1-013-R) ---
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: the picked card_b is in revealed_cards
+ok: the unpicked card_a is NOT in revealed_cards
+        B_fixture_identity                                                 4 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: B: the 起動 is accepted
+ok: 3 cards in hand, count=1 -> a choice is needed
+ok: B: a pending choice is readable
+ok: exactly 1 card is picked
+ok: the pick is blind — the opponent cannot see identities
+ok: the pick is a reveal
+ok: the zone is hand (YOUR hand is revealed)
+HARNESS GAP: RbChoice.target_player_id spells "self" (Rust) as the seat id "p1" (C)
+ok: target_player_id names p1 — YOUR OWN hand is the one picked from
+        B_blind_reveal_choice                                             12 assertion(s), 1 failure(s), 1 harness gap(s)
+FAILED   B_blind_reveal_choice
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: identity PL!-sd1-020-SD
+ok: B: the revealed fixture is a live card
+ok: B CONTROL: the single hand card really was revealed
+ok: revealing a LIVE card grants 常時 ライブの合計スコア+1
+        B_live_plus_one                                                    6 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: identity LL-E-001-SD
+ok: B: the revealed fixture is NOT a live card
+ok: B CONTROL: the energy card really was revealed blind
+ok: revealing a non-live card grants no live-total bonus
+        B_non_live_no_bonus                                                6 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: B CONTROL: the FIRST activation recorded its use
+ok: a second 起動 in the same turn is refused (ターン1回)
+ok: the refusal must not re-pay or re-open the hand cost
+ok: the refusal must not spend energy
+ok: a use-limit refusal must not open a prompt
+ok: one use record for one accepted activation, not two
+        B_use_limit                                                        8 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: the revealed card stays in hand
+ok: the card is tracked in revealed_cards
+        B_stays_in_hand                                                    4 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: B: +1 after recalculate_constants
+ok: B: +1 persists through the phase change
+        B_persists                                                         4 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: B: +1 while she is on stage
+ok: B: 0 after she leaves the stage
+        B_cleared_off_stage                                                4 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: B: a choice opens from a 5-card hand
+ok: exactly 1 card is picked regardless of hand size
+ok: all 5 cards start in hand
+ok: all 5 cards remain in hand after the pick
+        B_one_of_many                                                      6 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: 3 cards -> a choice is needed
+ok: the live card is the one revealed
+ok: all 3 cards remain in hand
+        B_mixed_pick_live                                                  6 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   B_mixed_pick_live
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: B CONTROL: the energy card really was revealed
+ok: picking a non-live card -> no bonus
+ok: the non-live card is the one revealed
+        B_mixed_pick_non_live                                              5 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-013-R
+ok: identity PL!-sd1-010-SD
+ok: the picked card_b is in revealed_cards
+ok: the unpicked card_a is NOT in revealed_cards
+        B_tracked                                                          4 assertion(s), 0 failure(s), 0 harness gap(s)
+--- C. opponent_hand_blind_reveal_no_live_card_draw (PL!-PR-014-PR) ---
+ok: identity PL!-PR-014-PR
+ok: the 登場 creates a reveal choice
+ok: 3 cards are picked
+ok: the pick is blind — you cannot see the opponent's cards
+ok: the pick is a reveal
+ok: the zone is hand (the OPPONENT's hand)
+HARNESS GAP: RbChoice.target_player_id spells "opponent" (Rust) as the seat id "p2" (C)
+ok: target_player_id names p2 — the OPPONENT's hand is the one revealed
+        C_appear_choice                                                    9 assertion(s), 1 failure(s), 1 harness gap(s)
+FAILED   C_appear_choice
+ok: identity PL!-PR-014-PR
+ok: 1 card is drawn (the played member is gone)
+ok: 3 cards are revealed
+ok: a 3-of-3 pick needs no further prompt
+        C_no_live_draws_one                                                4 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-PR-014-PR
+ok: no card is drawn when a live card is revealed
+ok: C CONTROL: 3 cards really were revealed
+ok: C CONTROL: the live card is among them
+        C_live_present                                                     4 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-PR-014-PR
+ok: C: a 5-card opponent hand forces a choice
+ok: the prompt re-opens after the first pick
+ok: the re-prompt asks for 2 more
+ok: the re-prompt preserves blind=true
+ok: the re-prompt preserves is_reveal=true
+ok: the re-prompt preserves target=opponent
+ok: the prompt re-opens for the last card
+ok: the reveal resolves after 3 picks
+        C_reprompt                                                         9 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-PR-014-PR
+ok: the OPPONENT's hand is not consumed by the blind reveal
+        C_hand_not_consumed                                                2 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-PR-014-PR
+ok: 3 cards are revealed by P1's own choices
+ok: the selection completes — YOU chose all 3
+        C_you_control                                                      3 assertion(s), 0 failure(s), 0 harness gap(s)
+--- D. under_card_and_success_live_conditions ---
+ok: identity PL!N-bp5-012-R＋
+ok: D: two energy cards sit under her
+ok: D: the energy deck is stocked
+        D_ranju_smoke                                                      3 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!SP-pb2-006-R
+ok: identity PL!SP-pb2-012-R
+ok: D: the under-card really is a 『Liella!』 group card
+ok: 1 『Liella!』 member under her -> cost +1
+ok: identity PL!SP-pb2-012-R
+ok: D CONTROL: the SECOND 『Liella!』 copy also resolves its group
+ok: 2 under her -> cost +2 (per card, not per area)
+ok: identity PL!N-sd1-010-SD
+ok: D: the control card is NOT a 『Liella!』 group card
+ok: a non-『Liella!』 card under her adds nothing
+ok: setup guard: three cards really are under her
+        D_keke_under_cost                                                 11 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-pb1-004-R
+ok: D: she is on stage with an empty success zone
+ok: identity PL!N-bp1-025-L
+ok: D: the +1 fixture really prints a score icon
+ok: D: one scoring card in the success zone
+ok: D: two scoring cards in the success zone
+        D_umi_alt_smoke                                                    6 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!SP-pb2-013-R
+ok: identity PL!SP-bp1-004-P
+ok: D: the blade-bearing branch needs a card that HAS a blade heart
+ok: D FIXTURE BUG: the Rust twin's discard target is NOT a 『KALEIDOSCORE』 card
+ok: D: PL!SP-sd1-010-SD (unit KALEIDOSCORE) IS a legal target for that step
+ok: D: 唐 可可 is on the stage
+ok: KNOWN GAP: 手札の『KALEIDOSCORE』のカードを1枚控え室に置いてもよい does not offer its prompt, so the card is still in hand
+ok: KNOWN GAP: the エネルギーカードを1枚ウェイト状態で置く step is gated on that discard, so no energy joined the zone
+ok: KNOWN GAP: nothing left the energy deck either, so the whole step is skipped
+        D_kaleidoscore_gap                                                 9 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!S-pb1-019-L
+ok: identity PL!S-bp2-024-L
+ok: identity PL!S-bp2-002-R
+ok: D: two separate 『Aqours』 instances
+ok: D: the turn reaches the live-card-set phase
+ok: D: the turn reaches the performance phase
+ok: D CONTROL: both 『Aqours』 members really reached the stage
+ok: D CONTROL: the 合計6 heart02 the printed gate needs is really present
+ok: 元気全開's ライブ開始時 invalidates its OWN ライブ成功時
+ok: 君のこころは輝いてるかい？ has its own ライブ成功時 and must not be invalidated
+ok: only ライブ成功時 was invalidated — ライブ開始時 is a separate trigger
+ok: the other live's ライブ開始時 is untouched too
+        D_genki_invalidate                                                12 assertion(s), 0 failure(s), 0 harness gap(s)
+--- E. live_phase_success_zone_replacement_q256 ---
+ok: identity PL!-bp6-024-L
+ok: identity PL!-bp3-019-L
+ok: E: the replacement really is a 『μ's』 live card
+ok: the live phase opens a replacement prompt
+ok: the p1 winner is the one prompted
+ok: CROSSROADS is in the waitroom after the replacement
+ok: the μ's live card is in the success zone
+ok: the live zone is empty after processing
+        E_fixture_identity                                                 8 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-bp6-024-L
+ok: identity PL!-bp3-019-L
+ok: E: the replacement really is a 『μ's』 live card
+ok: the live phase opens a replacement prompt
+ok: the p1 winner is the one prompted
+ok: CROSSROADS is in the waitroom after the replacement
+ok: the μ's live card is in the success zone
+ok: the live zone is empty after processing
+        E_p1_accept                                                        8 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-bp6-024-L
+ok: E: the replacement prompt is open
+ok: declining places CROSSROADS itself in the success zone
+ok: the μ's live card stays in the waitroom
+ok: E: the live zone is empty
+        E_declined                                                         5 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-bp6-024-L
+ok: E: the p2 winner is prompted too
+ok: p2's CROSSROADS is in p2's waitroom
+ok: p2's μ's live card is in p2's success zone
+        E_p2_routing                                                       5 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   E_p2_routing
+ok: identity PL!-bp6-024-L
+ok: identity PL!-bp6-022-L
+ok: E: the replacement prompt is open
+ok: CROSSROADS is in the waitroom
+ok: Dreamin' Go! Go!! is in the success zone
+        E_dreamin_identity                                                 5 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-bp6-024-L
+ok: identity PL!-bp6-022-L
+ok: identity PL!-bp3-019-L
+ok: identity PL!SP-sd1-023-SD
+ok: E: WE WILL!! is a live card that is NOT μ's
+ok: E: the replacement prompt is open
+ok: only the TWO μ's waitroom lives are offered
+ok: the first μ's target reaches the success zone
+ok: the non-μ's live card was never offered and stays in the waitroom
+ok: E: the live zone is empty
+        E_multi_filter                                                    10 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: identity PL!-bp6-022-L
+ok: E: the optional reveal-cost prompt appeared
+ok: E: the CROSSROADS replacement prompt appeared
+ok: E: no unexpected extra prompt
+ok: Dreamin' Go! Go!! is in the success zone
+ok: the original success-zone card is returned to hand
+        E_debut_dreamin                                                    9 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   E_debut_dreamin
+ok: identity PL!-bp6-024-L
+ok: E: the only waitroom live card is NOT μ's, so no target is legal
+ok: no prompt when the waitroom holds no μ's live
+ok: CROSSROADS is placed in the success zone directly
+        E_no_valid_target                                                  4 assertion(s), 0 failure(s), 0 harness gap(s)
+--- F. debut_reveal_success_zone_replacement_q256 (PL!-sd1-006-SD) ---
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: identity PL!-bp3-019-L
+ok: identity PL!S-PR-022-PR
+ok: F: the reveal pool is hand
+ok: F: the reveal is filtered to live cards
+ok: F: exactly 1 card is revealed
+ok: F: the reveal is optional (allow_skip)
+ok: F: the requested live card is in hand when the prompt is answered
+ok: F: the replacement pool is the WAITROOM (RbChoice.zone spells it "discard")
+ok: F: the replacement is filtered to live cards
+ok: F: exactly 1 replacement
+ok: F: the replacement is optional
+ok: F: the replacement is group-filtered to 『μ's』
+ok: F: μ's live is in the success zone
+ok: F: the unrelated reveal is still tracked
+ok: F: the unrelated reveal was NOT used as the placement
+ok: F: the previous success card is in hand
+        F_fixture_identity                                                19 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   F_fixture_identity
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: identity PL!-bp3-019-L
+ok: F: the reveal pool is hand
+ok: F: the reveal is filtered to live cards
+ok: F: exactly 1 card is revealed
+ok: F: the reveal is optional (allow_skip)
+ok: F: the requested live card is in hand when the prompt is answered
+ok: F: the replacement pool is the WAITROOM (RbChoice.zone spells it "discard")
+ok: F: the replacement is filtered to live cards
+ok: F: exactly 1 replacement
+ok: F: the replacement is optional
+ok: F: the replacement is group-filtered to 『μ's』
+ok: F: the previous success-zone card is returned to hand
+ok: F: the previous success-zone card left the success zone
+ok: F: μ's live is in the success zone
+ok: F: the μ's live exists exactly once
+ok: F: CROSSROADS exists exactly once
+ok: F: the previous live exists exactly once
+        F_accepts_replacement                                             21 assertion(s), 2 failure(s), 0 harness gap(s)
+FAILED   F_accepts_replacement
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: identity PL!-bp3-019-L
+ok: F: the reveal pool is hand
+ok: F: the reveal is filtered to live cards
+ok: F: exactly 1 card is revealed
+ok: F: the reveal is optional (allow_skip)
+ok: F: the requested live card is in hand when the prompt is answered
+ok: F: the revealed CROSSROADS already left hand
+ok: F: the replacement pool is the WAITROOM (RbChoice.zone spells it "discard")
+ok: F: the replacement is filtered to live cards
+ok: F: exactly 1 replacement
+ok: F: the replacement is optional
+ok: F: the replacement is group-filtered to 『μ's』
+ok: F: the previous success card is in hand
+ok: F: the μ's live card stays in the waitroom
+ok: F: the replacement prompt is resolved
+        F_declines_replacement                                            18 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   F_declines_replacement
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: F: the optional reveal prompt is open
+ok: F: the reveal pool is hand
+ok: F: the reveal may be declined
+ok: F: CROSSROADS stays in hand
+ok: F: the success zone is untouched when the reveal is declined
+ok: F: the μ's live stays in the waitroom
+ok: F: no prompt remains
+        F_can_decline_reveal                                               9 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: F: no live card in hand -> the 登場 does nothing
+ok: F: the success zone is untouched
+        F_no_live_in_hand                                                  4 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: identity PL!-bp3-019-L
+ok: F: the reveal pool is hand
+ok: F: the reveal is filtered to live cards
+ok: F: exactly 1 card is revealed
+ok: F: the reveal is optional (allow_skip)
+ok: F: the requested live card is in hand when the prompt is answered
+ok: F: the revealed card left hand
+ok: F: the replacement pool is the WAITROOM (RbChoice.zone spells it "discard")
+ok: F: the replacement is filtered to live cards
+ok: F: exactly 1 replacement
+ok: F: the replacement is optional
+ok: F: the replacement is group-filtered to 『μ's』
+ok: F: μ's live is in the success zone
+        F_empty_success                                                   16 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   F_empty_success
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: F: the reveal pool is hand
+ok: F: the reveal is filtered to live cards
+ok: F: exactly 1 card is revealed
+ok: F: the reveal is optional (allow_skip)
+ok: F: the requested live card is in hand when the prompt is answered
+ok: F: the pick pool is the success live card zone
+ok: F: exactly 1 success-zone card is taken
+ok: F: taking a success-zone card is mandatory
+ok: F: both success-zone cards are offered
+ok: F: the unselected card stays in the success zone
+ok: F: CROSSROADS joins the success zone
+ok: F: no prompt remains
+        F_selects_exact                                                   15 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   F_selects_exact
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: identity PL!HS-bp6-026-L
+ok: identity PL!-sd1-001-SD
+ok: F: the extra hand card is NOT a live card
+ok: F: the reveal pool is hand
+ok: F: the reveal is filtered to live cards
+ok: F: exactly 1 card is revealed
+ok: F: the reveal is optional (allow_skip)
+ok: F: the requested live card is in hand when the prompt is answered
+ok: F: a NON-μ's live bypasses the replacement entirely
+ok: F: no replacement prompt for a non-μ's live
+        F_non_crossroads                                                  12 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: identity PL!SP-sd1-023-SD
+ok: F: the reveal pool is hand
+ok: F: the reveal is filtered to live cards
+ok: F: exactly 1 card is revealed
+ok: F: the reveal is optional (allow_skip)
+ok: F: the requested live card is in hand when the prompt is answered
+ok: F: no μ's waitroom target -> no replacement prompt
+ok: F: CROSSROADS itself lands in the success zone
+ok: F: the non-μ's live is untouched
+        F_non_mus_waitroom                                                11 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: identity PL!-bp3-019-L
+ok: identity PL!-bp6-022-L
+ok: F: the reveal pool is hand
+ok: F: the reveal is filtered to live cards
+ok: F: exactly 1 card is revealed
+ok: F: the reveal is optional (allow_skip)
+ok: F: the requested live card is in hand when the prompt is answered
+ok: F: the non-μ's waitroom card is filtered out (physical indices 1,2)
+ok: F: the second μ's target is in the filtered list
+ok: F: the chosen μ's live is in the success zone
+ok: F: the other μ's live stays in the waitroom
+ok: F: the non-μ's live stays put
+        F_filters_multi_mus                                               15 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   F_filters_multi_mus
+ok: identity PL!-sd1-006-SD
+ok: identity PL!-bp6-024-L
+ok: identity PL!-bp3-019-L
+ok: identity PL!S-PR-022-PR
+ok: F: the reveal pool is hand
+ok: F: the reveal is filtered to live cards
+ok: F: exactly 1 card is revealed
+ok: F: the reveal is optional (allow_skip)
+ok: F: the requested live card is in hand when the prompt is answered
+ok: F: the replacement pool is the WAITROOM (RbChoice.zone spells it "discard")
+ok: F: the replacement is filtered to live cards
+ok: F: exactly 1 replacement
+ok: F: the replacement is optional
+ok: F: the replacement is group-filtered to 『μ's』
+ok: F: μ's live is in the success zone
+ok: F: the unrelated reveal is still tracked
+ok: F: the unrelated reveal was NOT used as the placement
+ok: F: the previous success card is in hand
+        F_only_cost_revealed                                              19 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   F_only_cost_revealed
+--- G. discard_placed_group_live_or_blade_condition (PL!N-bp7-006-R＋) ---
+ok: identity PL!N-bp7-006-R＋
+ok: G: 近江彼方 really prints two abilities (the target is ab#1)
+ok: G: both of them are 起動 abilities
+HARNESS GAP: rb_activate_card()/test_activate_ability() take no ability index, so 近江彼方's ab#1 cannot be driven through the C activation path; rb_resolve_ability(g, actor, ab, ability_idx=1, host, &resolved) is the substitute used throughout section G
+        G_ability_index_gap                                                4 assertion(s), 0 failure(s), 1 harness gap(s)
+ok: identity PL!N-bp7-006-R＋
+ok: G: ab#1 activates
+ok: the cost mills exactly the top 3 deck cards
+ok: the 3 milled cards are in the waitroom
+        G_cost_mills_three                                                 6 assertion(s), 2 failure(s), 0 harness gap(s)
+FAILED   G_cost_mills_three
+ok: identity PL!N-bp7-006-R＋
+ok: G CONTROL: the cost really milled 3 cards
+        G_live_offers_choice                                               3 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   G_live_offers_choice
+ok: identity PL!N-bp7-006-R＋
+ok: identity PL!N-bp1-001-R
+ok: G: 上原歩夢 really has NO blade heart (blade 4 != blade heart)
+ok: G CONTROL: the cost really milled 3 cards
+        G_member_nobh_choice                                               5 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   G_member_nobh_choice
+ok: identity PL!N-bp7-006-R＋
+ok: identity PL!N-bp7-007-R＋
+ok: G: 優木せつ菜 really HAS a blade heart (blade_heart b_heart02)
+ok: G CONTROL: the cost really milled 3 cards
+ok: a 虹ヶ咲 member WITH a blade heart must not satisfy the no-blade branch
+        G_member_bh_no_choice                                              5 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!N-bp7-006-R＋
+ok: G: the filler is a live-less CatChu! member, not 『虹ヶ咲』
+ok: G CONTROL: the cost really milled 3 cards
+ok: no 『虹ヶ咲』 live / no-blade-heart member among the discarded 3 -> no choice
+        G_no_match_no_choice                                               4 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!N-bp7-006-R＋
+        G_option_energy                                                    3 assertion(s), 2 failure(s), 0 harness gap(s)
+FAILED   G_option_energy
+ok: identity PL!N-bp7-006-R＋
+        G_option_blade                                                     3 assertion(s), 2 failure(s), 0 harness gap(s)
+FAILED   G_option_blade
+ok: identity PL!N-bp7-006-R＋
+ok: the condition only looks at the 3 cards THIS cost placed, not the whole waitroom
+        G_preexisting_ignored                                              2 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!N-bp7-006-R＋
+ok: G: the first use activates
+ok: G: the second use is still permitted (ターン2回)
+ok: G: a third activation in the same turn is blocked by ターン2回
+        G_use_limit_twice                                                  5 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   G_use_limit_twice
+--- H. activation_discard_blade_heart_count_condition (PL!SP-bp5-002-R＋) ---
+ok: identity PL!SP-bp5-002-R＋
+ok: identity PL!SP-sd1-011-P
+ok: H: 鬼塚冬毬 really prints blade 1
+ok: H: 鬼塚冬毬 really has NO blade heart
+ok: H: the self_cost leaves her WAIT
+ok: H: the 2-card hand discard is prompted
+        H_fixture_identity                                                 8 assertion(s), 2 failure(s), 0 harness gap(s)
+FAILED   H_fixture_identity
+ok: identity PL!SP-bp5-002-R＋
+ok: H: the two discard fixtures are live cards (not members)
+ok: H: the self_cost leaves her WAIT
+ok: H: the 2-card hand discard is prompted
+ok: H CONTROL: both picked LIVE cards really reached the waitroom
+ok: H: 0 no-blade-heart MEMBER cards discarded -> she stays WAIT
+ok: H: 0 blades
+        H_zero_members                                                     8 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   H_zero_members
+ok: identity PL!SP-bp5-002-R＋
+ok: identity PL!-bp6-001-R＋
+ok: H: 高坂穂乃果 really has no blade heart
+ok: H: the self_cost leaves her WAIT
+ok: H: the 2-card hand discard is prompted
+ok: H: 0 blades (only the 2-card branch grants them)
+        H_one_member                                                       7 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   H_one_member
+ok: identity PL!SP-bp5-002-R＋
+ok: H: the self_cost leaves her WAIT
+ok: H: the 2-card hand discard is prompted
+        H_two_members                                                      5 assertion(s), 2 failure(s), 0 harness gap(s)
+FAILED   H_two_members
+ok: identity PL!SP-bp5-002-R＋
+ok: identity PL!SP-sd1-011-P
+ok: H: 鬼塚冬毬 really prints blade 1
+ok: H: 鬼塚冬毬 really has NO blade heart
+ok: H: the self_cost leaves her WAIT
+ok: H: the 2-card hand discard is prompted
+        H_tomari_two                                                       8 assertion(s), 2 failure(s), 0 harness gap(s)
+FAILED   H_tomari_two
+--- I. debut_discard_blade_heart_draw (PL!SP-pb2-013-R) ---
+ok: identity PL!SP-pb2-013-R
+ok: identity PL!SP-bp1-021-N
+ok: I: the discarded card really has NO blade heart
+ok: I: the optional 『KALEIDOSCORE』 discard prompt appears
+ok: I: the prompt is resolved
+ok: I: she is on CENTER
+ok: I: the 『KALEIDOSCORE』 card left hand
+ok: I: it is in the waitroom
+ok: I: 1 energy joined the zone in WAIT state
+ok: I: 1 energy left the energy deck
+ok: I: a card WAS drawn (the discarded card had no blade heart)
+        I_fixture_identity                                                11 assertion(s), 0 failure(s), 0 harness gap(s)
+ok: identity PL!SP-pb2-013-R
+ok: identity PL!SP-sd1-010-SD
+ok: I: the discarded card really HAS a blade heart
+ok: I: the optional 『KALEIDOSCORE』 discard prompt appears
+ok: I: the prompt is resolved
+ok: I: she is on CENTER
+ok: I: the 『KALEIDOSCORE』 card left hand
+ok: I: it is in the waitroom
+ok: I: 1 energy joined the zone in WAIT state
+ok: I: 1 energy left the energy deck
+        I_blade_heart_no_draw                                             11 assertion(s), 1 failure(s), 0 harness gap(s)
+FAILED   I_blade_heart_no_draw
+ok: identity PL!SP-pb2-013-R
+ok: identity PL!SP-bp1-021-N
+ok: I: the discarded card really has NO blade heart
+ok: I: the optional 『KALEIDOSCORE』 discard prompt appears
+ok: I: the prompt is resolved
+ok: I: she is on CENTER
+ok: I: the 『KALEIDOSCORE』 card left hand
+ok: I: it is in the waitroom
+ok: I: 1 energy joined the zone in WAIT state
+ok: I: 1 energy left the energy deck
+ok: I: a card WAS drawn (the discarded card had no blade heart)
+        I_no_blade_heart_draw                                             11 assertion(s), 0 failure(s), 0 harness gap(s)
+
+==== zone_source parity: 39 cases passed, 27 cases failed, 0 crashed ====

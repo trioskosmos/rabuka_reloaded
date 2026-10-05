@@ -1736,11 +1736,35 @@ void rb_resume_position_change(GameState *g, int actor, const AbilityEffect *e, 
     rb_trigger_auto_abilities_for_movement_current(g);
 }
 
-/* Cyclic stage rotation — mirrors misc.rs::execute_rotation */
-void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e){
-    const char *t = (e->target && *e->target) ? e->target : "self";
-    if(!strcmp(t, "both")) t = "self";
-    int who = (!strcmp(t, "opponent")) ? (actor ^ 1) : actor;
+/* Cyclic stage rotation — the C twin of Rust execute_rotation,
+ * engine/src/ability/effects/position.rs:1124-1202 (the "misc.rs::execute_rotation"
+ * citation that used to sit here was stale: the function now lives in
+ * position.rs and starts at :1124). Rust dispatches it for the standalone
+ * action at effects/dispatch.rs:91 (`ActionType::Rotation =>
+ * resolver.execute_rotation(gs, effect, effect.target_name())`), which is the
+ * only path that reaches THIS function — see the reachability note below.
+ *
+ * REACHABILITY: unlike the sibling copy in misc.c (h_rotation), this one is
+ * reachable only through src/turn/triggers.c:1363, the `action == "rotation"`
+ * arm. Measured over cards/abilities.json's 985 unique abilities: ZERO carry
+ * `action: "rotation"` — the only rotation in the corpus is chisato
+ * (PL!SP-pb1-003-R), which is `action: "position_change"` with
+ * `multiple_targets: true` and reaches h_rotation instead. Rust keeps
+ * ActionType::Rotation as a live enum variant (enums.rs:313 / :429) even
+ * though the parser never emits it, so this arm is kept as the faithful twin of
+ * dispatch.rs:91 rather than tombstoned: deleting it would make a future corpus
+ * ability with `action: "rotation"` silently move nothing.
+ *
+ * It is NOT dead in the sense that matters — but note it is a duplicate of the
+ * rotation map, and it omits three things Rust does at position.rs:1178-1200:
+ * the `[[log_rotation]]` rule-log line (:1199-1200), the position_change_events
+ * pushes (:1179-1187), and trigger_auto_abilities_for_movement_current (:1193).
+ * h_rotation does all three. That divergence is unmeasurable today (0 callers
+ * with a real ability), so it is recorded here rather than changed. */
+/* One player's half of the rotation — position.rs:1136-1189. Split out so the
+   "both" case below can run it twice exactly as Rust's `for tgt in targets` at
+   position.rs:1136 does, without recursing back through rb_effect_rotation. */
+static void rb_effect_rotation_one(GameState *g, int who){
     RbPlayer *P = &g->p[who];
     int snap[RB_STAGE_SIZE], wsnap[RB_STAGE_SIZE];
     RbBag under[RB_STAGE_SIZE];
@@ -1758,6 +1782,25 @@ void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e){
         P->under_cards[dst] = under[src];
         rb_record_movement(g, snap[src]);
     }
+}
+
+void rb_effect_rotation(GameState *g, int actor, AbilityEffect *e){
+    const char *t = (e->target && *e->target) ? e->target : "self";
+    /* position.rs:1130-1136 — Rust builds `vec!["self", "opponent"]` for "both"
+       and LOOPS it, so a standalone `action: "rotation"` with target="both"
+       rotates BOTH stages. This function used to collapse "both" to "self" and
+       rotate only one, silently dropping the opponent's half. No corpus ability
+       carries action="rotation" (0 of 985), so the old behaviour was never
+       observed in a suite; it is fixed because the two-sided form is what
+       position.rs:1130 asserts. */
+    if(!strcmp(t, "both")){
+        rb_effect_rotation_one(g, actor);
+        rb_effect_rotation_one(g, actor ^ 1);
+        rb_recalc_constants(g);
+        return;
+    }
+    int who = (!strcmp(t, "opponent")) ? (actor ^ 1) : actor;
+    rb_effect_rotation_one(g, who);
     rb_recalc_constants(g);
 }
 

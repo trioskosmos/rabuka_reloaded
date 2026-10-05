@@ -1,0 +1,359 @@
+[DBG_GAIN] actor=0 host=497 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[DBG_GAIN] actor=0 host=497 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[DBG_GAIN] actor=0 host=497 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=497 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=497 ab=0 actor=0 action=gain_ability
+[DBG_GAIN] actor=0 host=497 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=5
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,0,7,0,0,2,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,1,0,4,0,0,0,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=6
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,0,7,0,0,2,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,1,0,4,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=4 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=511 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[QUEUE_PID_NORMALIZE] entry=0 card=1057 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1057 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1057 pending=0 depth=0 ptr=0xa00196050
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=1 card=1057 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=1057 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1057 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1057 pending=0 depth=0 ptr=0xa00196050
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=1 card=1057 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=1057 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1057 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1057 pending=0 depth=0 ptr=0xa00196050
+[EXEC_EFFECT_COND] action=draw_until_count ok=1
+[EXEC_EFFECT_DISPATCH] has=1 action=draw_until_count
+[EXECUTOR_DRAW_UNTIL] actor=0 ptr=0xa00196050
+[QUEUE_PID_NORMALIZE] entry=1 card=1057 ab=0 'player1' -> 'p1'
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1057 pending=0 depth=0 ptr=0xa00196050
+[EXEC_EFFECT_COND] action=draw_until_count ok=1
+[EXEC_EFFECT_DISPATCH] has=1 action=draw_until_count
+[EXECUTOR_DRAW_UNTIL] actor=0 ptr=0xa00196050
+[DBG_GAIN] actor=0 host=1057 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[QUEUE_PID_NORMALIZE] entry=0 card=1057 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1057 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1057 pending=0 depth=0 ptr=0xa00196050
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=1 card=1057 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=1057 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1057 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1057 pending=0 depth=0 ptr=0xa00196050
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=1 card=1057 ab=0 'player1' -> 'p1'
+[DBG_GAIN] actor=0 host=1057 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=1057 ab=1 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1057 ab=1 actor=0 action=gain_ability
+[DBG_GAIN] actor=0 host=1057 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[QUEUE_PID_NORMALIZE] entry=1 card=1057 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=1 n=2 cid=1057 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1057 pending=0 depth=0 ptr=0xa00196050
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=7
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,1,2,8,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,1,0,4,0,0,0,0]
+[QUEUE_PID_NORMALIZE] entry=0 card=1057 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1057 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1057 pending=0 depth=0 ptr=0xa00196050
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[QUEUE_PID_NORMALIZE] entry=0 card=1057 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=1057 ab=0 actor=0 action=draw_until_count
+[EXEC_EFFECT_ENTER] action=draw_until_count host=1057 pending=0 depth=0 ptr=0xa00196050
+[EXEC_EFFECT_COND] action=draw_until_count ok=0
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=10
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,1,2,8,2,2,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[3,1,0,1,0,0,0,0] filled=[0,1,0,4,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=4 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=511 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=17 ab=1 actor=0 action=gain_ability
+[DBG_GAIN] actor=0 host=17 act=gain_ability ag=【常時】ライブの合計スコアを+3する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=0
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=3 nex=3
+[DBG_GAIN_INNER_KV] value = 3
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=17 ab=1 actor=0 action=gain_ability
+[DBG_GAIN] actor=0 host=17 act=gain_ability ag=【常時】ライブの合計スコアを+3する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=0
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=3 nex=3
+[DBG_GAIN_INNER_KV] value = 3
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=3 hand_after=4
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=17 ab=1 queued=1
+FAIL: B2 precondition: the walk crossed the live-end rollover — a grant armed outside a live never sees one, so this would assert nothing
+FAIL: ライブ終了時まで is the whole duration: the +3 must not survive the live that granted it  (got 3, expected 0)
+FAIL: B2: the registration must be cleared as well as the score  (got 1, expected 0)
+[DBG_GAIN] actor=0 host=141 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=- ct= gn=- self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=3
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,0,4,0,0,1,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,1,0,1,0,0,1,0] filled=[0,1,0,1,0,0,1,0]
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=4
+[LIVE_SUCCESS_TRIGGER] pl=0 owner=0 cid=509 ab=0 occurrence=0 use_limit=-1 effect=look_and_select options=0
+[LIVE_SUCCESS_QUEUE] cid=509 ab=0 occurrence=0 limit=99 reached=0 completed=0
+[LIVE_SUCCESS_SIDE] pl=0 queued=1 queue=0->1 processed=0 pending=1
+[LIVE_VICTORY_PHASE] initial pending=1
+[RESUME_ANY] kind=1 zone=looked_at target= route=0 mode=2 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00197080 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=2 zone= target=order route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=1 state=3 options=0 reprompt=0
+[RESUME_ANY] kind=2 zone= target=order route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[EARLY_SEAT] pl=0 won=1 no_excess=0 surplus=4
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=1->1 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,2,0,4,0,0,1,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,1,0,1,0,0,1,0] filled=[0,1,0,1,0,0,1,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=2 p2=0
+[CAN_PLACE_DECODE] cid=509 ability=0 constant=0 trigger=ライブ成功時 action=look_and_select dest=-
+[LIVE_SUCCESS_RESULT] pl=0 won=1 must_skip=0 card=509 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker=0
+[LIVE_SUCCESS_SUMMARY] p1_won=1 p2_won=0 p1_succ=1(+1) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] resume pending=0
+[RESUME_ANY] kind=2 zone= target=choice_condition route=2 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[RESUME_ANY] kind=2 zone= target=choice_condition route=2 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=3 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_EXEC] idx=0 n=1 cid=1783 ab=0 actor=0 action=gain_ability
+[DBG_GAIN] actor=0 host=1783 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=stage ct=member_card gn=Aqours self_tgt= nsel=0 cond=1
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[RESUME_ANY] kind=1 zone=stage target=gain_ability_targets route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0xa00197ad0 target=0x0 eff=0xa00197ad0 cur=0 n=1 state=3 pending=1
+[STAGE_SELECT_MULTI] n=2 cards=2 target=gain_ability_targets
+[SELECT_CARD_MULTI] n=2 count=2 zone=stage target=gain_ability_targets
+[RESUME_EXEC] def=0xa00197ad0 action=gain_ability is_cost=0 host=1783
+[DBG_GAIN] actor=0 host=1783 act=gain_ability ag=【常時】ライブの合計スコアを+1する。 gat=常時 ge=yes ge_act=modify_score ge_tgt=live_total ge_cnt=-1 src=stage ct=member_card gn=Aqours self_tgt= nsel=2 cond=1
+[DBG_GAIN_INNER] count=-1 target=live_total action=modify_score value=1 nex=3
+[DBG_GAIN_INNER_KV] value = 1
+[DBG_GAIN_INNER_KV] operation = add
+[DBG_GAIN_INNER_KV] duration = live_end
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=1783 ab=0 queued=1
+FAIL: B4 precondition: the walk crossed a real victory determination
+FAIL: B4: ライブ終了時まで must clear the grant  (got 2, expected 0)
+FAIL: B4: the recipient's registration must be cleared as well as the score  (got 1, expected 0)
+[LIVE_ZONE_REFILL] pl=0 placed=3 hand_before=0 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=2079 ab=0 queued=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=54 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=2 cid=2079 ab=0 actor=0 action=modify_score
+[QUEUE_EXEC] idx=1 n=2 cid=54 ab=0 actor=0 action=gain_ability
+FAIL: B5 precondition: the live zone totals >= 8, so the ライブ開始時 must grant the +1 EXACTLY once — a doubled dispatch reads 2  (got 0, expected 1)
+FAIL: B5 precondition: one granted ability  (got 0, expected 1)
+FAIL: B5 round 1: the grant must not accumulate as scans repeat  (got 0, expected 1)
+FAIL: B5 round 2: the grant must not accumulate as scans repeat  (got 0, expected 1)
+FAIL: B5 round 3: the grant must not accumulate as scans repeat  (got 0, expected 1)
+FAIL: B5 round 4: the grant must not accumulate as scans repeat  (got 0, expected 1)
+FAIL: B5 round 5: the grant must not accumulate as scans repeat  (got 0, expected 1)
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=4
+[LIVE_ALLOCATION] pl=0 lives=3 hearts=[0,1,1,4,0,0,3,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[5,0,3,3,0,0,3,0] filled=[0,1,1,4,0,0,3,0]
+[LIVE_ALLOCATION_CARD] idx=1 need=[0,1,0,1,0,0,1,0] filled=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=2 need=[0,1,0,1,0,0,1,0] filled=[0,0,0,0,0,0,0,0]
+[EARLY_SEAT] pl=0 won=0 no_excess=0 surplus=-1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=3 hearts=[0,1,1,4,0,0,3,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[5,0,3,3,0,0,3,0] filled=[0,1,1,4,0,0,3,0]
+[LIVE_ALLOCATION_CARD] idx=1 need=[0,1,0,1,0,0,1,0] filled=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION_CARD] idx=2 need=[0,1,0,1,0,0,1,0] filled=[0,0,0,0,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[CAN_PLACE_DECODE] cid=2639 ability=0 constant=0 trigger=ライブ成功時 action=look_and_select dest=-
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=2639 can_place=1 live=3
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_WAITROOM_BATCH] n=3
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+FAIL: this grant prints NO ライブ終了時まで, so it must SURVIVE a live end — expiring it here would silently drop a permanent +1 mid-match  (got 0, expected 1)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=live_card_zone label=ライブ置場 cid=1899 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=1899 ab=0 actor=0 action=invalidate_ability
+[DBG_INVAL] actor=0 act=1899 tt=ライブ成功時 dur=- tgt=- ct= gn=- self=true
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=8
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,8,8,1,1,0,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[2,0,4,0,0,0,0,0] filled=[0,0,4,2,0,0,0,0]
+[DBG_INVAL] actor=0 act=1899 tt=ライブ成功時 dur=- tgt=- ct= gn=- self=true
+[DBG_INVAL] actor=0 act=1899 tt=ライブ成功時 dur=- tgt=- ct= gn=- self=true
+[DBG_INVAL] actor=0 act=1899 tt=ライブ成功時 dur=- tgt=- ct= gn=- self=true
+[DBG_INVAL] actor=0 act=1899 tt=ライブ成功時 dur=- tgt=- ct= gn=- self=true
+[DBG_INVAL] actor=0 act=1899 tt=ライブ成功時 dur=- tgt=- ct= gn=- self=true
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2383 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2383 ab=0 actor=0 action=change_state
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2383 target=self count=2
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2383 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2383 ab=0 actor=0 action=change_state
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2383 target=self count=2
+[DBG_INVAL] actor=0 act=2098 tt=ライブ開始時 dur=live_end tgt=self ct=member_card gn=Liella! self=
+FAIL: [VACUITY CONTROL] C2: her debut must OFFER the optional invalidation -- a case in which nothing was offered has not armed anything  (control point was 0, only 0 prompt(s) on screen, so the absence this licenses proves nothing)
+FAIL: C2: the prompt is a target SELECTION for the invalidation
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_PERFORM] queued=0 entries=0 state=0 occurred=1 revealed=4
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,4,6,0,0,2,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,1,0,1,0,0,1,0] filled=[0,0,0,1,0,0,1,0]
+[EARLY_SEAT] pl=0 won=0 no_excess=0 surplus=-1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,4,6,0,0,2,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,1,0,1,0,0,1,0] filled=[0,0,0,1,0,0,1,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[CAN_PLACE_DECODE] cid=509 ability=0 constant=0 trigger=ライブ成功時 action=look_and_select dest=-
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=509 can_place=1 live=1
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_WAITROOM_BATCH] n=1
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=3 hand_after=4
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=2 hand_after=2
+[LIVE_START_SCAN] pl=0 trigger=live_start zone=stage label=ステージ cid=2383 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2383 ab=0 actor=0 action=change_state
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=2383 target=self count=2
+[DBG_INVAL] actor=0 act=2098 tt=ライブ開始時 dur=live_end tgt=self ct=member_card gn=Liella! self=
+FAIL: C3: the debut must offer the optional invalidation as a target selection
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=1 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=1 hand_before=1 hand_after=2
+[LIVE_START_SCAN] pl=1 trigger=live_start zone=stage label=ステージ cid=2639 ab=0 queued=1
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=1 action=change_state
+DEBUG [EXEC_CHANGE_STATE] entry: actor=1 host_cid=2639 target=self count=2
+FAIL: D2 PRECONDITION: the two partners must differ on the printed group, which is the only difference between the boards
+[TEST_BATON_TOUCH] test_play_to_stage(527, area 1): area 1 already holds card 903, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[QUEUE_EXEC] idx=0 n=1 cid=903 ab=0 actor=0 action=change_state
+[TEST_BATON_TOUCH] test_play_to_stage(639, area 1): area 1 already holds card 903, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[QUEUE_EXEC] idx=0 n=1 cid=903 ab=0 actor=0 action=change_state
+FAIL: Q167: on an otherwise identical board, a >=10 partner of the printed group must leave the active-energy counter 2 HIGHER than a cheap outsider does. The cost model is identical on both boards, so the whole difference is the 「2枚アクティブ」 the clause grants (qualifying 19, non-qualifying 19)  (got 0, expected 2)
+[QUEUE_PID_NORMALIZE] entry=0 card=760 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=760 ab=0 actor=0 action=change_state
+DEBUG [EXEC_CHANGE_STATE] entry: actor=0 host_cid=760 target=opponent count=1
+DEBUG [EXEC_CHANGE_STATE] member_op: target=opponent count=1 max=0 state_change=wait is_member=1
+DEBUG [EXEC_CHANGE_STATE] targets nc=1 nchange=1 state_change=wait cannot_activate=0
+DEBUG [EXEC_CHANGE_STATE] applying: card_id=498 state=wait before_ori=active
+DEBUG [EXEC_CHANGE_STATE] after: card_id=498 ori=wait
+DEBUG [EXEC_CHANGE_STATE] pushing card_id=498 to selected_cards (len=0)
+DEBUG [EXEC_CHANGE_STATE] wait_before=0 last_wait_to_active=0
+DEBUG [STATE_CHANGE] detected: card=498 active->wait
+DEBUG [STATE_CHANGE] modifier applied, re-triggering auto abilities (state=wait)
+[RESUME_ANY] kind=2 zone= target=conditional_optional route=0 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+FAIL: E3 CONTROL: MIA is still in the waitroom, so it IS recovered to hand
+FAIL: Q277: the real mill must refresh MIA out of the waitroom into the deck BEFORE the auto resolves
+FAIL: E6: MIA's ab#0 must STILL present its optional even when the answer will be to decline -- the prompt is not conditional on accepting
+[QUEUE_PID_NORMALIZE] entry=0 card=823 ab=1 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=823 ab=1 actor=0 action=sequential
+FAIL: E7 PRECONDITION: the debut must have offered its hand select -- a run in which no prompt appeared would make every count below vacuous
+FAIL: E7: exactly ONE of the two candidates reaches the waitroom  (got 2, expected 1)
+FAIL: Q241: 1 card discarded in one batch fires the auto exactly once (heart01 == 1)
+FAIL: Q241: 1 card discarded gives blade exactly 1  (got 0, expected 1)
+[QUEUE_PID_NORMALIZE] entry=0 card=1771 ab=0 'player1' -> 'p1'
+FAIL: F1: a single group-matching live reaching the waitroom offers the placement
+FAIL: F1: the selected live card leaves the waitroom
+FAIL: F1: nothing else is left behind in the waitroom  (got 1, expected 0)
+FAIL: F1: the deck gains exactly one card  (got 20, expected 21)
+FAIL: F1: the relocated live card really reached the deck
+[QUEUE_PID_NORMALIZE] entry=0 card=1771 ab=0 'player1' -> 'p1'
+FAIL: F2: with 2 candidates the player is prompted to pick 1
+FAIL: F2: picking index 1 really moves the SECOND card out of the waitroom
+FAIL: F2: exactly one card reached the deck  (got 20, expected 21)
+[QUEUE_PID_NORMALIZE] entry=0 card=1771 ab=0 'player1' -> 'p1'
+FAIL: F3 PRECONDITION: the first trigger really does offer the placement -- without it the per-turn limit is not exercised
+FAIL: F3 PRECONDITION: the first trigger relocated it
+FAIL: F3 PRECONDITION: and it reached the deck
+FAIL: [VACUITY CONTROL] F3 CONTROL: the control point is read AFTER the first trigger's prompt was answered, so the absence below is not just a prompt that was never raised  (control point was 0, only 0 prompt(s) on screen, so the absence this licenses proves nothing)
+FAIL: F3: and the first card is not displaced
+[QUEUE_PID_NORMALIZE] entry=0 card=1771 ab=0 'player1' -> 'p1'
+FAIL: F4: one group-matching LIVE in the batch satisfies the condition
+FAIL: F4: the group-matching LIVE is the one taken
+FAIL: F4: exactly one card reached the deck  (got 20, expected 21)
+[QUEUE_PID_NORMALIZE] entry=0 card=1771 ab=0 'player1' -> 'p1'
+FAIL: F6: the batch of 3 offers a single-card selection
+FAIL: F6: the FIRST card is the one taken
+FAIL: F6: exactly two of the three remain in the waitroom  (got 3, expected 2)
+FAIL: F6: exactly one card reached the deck  (got 20, expected 21)
+15 test case(s) FAILED. EXPECTED: the grant/invalidation lifecycle lives in src/core/game_state_abilities.c, which is mid-translation. No assertion in this file is weakened and no failing test is deleted or ignored.

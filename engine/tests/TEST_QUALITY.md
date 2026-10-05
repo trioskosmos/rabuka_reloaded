@@ -40,12 +40,13 @@ _every assertion is a bare is_err()/is_none() — some guard fired, but nothing 
 
 None.
 
-## assert_only_counts (1)
+## assert_only_counts (2)
 
 _every assertion is about a count/size (len/count/>=1) — '3 options were offered' can hold while the 3 are the wrong 3_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
+| `engine/tests/test_modules/characterization/seed_reproduces_game_test.rs` | `each_replayed_game_reaches_a_terminal_result` | 363 |  |
 | `engine/tests/test_modules/effects/recover/to_hand/pb2_kidou_self_to_waitroom_recover_mus_live_then_energy_per_mus_pl_pb2_007_pp_test.rs` | `a_mus_live_is_recovered_from_the_waitroom` | 85 |  |
 
 ## live_success_no_premise (1)
@@ -195,11 +196,13 @@ _the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`)
 | `engine/tests/test_modules/integration/choice_player_id_routing_test.rs` | `both_seats_live_start_abilities_get_distinctly_stamped_prompts` | 179 | shizuku in 3 slots |
 | `engine/tests/test_modules/integration/choice_player_id_routing_test.rs` | `both_seats_live_start_abilities_get_distinctly_stamped_prompts` | 179 | shizuku in 3 slots |
 
-## count_inequality_only (0)
+## count_inequality_only (1)
 
 _every assertion is an INEQUALITY on a count and there is no assert_eq anywhere — a band, not a value, so 1 card and 9 both pass; pin the number the card prints_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/test_modules/characterization/seed_reproduces_game_test.rs` | `each_replayed_game_reaches_a_terminal_result` | 363 | 2 inequality assertion(s) on a count, vs baseline+threshold |
 
 ## unresolvable_card_id (1)
 

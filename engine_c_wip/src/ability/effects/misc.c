@@ -1516,6 +1516,10 @@ static int h_place_energy_under_member(GameState *g, int actor, const AbilityEff
 
 /* ─────────────────────── h_execute_position_change ─────────────────────────── */
 static int h_rotation(GameState *g, int actor, const AbilityEffect *e);
+static int h_execute_position_change(GameState *g, int actor, const AbilityEffect *e);
+/* Defined below with handle_both_targets; the target="both" arm of
+   execute_position_change needs the same faithful retargeting clone. */
+static AbilityEffect both_variant(const AbilityEffect *e, const char *target);
 
 /* The position-destination prompt emitter for the THREE arms of
    execute_position_change that share one shape.
@@ -1567,7 +1571,24 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
                          ? eff_extra(e,"position")
                          : eff_extra(e,"source_position");
 
-    RbPlayer *P=&g->p[actor];
+    /* The stage this call acts on. Rust reads it through
+       `gs.resolve_target_player(target)` at every use inside
+       execute_position_change (position.rs:129, :332, :361, :417), and
+       `target` is the RECURSION's parameter — on the target="both" recursion
+       that is "opponent", not the master. Binding P to the raw `actor` made
+       every below-the-both arm read the master's stage on the opponent pass.
+       That was invisible while the both arm only ever emitted a prompt, but it
+       decides the source-position arms now that the branch really recurses:
+       PL!SP-bp5-010-* (target="both", source_position="center", NO
+       multiple_targets) asks each side to move its own Center member, so the
+       opponent pass must look at the OPPONENT's stage. Measured before this
+       fix, on test_wien_opponent_center_only: the opponent's choice was never
+       raised ("Q223: the opponent owns the destination choice for their center
+       member" failed) because the emptiness test at position.rs:419 read P1's
+       Center, which is empty. misc_target_player is the same
+       resolve_target_player mapping used everywhere else in this file. */
+    int tgt_player = misc_target_player(actor, e);
+    RbPlayer *P=&g->p[tgt_player];
     if(s_activating_card>=0)
         rule_log_activated(g,s_activating_card,"[[log_position_change]]");
 
@@ -1616,10 +1637,61 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
     /* target_member == select — position.rs:273-277 */
     if(target_member && !strcmp(target_member,"select"))
         return position_destination_prompt(g, actor, e, target, "select");
-    /* both target — position.rs:290-300 recurses with target "opponent", so on
-       that recursion every stamp below carries "opponent". */
-    if(target_is_both)
-        return position_destination_prompt(g, actor^1, e, "opponent", "select");
+    /* both target — position.rs:291-317. Rust RECURSES with a cloned effect whose
+       target is "opponent", and only recurses again for "self" if that first
+       pass left no awaiting choice. Recursing is what makes the arms below
+       reachable at all on that pass: the clone's target is a real player, so
+       `target_is_both` is false and `target_member` defaults to "this_member".
+
+       The previous C arm collapsed the whole branch into ONE
+       position_destination_prompt for the opponent with tail "select". That is
+       unreachable as a rotation: it neither recursed nor consulted
+       multiple_targets, so EVERY target="both" position_change stopped at a
+       prompt. Measured on PL!SP-pb1-003-R (cards/abilities.json ab#0:
+       target="both", multiple_targets=true, position="left_side", NO
+       `destination` field at all): stage[0] stayed syncrie_a instead of
+       syncrie_b, stage[1] held chisato instead of chisato-in-center-per-map,
+       and the test's "asks nothing" assertion failed because the prompt WAS
+       raised. Rust position.rs:319-326 takes the rotation arm on the recursion
+       and rotates both stages with no choice.
+
+       Order note: this arm stays BELOW the destination arm because Rust checks
+       destination FIRST (position.rs:190) and reaches the rotation check only
+       afterwards (:319). The two conditions cannot both be true for any corpus
+       ability — the only target="both" position_change effects are chisato
+       (multiple_targets + position, no destination) and PL!SP-bp5-010-*
+       (source_position only, no multiple_targets) — so the relative order is
+       not observable, and matching Rust's order is the safe choice. */
+    if(target_is_both){
+        int had_choice_before = g->queue.has_pending;
+        AbilityEffect for_opponent = both_variant(e, "opponent");
+        h_execute_position_change(g, actor, &for_opponent);
+        /* position.rs:301-315: the self arm runs immediately when the opponent
+           pass raised nothing, and is otherwise PARKED as a pending action to
+           run after that answer arrives. */
+        AbilityEffect for_self = both_variant(e, "self");
+        if(g->queue.has_pending && !had_choice_before){
+            AbilityEffect *actions[RB_ENTRY_PENDING_CAP];
+            int n=0, cur=g->queue.cur;
+            if(cur>=0 && cur<g->queue.n_entries){
+                RbQueueEntry *en=&g->queue.entries[cur];
+                for(int i=0;i<en->pending_actions_n;i++){
+                    AbilityEffect *p=en->pending_actions[i];
+                    en->pending_actions[i]=NULL;
+                    if(!p) continue;
+                    if(n<RB_ENTRY_PENDING_CAP) actions[n++]=p;
+                    else rb_effect_free(p);
+                }
+                en->pending_actions_n=0;
+            }
+            if(n<RB_ENTRY_PENDING_CAP) actions[n++]=rb_effect_deep_clone(&for_self);
+            rb_queue_store_pending_actions(g, actions, n);
+            for(int i=0;i<n;i++) rb_effect_free(actions[i]);
+            return 1;
+        }
+        h_execute_position_change(g, actor, &for_self);
+        return 1;
+    }
     /* multiple_targets + position → rotation */
     if(extra_true(e,"multiple_targets") && pos_param)
         return h_rotation(g,actor,e);
@@ -1645,10 +1717,20 @@ static int h_execute_position_change(GameState *g, int actor, const AbilityEffec
 
 /* ─────────────────────── h_rotation ─────────────────────────────────────────── */
 static int h_rotation(GameState *g, int actor, const AbilityEffect *e){
-    /* Rust execute_rotation (misc.rs:3570-3582) takes a LIST of targets —
-       `vec!["self", "opponent"]` for "both", otherwise the single target. The
-       "both" expansion happens in rb_misc_handle_both_targets, so here the
-       target is always one real player. */
+    /* Rust execute_rotation, engine/src/ability/effects/position.rs:1124-1202
+       (the "misc.rs:3570" citation that used to sit here was stale — the function
+       moved to position.rs and now sits at :1124). Reached from Rust at
+       position.rs:325, INSIDE `if target_member == "this_member"`, and
+       dispatched as ActionType::Rotation at effects/dispatch.rs:91.
+
+       Rust takes a LIST of targets — `vec!["self", "opponent"]` for "both",
+       otherwise the single target (position.rs:1130-1134) — and loops it at
+       :1136. The C never reaches that loop shape for "both": the target="both"
+       arm above RECURSES instead, once per player, so `e->target` is always one
+       real player by the time control gets here. That is behaviourally
+       equivalent (each pass rotates exactly one stage, same map, same
+       bookkeeping) and it is what makes the recursion reachable at all — but it
+       is why `t` below can never be "both". */
     int tgt = misc_target_player(actor, e);
     RbPlayer *P=&g->p[tgt];
 
@@ -1826,11 +1908,43 @@ int rb_effect_pay_cost_all_discard(GameState *g, int actor, const AbilityEffect 
      * `unwrap_or("self")` exactly: with no cost the actor's own hand goes. */
     if(e && e->target && (!strcmp(e->target,"opponent")||!strcmp(e->target,"p2")))
         who = actor^1;
+    /* handlers.rs:1691-1694 --
+     *     let source = cost.as_ref().and_then(|c| c.source_str()).unwrap_or("hand");
+     * the same `unwrap_or` shape as the target above: an ABSENT source is "hand",
+     * and with no cost at all it is still "hand", because the drain below is a
+     * hand drain either way. `source` is the ZONE LABEL the movement event
+     * records, not a routing key, so an unrecognised one degrades to ZoneId
+     * Unknown exactly as Rust's ZoneId::from_str does at modifiers.rs:2011. */
+    const char *src_label = "hand";
+    if(e && e->source && e->source[0]) src_label = e->source;
     RbPlayer *P=&g->p[who];
+    /* handlers.rs:1696-1706. Rust DRAINS the hand into a local `hand_ids`, extends
+     * the waitroom from it, and THEN pushes one movement event per card -- in that
+     * order, so every event is pushed after the card is already in the waitroom.
+     * `effect_only` is Rust's literal `false`: cost payment is a player action,
+     * not an effect, so a 「カードの効果によって」 watcher must NOT see it
+     * (handlers.rs:1702-1704, mirroring choice.rs:544). The C folded this to
+     * ZERO events, which silently dropped every cost-discard move out of
+     * batch_movements / recently_moved / cards_moved_this_turn; the prompt is
+     * routed now, so this arm is reachable and the divergence is live.
+     *
+     * `who` is the resolved discarder, which is what Rust passes as
+     * `cause_player_id` (via target_str). For a hand->discard move the
+     * opponent-cause watcher does not fire anyway -- that hook is gated on
+     * stage->stage (modifiers.rs:2070-2095, mirrored by the from_zone==STAGE
+     * test in rb_record_card_movement) -- so this value only lands in the event
+     * record. */
+    int src_zone = (int)rb_zone_id_from_str(src_label);
+    int n_moved = P->hand.n;
+    int ids[RB_MAX_HAND];
+    if (n_moved > RB_MAX_HAND) n_moved = RB_MAX_HAND;
+    for (int i = 0; i < n_moved; i++) ids[i] = P->hand.cards[i];
     while(P->hand.n>0){
         int cid=P->hand.cards[--P->hand.n];
         rb_waitroom_add(P,cid);
     }
+    for (int i = 0; i < n_moved; i++)
+        rb_record_card_movement(g, ids[i], src_zone, RB_ZONEID_DISCARD, who, 0);
     return 1;
 }
 

@@ -110,12 +110,16 @@ class Session:
     def recycle(self):
         # Swap the tab, not the browser: the socket exhaustion is per-renderer, so a
         # fresh tab is the cure and it costs a fraction of relaunching the context.
+        # If the whole context died, relaunch it - progress lives on disk, not in here.
         try:
             if self.page:
                 self.page.close()
         except Exception:
             pass
-        self.page = self.ctx.new_page()
+        try:
+            self.page = self.ctx.new_page()
+        except Exception:
+            self.open_context()
 
     def post(self, path, body=None):
         for attempt in range(3):
@@ -227,6 +231,8 @@ def phase_codes(args):
                 if page % RECYCLE_EVERY == 0:
                     s.recycle()
                     print(f"  recycled the tab at page {page} (fresh renderer)")
+                    cf.flush()
+                    mf.flush()
                 time.sleep(args.pause)
         finally:
             cf.close()

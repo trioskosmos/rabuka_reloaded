@@ -1,0 +1,53 @@
+tests/test_parity_cce_gaps.c: In function 'j8_three_skip_reveal_live':
+tests/test_parity_cce_gaps.c:3254:15: warning: unused variable 'niji' [-Wunused-variable]
+ 3254 |     const int niji[3] = { n1, n2, n3 };
+      |               ^~~~
+tests/test_parity_cce_gaps.c: At top level:
+tests/test_parity_cce_gaps.c:583:13: warning: 'note_prompt' defined but not used [-Wunused-function]
+  583 | static void note_prompt(TestGame *tg) { if (pending(tg)) prompts++; }
+      |             ^~~~~~~~~~~
+tests/test_parity_cce_gaps.c:471:13: warning: 'bare_board' defined but not used [-Wunused-function]
+  471 | static void bare_board(TestGame *tg)
+      |             ^~~~~~~~~~
+tests/test_parity_cce_gaps.c:447:13: warning: 'add_live' defined but not used [-Wunused-function]
+  447 | static void add_live(TestGame *tg, int cid)
+      |             ^~~~~~~~
+tests/test_parity_cce_gaps.c:412:12: warning: 'p2_stage_at' defined but not used [-Wunused-function]
+  412 | static int p2_stage_at(TestGame *tg, int area) { return tg->state.p[1].stage[area]; }
+      |            ^~~~~~~~~~~
+tests/test_parity_cce_gaps.c:408:12: warning: 'under_has' defined but not used [-Wunused-function]
+  408 | static int under_has(TestGame *tg, int area, int cid)
+      |            ^~~~~~~~~
+tests/test_parity_cce_gaps.c:401:12: warning: 'energy_has' defined but not used [-Wunused-function]
+  401 | static int energy_has(TestGame *tg, int cid) { return bag_has(&tg->state.p[0].energy, cid); }
+      |            ^~~~~~~~~~
+tests/test_parity_cce_gaps.c:400:12: warning: 'live_has' defined but not used [-Wunused-function]
+  400 | static int live_has(TestGame *tg, int cid)   { return bag_has(&tg->state.p[0].live, cid); }
+      |            ^~~~~~~~
+tests/test_parity_cce_gaps.c:350:12: warning: 'mh' defined but not used [-Wunused-function]
+  350 | static int mh(TestGame *tg, int cid, int color)
+      |            ^~
+tests/test_parity_cce_gaps.c:156:45: warning: 't_e6' defined but not used [-Wunused-variable]
+  156 |               t_e1, t_e2, t_e3, t_e4, t_e5, t_e6,
+      |                                             ^~~~
+tests/test_parity_cce_gaps.c:151:20: warning: 't_z' defined but not used [-Wunused-variable]
+  151 |               t_y, t_z,
+      |                    ^~~
+tests/test_parity_cce_gaps.c: In function 'prompt_shape':
+tests/test_parity_cce_gaps.c:525:14: warning: '%s' directive output may be truncated writing up to 511 bytes into a region of size between 57 and 191 [-Wformat-truncation=]
+  525 |              "kind=%d zone=\"%s\" target=\"%s\" count=%d allow_skip=%d "
+      |              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/test_parity_cce_gaps.c:526:36: note: format string is defined here
+  526 |              "n_filtered=%d desc=\"%s\"",
+      |                                    ^~
+tests/test_parity_cce_gaps.c:524:5: note: 'snprintf' output between 67 and 712 bytes into a destination of size 256
+  524 |     snprintf(buf, sizeof buf,
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~
+  525 |              "kind=%d zone=\"%s\" target=\"%s\" count=%d allow_skip=%d "
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  526 |              "n_filtered=%d desc=\"%s\"",
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  527 |              (int)c->kind, c->zone, c->target, c->count, c->allow_skip,
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  528 |              c->n_filtered_indices, c->description);
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

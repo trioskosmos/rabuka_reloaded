@@ -1,0 +1,5 @@
+parity_cost_and_effect             ok=135    FAIL=46    alias_hits=3    frees_top=409    prompt_open=343    probe=LINKED ran=yes SUMMARY-DISAGREES(forked children: log=3 parent_summary=0)
+parity_cost_compound               ok=98     FAIL=2     alias_hits=0    frees_top=74     prompt_open=1      probe=LINKED ran=yes 
+parity_conc_cost_card              ok=71     FAIL=0     alias_hits=0    frees_top=16     prompt_open=0      probe=LINKED ran=yes 
+mechanics                          ok=30     FAIL=0     alias_hits=0    frees_top=78     prompt_open=0      probe=LINKED ran=yes 
+ALIAS_PROBE_TOTAL hits=3 probed=4 unusable=0

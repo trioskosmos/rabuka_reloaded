@@ -104,6 +104,70 @@ fn slot_named(requirement: &str, slot: Option<u8>) -> bool {
     })
 }
 
+/// Every accumulator the 常時 registration pass builds.
+///
+/// These were a dozen separate locals threaded through one ~550-line loop, which is what
+/// blocked extracting the accumulation half of `recalculate_constants`: a helper needs ten
+/// `&mut` arguments, and ten `&mut` arguments plus `&mut self` do not borrow-check. One
+/// local struct keeps `&mut self` and `&mut acc` disjoint, so the accumulation can become
+/// a real method taking both.
+///
+/// Grouping only — no behaviour change. Three of the buffers come off `self`'s scratch
+/// pool so the steady state still allocates nothing; the other four never had a scratch
+/// buffer and still allocate only when first pushed, exactly as the locals did. The
+/// round-trip deliberately lives in `take_from` rather than a field initialiser because
+/// the scratch fields are `mem::take`-shaped and must come back even on an early return.
+struct ConstantAccum {
+    exp_blade: HashMap<i16, i16>,
+    exp_score: HashMap<i16, i16>,
+    exp_heart: HashMap<i16, HashMap<String, i16>>,
+    exp_prohibition: Vec<String>,
+    exp_delayed_gained_effects: SmallVec<[(i16, crate::card::AbilityEffect); 2]>,
+    expected_gained_texts: HashMap<i16, Vec<String>>,
+    exp_global_need_heart: Vec<(i16, String, i16)>,
+    exp_blade_sources: DisplaySources,
+    exp_heart_sources: DisplaySources,
+    exp_global_nh_sources: DisplaySources,
+    p1_constant_score_bonus: i16,
+    p2_constant_score_bonus: i16,
+    jyouji_statuses: Vec<crate::types::ConstantAbilityStatus>,
+}
+
+impl ConstantAccum {
+    /// Take every accumulator off the shared scratch pool, cleared.
+    fn take_from(gs: &mut GameState) -> Self {
+        gs.constant_cannot_activate_members.clear();
+        Self {
+            exp_blade: core::mem::take(&mut gs.scratch_exp_blade),
+            exp_score: core::mem::take(&mut gs.scratch_exp_score),
+            exp_heart: core::mem::take(&mut gs.scratch_exp_heart),
+            // No scratch buffer exists for these; they allocate only when first pushed,
+            // exactly as the locals they replace did.
+            exp_prohibition: Vec::new(),
+            exp_delayed_gained_effects: SmallVec::new(),
+            expected_gained_texts: HashMap::default(),
+            exp_global_need_heart: Vec::new(),
+            exp_blade_sources: DisplaySources::new(),
+            exp_heart_sources: DisplaySources::new(),
+            exp_global_nh_sources: DisplaySources::new(),
+            p1_constant_score_bonus: 0,
+            p2_constant_score_bonus: 0,
+            jyouji_statuses: Vec::new(),
+        }
+        .cleared()
+    }
+
+    /// Empty every buffer. The three scratch-backed maps come off the pool with stale
+    /// contents — the locals they replace cleared them immediately after `mem::take`, and
+    /// that has to keep happening or a previous game's constants leak into this one.
+    fn cleared(mut self) -> Self {
+        self.exp_blade.clear();
+        self.exp_score.clear();
+        self.exp_heart.clear();
+        self
+    }
+}
+
 impl GameState {
     /// Compute the opponent-front targets for a constant "正面のエリア" (front area)
     /// ability. Given the activating card's stage slot, mirrors to the opponent's
@@ -510,6 +574,66 @@ impl GameState {
         }
     }
 
+    /// The position + condition gate for one 常時 entry during registration.
+    ///
+    /// Split out of `recalculate_constants`, which was 782 lines and doing four separable
+    /// things. This half only READS state, so it stands alone; the accumulation half is not
+    /// extracted because it needs `activating_card` still set for target resolution and
+    /// `resolve_dynamic_count`, which is why the caller saves and restores that field
+    /// around BOTH halves.
+    fn constant_entry_gate_met(
+        &mut self,
+        card_id: i16,
+        ability_idx: usize,
+        effect: &crate::card::AbilityEffect,
+        entry_positions: &HashMap<i16, Option<u8>>,
+    ) -> bool {
+        let self_player = if self.player1.stage.stage.contains(&card_id) {
+            Some(&self.player1)
+        } else {
+            Some(&self.player2)
+        };
+        let mut ctx = crate::ability::condition::ConditionContext::new_with_self(self, self_player);
+        // Constant abilities register regardless of the current phase — the phase gate only
+        // matters at trigger evaluation time, not during constant registration.
+        ctx.skip_phase_gate = true;
+
+        // `activation_position` ("左サイド,右サイド" etc.) is the AUTHORITATIVE gate when
+        // present — 鬼塚夏美 SP-bp7-009 prints 「（この能力は左サイド/右サイドエリアにいる
+        // 場合のみ発動する）」 and the parser encodes BOTH slots there. Checking only
+        // `position` (which may name a single slot) broke the second listed side: moving
+        // her right never re-granted heart02.
+        let card_pos = entry_positions.get(&card_id).copied().flatten();
+        let pos_ok = if let Some(act) = effect.activation_position_any() {
+            // Any one of the listed sides satisfies the condition.
+            act.split(',')
+                .map(|p| p.trim())
+                .any(|p| slot_named(p, card_pos))
+        } else {
+            // Otherwise the targeting rule, naming at most one slot. "front" and an
+            // unstated position are not slot constraints.
+            match effect.position_any().and_then(|p| p.get_position()) {
+                Some(pos) if pos != "front" => slot_named(pos, card_pos),
+                _ => true,
+            }
+        };
+        if !pos_ok {
+            return false;
+        }
+        let cond_met = effect
+            .condition
+            .as_ref()
+            .is_none_or(|c| ctx.evaluate_condition(c));
+        log::debug!(
+            "[CONSTANT_CONDITION] zone=stage source={} ability={} action={} passes={}",
+            card_id,
+            ability_idx,
+            effect.action,
+            cond_met
+        );
+        cond_met
+    }
+
     /// Apply the accumulated constant-effect scratch results onto the live
     /// modifier state: clear old constant-derived bonuses and re-apply the new
     /// ones (blade, score, per-player score bonus, heart, prohibition, and
@@ -671,69 +795,69 @@ fn commit_constant_results(
     ///   So this asks the index OR `gained_constant_for`, which covers both — that pairing
     ///   is what makes it sound, and it is why the index is used as a *term* here rather
     ///   than as the answer.
+    /// ── No skip gate, and that is now a MEASURED decision rather than a guess ──
+    ///
+    /// Five attempts, all recorded, all failing on the same root cause until the last
+    /// one: **under-counting the sources.** `recalculate_constants` derives from FIVE
+    /// independent sources —
+    ///
+    /// 1. printed 常時 on a stage slot      \
+    /// 2. gained 常時 (`gain_ability`)      } -> `entries`, which walks stage SLOTS only
+    /// 3. hand-resident cost modifiers       -> `hand_ids`
+    /// 4. the live and success zones        -> Part B below
+    /// 5. a card UNDER a stage member       -> in no zone collection at all
+    ///
+    /// — and each omitted source produced failures that named itself. Attempt 2 missed
+    /// (4) and cost 17 failures; attempt 4 missed (5) and cost 7; and attempt 5, the
+    /// first to check all five exhaustively, passed the whole suite on its second
+    /// correction (the flag also has to include (5), or a departing host skips the pass
+    /// that removes its blade — `under_liella_host_blade_leaving_removes_blade`).
+    ///
+    /// Attempt 5 is sound, its gate is free (six emptiness tests on already
+    /// materialised slices), and its skip rate is **13.4%**. It measures at **+0.2% —
+    /// noise.** So the correct gate is worth nothing, and that is the useful result:
+    ///
+    /// **this pass is already cheap when there is nothing to do.**
+    ///
+    /// The obvious estimate said otherwise — 13.4% of ~3.5 us of "skippable work" is
+    /// ~2.6% of engine time — but the estimate assumed the empty case still costs 3.5 us.
+    /// It does not. `recalculate_constant_cost_modifiers_with_ids` iterates
+    /// `stage_ids.chain(hand_ids)`, so on the very inputs the gate tests for emptiness it
+    /// is already doing nothing; its 1.52 us average is carried by the 86% of calls that
+    /// are NOT empty, which a gate cannot touch. What the gate skips is the clearing and
+    /// the bookkeeping, and those are cheap.
+    ///
+    /// So the fat is only in the NON-empty case, and the only lever that reaches it is
+    /// making the per-常時 evaluation cheaper — which is the same work whether or not a
+    /// card is on the board. An incremental constant-source count (O(1) and complete by
+    /// construction) was the remaining idea and is unnecessary: the gate it would feed is
+    /// already worth nothing.
+    ///
+    /// Measurement note: trust the skip RATE, never gps. It is deterministic and
+    /// per-mechanism; gps is not comparable across builds because a faster engine fits
+    /// more games into the same warmup window.
+    /// Measurement note, and the reason the phase table above is not the whole story:
+    /// **each `Timer::start` in this function costs ~0.44 us.** Measured by adding two
+    /// more and watching the pass go from 5.53 us to 6.40 us — +0.87 us for two timers.
+    ///
+    /// That is the same order as most of the phases it is measuring: a pass at ~5-6 us
+    /// is roughly one timer. So the per-phase figures are each inflated by about that
+    /// amount (`cost_mods` 1.48 -> ~1.04 true, `main_loop` 0.54 -> ~0.10 true), the
+    /// residual "unaccounted" gap is largely the timers themselves, and adding
+    /// instrumentation to find the remaining cost costs more than what it finds.
+    ///
+    /// It also explains a pattern worth keeping: eleven separate micro-optimisations of
+    /// this pass measured between -5% and +5%, i.e. nothing, while the profile kept
+    /// showing a 20% hotspot. They were all being measured through an instrument that
+    /// costs ~0.44 us per reading, on a function with ~0.5 us of real work outside them.
+    ///
+    /// What to trust is the skip RATE and the end-to-end `mean_aps`, both of which are
+    /// read outside this function. gps is not comparable across builds because a faster
+    /// engine fits more games into the same warmup window.
     #[inline(never)]
     pub fn recalculate_constants(&mut self) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("recalculate_constants");
-        // ── No skip gate, and that is now a MEASURED decision rather than a guess ──
-        //
-        // Five attempts, all recorded, all failing on the same root cause until the last
-        // one: **under-counting the sources.** `recalculate_constants` derives from FIVE
-        // independent sources —
-        //
-        //   1. printed 常時 on a stage slot      \
-        //   2. gained 常時 (`gain_ability`)      } -> `entries`, which walks stage SLOTS only
-        //   3. hand-resident cost modifiers       -> `hand_ids`
-        //   4. the live and success zones        -> Part B below
-        //   5. a card UNDER a stage member       -> in no zone collection at all
-        //
-        // — and each omitted source produced failures that named itself. Attempt 2 missed
-        // (4) and cost 17 failures; attempt 4 missed (5) and cost 7; and attempt 5, the
-        // first to check all five exhaustively, passed the whole suite on its second
-        // correction (the flag also has to include (5), or a departing host skips the pass
-        // that removes its blade — `under_liella_host_blade_leaving_removes_blade`).
-        //
-        // Attempt 5 is sound, its gate is free (six emptiness tests on already
-        // materialised slices), and its skip rate is **13.4%**. It measures at **+0.2% —
-        // noise.** So the correct gate is worth nothing, and that is the useful result:
-        //
-        //     **this pass is already cheap when there is nothing to do.**
-        //
-        // The obvious estimate said otherwise — 13.4% of ~3.5 us of "skippable work" is
-        // ~2.6% of engine time — but the estimate assumed the empty case still costs 3.5 us.
-        // It does not. `recalculate_constant_cost_modifiers_with_ids` iterates
-        // `stage_ids.chain(hand_ids)`, so on the very inputs the gate tests for emptiness it
-        // is already doing nothing; its 1.52 us average is carried by the 86% of calls that
-        // are NOT empty, which a gate cannot touch. What the gate skips is the clearing and
-        // the bookkeeping, and those are cheap.
-        //
-        // So the fat is only in the NON-empty case, and the only lever that reaches it is
-        // making the per-常時 evaluation cheaper — which is the same work whether or not a
-        // card is on the board. An incremental constant-source count (O(1) and complete by
-        // construction) was the remaining idea and is unnecessary: the gate it would feed is
-        // already worth nothing.
-        //
-        // Measurement note: trust the skip RATE, never gps. It is deterministic and
-        // per-mechanism; gps is not comparable across builds because a faster engine fits
-        // more games into the same warmup window.
-        // Measurement note, and the reason the phase table above is not the whole story:
-        // **each `Timer::start` in this function costs ~0.44 us.** Measured by adding two
-        // more and watching the pass go from 5.53 us to 6.40 us — +0.87 us for two timers.
-        //
-        // That is the same order as most of the phases it is measuring: a pass at ~5-6 us
-        // is roughly one timer. So the per-phase figures are each inflated by about that
-        // amount (`cost_mods` 1.48 -> ~1.04 true, `main_loop` 0.54 -> ~0.10 true), the
-        // residual "unaccounted" gap is largely the timers themselves, and adding
-        // instrumentation to find the remaining cost costs more than what it finds.
-        //
-        // It also explains a pattern worth keeping: eleven separate micro-optimisations of
-        // this pass measured between -5% and +5%, i.e. nothing, while the profile kept
-        // showing a 20% hotspot. They were all being measured through an instrument that
-        // costs ~0.44 us per reading, on a function with ~0.5 us of real work outside them.
-        //
-        // What to trust is the skip RATE and the end-to-end `mean_aps`, both of which are
-        // read outside this function. gps is not comparable across builds because a faster
-        // engine fits more games into the same warmup window.
         tdbg!("RC:0 ENTERED");
         // Measures the PROLOGUE — scratch takes, the `entry_positions` map, and the
         // `mods.constant_*` clears — which the `recalc::collect` timer starts after and so
@@ -759,26 +883,11 @@ fn commit_constant_results(
         let card_db = self.card_database.clone();
 
         // Reuse pre-allocated scratch buffers to avoid allocation storm
-        let mut exp_blade = core::mem::take(&mut self.scratch_exp_blade);
-        exp_blade.clear();
-        let mut exp_score = core::mem::take(&mut self.scratch_exp_score);
-        exp_score.clear();
-        let mut exp_heart = core::mem::take(&mut self.scratch_exp_heart);
-        exp_heart.clear();
-        let mut exp_prohibition: Vec<String> = Vec::new();
-        let mut exp_delayed_gained_effects = SmallVec::new();
-        let mut expected_gained_texts: HashMap<i16, Vec<String>> = HashMap::default();
-        self.constant_cannot_activate_members.clear();
-        let mut exp_global_need_heart: Vec<(i16, String, i16)> = Vec::new();
-        // Per-source attribution for everything accumulated below (UI bonus
-        // provenance). Mirrors the exp_* maps entry-for-entry. Gated: see
-        // `DisplaySources`.
-        let mut exp_blade_sources = DisplaySources::new();
-        let mut exp_heart_sources = DisplaySources::new();
-        let mut exp_global_nh_sources = DisplaySources::new();
-        let mut p1_constant_score_bonus: i16 = 0;
-        let mut p2_constant_score_bonus: i16 = 0;
-        let mut jyouji_statuses: Vec<crate::types::ConstantAbilityStatus> = Vec::new();
+        // All accumulators for the 常時 pass, in one struct. These were a dozen
+        // separate locals threaded through one ~550-line loop, which is what blocked
+        // extracting the accumulation half: any helper needs ten `&mut` arguments.
+        // A single local struct keeps `&mut self` and `&mut acc` disjoint.
+        let mut acc = ConstantAccum::take_from(self);
         tdbg!("RC:3 VEC_HASHMAP_INIT_OK");
 
         let mut entry_positions = core::mem::take(&mut self.scratch_entry_positions);
@@ -815,49 +924,18 @@ fn commit_constant_results(
             // allocated per entry even when the condition failed.
 
             {
-                let self_player = if self.player1.stage.stage.contains(&card_id) {
-                    Some(&self.player1)
-                } else {
-                    Some(&self.player2)
-                };
-                let mut ctx =
-                    crate::ability::condition::ConditionContext::new_with_self(self, self_player);
-                // Constant abilities should register their effects regardless
-                // of the current phase — the phase gate only matters at trigger
-                // evaluation time, not during constant registration.
-                ctx.skip_phase_gate = true;
+                // Gate only: position + condition. The accumulation below still needs
+                // `activating_card` set (target resolution and `resolve_dynamic_count` read
+                // it), so `activating_card` is saved and restored by the CALLER around both
+                // halves — which is why this half is extracted and the other is not.
+                let cond_met = self.constant_entry_gate_met(
+                    card_id,
+                    ability_idx,
+                    effect,
+                    &entry_positions,
+                );
 
-                // activation_position ("左サイド,右サイド" etc.) is the AUTHORITATIVE
-                // gate when present — cards like 鬼塚夏美 SP-bp7-009 print
-                // 「（この能力は左サイド/右サイドエリアにいる場合のみ発動する）」 and the
-                // parser encodes both slots there. Checking only `position` (which
-                // may name a single slot) broke the second listed side: moving her
-                // right never re-granted heart02.
-                let card_pos = entry_positions.get(&card_id).copied().flatten();
-                let pos_ok = if let Some(act) = effect.activation_position_any() {
-                    // The authoritative gate, and the parser can list several
-                    // sides in it — any one of them satisfies the condition.
-                    act.split(',')
-                        .map(|p| p.trim())
-                        .any(|p| slot_named(p, card_pos))
-                } else {
-                    // Otherwise the targeting rule, which names at most one slot.
-                    // "front" and an unstated position are not slot constraints.
-                    match effect.position_any().and_then(|p| p.get_position()) {
-                        Some(pos) if pos != "front" => slot_named(pos, card_pos),
-                        _ => true,
-                    }
-                };
-
-                if pos_ok {
-                    let cond_met = effect
-                        .condition
-                        .as_ref()
-                        .is_none_or(|c| ctx.evaluate_condition(c));
-                    log::debug!("[CONSTANT_CONDITION] zone=stage source={} ability={} action={} passes={}",
-                        card_id, ability_idx, effect.action, cond_met);
-
-                    if cond_met {
+                if cond_met {
                         // Record jyouji status for this card (lazily capture
                         // name/owner only now that the condition passed).
                         // Skipped under `headless` — display-only summary data.
@@ -872,13 +950,13 @@ fn commit_constant_results(
                             } else {
                                 self.player2.id.clone()
                             };
-                            jyouji_statuses.push(crate::types::ConstantAbilityStatus {
+                            acc.jyouji_statuses.push(crate::types::ConstantAbilityStatus {
                                 card_id,
                                 card_name: status_card_name.clone(),
                                 owner: status_owner.to_string(),
                                 zone: "stage".to_string(),
                                 ability_text: ui_text(&effect.text),
-                                all_conditions_met: pos_ok && cond_met,
+                                all_conditions_met: cond_met,
                                 conditions: vec![crate::types::ConditionResult {
                                     text: "条件".to_string(),
                                     passed: cond_met,
@@ -979,8 +1057,8 @@ fn commit_constant_results(
                                             == Some("front");
                                         if is_front {
                                             for tid in self.constant_front_targets(card_id, effect) {
-                                                *exp_blade.entry(tid).or_insert(0) += delta;
-                                                exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
+                                                *acc.exp_blade.entry(tid).or_insert(0) += delta;
+                                                acc.exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
                                                     source_card_id: card_id,
                                                     ability_text: ui_text(&effect.text),
                                                     target_card_id: tid,
@@ -1020,8 +1098,8 @@ fn commit_constant_results(
                                                     continue;
                                                 }
                                             }
-                                                *exp_blade.entry(mid).or_insert(0) += delta;
-                                                exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
+                                                *acc.exp_blade.entry(mid).or_insert(0) += delta;
+                                                acc.exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
                                                     source_card_id: card_id,
                                                     ability_text: ui_text(&effect.text),
                                                     target_card_id: mid,
@@ -1031,8 +1109,8 @@ fn commit_constant_results(
                                                 });
                                             }
                                         } else {
-                                            *exp_blade.entry(card_id).or_insert(0) += delta;
-                                            exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
+                                            *acc.exp_blade.entry(card_id).or_insert(0) += delta;
+                                            acc.exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
                                                 source_card_id: card_id,
                                                 ability_text: ui_text(&effect.text),
                                                 target_card_id: card_id,
@@ -1086,12 +1164,12 @@ fn commit_constant_results(
                                             i16::from(effect.count_any().unwrap_or(1))
                                         };
                                         if crate::ability::util::is_all_heart_type(effect) {
-                                            *exp_heart
+                                            *acc.exp_heart
                                                 .entry(card_id)
                                                 .or_default()
                                                 .entry(crate::ability::util::HEART_ALL_KEY.to_string())
                                                 .or_insert(0) += i16::try_from(n).unwrap();
-                                            exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
+                                            acc.exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
                                                 source_card_id: card_id,
                                                 ability_text: ui_text(&effect.text),
                                                 target_card_id: card_id,
@@ -1103,12 +1181,12 @@ fn commit_constant_results(
                                             let hc_list = effect.heart_colors_any();
                                             let per_entry = n / hc_list.len().max(1).max(1) as i16;
                                             for hc in hc_list {
-                                                *exp_heart
+                                                *acc.exp_heart
                                                     .entry(card_id)
                                                     .or_default()
                                                     .entry(hc.clone())
                                                     .or_insert(0) += per_entry;
-                                                exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
+                                                acc.exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
                                                     source_card_id: card_id,
                                                     ability_text: ui_text(&effect.text),
                                                     target_card_id: card_id,
@@ -1146,12 +1224,12 @@ fn commit_constant_results(
                                     let belongs_to_p1 =
                                         self.player1.stage.stage.contains(&card_id);
                                     if belongs_to_p1 {
-                                        p1_constant_score_bonus += sv;
+                                        acc.p1_constant_score_bonus += sv;
                                     } else {
-                                        p2_constant_score_bonus += sv;
+                                        acc.p2_constant_score_bonus += sv;
                                     }
                                 } else {
-                                    *exp_score.entry(card_id).or_insert(0) += sv;
+                                    *acc.exp_score.entry(card_id).or_insert(0) += sv;
                                 }
                             }
                             crate::ability::enums::ActionType::Restriction => {
@@ -1167,7 +1245,7 @@ fn commit_constant_results(
                                     // to prohibition_effects would incorrectly block manual
                                     // ability activation via is_action_prohibited.
                                     if rt != "cannot_activate" {
-                                        exp_prohibition.push(format!(
+                                        acc.exp_prohibition.push(format!(
                                             "const_restriction:{},card={},cardname={}:",
                                             rt, card_id, card_name
                                         ));
@@ -1220,12 +1298,12 @@ fn commit_constant_results(
                                         .is_some_and(|t| t.contains("ALL"))
                                 {
                                     // All-heart: store as single "all" entry (HeartColor::All)
-                                    *exp_heart
+                                    *acc.exp_heart
                                         .entry(card_id)
                                         .or_default()
                                         .entry("all".to_string())
                                         .or_insert(0) += 1i16;
-                                    exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
+                                    acc.exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
                                         source_card_id: card_id,
                                         ability_text: ui_text(&effect.text),
                                         target_card_id: card_id,
@@ -1238,12 +1316,12 @@ fn commit_constant_results(
                                     // Determine which player this card belongs to
                                     let belongs_to_p1 = self.player1.stage.stage.contains(&card_id);
                                     let bonus_target = if belongs_to_p1 {
-                                        &mut p1_constant_score_bonus
+                                        &mut acc.p1_constant_score_bonus
                                     } else {
-                                        &mut p2_constant_score_bonus
+                                        &mut acc.p2_constant_score_bonus
                                     };
 
-                                    let texts = expected_gained_texts.entry(card_id).or_default();
+                                    let texts = acc.expected_gained_texts.entry(card_id).or_default();
                                     if !texts.iter().any(|text| text == gain_text) {
                                         texts.push(ui_text(gain_text));
                                     }
@@ -1270,7 +1348,7 @@ fn commit_constant_results(
                                             // based on revealed card count) can't be evaluated at
                                             // constant evaluation time.  Store them for later
                                             // evaluation during execute_live_victory_determination.
-                                            exp_delayed_gained_effects
+                                            acc.exp_delayed_gained_effects
                                                 .push((card_id, gained.clone()));
                                         }
                                     } else {
@@ -1326,12 +1404,12 @@ fn commit_constant_results(
                                 let host_id = card_id;
                                 for card_id in &target_player.live_card_zone.cards {
                                     for color in colors.clone() {
-                                        exp_global_need_heart.push((
+                                        acc.exp_global_need_heart.push((
                                             *card_id,
                                             color.to_string(),
                                             delta,
                                         ));
-                                        exp_global_nh_sources.push(
+                                        acc.exp_global_nh_sources.push(
                                             crate::core::game_modifiers::BonusSource {
                                                 source_card_id: host_id,
                                                 ability_text: ui_text(&effect.text),
@@ -1346,6 +1424,18 @@ fn commit_constant_results(
                             }
                             crate::ability::enums::ActionType::Sequential => {
                                 if let Some(ref actions) = effect.compound.actions {
+                                    // A nested condition needs its own context: the one
+                                    // inside `constant_entry_gate_met` is gone by the time
+                                    // the accumulation half runs. Same construction as that
+                                    // helper — `skip_phase_gate` for the same reason.
+                                    let self_player = if self.player1.stage.stage.contains(&card_id)
+                                    {
+                                        Some(&self.player1)
+                                    } else {
+                                        Some(&self.player2)
+                                    };
+                                    let mut ctx = crate::ability::condition::ConditionContext::new_with_self(self, self_player);
+                                    ctx.skip_phase_gate = true;
                                     for sub in actions {
                                         let sub_cond = sub
                                             .condition
@@ -1363,8 +1453,8 @@ fn commit_constant_results(
                                                         sub.resource_icon_count_any()
                                                             .unwrap_or(sub.count.unwrap_or(1)),
                                                     );
-                                                    *exp_blade.entry(card_id).or_insert(0) += n;
-                                                    exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
+                                                    *acc.exp_blade.entry(card_id).or_insert(0) += n;
+                                                    acc.exp_blade_sources.push(crate::core::game_modifiers::BonusSource {
                                                         source_card_id: card_id,
                                                         ability_text: ui_text(&effect.text),
                                                         target_card_id: card_id,
@@ -1386,12 +1476,12 @@ fn commit_constant_results(
                                                         n.i32_count() / hc_list.len().max(1).i32_count(),
                                                     );
                                                     for hc in hc_list {
-                                                        *exp_heart
+                                                        *acc.exp_heart
                                                             .entry(card_id)
                                                             .or_default()
                                                             .entry(hc.clone())
                                                             .or_insert(0) += per_color;
-                                                        exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
+                                                        acc.exp_heart_sources.push(crate::core::game_modifiers::BonusSource {
                                                             source_card_id: card_id,
                                                             ability_text: ui_text(&effect.text),
                                                             target_card_id: card_id,
@@ -1411,7 +1501,6 @@ fn commit_constant_results(
                         }
                     }
                 }
-            }
 
             // Restore the previous activating_card
             self.activating_card = prev_activating;
@@ -1419,7 +1508,7 @@ fn commit_constant_results(
         let previous_gained_texts = core::mem::take(&mut self.constant_gained_abilities);
         for (card_id, texts) in previous_gained_texts {
             for text in texts {
-                if expected_gained_texts
+                if acc.expected_gained_texts
                     .get(&card_id)
                     .is_some_and(|expected| expected.contains(&text))
                 {
@@ -1440,7 +1529,7 @@ fn commit_constant_results(
                 }
             }
         }
-        for (card_id, texts) in expected_gained_texts {
+        for (card_id, texts) in acc.expected_gained_texts {
             for text in texts {
                 let gained = self.gained_abilities.entry(card_id).or_default();
                 if !gained.contains(&text) {
@@ -1459,8 +1548,8 @@ fn commit_constant_results(
         }
         // Recycle entry_positions allocation into scratch buffer
         self.scratch_entry_positions = entry_positions;
-        let _jyouji_len = jyouji_statuses.len();
-        self.constant_ability_statuses = jyouji_statuses.into();
+        let _jyouji_len = acc.jyouji_statuses.len();
+        self.constant_ability_statuses = acc.jyouji_statuses.into();
 tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
         // `Option` + `take` rather than a plain `let _t = Timer::start(..)` binding: a
         // guard dropped at end of scope NESTS, so three of them report as
@@ -1478,22 +1567,22 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
         // timer — it walks `stage.under_cards` directly and is in no zone collection.
         // Four earlier attempts to gate this pass missed it, which is what
         // `under_liella_member_constant_host_blade_*` kept reporting.
-        self.grant_under_card_constant_blades(&mut exp_blade, &mut exp_blade_sources);
+        self.grant_under_card_constant_blades(&mut acc.exp_blade, &mut acc.exp_blade_sources);
 
         // Takes TEN collections by value, so each call both moves ~10 Vec/SmallVec/HashMap
         // headers into `mods` and drops the displaced ones — a deallocation per populated
         // accumulator. That is the other half of what the phase timers did not cover.
         self.commit_constant_results(
-            exp_blade,
-            exp_score,
-            exp_heart,
-            exp_prohibition,
-            exp_global_need_heart,
-            exp_blade_sources,
-            exp_heart_sources,
-            exp_global_nh_sources,
-            p1_constant_score_bonus,
-            p2_constant_score_bonus,
+            acc.exp_blade,
+            acc.exp_score,
+            acc.exp_heart,
+            acc.exp_prohibition,
+            acc.exp_global_need_heart,
+            acc.exp_blade_sources,
+            acc.exp_heart_sources,
+            acc.exp_global_nh_sources,
+            acc.p1_constant_score_bonus,
+            acc.p2_constant_score_bonus,
         );
 
         // Also recalculate cost modifiers from hand cards (hand-based cost reductions)
@@ -1511,7 +1600,7 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
         self.evaluate_success_zone_constant_modifiers();
         tdbg!("RC:14b SUCCESS_ZONE_DONE");
         self.refresh_yell_sources();
-        self.delayed_gained_effects = exp_delayed_gained_effects;
+        self.delayed_gained_effects = acc.exp_delayed_gained_effects;
     }
 
     /// G8: set each player's yell source from 常時 yell_source_modifier live cards

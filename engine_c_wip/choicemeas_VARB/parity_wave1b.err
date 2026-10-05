@@ -1,0 +1,337 @@
+--- heart index map (rb_heart_color_as_str) ---
+    index 0 -> "heart00" -> enum 0
+    index 1 -> "heart01" -> enum 1
+    index 2 -> "heart02" -> enum 2
+    index 3 -> "heart03" -> enum 3
+    index 4 -> "heart04" -> enum 4
+    index 5 -> "heart05" -> enum 5
+    index 6 -> "heart06" -> enum 6
+--- group / unit names (group is SERIES-LEVEL) ---
+    PL!HS-pb1-001-R        id=819    cost=11  blade=3   group="蓮ノ空" unit="スリーズブーケ"
+    PL!HS-sd1-012-SD       id=914    cost=4   blade=1   group="蓮ノ空" unit="スリーズブーケ"
+    PL!HS-pb1-003-R        id=823    cost=15  blade=5   group="蓮ノ空" unit="みらくらぱーく！"
+    PL!HS-pb1-009-R        id=835    cost=15  blade=4   group="蓮ノ空" unit="スリーズブーケ"
+    PL!HS-sd1-001-SD       id=903    cost=9   blade=2   group="蓮ノ空" unit="スリーズブーケ"
+    PL!HS-sd1-012-SD       id=914    cost=4   blade=1   group="蓮ノ空" unit="スリーズブーケ"
+    PL!HS-bp6-019-N        id=773    cost=5   blade=2   group="蓮ノ空" unit="みらくらぱーく！"
+    PL!HS-pb1-019-N        id=852    cost=2   blade=1   group="蓮ノ空" unit="みらくらぱーく！"
+    PL!SP-bp5-005-R＋     id=2251   cost=11  blade=1   group="Liella!" unit="KALEIDOSCORE"
+    PL!SP-bp1-002-R＋     id=2029   cost=4   blade=0   group="Liella!" unit="KALEIDOSCORE"
+    PL!SP-bp1-004-R        id=2037   cost=15  blade=2   group="Liella!" unit="CatChu!"
+    PL!SP-bp2-021-N        id=2135   cost=4   blade=1   group="Liella!" unit="KALEIDOSCORE"
+    PL!SP-bp2-015-N        id=2129   cost=4   blade=1   group="Liella!" unit="CatChu!"
+    PL!S-bp3-020-L         id=1686   cost=0   blade=0   group="Aqours" unit=""
+    PL!S-sd1-003-SD        id=1967   cost=11  blade=3   group="Aqours" unit="AZALEA"
+    PL!-pb2-040-L          id=468    cost=0   blade=0   group="μ's" unit="Printemps"
+    PL!-bp6-017-N          id=286    cost=2   blade=0   group="μ's" unit="Printemps"
+    PL!-bp5-012-N          id=215    cost=4   blade=1   group="μ's" unit="Printemps"
+    PL!-pb1-026-N          id=350    cost=4   blade=1   group="μ's" unit="Printemps"
+    PL!-pb2-012-P＋       id=433    cost=13  blade=4   group="μ's" unit="Printemps"
+    PL!S-bp5-012-N         id=1736   cost=2   blade=0   group="Aqours" unit="AZALEA"
+    PL!-sd1-002-SD         id=489    cost=2   blade=1   group="μ's" unit="BiBi"
+    PL!-sd1-010-SD         id=498    cost=4   blade=1   group="μ's" unit="Printemps"
+    LL-E-001-SD            id=1      cost=0   blade=0   group="μ's" unit=""
+--- assertion literals used above ---
+    GRP_HASUNO  = "蓮ノ空"
+    GRP_LIELLA  = "Liella!"
+    UNIT_SUZUKE = "スリーズブーケ"
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=conditional_on_optional
+[RESUME_ANY] kind=2 zone= target=conditional_optional route=0 mode=0 idx=1
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+        [info] A1 accept=1 played=1 ally_on_stage=1 prompts jidou=1/1-target live_start=0/0-target queued=1 | active 5->1->1 | blade=0 heart04=0 | CENSUS 49/49/49 | waitroom 0/0/0
+FAIL: A1+: ab#0 paid 1E out of the 1 the 4-cost ally left (1->0) and activated the 2 waited (0->2).  The zone must hold 2 active for ab#1. (got 1 expected 2)
+FAIL: A1+: VACUITY CONTROL -- ab#1's 2E payment really was OFFERED as a SelectTarget (0)
+FAIL: A1+: ab#1 spent exactly the 2 energy ab#0 activated -- the zone empties. This is the link: the sibling's payment is funded by the jidou. (got 1 expected 0)
+FAIL: A1+: ab#1 granted its ブレード to 花帆 (EXACT, not > 0: the grant is a fixed amount) (got 0 expected 1)
+FAIL: A1+: ab#1 also granted heart04, as printed (got 0 expected 1)
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=conditional_on_optional
+[RESUME_ANY] kind=2 zone= target=conditional_optional route=0 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0x0 cur=0 n=1 state=4 pending=1
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+        [info] A1 accept=0 played=1 ally_on_stage=1 prompts jidou=1/1-target live_start=0/0-target queued=1 | active 5->1->1 | blade=0 heart04=0 | CENSUS 49/49/49 | waitroom 0/0/0
+FAIL: A2: ab#1's 2E payment was still offered on a board with only 1 active energy (0 SelectTarget)
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+        [info] A3 events=2 queued=1/1/0 use=1/2/0 blade=1/2/0 heart01=1/2/0 CENSUS 1,1,0
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+        [info] A3 events=2 queued=1/1/0 use=1/2/0 blade=1/2/0 heart01=1/2/0 CENSUS 1,1,0
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=1 'player1' -> 'p1'
+        [info] A3 events=3 queued=1/1/0 use=1/2/2 blade=1/2/2 heart01=1/2/2 CENSUS 1,1,1
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=gain_resource
+        [info] A6+ after appearance: host blade_mod=2 total=6 | ally0(PL!HS-sd1-001-SD) blade_mod=2 | use(host,ab0)=1 deck=40 hand=1 CENSUS 113->113
+FAIL: A6+: the appearing ally must NOT receive the blades; only the センター host does (got 2 expected 0)
+        [info] A6+ live start: queued=1 targets=0 cards=0 deck 40->40 hand 1->1 CENSUS 113->113
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=gain_resource
+[QUEUE_PID_NORMALIZE] entry=1 card=2639 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=1 n=2 cid=2639 ab=0 actor=0 action=gain_resource
+[RESUME_ANY] kind=1 zone=hand target= route=3 mode=0 idx=0
+[RESUME_CAPTURE] def=0x0 target=0x0 eff=0xa00198910 cur=2 n=3 state=3 pending=1
+[CHOICE_EPILOGUE] pending=0 options=0 reprompt=0 queue_actions=0 resolver_pending=0
+[CHOICE_RESUME_END] pending=0 state=1 options=0 reprompt=0
+MARK:free_keepalive pending=0
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=gain_resource
+[QUEUE_PID_NORMALIZE] entry=1 card=2639 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=1 n=2 cid=2639 ab=0 actor=0 action=gain_resource
+FAIL: A9: the first appearing 蓮ノ空 member must not receive the blades (got 4 expected 0)
+[QUEUE_PID_NORMALIZE] entry=0 card=2639 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=gain_resource
+[QUEUE_PID_NORMALIZE] entry=1 card=2639 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=1 n=2 cid=2639 ab=0 actor=0 action=gain_resource
+[TEST_BATON_TOUCH] test_play_to_stage(2645, area 0): area 0 already holds card 2641, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[QUEUE_PID_NORMALIZE] entry=2 card=2639 ab=0 'player1' -> 'p1'
+[QUEUE_PID_NORMALIZE] entry=3 card=2643 ab=0 'player1' -> 'p1'
+[QUEUE_EXEC] idx=2 n=5 cid=2639 ab=0 actor=0 action=gain_resource
+[QUEUE_EXEC] idx=3 n=5 cid=2643 ab=0 actor=0 action=change_state
+[QUEUE_EXEC] idx=4 n=5 cid=2641 ab=0 actor=0 action=change_state
+        [info] A10 turn2: host blade_mod=6 total=10 use=2 CENSUS 116->116 deck=40 hand=2 wait=1
+[TEST_BATON_TOUCH] test_play_to_stage(2642, area 1): area 1 already holds card 2639, so this play BATON-TOUCHES it (the occupant is replaced and goes to the waitroom). Rust's TestGame::play_to_stage panics here (helpers/mod.rs:391); use test_play_to_stage_for / test_try_play_to_stage if the swap is intended.
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=sequential
+        [info] A11 played=1 queued_after_play=0 deck 40->40->40 hand 0->0 waitroom 0->1->1 CENSUS 98->98 prompts play=0 baton=0 scan=0 on_screen_at_end=0
+FAIL: A11: カードを2枚引き -- exactly 2 (got 0 expected 2)
+FAIL: A11: 手札を2枚控え室に置く (the two discards join the baton arrival and herself): waitroom 0 -> 1
+        [info] A12 pay=1 accepted=1 offered=0 milled_in_wait=3 blade=3 deck 13->10 waitroom 0->3 hand 0->0 recovered=0() still_in_wait=0 CENSUS 27/27/27
+        [info] A12 waitroom now holds: PL!SP-bp1-002-R＋ PL!SP-bp1-004-R PL!-sd1-010-SD
+        [info] A12 deck head: PL!-sd1-010-SD PL!-sd1-010-SD PL!-sd1-010-SD PL!-sd1-010-SD
+FAIL: A12+: ab#0 -- the 起動 milled 2 「Liella!」 members -> ブレード 2.  This reads the SAME batch ab#1 recovers from. (got 3 expected 2)
+FAIL: A12+: ab#1 MUST fire on the 起動's own mill of 3 cards into the 控え室 (0 SelectTarget offered).  If this is absent the 自動 and the 起動 are not coupled and the pair's whole point is void.
+FAIL: A12+: ab#1 adds EXACTLY 1 of 「それらのカード」 to hand (got 0, hand 0->0).  A card from outside the mill would mean ab#1 read the wrong batch. (got 0 expected 1)
+FAIL: A12+: ab#1 recovers 1 card to hand (got 0 expected 1)
+        [info] A12 pay=0 accepted=1 offered=0 milled_in_wait=3 blade=3 deck 13->10 waitroom 0->3 hand 0->0 recovered=0() still_in_wait=0 CENSUS 27/27/27
+        [info] A12 waitroom now holds: PL!SP-bp1-002-R＋ PL!SP-bp1-004-R PL!-sd1-010-SD
+        [info] A12 deck head: PL!-sd1-010-SD PL!-sd1-010-SD PL!-sd1-010-SD PL!-sd1-010-SD
+FAIL: A13: ab#1 must be OFFERED after the 起動 mills, even though the player will decline the E (0 SelectTarget)
+FAIL: A13: declining ab#1 must not change ab#0's ブレード -- the 起動's blade is earned by the mill itself, independent of the choice (got 3 expected 2)
+        [info] A14 live PL!S-bp3-020-L prints score 1 (blade 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=4 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_QUEUE] cid=2639 ability=0 passes=1 occurred=1 revealed=4
+[YELL_PERFORM] queued=1 entries=1 state=0 occurred=1 revealed=4
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=4 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=gain_resource
+[YELL_DRAIN] cid=2639 action=gain_resource has_cond=1 cond=0xa001968a0 pending=0
+[YELL_EXEC_ENTER] host=2639 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=4
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=4 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_EXEC_COND] host=2639 occurred=1 revealed=4 result=1
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=4 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,2,1,2,1,1,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,1,0,1,1,0,0] filled=[0,0,1,0,1,1,0,0]
+        [info] A14 watcher=PL!SP-bp2-021-N live=PL!S-bp3-020-L yell=0 revealed=4 prompts=0 heart03=1 heart06=0 phase=13 CENSUS 138->138
+FAIL: A14+: g->yell_occurred is still 0 at the assertion site.  The engine logs occurred=1 at yell time and clears the flag inside the SAME pass, so the Rust `state.yell_occurred` observation has no C twin at this vantage point (the yell itself is proven by the line above and by heart03=1).
+        [info] A14 live PL!S-bp3-020-L prints score 1 (blade 0)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=4 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_QUEUE] cid=2639 ability=0 passes=1 occurred=1 revealed=4
+[YELL_PERFORM] queued=1 entries=1 state=0 occurred=1 revealed=4
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=4 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[QUEUE_EXEC] idx=0 n=1 cid=2639 ab=0 actor=0 action=gain_resource
+[YELL_DRAIN] cid=2639 action=gain_resource has_cond=1 cond=0xa001968a0 pending=0
+[YELL_EXEC_ENTER] host=2639 action=gain_resource has_cond=1 pending=0 occurred=1 revealed=4
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=4 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_EXEC_COND] host=2639 occurred=1 revealed=4 result=1
+[YELL_COND] host=2639 loc=revealed_cards occurred=1 revealed=4 property=has_blade_heart negation=1
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[YELL_PROPERTY] id=2642 no=LL-E-001-SD num_blade=0 base=0 hearts=0 has=0
+[LIVE_ALLOCATION] pl=0 lives=1 hearts=[0,0,2,1,2,1,1,0]
+[LIVE_ALLOCATION_CARD] idx=0 need=[0,0,1,0,1,1,0,0] filled=[0,0,1,0,1,1,0,0]
+        [info] A14 watcher=PL!SP-bp2-015-N live=PL!S-bp3-020-L yell=0 revealed=4 prompts=0 heart03=0 heart06=1 phase=13 CENSUS 138->138
+FAIL: A15: precondition -- g->yell_occurred is transient in C (logged occurred=1 at yell time, cleared inside the same pass)
+[LIVE_ZONE_REFILL] pl=0 placed=1 hand_before=0 hand_after=1
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,0,3,1,2,1,1,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=2 hand_after=2
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=2 hand_after=2
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,0,3,1,2,1,1,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=3 hand_after=3
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=3 hand_after=3
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,0,3,1,2,1,1,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=4 hand_after=4
+        [info] A16 yell_ever=0 revealed_peak=0 yell_flag_now=0 heart03=0 heart06=0 CENSUS 99->99
+        [info] B staged=0 activated=0 queued=1 heart00_mod=0 prompts=3 CENSUS 80/81/81 phase=6 turn=1
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,1,0,1,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+        [info] B staged=1 activated=1 queued=1 heart00_mod=-3 prompts=3 CENSUS 81/82/82 phase=6 turn=2
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,1,0,2,0,0,1,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+        [info] B staged=2 activated=1 queued=1 heart00_mod=-5 prompts=3 CENSUS 82/83/83 phase=6 turn=2
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,1,0,4,0,0,1,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+        [info] B staged=3 activated=1 queued=1 heart00_mod=-6 prompts=3 CENSUS 83/84/84 phase=6 turn=2
+        [info] B staged=3 activated=0 queued=1 heart00_mod=-6 prompts=3 CENSUS 83/84/84 phase=6 turn=1
+FAIL: B5: 「このターン中に…アクティブにしていた」 -- three Printemps are staged but NONE was switched out of wait this turn, so no step may apply.  The 2人/3人 clauses are elliptical and inherit the history gate from the 1人 clause; before the Rust parser fix they parsed without it and this read -6. (got -6 expected 0)
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,1,0,1,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+        [info] B staged=1 activated=1 queued=1 heart00_mod=-3 prompts=3 CENSUS 81/82/82 phase=6 turn=2
+[LIVE_ZONE_REFILL] pl=0 placed=0 hand_before=0 hand_after=0
+[LIVE_ZONE_REFILL] pl=1 placed=0 hand_before=1 hand_after=1
+[LIVE_SUCCESS_SIDE] pl=0 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_SUCCESS_SIDE] pl=1 queued=0 queue=0->0 processed=0 pending=0
+[LIVE_ALLOCATION] pl=0 lives=0 hearts=[0,1,0,1,0,0,0,0]
+[LIVE_ALLOCATION] pl=1 lives=0 hearts=[0,0,0,0,0,0,0,0]
+[LIVE_SCORE] p1=0 p2=0
+[LIVE_SUCCESS_RESULT] pl=0 won=0 must_skip=0 card=-1 can_place=0 live=0
+[LIVE_SUCCESS_RESULT] pl=1 won=0 must_skip=0 card=-1 can_place=0 live=0
+[FIRST_ATTACKER_RULE_8_4_13] first_attacker unchanged (=0) p1_added=0 p2_added=0
+[LIVE_SUCCESS_SUMMARY] p1_won=0 p2_won=0 p1_succ=0(+0) p2_succ=0(+0)
+[LIVE_VICTORY_PHASE] initial pending=0
+        [info] B7 queued=1 heart00_mod=-3 CENSUS 82->82
+    effect extra[0] "group_names" = Printemps
+    effect extra[1] "activated_this_turn" = true
+    effect extra[2] "heart_colors" = heart00
+    effect extra[3] "heart_color" = heart00
+    effect extra[0] "heart_colors" = heart00
+    effect extra[1] "heart_color" = heart00
+    effect extra[2] "operation" = decrease
+    effect extra[3] "self_target" = true
+    effect extra[4] "group_names" = Printemps
+    effect extra[5] "value" = 3
+    effect extra[6] "activated_this_turn" = true
+     cond key "count" tag=3 = 1
+     cond key "operator" tag=6 = ">="
+     cond key "text" tag=6 = "自分のステージに、このターン中に自分の『Printemps』のカードの効果によってウェイト状態からアクティブにしていたメンバーが1人以上いる場合"
+     cond key "unit" tag=6 = "人"
+     cond key "card_type" tag=6 = "member_card"
+     cond key "location" tag=6 = "stage"
+     cond key "target" tag=6 = "self"
+     cond key "group_names" tag=7
+     cond key "activated_this_turn" tag=2
+    effect extra[0] "heart_colors" = heart00
+    effect extra[1] "heart_color" = heart00
+    effect extra[2] "operation" = decrease
+    effect extra[3] "group_names" = Printemps
+    effect extra[4] "value" = 2
+     cond key "count" tag=3 = 2
+     cond key "operator" tag=6 = ">="
+     cond key "text" tag=6 = "2人以上いる場合"
+     cond key "unit" tag=6 = "人"
+     cond key "card_type" tag=6 = "member_card"
+     cond key "activated_this_turn" tag=2
+     cond key "location" tag=6 = "stage"
+    effect extra[0] "heart_colors" = heart00
+    effect extra[1] "heart_color" = heart00
+    effect extra[2] "operation" = decrease
+    effect extra[3] "group_names" = Printemps
+    effect extra[4] "value" = 1
+     cond key "count" tag=3 = 3
+     cond key "operator" tag=6 = ">="
+     cond key "text" tag=6 = "3人以上いる場合"
+     cond key "unit" tag=6 = "人"
+     cond key "card_type" tag=6 = "member_card"
+     cond key "activated_this_turn" tag=2
+     cond key "location" tag=6 = "stage"
+        [info] B8 decoded: action=sequential n_child=3 activated_this_turn hits=5 wait-state hits=0
+        [info] C own=0 cost_mod=0 CENSUS 1->1
+        [info] C own=1 cost_mod=0 CENSUS 2->2
+        [info] C own=2 cost_mod=-2 CENSUS 3->3
+        [info] C own=2 cost_mod=0 CENSUS 3->3
+        [info] C own=2 cost_mod=0 CENSUS 3->3
+        [info] C own=3 cost_mod=-2 CENSUS 4->4
+10 test case(s) FAILED. Every red assertion in this file is classified in the accompanying report; none is a weakened or skipped assertion.

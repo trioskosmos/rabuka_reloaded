@@ -1,0 +1,302 @@
+[
+ {
+  "suite": "parity_cost_and_effect",
+  "checks": 167,
+  "fails": 46,
+  "raw_fails": 46,
+  "reported": 32,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_cost_compound",
+  "checks": 99,
+  "fails": 2,
+  "raw_fails": 2,
+  "reported": 1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_cost_discount",
+  "checks": -1,
+  "fails": 87,
+  "raw_fails": 87,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_fw_cost_cardtype",
+  "checks": 6,
+  "fails": 0,
+  "raw_fails": 0,
+  "reported": 0,
+  "result_lines": -1,
+  "rc": 0,
+  "missing": false
+ },
+ {
+  "suite": "parity_card_score",
+  "checks": -1,
+  "fails": 24,
+  "raw_fails": 24,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_card_filters",
+  "checks": -1,
+  "fails": 0,
+  "raw_fails": 0,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": true
+ },
+ {
+  "suite": "parity_card_text",
+  "checks": -1,
+  "fails": 0,
+  "raw_fails": 0,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": true
+ },
+ {
+  "suite": "card_data_decode",
+  "checks": 41,
+  "fails": 0,
+  "raw_fails": 0,
+  "reported": 0,
+  "result_lines": -1,
+  "rc": 0,
+  "missing": false
+ },
+ {
+  "suite": "decode_skew",
+  "checks": 41,
+  "fails": 0,
+  "raw_fails": 0,
+  "reported": 0,
+  "result_lines": -1,
+  "rc": 0,
+  "missing": false
+ },
+ {
+  "suite": "decode_fallback",
+  "checks": -1,
+  "fails": 0,
+  "raw_fails": 0,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 0,
+  "missing": false
+ },
+ {
+  "suite": "test_parity_dead_twins",
+  "checks": -1,
+  "fails": 0,
+  "raw_fails": 0,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": true
+ },
+ {
+  "suite": "parity_group_names",
+  "checks": -1,
+  "fails": 0,
+  "raw_fails": 0,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 0,
+  "missing": false
+ },
+ {
+  "suite": "parity_zone_source",
+  "checks": 37,
+  "fails": 73,
+  "raw_fails": 73,
+  "reported": 29,
+  "result_lines": -1,
+  "rc": 0,
+  "missing": false
+ },
+ {
+  "suite": "parity_sequential",
+  "checks": 52,
+  "fails": 142,
+  "raw_fails": 142,
+  "reported": 29,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_integration",
+  "checks": -1,
+  "fails": 39,
+  "raw_fails": 39,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_small_clusters",
+  "checks": 64,
+  "fails": 101,
+  "raw_fails": 101,
+  "reported": 39,
+  "result_lines": -1,
+  "rc": 0,
+  "missing": false
+ },
+ {
+  "suite": "parity_cce_gaps",
+  "checks": 68,
+  "fails": 82,
+  "raw_fails": 82,
+  "reported": 33,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_required_hearts",
+  "checks": -1,
+  "fails": 51,
+  "raw_fails": 51,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_under_member",
+  "checks": -1,
+  "fails": 81,
+  "raw_fails": 81,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 0,
+  "missing": false
+ },
+ {
+  "suite": "parity_zones_position",
+  "checks": -1,
+  "fails": 48,
+  "raw_fails": 48,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_live_total",
+  "checks": -1,
+  "fails": 50,
+  "raw_fails": 50,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_recover_live",
+  "checks": 65,
+  "fails": 52,
+  "raw_fails": 52,
+  "reported": 19,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_wave1a",
+  "checks": -1,
+  "fails": 38,
+  "raw_fails": 38,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_wave1b",
+  "checks": -1,
+  "fails": 29,
+  "raw_fails": 29,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_wave1c",
+  "checks": -1,
+  "fails": 55,
+  "raw_fails": 55,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_full_round",
+  "checks": -1,
+  "fails": 44,
+  "raw_fails": 44,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_full_round2",
+  "checks": -1,
+  "fails": 68,
+  "raw_fails": 68,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "parity_full_round3",
+  "checks": -1,
+  "fails": 17,
+  "raw_fails": 17,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ },
+ {
+  "suite": "mechanics",
+  "checks": -1,
+  "fails": 0,
+  "raw_fails": 0,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 0,
+  "missing": false
+ },
+ {
+  "suite": "audit_fields",
+  "checks": -1,
+  "fails": 4,
+  "raw_fails": 4,
+  "reported": -1,
+  "result_lines": -1,
+  "rc": 2,
+  "missing": false
+ }
+]
