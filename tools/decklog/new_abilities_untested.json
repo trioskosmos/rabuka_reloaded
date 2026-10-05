@@ -1,0 +1,114 @@
+[
+ {
+  "card_no": "PL!-PR-022-PR",
+  "name": "西木野真姫",
+  "cost": 13,
+  "blade": 3,
+  "abilities": 1,
+  "covered": false
+ },
+ {
+  "card_no": "PL!-PR-023-PR",
+  "name": "絢瀬絵里",
+  "cost": 11,
+  "blade": 3,
+  "abilities": 2,
+  "covered": false
+ },
+ {
+  "card_no": "PL!-PR-024-PR",
+  "name": "絢瀬絵里",
+  "cost": 2,
+  "blade": 1,
+  "abilities": 1,
+  "covered": false
+ },
+ {
+  "card_no": "PL!-PR-025-PR",
+  "name": "南 ことり",
+  "cost": 4,
+  "blade": 1,
+  "abilities": 1,
+  "covered": false
+ },
+ {
+  "card_no": "PL!HS-PR-038-PR",
+  "name": "セラス 柳田 リリエンフェルト",
+  "cost": 4,
+  "blade": 3,
+  "abilities": 2,
+  "covered": false
+ },
+ {
+  "card_no": "PL!HS-PR-039-PR",
+  "name": "百生吟子",
+  "cost": 15,
+  "blade": 5,
+  "abilities": 1,
+  "covered": false
+ },
+ {
+  "card_no": "PL!HS-PR-040-PR",
+  "name": "安養寺姫芽",
+  "cost": 4,
+  "blade": 1,
+  "abilities": 1,
+  "covered": false
+ },
+ {
+  "card_no": "PL!N-PR-033-PR",
+  "name": "中須かすみ",
+  "cost": 9,
+  "blade": 4,
+  "abilities": 1,
+  "covered": false
+ },
+ {
+  "card_no": "PL!N-PR-034-PR",
+  "name": "三船栞子",
+  "cost": 2,
+  "blade": 1,
+  "abilities": 1,
+  "covered": false
+ },
+ {
+  "card_no": "PL!S-PR-046-PR",
+  "name": "渡辺 曜",
+  "cost": 5,
+  "blade": 0,
+  "abilities": 1,
+  "covered": false
+ },
+ {
+  "card_no": "PL!S-PR-047-PR",
+  "name": "桜内梨子",
+  "cost": 4,
+  "blade": 1,
+  "abilities": 1,
+  "covered": false
+ },
+ {
+  "card_no": "PL!S-PR-048-PR",
+  "name": "黒澤ルビィ",
+  "cost": 13,
+  "blade": 5,
+  "abilities": 1,
+  "covered": false
+ },
+ {
+  "card_no": "PL!SP-PR-027-PR",
+  "name": "平安名すみれ",
+  "cost": 13,
+  "blade": 5,
+  "abilities": 1,
+  "covered": false
+ },
+ {
+  "card_no": "PL!SP-PR-028-PR",
+  "name": "米女メイ",
+  "cost": 15,
+  "blade": 5,
+  "abilities": 1,
+  "covered": false
+ }
+]

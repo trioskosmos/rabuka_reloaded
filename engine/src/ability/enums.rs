@@ -1,4 +1,4 @@
-﻿use crate::core::types::ArcStr;
+use crate::core::types::ArcStr;
 #[cfg(feature = "serde_support")]
 use serde::ser::Serializer;
 

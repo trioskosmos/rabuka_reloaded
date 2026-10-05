@@ -82,25 +82,3 @@ pub fn push_temporary_effect(
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_canonical_duration_codes() {
-        assert_eq!(parse_duration("this_turn"), Some(Duration::ThisTurn));
-        assert_eq!(parse_duration("live_end"), Some(Duration::LiveEnd));
-        assert_eq!(parse_duration("as_long_as"), Some(Duration::AsLongAs));
-        assert_eq!(parse_duration("unless"), Some(Duration::Unless));
-        assert_eq!(parse_duration("permanent"), Some(Duration::Permanent));
-    }
-
-    #[test]
-    fn rejects_noncanonical_duration_codes() {
-        assert_eq!(parse_duration("turn_end"), None);
-        assert_eq!(parse_duration("this_live"), None);
-        assert_eq!(parse_duration("until_used"), None);
-        assert_eq!(parse_duration("next_turn"), None);
-    }
-}

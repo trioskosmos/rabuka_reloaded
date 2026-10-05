@@ -630,7 +630,7 @@ pub struct EnergyZone {
     // active/waited cards intermixed. Menus and filters rely on
     // util::{active,waited}_energy_indices, which encode the same rule.
     pub cards: SmallVec<[i16; MAX_ENERGY_CARDS]>,
-    pub(crate) active_energy_count: u8,
+    pub active_energy_count: u8,
 }
 
 impl Default for EnergyZone {

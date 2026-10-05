@@ -34,8 +34,8 @@ pub struct CardLoader;
 /// Clone this when a test needs to own its cards. Cloning the parsed
 /// `Vec<Card>` is much cheaper than re-parsing it, and callers that only read
 /// should prefer [`test_card_db`], which hands out an `Arc` instead.
-#[cfg(all(test, not(feature = "no_std")))]
-pub(crate) fn test_cards() -> &'static [Card] {
+#[cfg(not(feature = "no_std"))]
+pub fn test_cards() -> &'static [Card] {
     use std::sync::OnceLock;
     static CARDS: OnceLock<Vec<Card>> = OnceLock::new();
     CARDS
@@ -50,8 +50,8 @@ pub(crate) fn test_cards() -> &'static [Card] {
 ///
 /// Prefer this over [`test_cards`] when the test does not need its own copy:
 /// it hands out an `Arc`, so there is no per-test clone of 2280 cards at all.
-#[cfg(all(test, not(feature = "no_std")))]
-pub(crate) fn test_card_db() -> &'static std::sync::Arc<crate::card::CardDatabase> {
+#[cfg(not(feature = "no_std"))]
+pub fn test_card_db() -> &'static std::sync::Arc<crate::card::CardDatabase> {
     use std::sync::OnceLock;
     static DB: OnceLock<std::sync::Arc<crate::card::CardDatabase>> = OnceLock::new();
     DB.get_or_init(|| {
@@ -204,36 +204,5 @@ impl CardLoader {
     /// Build the ability map for tests that need it directly.
     pub fn build_abilities_map_shared_for_tests() -> HashMap<String, Vec<AbilityRef>> {
         Self::build_abilities_map_shared()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn ability_map_is_non_empty() {
-        let map = CardLoader::build_abilities_map_shared_for_tests();
-        assert!(
-            !map.is_empty(),
-            "ability map should contain at least one card"
-        );
-    }
-
-    #[test]
-    fn ability_refs_all_have_valid_indices() {
-        let map = CardLoader::build_abilities_map_shared_for_tests();
-        for (card_no, refs) in map.iter() {
-            for r in refs {
-                let idx = r.idx();
-                assert!(
-                    usize::from(idx) < crate::ability::abilities_gen::NUM_ABILITIES,
-                    "card {} has ability index {} >= {}",
-                    card_no,
-                    idx,
-                    crate::ability::abilities_gen::NUM_ABILITIES
-                );
-            }
-        }
     }
 }

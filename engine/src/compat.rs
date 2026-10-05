@@ -31,7 +31,7 @@ mod psp_hash {
 }
 
 #[cfg(feature = "no_std")]
-pub(crate) use psp_hash::{HashMap, HashSet};
+pub use psp_hash::{HashMap, HashSet};
 
 // DO NOT swap this for a faster hasher.
 //
@@ -51,32 +51,32 @@ pub(crate) use psp_hash::{HashMap, HashSet};
 // Any change here must be treated as a gameplay change, gated on engine
 // outcomes and not just on tests passing.
 #[cfg(not(feature = "no_std"))]
-pub(crate) use std::collections::{HashMap, HashSet};
+pub use std::collections::{HashMap, HashSet};
 
 #[cfg(all(feature = "no_std", target_has_atomic = "ptr"))]
-pub(crate) use alloc::sync::Arc;
+pub use alloc::sync::Arc;
 // No-atomic targets (PS1 R3000/MIPS-I, etc.): use Rc. The game is single-
 // threaded on consoles and only uses new/clone/make_mut/deref, so the shared
 // Rc/Arc API is a drop-in; Rc doesn't require target atomics.
 #[cfg(all(feature = "no_std", not(target_has_atomic = "ptr")))]
-pub(crate) use alloc::rc::Rc as Arc;
+pub use alloc::rc::Rc as Arc;
 #[cfg(not(feature = "no_std"))]
-pub(crate) use std::sync::Arc;
+pub use std::sync::Arc;
 
 #[cfg(feature = "no_std")]
-pub(crate) use alloc::boxed::Box;
+pub use alloc::boxed::Box;
 #[cfg(not(feature = "no_std"))]
-pub(crate) use std::boxed::Box;
+pub use std::boxed::Box;
 
 #[cfg(all(feature = "no_std", feature = "serde_support"))]
-pub(crate) use alloc::collections::BTreeMap;
+pub use alloc::collections::BTreeMap;
 #[cfg(all(not(feature = "no_std"), feature = "serde_support"))]
-pub(crate) use std::collections::BTreeMap;
+pub use std::collections::BTreeMap;
 
 #[cfg(feature = "no_std")]
-pub(crate) use alloc::collections::VecDeque;
+pub use alloc::collections::VecDeque;
 #[cfg(not(feature = "no_std"))]
-pub(crate) use std::collections::VecDeque;
+pub use std::collections::VecDeque;
 
 /// Atomic counter for the defensive runaway-loop guards.
 ///
@@ -85,7 +85,7 @@ pub(crate) use std::collections::VecDeque;
 /// `Cell`-based counter with a relaxed `fetch_add` is a drop-in replacement.
 /// (`Ordering` always exists and is used unchanged from `core`.) On targets
 /// with atomics (including host builds) it resolves to `core`'s `AtomicU32`.
-pub(crate) mod atomic {
+pub mod atomic {
     #[cfg(target_has_atomic = "32")]
     pub use core::sync::atomic::AtomicU32;
 

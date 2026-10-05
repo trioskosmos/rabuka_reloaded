@@ -34,6 +34,14 @@ strip = "symbols"
 
 [lib]
 doctest = false
+# Every test in this crate -- including the ones that used to be in-source
+# `#[cfg(test)] mod` blocks under src/ -- now lives in tests/run_all.rs.
+# `cargo test` prints one `running N tests` / `test result:` pair per target,
+# so leaving the lib harness on would always print a second, separate summary.
+# The tests were moved rather than deleted: src/ lost its `#[cfg(test)] mod`
+# blocks and tests/run_all.rs gained them, re-pointed from `crate::` to
+# `rabuka_engine::`. Anything they touched that was private became `pub`.
+test = false
 
 [dependencies]
 cfg-if = "1"
@@ -270,4 +278,49 @@ test = false
 [[bin]]
 name = "turn_replay"
 path = "src/bin/turn_replay.rs"
+test = false
+
+# The remaining auto-discovered src/bin/ targets. Each of these eight has
+# zero #[test] functions, so without an explicit entry bare `cargo test`
+# compiled and ran an empty unittest harness for each — eight "running 0
+# tests" targets in the output for no reason. Declaring them with
+# `test = false` keeps them buildable and runnable exactly as before.
+[[bin]]
+name = "bot_replay"
+path = "src/bin/bot_replay.rs"
+test = false
+
+[[bin]]
+name = "curve_prob"
+path = "src/bin/curve_prob.rs"
+test = false
+
+[[bin]]
+name = "human_vs_v7"
+path = "src/bin/human_vs_v7.rs"
+test = false
+
+[[bin]]
+name = "live_calibrate"
+path = "src/bin/live_calibrate.rs"
+test = false
+
+[[bin]]
+name = "move_stats"
+path = "src/bin/move_stats.rs"
+test = false
+
+[[bin]]
+name = "ppo_learn"
+path = "src/bin/ppo_learn.rs"
+test = false
+
+[[bin]]
+name = "ppo_train"
+path = "src/bin/ppo_train.rs"
+test = false
+
+[[bin]]
+name = "value_train"
+path = "src/bin/value_train.rs"
 test = false

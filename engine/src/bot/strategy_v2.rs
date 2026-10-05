@@ -56,7 +56,7 @@ impl Clone for V2Policy {
 }
 
 /// Per-color heart accumulator. Alias of `strategy_common::Acc`.
-type Acc = sc::Acc;
+pub type Acc = sc::Acc;
 
 /// Active-member blade count for yell flips (Q133: waited members don't yell).
 fn yell_flips(gs: &GameState, p: &Player, db: &CardDatabase) -> usize {
@@ -85,7 +85,7 @@ impl McRng {
 /// Monte Carlo pass probability: sample `flips` cards from the known
 /// remaining deck and check whether own hearts + flipped blade-hearts
 /// satisfy the combined requirements of the candidate lives.
-fn pass_probability(
+pub fn pass_probability(
     db: &CardDatabase,
     deck: &[i16],
     flips: usize,

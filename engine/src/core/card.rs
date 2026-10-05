@@ -485,34 +485,6 @@ impl CardDatabase {
     }
 }
 
-#[cfg(all(test, not(feature = "no_std")))]
-mod card_id_tests {
-    use super::*;
-
-    #[test]
-    fn conversions_round_trip() {
-        let id = CardId::from(42_i16);
-        assert_eq!(id.raw(), 42);
-        assert_eq!(CardId::from_raw(-1), CardId::EMPTY);
-        assert_eq!(usize::from(CardId::from_raw(7)), 7usize);
-    }
-
-    #[test]
-    fn empty_and_negative_detection() {
-        assert!(CardId::EMPTY.is_empty());
-        assert!(CardId::from_raw(-5).is_empty());
-        assert!(!CardId::from_raw(0).is_empty());
-        assert!(!CardId::from_raw(1).is_empty());
-    }
-
-    #[test]
-    fn usable_as_map_key() {
-        let mut m = HashMap::new();
-        m.insert(CardId::from_raw(3), "x");
-        assert_eq!(m.get(&CardId::from_raw(3)), Some(&"x"));
-        assert_eq!(m.get(&CardId::from_raw(4)), None);
-    }
-}
 
 impl Default for CardDatabase {
     fn default() -> Self {
@@ -769,7 +741,7 @@ impl CardDatabase {
     /// Normalize card_no for lookup: uppercase, fullwidth → halfwidth.
     /// Avoids allocation when input is already ASCII uppercase with no
     /// fullwidth characters (the common case after initial load).
-    pub(crate) fn normalize_card_no(card_no: &str) -> String {
+    pub fn normalize_card_no(card_no: &str) -> String {
         let mut result = String::with_capacity(card_no.len());
         let mut changed = false;
         for ch in card_no.chars() {

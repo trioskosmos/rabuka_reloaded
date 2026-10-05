@@ -1,4 +1,4 @@
-﻿//! Experimental strategy bot v3  Egeneral planning.
+//! Experimental strategy bot v3  Egeneral planning.
 //!
 //! Adds a planning layer on top of v2's yell-math live-set policy:
 //!

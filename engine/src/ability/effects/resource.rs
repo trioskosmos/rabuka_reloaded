@@ -1,4 +1,4 @@
-﻿//! `gain_resource` - the largest single action family in the engine.
+//! `gain_resource` - the largest single action family in the engine.
 //!
 //! 160 of the 936 unique abilities in `cards/abilities.json`
 //! (`docs/ABILITY_MATRIX.md`), 17% of all ability behaviour. Everything

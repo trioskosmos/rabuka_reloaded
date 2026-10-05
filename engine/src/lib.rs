@@ -50,10 +50,13 @@ macro_rules! eprintln {
 }
 
 // Platform compat: maps std types to no_std equivalents for PSP
-pub(crate) mod compat;
-pub(crate) use compat::{Arc, Box, HashMap, HashSet, VecDeque};
+// Public because the relocated unit tests (tests/run_all.rs) name these
+// types directly; they were `pub(crate)` only because those tests used to
+// live inside the crate.
+pub mod compat;
+pub use compat::{Arc, Box, HashMap, HashSet, VecDeque};
 #[cfg(feature = "serde_support")]
-pub(crate) use compat::BTreeMap;
+pub use compat::BTreeMap;
 
 #[cfg(feature = "alloc_tracker")]
 pub mod alloc_counter;

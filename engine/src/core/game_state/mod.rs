@@ -1719,38 +1719,4 @@ fn push_revealed_internal(
     }
 }
 
-#[cfg(test)]
-mod serde_roundtrip_tests {
-    use super::*;
-    use crate::card::CardDatabase;
-    use crate::player::Player;
-    use crate::zones::Stage;
-    use crate::Arc;
 
-    fn test_gs() -> GameState {
-        let db = CardDatabase::new();
-        let mut p1 = Player::new("p1".into(), "P1".into(), true);
-        let mut p2 = Player::new("p2".into(), "P2".into(), false);
-        p1.stage = Stage::new();
-        p2.stage = Stage::new();
-        let mut gs = GameState::new(p1, p2, Arc::new(db));
-        gs.current_phase = Phase::Main;
-        gs.turn_number = 3;
-        gs
-    }
-
-    #[test]
-    fn game_state_roundtrips_through_rmp() {
-        let mut gs = test_gs();
-        gs.player1.hand.cards.push(1);
-        gs.player2.stage.stage[1] = 5;
-        let bytes = rmp_serde::to_vec(&gs).unwrap();
-        let mut back: GameState = rmp_serde::from_slice(&bytes).unwrap();
-        // card_database is #[serde(skip)] 窶・caller reattaches its own
-        back.card_database = gs.card_database.clone();
-        assert_eq!(gs.player1.hand.cards, back.player1.hand.cards);
-        assert_eq!(gs.player2.stage.stage, back.player2.stage.stage);
-        assert_eq!(gs.turn_number, back.turn_number);
-        assert_eq!(gs.current_phase, back.current_phase);
-    }
-}

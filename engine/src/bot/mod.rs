@@ -18,9 +18,9 @@ pub mod strategy_v7;
 mod v7_main;
 pub mod v7_ismcts;
 pub mod strategy_v8;
-mod v8_live;
+pub mod v8_live;
 mod v8_main;
-mod v8_model;
+pub mod v8_model;
 pub mod registry;
 pub mod weights;
 

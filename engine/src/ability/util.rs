@@ -1,4 +1,4 @@
-﻿use crate::core::constants::CountCast;
+use crate::core::constants::CountCast;
 use super::enums::{ActionType, Zone};
 use crate::card::{
     parse_heart_color, Ability, AbilityEffect, AbilityFilter, Card, CardDatabase, DistinctType,

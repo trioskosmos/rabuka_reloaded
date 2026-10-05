@@ -1,4 +1,4 @@
-﻿//! `change_state` - put a member active or wait.
+//! `change_state` - put a member active or wait.
 //!
 //! Home of `ActionType::ChangeState`: 59 of the 936 unique abilities in
 //! `cards/abilities.json` (`docs/ABILITY_MATRIX.md`, "change active/wait
