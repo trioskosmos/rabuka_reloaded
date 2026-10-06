@@ -19,13 +19,18 @@ const REVIVED: &str = "PL!S-bp2-014-N";
 /// Abilityless member whose name is neither 星空 凛 nor 小泉花陽.
 const FILLER: &str = "PL!-sd1-010-SD";
 
+/// Kasumi's 自動 is the only prompt these fixtures raise. Loop on the TYPE, not on
+/// pendency (EDGE_CASE_FINDINGS C9): a prompt of any other kind ends the loop and the
+/// trailing assert reports it by name, instead of a blind `&[0]`/`&[]` absorbing it.
 fn drain_auto(v: &mut TestGame) {
-    while v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
-        }
+    while v.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
+        v.select_indices(&[0]);
     }
+    assert!(
+        !v.has_pending_choice(),
+        "a prompt other than kasumi's 自動 is queued: {:?}",
+        v.pending_choice_type()
+    );
 }
 
 fn setup() -> TestGame {

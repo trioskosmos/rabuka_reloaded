@@ -2435,6 +2435,21 @@ def _set_action_081(t, a):
     a["condition_text"] = t
     return a
 
+
+# 「10から自分の手札の枚数を引いた数」 — 引く as SUBTRACT (a look COUNT), not a draw.
+# The phrase used to make action_012_draw_card win (it runs 30 rules ahead of
+# action_042_look_at, and rules are first-match-wins), so a printed LOOK parsed as
+# draw_card→hand and the cards went straight into hand instead of being looked at
+# and selected from.
+_ARITHMETIC_SUBTRACT_RE = re.compile(r"[^、。]*を引いた数")
+
+
+def _draw_verb_in(t):
+    """True when the clause really asks to draw, arithmetic 引いた数 aside."""
+    stripped = _ARITHMETIC_SUBTRACT_RE.sub("", t)
+    return "引く" in stripped or "引き" in stripped or "引い" in stripped
+
+
 _ACTION_RULES: List[ActionRule] = [
     ActionRule(name='action_000_shuffle', condition=lambda t: _has_shuffle(t), action='shuffle', setter=_set_action_000),
     ActionRule(name='action_001_position_change', condition=lambda t: '入れ替える' in t or '入れ替えて' in t, action='position_change', setter=None),
@@ -2448,7 +2463,7 @@ _ACTION_RULES: List[ActionRule] = [
     ActionRule(name='action_009_discard_until_count', condition=lambda t: '枚になるまで' in t and ('控え室に置く' in t or '控え室に置き' in t), action='discard_until_count', setter=_set_action_009),
     ActionRule(name='action_010_draw_card', match='カードを1枚引いてもよい', action='draw_card', setter=_set_action_010),
     ActionRule(name='action_011_move_cards', condition=lambda t: '引いた枚数' in t and '手札から' in t and ('控え室に置く' in t), action='move_cards', setter=_set_action_011),
-    ActionRule(name='action_012_draw_card', condition=lambda t: ('引く' in t or '引き' in t or '引い' in t) and '手札から控え室に置く' not in t, action='draw_card', setter=_set_action_012),
+    ActionRule(name='action_012_draw_card', condition=lambda t: _draw_verb_in(t) and '手札から控え室に置く' not in t, action='draw_card', setter=_set_action_012),
     ActionRule(name='action_013_draw_card', condition=lambda t: '引いてもよい' in t, action='draw_card', setter=_set_action_013),
     ActionRule(name='action_014_modify_cost', condition=lambda t: re.search(rf"コスト[はが](\d+){COST_CHANGE_VERBS}", t) or re.search('ためのコストは(\\d+)減る', t), action='modify_cost', setter=_set_action_014),
     ActionRule(name='action_015_move_cards', condition=lambda t, a: 'source' in a and a.get('source') and ('destination' in a) and a.get('destination') and ('選ぶ' not in t) and ('選び' not in t) and (not ('手札に加える' in t and extract_count(t) is not None)), action='move_cards', setter=None),
@@ -12909,6 +12924,16 @@ def _canonicalize_dynamic_counts(node):
                 current.pop("count", None)
         elif "これにより控え室に置いた" in ref:
             dc["reference"] = "these_waitroom_placed_count"
+        elif "手札の枚数を引いた数" in ref:
+            # 「10から自分の手札の枚数を引いた数に等しい枚数のカードを見る」
+            # — a look count of N − hand size. N lives in base_reference so the
+            # engine can dispatch it; the prose reference was unresolvable and
+            # silently resolved to 0 (no cards looked at).
+            match = re.search(r"(\d+)から自分の手札の枚数を引いた数", ref)
+            if match:
+                dc["reference"] = "hand_size_below_base"
+                dc["base_reference"] = match.group(1)
+                dc.pop("count", None)
         elif "ステージ" in ref and "メンバー" in ref:
             dc["reference"] = (
                 "opponent_stage_member_count"

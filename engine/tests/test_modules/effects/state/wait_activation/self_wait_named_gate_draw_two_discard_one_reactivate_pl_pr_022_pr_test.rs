@@ -52,10 +52,18 @@ fn wait_state(game: &TestGame, cid: i16) -> Option<String> {
 
 /// The draw raises a 「手札を1枚控え室に置く」 selection before the rest of the
 /// ability resolves, so every assertion below runs after the board has settled.
+/// Loop on the TYPE, not on pendency (EDGE_CASE_FINDINGS C9): the 「手札を1枚控え室に
+/// 置く」 selection is the only prompt this fixture raises, and anything else ends the
+/// loop so the trailing assert can name it.
 fn drain(game: &mut TestGame) {
-    while game.has_pending_choice() {
+    while game.pending_choice_type().as_deref() == Some("SelectCard") {
         game.select_indices(&[0]);
     }
+    assert!(
+        !game.has_pending_choice(),
+        "maki's ability left {:?} queued",
+        game.pending_choice_type()
+    );
 }
 
 fn maki_of(game: &TestGame) -> i16 {

@@ -271,6 +271,14 @@ pub struct Carried {
     /// is spawned. The answer-time handler has no effect context, so the
     /// position rides here (consumed on first looked_at selection).
     pub looked_at_deck_position: Option<usize>,
+    /// Cards already taken out of the CURRENT looked-at pool across the repeated
+    /// "select up to N more" answers of one look-and-select.
+    ///
+    /// The printed cap (「その中から2枚まで手札に加える」) bounds the TOTAL, but each
+    /// answer used to be measured on its own (`max_select > selected_count`), so
+    /// answering one card at a time walked straight past the cap and the player
+    /// banked the whole look. Reset whenever a fresh pool is offered.
+    pub looked_at_taken: usize,
     pub last_known_members: SmallVec<[(i16, LastKnownMemberInfo); 2]>,
 }
 

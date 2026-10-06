@@ -3,6 +3,7 @@
 pub mod bottom_inspect;
 pub mod debut_look_five_take_blade_heart_less_mus_member_pl_pb2_032_n_test;
 pub mod deck_bottom_reposition_and_conditional_second_draw_test;
+pub mod hand_size_minus_look_take_two_pl_hs_pr_039_pr_test;
 pub mod heart_colour_choice_and_optional_banking_test;
 pub mod look_and_filter;
 pub mod optional_look_and_select_negative_branches_test;

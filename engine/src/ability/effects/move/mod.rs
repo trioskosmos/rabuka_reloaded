@@ -3098,7 +3098,6 @@ pub fn execute_selected_cards_from_zone(
                 selected_cards.insert(0, looked_at.remove(i));
             }
         }
-        let selected_count = selected_cards.len();
 
         {
             let card_db = &gs.card_database;
@@ -3110,6 +3109,15 @@ pub fn execute_selected_cards_from_zone(
                 util::card_matches_cost_limit_op(card_db, cid, cost_limit, cost_limit_operator)
             });
         }
+        // AFTER the cost-limit retain: a card the filter rejects was never taken,
+        // so it must not count against the printed cap.
+        let selected_count = selected_cards.len();
+        // 「2枚まで」 bounds the TOTAL this look hands over across every repeated
+        // answer. Measuring each answer on its own let a player who picked one card
+        // at a time walk past the cap. Counted here (before any early return) so
+        // every later path — including choice.rs's own re-prompt — sees one number.
+        self.carried.looked_at_taken += selected_count;
+        let cumulative_taken = self.carried.looked_at_taken;
 
         let remaining_cards: SmallVec<[i16; 8]> = core::mem::take(looked_at);
 
@@ -3188,8 +3196,11 @@ pub fn execute_selected_cards_from_zone(
             .unwrap_or(false);
         let json_count = select_action.as_ref().and_then(|sa| sa.count).unwrap_or(1) as usize;
         let total_available = selected_count + remaining_cards.len();
+        // 「好きな枚数」 caps at the WHOLE look window: cards taken on earlier answers
+        // plus what is still offered. Recomputing from this answer alone cut the cap
+        // short as soon as a second answer arrived.
         let max_select = if any_number {
-            total_available
+            cumulative_taken + remaining_cards.len()
         } else {
             json_count
         };
@@ -3199,7 +3210,7 @@ pub fn execute_selected_cards_from_zone(
                 sa.max.unwrap_or(false)
                     || sa.optional.unwrap_or(false)
                     || any_number
-                    || json_count > selected_count
+                    || json_count > cumulative_taken
             })
             .unwrap_or(false);
 
@@ -3229,14 +3240,15 @@ pub fn execute_selected_cards_from_zone(
 
         if selected_count > 0
             && can_select_more
-            && max_select > selected_count
+            && max_select > cumulative_taken
             && !remaining_indices.is_empty()
         {
             gs.looked_at_cards = remaining_cards.clone();
             let remaining_available = gs.looked_at_cards.len();
             // Never promise more picks than there are cards left that CAN be
             // picked. With no filter this is `remaining_available` as before.
-            let remaining_selections = (max_select - selected_count).min(remaining_indices.len());
+            let remaining_selections =
+                (max_select - cumulative_taken).min(remaining_indices.len());
             let description = format!(
                 "Select up to {} more {} from the {} remaining looked-at {}",
                 remaining_selections,

@@ -2007,14 +2007,24 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                 let is_max = sa.and_then(|s| s.max).unwrap_or(false);
                 let is_optional = sa.and_then(|s| s.optional).unwrap_or(false);
                 let json_count = sa.and_then(|s| s.count).unwrap_or(1).usize_count();
-                let max_count = ctx.count;
                 let selected_count = valid.len();
                 let remaining = gs.looked_at_cards.len();
 
+                // Cumulative across repeated answers: the mover has already counted
+                // this answer into `carried.looked_at_taken`, so `taken` is the TOTAL
+                // handed over so far, not this answer alone.
+                let taken = self.carried.looked_at_taken;
+                // 「好きな枚数」 caps at the whole look window (taken + what is left),
+                // not `ctx.count` measured against a single answer.
+                let max_count = if any_number {
+                    taken + remaining
+                } else {
+                    ctx.count
+                };
                 let can_reprompt =
                     is_max || is_optional || any_number || json_count > selected_count;
-                if can_reprompt && max_count > selected_count && remaining > 0 {
-                    let remaining_max = max_count - selected_count;
+                if can_reprompt && max_count > taken && remaining > 0 {
+                    let remaining_max = max_count - taken;
                     let ct = ctx.card_type.clone();
                     // Compute filtered_indices for remaining looked_at cards
                     let remaining_indices: Vec<usize> = {
@@ -2037,7 +2047,10 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                             Zone::LookedAt.to_str(),
                             remaining_max,
                             format!("Select up to {} more card(s) from the {} remaining looked-at cards", remaining_max, remaining),
-                            is_optional || any_number,
+                            // 「2枚まで」 is an upper bound, so a player who has taken
+                            // fewer must be allowed to stop — otherwise a partial take
+                            // is trapped until the cap is filled.
+                            is_optional || any_number || is_max,
                         )
                         .description_ja(Some(format!(
                             "残り{}枚の確認済みカードから最大{}枚選択",

@@ -6,11 +6,13 @@ Fn-level static signals over `engine/tests/**/*.rs`. Coverage counts (TEST_COVER
 answer “does it fire”; this answers “would the test notice if the trigger were wrong”.
 Report-only: rows are review prompts, not failures.
 
-## no_assert (0)
+## no_assert (1)
 
 _test never asserts (smoke at best — cannot pin behavior)_
 
-None.
+| file | test | line | detail |
+| --- | --- | --- | --- |
+| `engine/tests/unit_tests/core_card_binary_tests.rs` | `test_decode_member_card` | 42 |  |
 
 ## no_drive (1)
 
@@ -47,7 +49,7 @@ _every assertion is about a count/size (len/count/>=1) — '3 options were offer
 | file | test | line | detail |
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/characterization/seed_reproduces_game_test.rs` | `each_replayed_game_reaches_a_terminal_result` | 394 |  |
-| `engine/tests/test_modules/effects/recover/to_hand/pb2_kidou_self_to_waitroom_recover_mus_live_then_energy_per_mus_pl_pb2_007_pp_test.rs` | `a_mus_live_is_recovered_from_the_waitroom` | 85 |  |
+| `engine/tests/test_modules/effects/recover/to_hand/pb2_kidou_self_to_waitroom_recover_mus_live_then_energy_per_mus_pl_pb2_007_pp_test.rs` | `a_mus_live_is_recovered_from_the_waitroom` | 87 |  |
 
 ## live_success_no_premise (1)
 
@@ -145,7 +147,7 @@ _a fixed `for _ in 0..N { pass() }` walk through the turn — a phase gaining or
 | `engine/tests/test_modules/effects/invalidate/live_success/pb2_invalidate_live_success_gains_heart03_pl_pb2_003_pp_test.rs` | `our_own_live_success_abilities_are_not_invalidated` | 136 |  |
 | `engine/tests/test_modules/effects/mill/liella_milled_per_unit_blades_test.rs` | `hazuki_ren_bp5_005_a_live_phase_discard_does_not_trip_the_watcher` | 220 |  |
 | `engine/tests/test_modules/effects/modify_need_heart/pb2_need_heart_minus_3_minus_2_minus_1_per_activated_pl_pb2_040_l_test.rs` | `a_member_waited_again_after_being_activated_still_counts` | 247 |  |
-| `engine/tests/test_modules/effects/yell/pb2_yell_plus_ten_when_two_mus_success_pl_pb2_039_l_test.rs` | `the_opponents_success_zone_does_not_count` | 157 |  |
+| `engine/tests/test_modules/effects/yell/pb2_yell_plus_ten_when_two_mus_success_pl_pb2_039_l_test.rs` | `the_opponents_success_zone_does_not_count` | 158 |  |
 
 ## similar_cards (27)
 
@@ -196,13 +198,17 @@ _the same card INSTANCE in two stage slots (`stage.stage = [filler, y, filler]`)
 | `engine/tests/test_modules/integration/choice_player_id_routing_test.rs` | `both_seats_live_start_abilities_get_distinctly_stamped_prompts` | 179 | shizuku in 3 slots |
 | `engine/tests/test_modules/integration/choice_player_id_routing_test.rs` | `both_seats_live_start_abilities_get_distinctly_stamped_prompts` | 179 | shizuku in 3 slots |
 
-## count_inequality_only (1)
+## count_inequality_only (5)
 
 _every assertion is an INEQUALITY on a count and there is no assert_eq anywhere — a band, not a value, so 1 card and 9 both pass; pin the number the card prints_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/characterization/seed_reproduces_game_test.rs` | `each_replayed_game_reaches_a_terminal_result` | 394 | 2 inequality assertion(s) on a count, vs baseline+threshold |
+| `engine/tests/unit_tests/ability_vm_tests.rs` | `every_offset_slice_is_within_the_blob` | 67 | 1 inequality assertion(s) on a count, vs baseline |
+| `engine/tests/unit_tests/bot_encoding_locm_encoding_tests.rs` | `locm_encoding_separates_the_evaluated_deck` | 82 | 1 inequality assertion(s) on a count, vs threshold |
+| `engine/tests/unit_tests/bot_strategy_v7_mulligan_tests.rs` | `v7_mulligan_dumps_lives_beyond_the_three_slots` | 90 | 1 inequality assertion(s) on a count, vs threshold |
+| `engine/tests/unit_tests/bot_v8_model_tests.rs` | `the_forecast_rises_with_the_opponents_public_board` | 622 | 1 inequality assertion(s) on a count, vs threshold |
 
 ## unresolvable_card_id (1)
 

@@ -142,6 +142,17 @@ impl GameState {
                 let area = crate::ability::util::pos_to_area(pos);
                 player.stage.get_under_cards(area).len().u8_count()
             }
+            // 「10から自分の手札の枚数を引いた数に等しい枚数のカードを見る」 — look
+            // count = N − own hand size (base_reference holds N), clamped at 0.
+            Some("hand_size_below_base") => {
+                let threshold = dc
+                    .base_reference
+                    .as_deref()
+                    .and_then(|s| s.parse::<u8>().ok())
+                    .unwrap_or(0);
+                let player = self.resolve_target_player("self");
+                threshold.saturating_sub(player.hand.cards.len().u8_count())
+            }
             _ => match dc.count_type.as_str() {
                 "revealed_cards" => self.revealed_count(),
                 _ => 0,

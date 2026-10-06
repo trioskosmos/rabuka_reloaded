@@ -91,6 +91,11 @@ impl AbilityResolver {
         let any_number = select_action.any_number_any().unwrap_or(false);
         let count = select_action.count.unwrap_or(1);
         let optional = select_action.optional.unwrap_or(false);
+        // Fresh pool, fresh cap: the cumulative "how many has this look already
+        // taken" counter starts at zero here, because the re-prompts that follow
+        // are built elsewhere (move/mod.rs) and would otherwise inherit the
+        // previous look's tally.
+        self.carried.looked_at_taken = 0;
 
         let card_db = &gs.card_database;
         let total_count = gs.looked_at_cards.len();

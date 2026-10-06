@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-06T03:49:59.221068",
+  "generated_at": "2026-10-06T17:56:59.357356",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "d44b95ff",
+  "engine_commit": "0b886ca5",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -14691,16 +14691,16 @@
         "action": "look_and_select",
         "look_action": {
           "text": "自分のデッキの上から、10から自分の手札の枚数を引いた数に等しい枚数のカードを見る。",
-          "source": "deck",
+          "source": "deck_top",
           "count": 1,
           "dynamic_count": {
             "type": "dynamic_count",
-            "reference": "自分のデッキの上から、10から自分の手札の枚数を引いた数",
-            "mode": "equals"
+            "reference": "hand_size_below_base",
+            "mode": "equals",
+            "base_reference": "10"
           },
           "target": "self",
-          "action": "draw_card",
-          "destination": "hand"
+          "action": "look_at"
         },
         "select_action": {
           "action": "select_cards",
