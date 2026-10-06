@@ -2376,6 +2376,38 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
         _validate_card: &mut impl FnMut(i16) -> bool,
     ) -> Result<(), String> {
         let mapped_indices = ctx.mfi(&ctx.indices);
+        // 「3枚まで選び」 is a CEILING, not a quota: a player who picks fewer is
+        // finished, not chased for the rest of `ctx.count`. The printed 「まで」 is
+        // the `max` flag, and it lives on the queued select action — not on the
+        // context, which only carries the numeric count.
+        let printed_max = gs
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.ability.effect.as_ref())
+            .map(|ef| {
+                // Single-effect shape: `compound.select_action`, or the effect itself.
+                ef.max.unwrap_or(false)
+                    || ef.compound
+                        .select_action
+                        .as_ref()
+                        .is_some_and(|sa| sa.max.unwrap_or(false))
+                    // Sequential shape (「…選び、デッキの上に置く」 parses as
+                    // select → move): the 「まで」 lives on the select STEP.
+                    || ef.compound.actions.as_ref().is_some_and(|steps| {
+                        steps.iter().any(|a| a.max.unwrap_or(false))
+                    })
+            })
+            .unwrap_or(false);
+        let picked_now = mapped_indices.len();
+        log::debug!(
+            "[SELECT_ANSWER] zone=discard select_action={} picked={} selected_so_far={} count={} max={} allow_skip={}",
+            ctx.is_select_action,
+            picked_now,
+            self.selection.cards.len(),
+            ctx.count,
+            printed_max,
+            ctx.allow_skip
+        );
         if ctx.is_select_action {
             let target = ctx
                 .target_player_id
@@ -2394,7 +2426,22 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                 }
             }
             let selected_so_far = self.selection.cards.len();
-            if ctx.count > 0 && !mapped_indices.is_empty() && selected_so_far < ctx.count {
+            // A 「3枚まで」 re-prompt is an OFFER, not a quota: the player may stop
+            // after a partial pick. The re-prompt still appears (the remaining cards
+            // are still legally selectable) — it just becomes skippable, which is
+            // the difference between 「3枚まで」 (up to 3) and 「3枚必ず」 (exactly 3).
+            let may_reprompt =
+                ctx.count > 0 && !mapped_indices.is_empty() && selected_so_far < ctx.count;
+            let skippable = ctx.allow_skip || printed_max;
+            log::debug!(
+                "[SELECT_REPROMPT] selected_so_far={} count={} max={} skip={} -> {}",
+                selected_so_far,
+                ctx.count,
+                printed_max,
+                skippable,
+                if may_reprompt { "offer the rest" } else { "finalize" }
+            );
+            if may_reprompt {
                 let remaining = ctx.count - selected_so_far;
                 let waitroom_cards: Vec<i16> = {
                     let p = gs.resolve_target_player_mut(&target);
@@ -2424,7 +2471,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                         remaining,
                         desc,
                         desc_ja,
-                        false,
+                        skippable,
                         fi,
                         Some(target.clone()),
                         ctx.cost_total,
@@ -2607,7 +2654,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                         remaining,
                         desc,
                         desc_ja,
-                        ctx.allow_skip,
+                        ctx.allow_skip || printed_max,
                         fi,
                         Some(target),
                         remaining_budget,

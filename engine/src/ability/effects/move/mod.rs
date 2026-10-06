@@ -3195,7 +3195,6 @@ pub fn execute_selected_cards_from_zone(
             .and_then(|sa| sa.any_number_any())
             .unwrap_or(false);
         let json_count = select_action.as_ref().and_then(|sa| sa.count).unwrap_or(1) as usize;
-        let total_available = selected_count + remaining_cards.len();
         // 「好きな枚数」 caps at the WHOLE look window: cards taken on earlier answers
         // plus what is still offered. Recomputing from this answer alone cut the cap
         // short as soon as a second answer arrived.

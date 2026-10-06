@@ -490,10 +490,12 @@ fn fire_ginko_debut_as(game: &mut TestGame, gin: i16, seat: &str) {
 /// Drive 吟子's prompt chain. The 「置いてもよい」 gate IS the SelectCard's
 /// allow_skip (no separate optional prompt): accept answers with all 3
 /// discard slots, decline answers empty — which must skip BOTH the placement
-/// and the conditional rest.
+/// and the conditional rest. Accepting then hits the printed
+/// 「好きな順番で」 order choice before the cards actually move.
 fn drain_ginko(game: &mut TestGame, accept: bool) {
     use rabuka_engine::ability::types::Choice;
     let mut guard = 0;
+    let mut saw_order = false;
     while game.has_pending_choice() && guard < 12 {
         guard += 1;
         match game.get_pending_choice() {
@@ -506,9 +508,22 @@ fn drain_ginko(game: &mut TestGame, accept: bool) {
                     game.select_indices(&[]);
                 }
             }
+            Choice::SelectTarget { target, .. } if target == "order" => {
+                saw_order = true;
+                game.select_option(0);
+            }
             _ => break,
         }
     }
+    assert_eq!(
+        saw_order, accept,
+        "「好きな順番で」: accepting must offer the deck-order choice, declining must not"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "吟子's prompt chain must drain clean, still pending: {:?}",
+        game.get_pending_choice()
+    );
 }
 
 #[test]

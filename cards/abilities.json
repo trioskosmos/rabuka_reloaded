@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-06T17:56:59.357356",
+  "generated_at": "2026-10-06T18:37:48.094432",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "0b886ca5",
+  "engine_commit": "6401eb76",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -19792,13 +19792,28 @@
           "location": "discard",
           "target": "self"
         },
-        "source": "discard",
-        "placement_order": "any_order",
-        "count": 3,
-        "card_type": "live_card",
-        "target": "self",
-        "max": true,
-        "action": "select"
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "自分の控え室にあるライブカードを3枚まで選び、自分のデッキの上に好きな順番で置く",
+            "source": "discard",
+            "placement_order": "any_order",
+            "count": 3,
+            "card_type": "live_card",
+            "target": "self",
+            "max": true,
+            "action": "select"
+          },
+          {
+            "action": "move_cards",
+            "source": "selected_cards",
+            "destination": "deck_top",
+            "all": true,
+            "target": "self",
+            "placement_order": "any_order",
+            "text": "自分の控え室にあるカードが9枚以下の場合、自分の控え室にあるライブカードを3枚まで選び、自分のデッキの上に好きな順番で置く"
+          }
+        ]
       }
     },
     {
@@ -28672,6 +28687,7 @@
             "destination": "deck_bottom",
             "all": true,
             "target": "opponent",
+            "placement_order": "any_order",
             "text": "相手の控え室にあるメンバーカードを3枚選び、相手のデッキの下に好きな順番で置いてもよい。そうした場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする",
             "original_value": true
           },

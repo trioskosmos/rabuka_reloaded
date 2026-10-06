@@ -11,7 +11,7 @@ file), NOT verified assertions — see TEST_COVERAGE.md for depth semantics.
 
 | Family | Abilities | Covered | Variants |
 |---|---|---|---|
-| [other:ライブ開始時:sequential](#other:ライブ開始時:sequential) | 87 | 87 | 1 |
+| [other:ライブ開始時:sequential](#other:ライブ開始時:sequential) | 88 | 88 | 1 |
 | [other:登場:sequential](#other:登場:sequential) | 66 | 66 | 1 |
 | [live_start_gain](#live_start_gain) | 64 | 64 | 1 |
 | [debut_look_and_select](#debut_look_and_select) | 60 | 60 | 1 |
@@ -92,7 +92,6 @@ file), NOT verified assertions — see TEST_COVERAGE.md for depth semantics.
 | [other:常時:replacement_appear_wait](#other:常時:replacement_appear_wait) | 1 | 1 | 1 |
 | [other:自動:perform_yell](#other:自動:perform_yell) | 1 | 1 | 1 |
 | [other:登場:draw_until_count](#other:登場:draw_until_count) | 1 | 1 | 1 |
-| [other:ライブ開始時:select](#other:ライブ開始時:select) | 1 | 0 | 1 |
 | [other:自動:conditional_on_result](#other:自動:conditional_on_result) | 1 | 1 | 1 |
 | [other:起動:choose_target_player](#other:起動:choose_target_player) | 1 | 1 | 1 |
 | [other:常時:modify_yell_source](#other:常時:modify_yell_source) | 1 | 1 | 1 |
@@ -111,9 +110,9 @@ file), NOT verified assertions — see TEST_COVERAGE.md for depth semantics.
 
 ## other:ライブ開始時:sequential
 
-Triggers: ライブ開始時 — 87/87 L0-covered.
+Triggers: ライブ開始時 — 88/88 L0-covered.
 
-### variant: (no variant) — 87 abilities
+### variant: (no variant) — 88 abilities
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
@@ -1907,16 +1906,6 @@ Triggers: 登場 — 1/1 L0-covered.
 | Card | Depth | Tests | Text |
 |---|---|---|---|
 | `PL!HS-PR-031` | L2+choice | 26 | {{toujyou.png/登場}}手札を2枚控え室に置いてもよい：自分の手札が5枚になるまでカードを引く。 |
-
-## other:ライブ開始時:select
-
-Triggers: ライブ開始時 — 0/1 L0-covered.
-
-### variant: (no variant) — 1 abilities
-
-| Card | Depth | Tests | Text |
-|---|---|---|---|
-| `PL!S-PR-048` | none | 0 | {{live_start.png/ライブ開始時}}自分の控え室にあるカードが9枚以下の場合、自分の控え室にあるライブカードを3枚まで選び、自分のデッキの上に好きな順番で置く。 |
 
 ## other:自動:conditional_on_result
 

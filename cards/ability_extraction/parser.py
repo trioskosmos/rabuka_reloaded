@@ -2867,7 +2867,7 @@ def _is_anaphoric_clause(text) -> bool:
     return any(marker in text for marker in _ANAPHORIC_SUBJECT_MARKERS)
 
 
-def parse_action(text: str) -> Dict[str, Any]:
+def parse_action(text: str, *, stated_move: bool = True) -> Dict[str, Any]:
     """Parse an action text."""
     # (The "カードを1枚引いてもよい" optional-draw phrase is handled by the
     # _ACTION_RULES registry dispatch below; no dedicated early-return needed.)
@@ -3141,6 +3141,22 @@ def parse_action(text: str) -> Dict[str, Any]:
         action["exclude_self"] = True
 
     _fill_defaults(action, text, _cached_source=source, _cached_dest=destination)
+
+    # 「自分の控え室にあるライブカードを3枚まで選び、自分のデッキの上に好きな順番で
+    # 置く」 — the action rules are first-match-wins, and `action_035_move_cards` is
+    # disqualified by 「選び」, so `action_046_select` wins and the 置く clause would be
+    # dropped (no destination, cards never leave the waitroom). Split into the select
+    # plus the move the text states — the same shape `_select_move_step` already
+    # builds for the conditional form.
+    #
+    # `stated_move=False` from `_try_conditional_sequential`: that path splits the
+    # text itself and inserts ITS OWN move step, so wrapping here would nest the pair
+    # inside a second sequential (百生吟子 PL!HS-PR-035-PR, 黒澤ダイヤ
+    # PL!S-bp6-004-P).
+    if stated_move:
+        move_step = _select_move_step(action, text)
+        if move_step:
+            return {"text": text, "action": "sequential", "actions": [action, move_step]}
     return action
 
 
@@ -10066,6 +10082,10 @@ def _split_select_and_energy_payment(fa, fp, restate_text):
 _SELECT_STATED_DESTINATIONS = (
     ("デッキの一番上", "deck_top", None),
     ("デッキの下", "deck_bottom", "any_order"),
+    # 「自分のデッキの上に好きな順番で置く」 (PL!S-PR-048-PR / PL!SP-PR-027-PR) —
+    # 「デッキの上から」 is a SOURCE phrase, so the 「に」 is what makes this a
+    # destination. Listed last so the more specific rows keep first match.
+    ("デッキの上に", "deck_top", None),
 )
 
 
@@ -10081,7 +10101,7 @@ def _select_move_step(fa, fp):
             break
     if not fa.get("destination"):
         return None
-    return {
+    step = {
         "action": "move_cards",
         "source": "selected_cards",
         "destination": fa.pop("destination"),
@@ -10089,6 +10109,10 @@ def _select_move_step(fa, fp):
         "all": True,
         "target": fa.get("target", "self"),
     }
+    # 「好きな順番で置く」 — the ORDER choice belongs to the move, not the select.
+    if "好きな順番で" in fp:
+        step["placement_order"] = "any_order"
+    return step
 
 
 def _try_conditional_sequential(text):
@@ -10104,7 +10128,7 @@ def _try_conditional_sequential(text):
     # Check for condition in first part
     fc, fat = split_condition_action(fp)
     if fc and fat:
-        fa = parse_action(fat)
+        fa = parse_action(fat, stated_move=False)
         fa["text"] = fat
         cond = parse_condition(fc)
         # Propagate the condition's zone to the action's source when the
@@ -10114,7 +10138,7 @@ def _try_conditional_sequential(text):
         if cond and cond.get("location") and "source" not in fa:
             fa["source"] = cond["location"]
     else:
-        fa = parse_action(fp)
+        fa = parse_action(fp, stated_move=False)
         cond = None
 
     # Fix 9c: Handle "select + energy payment" pattern where both appear

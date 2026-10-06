@@ -2687,6 +2687,17 @@ let actual = if condition.get_member_has_resource_under() == Some(true) {
         }
         let mut dbg = AbDebug::new();
         dbg.condition(condition, actual, count, passed);
+        // One line that answers "why did the gate fire / not fire" without a
+        // debugger: the zone count, the printed threshold, the operator, the verdict.
+        log::debug!(
+            "[CARD_COUNT_COND] location={} card_type={} actual={} op={} threshold={} passed={}",
+            location,
+            card_type,
+            actual,
+            count_op.unwrap_or("?"),
+            count,
+            passed
+        );
         #[cfg(not(feature = "no_std"))]
         super::push_cond_verdict(condition, &format!("{}枚", actual), passed, vec![]);
         passed

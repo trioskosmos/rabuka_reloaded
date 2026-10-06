@@ -1,17 +1,17 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-06T07:18:54.717362+00:00",
+  "generated_at": "2026-10-06T08:12:52.602984+00:00",
   "stats": {
     "total_cards": 2674,
     "cards_with_abilities": 1664,
     "total_abilities": 2132,
     "unique_abilities": 996
   },
-  "n_files": 1041,
-  "n_tests": 4328,
+  "n_files": 1042,
+  "n_tests": 4333,
   "total_cards": 818,
-  "covered_cards": 813,
-  "abilities_on_covered": 989,
+  "covered_cards": 814,
+  "abilities_on_covered": 990,
   "trigger_counts": {
     "起動": [
       101,
@@ -22,7 +22,7 @@
       283
     ],
     "ライブ開始時": [
-      285,
+      286,
       286
     ],
     "(none)": [
@@ -56,8 +56,8 @@
       174
     ],
     "sequential": [
-      232,
-      233
+      233,
+      234
     ],
     "unknown": [
       2,
@@ -151,10 +151,6 @@
       6,
       6
     ],
-    "select": [
-      0,
-      1
-    ],
     "modify_yell_source": [
       1,
       1
@@ -210,7 +206,7 @@
       48
     ],
     "card_count_condition": [
-      92,
+      93,
       93
     ],
     "compound": [
@@ -288,7 +284,7 @@
       56
     ],
     "PR": [
-      54,
+      55,
       61
     ],
     "bp3": [
@@ -325,9 +321,9 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 856,
+    "L2+choice": 857,
     "L2": 105,
-    "none": 7,
+    "none": 6,
     "L1+choice": 27,
     "L1": 1
   },
@@ -1086,7 +1082,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4328,
+  "n_test_fns_parsed": 4333,
   "abilities": [
     {
       "idx": 0,
@@ -31718,7 +31714,7 @@
       "trigger_list": [
         "ライブ開始時"
       ],
-      "action": "select",
+      "action": "sequential",
       "condition": "card_count_condition",
       "set": "PR",
       "cards": [
@@ -31726,16 +31722,30 @@
         "PL!SP-PR-027-PR"
       ],
       "base": "PL!S-PR-048",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
-      "direct_tests": [],
-      "direct_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/jidou/movement/live_start_waitroom_to_deck_top/live_start_waitroom_nine_or_fewer_lives_to_deck_top_any_order_pl_s_pr_048_pr_test.rs"
+      ],
+      "covering_tests": [
+        "nine_cards_in_the_waitroom_still_fires",
+        "taking_one_still_places_it_on_deck_top",
+        "ten_cards_in_the_waitroom_does_not_fire",
+        "the_second_print_behaves_the_same",
+        "the_three_lives_go_to_deck_top_in_the_chosen_order"
+      ],
+      "covering_test_count": 5,
+      "direct_tests": [
+        "nine_cards_in_the_waitroom_still_fires",
+        "taking_one_still_places_it_on_deck_top",
+        "ten_cards_in_the_waitroom_does_not_fire",
+        "the_second_print_behaves_the_same",
+        "the_three_lives_go_to_deck_top_in_the_chosen_order"
+      ],
+      "direct_test_count": 5,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
