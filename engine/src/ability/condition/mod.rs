@@ -883,6 +883,12 @@ impl<'a> ConditionContext<'a> {
 }
 
 mod card;
+mod ability_filter;
+mod appearance;
+mod card_count;
+mod group;
+mod location;
+mod movement;
 mod comparison;
 mod compound;
 mod predicates;
