@@ -69,8 +69,10 @@ fn yell_flips(gs: &GameState, p: &Player, db: &CardDatabase) -> usize {
         ) as usize
 }
 
-/// Deterministic LCG for the Monte Carlo sampler.
-struct McRng(u64);
+/// Deterministic LCG for the Monte Carlo sampler. `pub` because it is the
+/// argument type of `pass_probability`, which is reachable from outside the
+/// module.
+pub struct McRng(u64);
 
 impl McRng {
     fn next(&mut self) -> u64 {

@@ -32,7 +32,6 @@
 
 use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;
-use rabuka_engine::zones::MemberArea;
 
 const RESONANCE: &str = "PL!-pb2-016-P＋";
 const FILLER: &str = "PL!-sd1-010-SD";

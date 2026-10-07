@@ -322,7 +322,7 @@ fn main() {
     // Hold out whole games, not individual states: adjacent states are
     // correlated, so a random split leaks the outcome.
     let mut rnd = 0x2545_F491_4F6C_DD1Du64;
-    let mut rand_usize = |n: usize, r: &mut u64| -> usize {
+    let rand_usize = |n: usize, r: &mut u64| -> usize {
         *r ^= *r << 13;
         *r ^= *r >> 7;
         *r ^= *r << 17;
@@ -334,7 +334,7 @@ fn main() {
         idx.swap(i, j);
     }
     let split = (data.len() * 8) / 10;
-    let mut train: Vec<&Sample> = idx[..split].iter().map(|&i| &data[i]).collect();
+    let train: Vec<&Sample> = idx[..split].iter().map(|&i| &data[i]).collect();
     let mut test: Vec<&Sample> = idx[split..].iter().map(|&i| &data[i]).collect();
     if test.is_empty() {
         test = train.clone();

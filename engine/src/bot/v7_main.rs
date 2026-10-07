@@ -619,24 +619,6 @@ fn coverage_gradient_weight() -> Option<f64> {
         .filter(|w: &f64| w.is_finite())
 }
 
-/// Diagnostic: is the opponent's coverage term even LIVE in the search?
-///
-/// The leaf compares candidate actions within one Main-phase turn. The opponent
-/// does not move during that turn, so `opp_coverage` is a CONSTANT across every
-/// candidate and cancels in the argmax exactly as `v8_main`'s `initiative` does
-/// (`v8_main.rs:1058-1063` documents the same shape). That is a structural
-/// property, not a tuning question, and no weight can fix it.
-///
-/// Emitted under `V7_DIAG_TERMS` so the claim is measured rather than argued.
-pub(crate) fn diag_term_liveness(gs: &GameState, me: u8) -> Option<(f64, f64)> {
-    if std::env::var_os("V7_DIAG_TERMS").is_none() {
-        return None;
-    }
-    let mine = features(gs, me).coverage;
-    let theirs = features(gs, 1 - me).coverage;
-    Some((mine, theirs))
-}
-
 /// Board-PRESENCE term, ported in shape from SabberStone's competition AI
 /// (`core-extensions/SabberStoneBasicAI/src/Score/MidRangeScore.cs`):
 ///

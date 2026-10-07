@@ -271,7 +271,7 @@ fn main() {
     let lam: f32 = env_f32("PPO_LAMBDA", 0.95);
     let clip_eps: f32 = env_f32("PPO_CLIP", 0.2);
     let v_coef: f32 = env_f32("PPO_VCOEF", 0.5);
-    let ent_coef: f32 = env_f32("PPO_ENTCOEF", 0.01);
+    let _ent_coef: f32 = env_f32("PPO_ENTCOEF", 0.01);
     let batch: usize = env_u32("PPO_BATCH", 1024) as usize;
 
     let steps = load(&traj);
@@ -294,7 +294,7 @@ fn main() {
     }
 
     let mut rnd = 0x2545_F491_4F6C_DD1Du64;
-    let mut rand_usize = |n: usize, r: &mut u64| -> usize {
+    let rand_usize = |n: usize, r: &mut u64| -> usize {
         *r ^= *r << 13;
         *r ^= *r >> 7;
         *r ^= *r << 17;

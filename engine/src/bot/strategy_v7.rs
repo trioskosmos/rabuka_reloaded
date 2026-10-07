@@ -1369,17 +1369,6 @@ pub(crate) enum AbilityClass {
 }
 
 impl AbilityClass {
-    pub fn label(&self) -> &'static str {
-        match self {
-            AbilityClass::Inactive => "inactive",
-            AbilityClass::Tempo => "tempo",
-            AbilityClass::Power => "power",
-            AbilityClass::Energy => "energy",
-            AbilityClass::Score => "score",
-            AbilityClass::Disposal => "disposal",
-            AbilityClass::Automatic => "automatic",
-        }
-    }
 }
 
 /// Classify one ability by its printed text.
@@ -1796,57 +1785,6 @@ pub(crate) fn board_cover_of_best_life(gs: &GameState, me: u8, db: &CardDatabase
     best_cover
 }
 
-/// The opponent's pass probability, from what is PUBLIC about them: the cards
-/// they committed to the live zone and their active blades.
-///
-/// Returns `None` when they have committed nothing — then there is no `q` to
-/// compare against, only the risk that they assemble a set later, which is
-/// what the reliability floor is for.
-///
-/// Built by calling the SAME pool machinery with the other seat, rather than by
-/// re-deriving a colour convention from card data. A first attempt did the
-/// latter and had to guess the `heart0` / `b_all` / `b_heart0N` slot mapping;
-/// this is the engine's own model of a board and a deck draw, so it cannot
-/// drift from what the check will actually do.
-pub(crate) fn opponent_pass_probability(gs: &GameState, me: u8, db: &CardDatabase) -> Option<f64> {
-    let opp_seat = 1 - me;
-    let opp = gs.seat_player(opp_seat);
-    if opp.live_card_zone.cards.is_empty() {
-        return None;
-    }
-    let mut need: Acc = [0i16; 11];
-    let mut any = false;
-    for &cid in &opp.live_card_zone.cards {
-        let base = db.get_card(cid).and_then(|card| card.need_heart.as_ref());
-        let Some(effective) = crate::core::stats_pipeline::effective_need_heart(
-            base,
-            cid,
-            &gs.mods.need_heart_modifiers,
-        ) else {
-            continue;
-        };
-        any = true;
-        for (color, count) in &effective.hearts {
-            need[color.index()] += i16::from(*count);
-        }
-    }
-    if !any {
-        return None;
-    }
-    if need[8] > 0 || need[9] > 0 {
-        // They are holding something that cannot pass, so q is 0 and a commit
-        // is always right.
-        return Some(0.0);
-    }
-    let (cats, deck_len) = experiment_flip_categories(gs, opp_seat, db);
-    let blades = experiment_blades(gs, opp_seat, db);
-    if blades <= 0 || deck_len == 0 {
-        return Some(0.0);
-    }
-    let their_board = experiment_board_pool(gs, opp_seat, db);
-    let pools = experiment_sample_pools(&cats, deck_len, blades, &their_board);
-    Some(experiment_pass_probability_pools(&pools, &need))
-}
 /// The two public facts a fold decision needs about the opponent: how likely
 /// their committed set is to pass, and what it scores if it does.
 ///

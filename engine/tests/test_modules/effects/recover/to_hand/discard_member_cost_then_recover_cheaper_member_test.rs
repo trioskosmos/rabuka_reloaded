@@ -186,7 +186,7 @@ fn emma_008_both_cheaper_cards_are_offered_when_the_discard_is_the_dearest() {
 #[test]
 fn emma_008_only_the_strictly_cheaper_card_is_eligible() {
     let db = load_real_database();
-    let mut v = TestGame::new(db);
+    let v = TestGame::new(db);
     let dear = v.id(DEAR_MEMBER);
 
     let (asked, hand, waitroom) = emma_008_recover_from(dear);

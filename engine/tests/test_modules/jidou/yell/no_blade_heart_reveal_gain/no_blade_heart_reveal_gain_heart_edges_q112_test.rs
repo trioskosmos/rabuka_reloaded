@@ -124,7 +124,7 @@ fn yell_score_icon_live_counts_as_a_blade_heart_q112() {
 #[test]
 fn a_draw_icon_live_carries_a_real_blade_heart_so_it_cannot_expose_the_q112_difference() {
     let db = load_real_database();
-    let mut game = TestGame::new(db);
+    let game = TestGame::new(db);
 
     let card = game.id("PL!-bp3-021-L"); // 愛してるばんざーい! — ドロー icon
     let c = game.db.get_card(card).unwrap();

@@ -173,7 +173,7 @@ fn nine_cards_in_the_waitroom_still_fires() {
 /// Boundary: ten banked does not fire.
 #[test]
 fn ten_cards_in_the_waitroom_does_not_fire() {
-    let (mut game, _banked) = to_live_start(RUBII, 3, 7);
+    let (game, _banked) = to_live_start(RUBII, 3, 7);
     assert!(
         !game.has_pending_choice(),
         "10枚 → the gate is 9枚以下, so nothing is offered (pending {:?})",

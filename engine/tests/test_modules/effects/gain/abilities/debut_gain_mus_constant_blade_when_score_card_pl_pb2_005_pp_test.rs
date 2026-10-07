@@ -54,7 +54,7 @@ fn debut_with(success_zone: &[&str]) -> (TestGame, i16, i16, i16) {
 
 #[test]
 fn mus_score_card_grants_the_constant_to_every_mus_member() {
-    let (mut game, rin, ally, non_mus) = debut_with(&[MUS_SCORE]);
+    let (game, rin, ally, non_mus) = debut_with(&[MUS_SCORE]);
 
     assert_eq!(
         game.state.mods.get_blade_modifier(ally),
@@ -76,7 +76,7 @@ fn mus_score_card_grants_the_constant_to_every_mus_member() {
 /// Break the icon half of the condition only: right group, no スコア icon.
 #[test]
 fn mus_card_without_score_icon_grants_nothing() {
-    let (mut game, _rin, ally, _non_mus) = debut_with(&[MUS_NO_ICON]);
+    let (game, _rin, ally, _non_mus) = debut_with(&[MUS_NO_ICON]);
 
     assert_eq!(
         game.state.mods.get_blade_modifier(ally),
@@ -89,7 +89,7 @@ fn mus_card_without_score_icon_grants_nothing() {
 /// Break the group half only: right icon, wrong group.
 #[test]
 fn non_mus_score_card_grants_nothing() {
-    let (mut game, _rin, ally, _non_mus) = debut_with(&[NON_MUS_SCORE]);
+    let (game, _rin, ally, _non_mus) = debut_with(&[NON_MUS_SCORE]);
 
     assert_eq!(
         game.state.mods.get_blade_modifier(ally),
@@ -100,7 +100,7 @@ fn non_mus_score_card_grants_nothing() {
 
 #[test]
 fn empty_success_zone_grants_nothing() {
-    let (mut game, _rin, ally, _non_mus) = debut_with(&[]);
+    let (game, _rin, ally, _non_mus) = debut_with(&[]);
 
     assert_eq!(
         game.state.mods.get_blade_modifier(ally),
@@ -139,7 +139,7 @@ fn a_score_card_arriving_after_debut_does_not_backfill() {
 /// member, not scaled by how many score-icon lives are in the zone.
 #[test]
 fn two_mus_score_cards_do_not_double_the_constant() {
-    let (mut game, _rin, ally, _non_mus) = debut_with(&[MUS_SCORE, "PL!-pb1-029-SRL"]);
+    let (game, _rin, ally, _non_mus) = debut_with(&[MUS_SCORE, "PL!-pb1-029-SRL"]);
 
     assert_eq!(
         game.state.mods.get_blade_modifier(ally),

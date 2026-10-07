@@ -121,7 +121,6 @@ fn position_change_one_member() {
     assert!(!game.has_pending_choice());
 }
 
-use rabuka_engine::types::AbilityTrigger;
 
 /// The decline path, on a SECOND card — the blast-radius question, now answered.
 ///

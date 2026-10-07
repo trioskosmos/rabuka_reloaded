@@ -7,7 +7,7 @@
 /// OR condition: A (no blade heart = 0) OR B (excess >= 2) → score = 4.
 /// Q182: Either condition met → score = 4.
 use crate::helpers::*;
-use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
+use rabuka_engine::card::HeartColor;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
     for _ in 0..5 {

@@ -15,7 +15,6 @@
 //! the one that says 「1枚につき」 — two qualifying cards must give two, not one.
 
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 const HANAYOME: &str = "PL!-pb2-007-PP"; // 東條 希, lily white
 const ENERGY: &str = "LL-E-001-SD";

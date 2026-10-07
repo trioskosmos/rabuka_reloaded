@@ -9,7 +9,6 @@
 //! must not satisfy it.
 
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 const KOTORI: &str = "PL!-pb2-012-P＋";
 /// Two DIFFERENTLY-NAMED Printemps members with no abilities of their own, so
@@ -72,7 +71,7 @@ fn one_printemps_member_alone_is_not_enough() {
 
 #[test]
 fn two_distinctly_named_printemps_members_grant_minus_two() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     probe.assert_card_in_group(probe.id(P_HANAYOME), "Printemps", "ally fixture");
     probe.assert_card_in_group(probe.id(P_KOTORI2), "Printemps", "ally fixture");
     probe.assert_distinct_card_names(probe.id(P_HANAYOME), probe.id(P_KOTORI2), "ally fixture");
@@ -88,7 +87,7 @@ fn two_distinctly_named_printemps_members_grant_minus_two() {
 /// 名前が異なる — the same character twice does not satisfy the count.
 #[test]
 fn two_prints_of_the_same_character_are_not_distinct() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let a = probe.id(P_HANAYOME);
     let b = probe.new_id(P_HANAYOME);
     probe.assert_same_card_name(a, b, "duplicate fixture");
@@ -111,7 +110,7 @@ fn two_prints_of_the_same_character_are_not_distinct() {
 
 #[test]
 fn a_non_printemps_ally_does_not_count() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     probe.assert_card_in_group(probe.id(P_HANAYOME), "Printemps", "ally fixture");
     let n = probe.id(NON_PRINTEMPS);
     assert_eq!(

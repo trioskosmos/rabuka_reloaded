@@ -178,7 +178,7 @@ fn the_two_boundary_fixtures_print_cost_nine_and_cost_ten() {
 /// is the same board and the same filter, read the way the engine actually resolves it.
 #[test]
 fn paying_the_cost_waits_the_cost_nine_member_and_not_the_cost_ten_member() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let m9 = probe.id(COST_9);
     let m10 = probe.id(COST_10);
 
@@ -236,7 +236,7 @@ fn paying_the_cost_waits_the_cost_nine_member_and_not_the_cost_ten_member() {
 /// `以下`, so a text containing both would resolve to `>=`; this one contains only `以下`).
 #[test]
 fn the_offered_candidate_set_excludes_the_cost_ten_member() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let m9 = probe.id(COST_9);
     let m4 = probe.id(COST_4);
     let m10 = probe.id(COST_10);
@@ -283,7 +283,7 @@ fn the_offered_candidate_set_excludes_the_cost_ten_member() {
 /// `count: 1` is a real limit, not a formality: three qualifying members, one waited.
 #[test]
 fn exactly_one_member_is_waited_even_when_all_three_qualify() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let m9 = probe.id(COST_9);
     let m4 = probe.id(COST_4);
     let m4b = probe.new_id(COST_4);
@@ -311,7 +311,7 @@ fn exactly_one_member_is_waited_even_when_all_three_qualify() {
 /// engine must NOT open a prompt, and must still apply the wait.
 #[test]
 fn an_already_waited_member_is_not_offered_and_the_remaining_candidate_resolves() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let m9 = probe.id(COST_9);
     let m4 = probe.id(COST_4);
 
@@ -350,7 +350,7 @@ fn an_already_waited_member_is_not_offered_and_the_remaining_candidate_resolves(
 /// for a wait they did not choose, or an opponent member is waited for free.
 #[test]
 fn declining_the_optional_self_wait_does_not_wait_the_opponent() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let m9 = probe.id(COST_9);
     let m4 = probe.id(COST_4);
 
@@ -412,7 +412,7 @@ fn declining_the_optional_self_wait_does_not_wait_the_opponent() {
 /// than done.
 #[test]
 fn a_cost_ten_only_opponent_stage_waits_nobody() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let m10 = probe.id(COST_10);
     let m10b = probe.new_id(COST_10);
 
@@ -451,7 +451,7 @@ fn a_cost_ten_only_opponent_stage_waits_nobody() {
 /// in the pay path's orientation write would be caught from the outside.
 #[test]
 fn paying_the_debut_cost_switches_on_her_own_constant_heart05() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let m9 = probe.id(COST_9);
     let m10 = probe.id(COST_10);
 
@@ -700,7 +700,7 @@ fn two_copies_each_pay_their_own_orientation_and_see_the_updated_board() {
 /// a prompted choice.
 #[test]
 fn the_prompted_path_applies_the_wait_to_the_chosen_member_only() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let m9 = probe.id(COST_9);
     let m4 = probe.id(COST_4);
     let m4b = probe.new_id(COST_4);
@@ -870,7 +870,7 @@ fn waiting_an_opponent_erena_grants_the_opponent_her_own_heart() {
 /// sets `target_player_id` to the effect's `target`, i.e. `"opponent"` here.
 #[test]
 fn the_resolving_player_chooses_which_opponent_member_is_waited() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let m9 = probe.id(COST_9);
     let m4 = probe.id(COST_4);
 
@@ -1110,7 +1110,7 @@ fn a_baton_touch_debut_belongs_to_the_arriving_copy() {
 /// `play_to_stage`, so the whole 登場 chain runs for real the second time.
 #[test]
 fn a_second_entry_to_the_stage_offers_the_debut_gate_again() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let m9 = probe.id(COST_9);
     let m4 = probe.id(COST_4);
 
@@ -1193,7 +1193,7 @@ fn a_second_entry_to_the_stage_offers_the_debut_gate_again() {
 /// immune member.
 #[test]
 fn a_wait_immune_opponent_member_is_offered_but_not_actually_waited() {
-    let mut probe = TestGame::new(load_real_database());
+    let probe = TestGame::new(load_real_database());
     let m9 = probe.id(COST_9);
     let m4 = probe.id(COST_4);
 

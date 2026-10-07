@@ -142,7 +142,7 @@ fn the_choice_is_presented_and_selecting_an_option_runs_it() {
 /// it is a property of the shape, not a defect in this card.
 #[test]
 fn the_prompt_does_not_enumerate_its_options() {
-    let mut game = fired(&[MUS_LIVE]);
+    let game = fired(&[MUS_LIVE]);
     assert!(game.has_pending_choice(), "the choice is offered");
     assert_eq!(
         game.pending_choice_count(),

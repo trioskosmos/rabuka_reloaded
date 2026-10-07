@@ -37,7 +37,6 @@
 /// correction to write down.
 use crate::helpers::*;
 use rabuka_engine::core::types::AbilityTrigger;
-use rabuka_engine::zones::MemberArea;
 
 const LOVE_WING_BELL: &str = "PL!-bp4-020-L";
 /// Three μ's members with three different names. Verified in cards.json:

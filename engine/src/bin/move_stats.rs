@@ -127,7 +127,7 @@ fn main() {
     println!("--- action type by lift (P(lose | action) - base loss rate) ---");
     let mut rows: Vec<(String, String, u32, u32, f64)> = stat
         .iter()
-        .filter(|((a, _), (n, _))| *n >= 200)
+        .filter(|((_a, _), (n, _))| *n >= 200)
         .map(|((a, c), (n, w))| (a.clone(), c.clone(), *n, *w, *w as f64 / *n as f64))
         .collect();
     rows.sort_by(|x, y| x.4.partial_cmp(&y.4).unwrap_or(std::cmp::Ordering::Equal));

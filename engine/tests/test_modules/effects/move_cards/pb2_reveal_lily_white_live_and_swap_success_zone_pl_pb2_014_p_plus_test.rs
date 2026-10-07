@@ -24,7 +24,6 @@
 //! What was already correct and is still pinned: the optional reveal cost.
 
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 const SHIRO: &str = "PL!-pb2-014-P＋";
 const FILLER: &str = "PL!-sd1-010-SD";

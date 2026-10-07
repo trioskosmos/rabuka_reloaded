@@ -31,7 +31,6 @@
 /// are picked from across the family's units (Printemps/BiBi, 虹ヶ咲, Liella!,
 /// 5yncri5e!, lily white, AZALEA, CatChu!) so nothing here depends on group matching.
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 const SUBJECT: &str = "PL!S-bp2-016-N"; // 国木田 花丸, cost 2
 const OTHER: &str = "PL!N-bp4-017-N"; // 宮下 愛, cost 2

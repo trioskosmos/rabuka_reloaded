@@ -1406,7 +1406,7 @@ pub(crate) fn class_value(class: crate::bot::strategy_v7::AbilityClass) -> f64 {
 /// `Disposal` is allowed but not encouraged: discarding a dead card is hygiene
 /// that the live-zone junk fill already does for free under 8.3.4, so spending
 /// a member for it is strictly worse.
-pub fn ability_is_worth_spending(class: crate::bot::strategy_v7::AbilityClass) -> bool {
+pub(crate) fn ability_is_worth_spending(class: crate::bot::strategy_v7::AbilityClass) -> bool {
     use crate::bot::strategy_v7::AbilityClass;
     match class {
         // Never: it resolves on its own.

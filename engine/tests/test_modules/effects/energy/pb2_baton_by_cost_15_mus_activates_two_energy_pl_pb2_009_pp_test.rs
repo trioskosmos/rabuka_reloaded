@@ -92,7 +92,7 @@ fn fill_decks(game: &mut TestGame, filler: i16) {
 fn fixture_cost_and_group_are_what_the_gates_assume() {
     let db = load_real_database();
     let game = TestGame::new(db);
-    for (card_no, want_cost, want_mus) in [
+    for (card_no, want_cost, _want_mus) in [
         (HIGH_COST_MUS, 22u8, true),
         (LOW_COST_MUS, 9, true),
         (HIGH_COST_NON_MUS, 22, false),

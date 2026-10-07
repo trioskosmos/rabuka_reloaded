@@ -142,7 +142,7 @@ fn condition_fails_with_no_match() {
     let db = load_real_database();
     let mut g = TestGame::new(db);
     let f = g.id("PL!-sd1-013-SD");
-    let n = g.id("PL!-sd1-010-SD");
+    let _n = g.id("PL!-sd1-010-SD");
     play_himeno(&mut g, f, f);
     let (r, _) = debut_result_and_actions(&g);
     assert_eq!(r, "failure");
@@ -178,7 +178,7 @@ fn no_effects_without_match() {
     let db = load_real_database();
     let mut g = TestGame::new(db);
     let f = g.id("PL!-sd1-013-SD");
-    let n = g.id("PL!-sd1-010-SD");
+    let _n = g.id("PL!-sd1-010-SD");
     play_himeno(&mut g, f, f);
     let (r, actions) = debut_result_and_actions(&g);
     assert_eq!(r, "failure");

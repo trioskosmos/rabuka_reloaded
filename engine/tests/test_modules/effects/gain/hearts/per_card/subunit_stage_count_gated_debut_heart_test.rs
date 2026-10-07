@@ -47,7 +47,7 @@ const PRINTED_GROUP: &str = "R3BIRTH";
 #[test]
 fn n_bp7_024_n_fixture_group_membership_is_documented() {
     let db = load_real_database();
-    let mut game = TestGame::new(db);
+    let game = TestGame::new(db);
 
     for card_no in [ME, R3BIRTH_A, R3BIRTH_B, R3BIRTH_C] {
         let id = game.id(card_no);

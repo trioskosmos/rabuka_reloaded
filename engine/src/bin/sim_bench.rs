@@ -271,6 +271,7 @@ fn run_game(
         None
     };
     let mut actions_total = 0u64;
+    #[cfg(feature = "alloc_tracker")]
     let mut advance_count = 0usize;
     let mut end_reason = "iteration_cap";
     let mut last_turn = 0u8;
@@ -336,6 +337,7 @@ fn run_game(
                     rabuka_engine::alloc_counter::arm_alloc_trace();
                 }
                 TurnEngine::advance_phase(&mut gs);
+                advance_count += 1;
                 if trace_phase {
                     let rows = rabuka_engine::alloc_counter::disarm_alloc_trace();
                     let total: u64 = rows.iter().map(|r| r.1).sum();
@@ -352,7 +354,6 @@ fn run_game(
             }
             #[cfg(not(feature = "alloc_tracker"))]
             TurnEngine::advance_phase(&mut gs);
-            advance_count += 1;
             if let Some(trace) = trace.as_mut() {
                 trace.steps.push(Step {
                     operation: "empty_advance".into(),

@@ -229,7 +229,7 @@ fn a_non_mus_member_produces_no_bonus() {
 #[test]
 fn the_live_success_harness_fires_the_ability() {
     let db = load_real_database();
-    let mut game = TestGame::new(db);
+    let game = TestGame::new(db);
     let hikari = game.id(HIKARI);
     let card = game.db.get_card(hikari).unwrap();
     assert!(

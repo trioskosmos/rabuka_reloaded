@@ -331,7 +331,7 @@ let num_games: u32 = std::env::args()
                     .iter()
                     .map(|a| ActionEncoding::from_action(a, &obs))
                     .collect();
-                let (logits, value) = network.evaluate_actions(&enc_state, &action_encs);
+                let (_logits, value) = network.evaluate_actions(&enc_state, &action_encs);
                 let target = choose_v7_action(&gs, &actions, 0, &plan_p1);
                 let idx = action_index(&actions, &target);
                 trajectory.push(Step {

@@ -24,8 +24,6 @@
 //! the 「ブレードハートは含みません」 half — a real printed grant, not a synthetic modifier.
 
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
-use rabuka_engine::core::types::AbilityTrigger;
 
 const LOVEPEACE: &str = "PL!-bp3-026-L";
 /// 高坂 穂乃果 — heart01:1, heart03:1 = **2** hearts.
