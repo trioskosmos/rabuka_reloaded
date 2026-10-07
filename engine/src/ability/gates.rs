@@ -355,8 +355,16 @@ pub fn handle_pending_choice(
     }
 
     if is_cost_choice && !cost_already_paid {
-        if let Some(entry) = gs.ability_queue.current_entry_mut() {
-            entry.cost_paid = true;
+        // …unless a SequentialCost is still half-paid: `pay_cost_inner` yields
+        // as soon as a sub-cost creates a choice and records `cost_paid_index`,
+        // so marking the whole cost paid here would strand the remaining
+        // sub-costs (they would never run) and let the effect resolve for free.
+        // Leaving it false lets the resume path re-enter `pay_ability_cost`
+        // at `cost_paid_index` — see `finalize_choice` / `resume_sequential_cost`.
+        if !gs.ability_queue.has_unpaid_sequential_sub_cost() {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.cost_paid = true;
+            }
         }
     }
 

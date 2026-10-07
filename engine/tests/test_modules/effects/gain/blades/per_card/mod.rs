@@ -7,6 +7,7 @@ pub mod hazuki_activate_discard_per_liella_member_blade_test;
 pub mod kanon_debut_one_per_group_deck_bottom_edge_test;
 pub mod modifier_layer_characterization_test;
 pub mod per_unit_discard_count_regression_test;
+pub mod pr_023_each_wait_transition_grants_blade_test;
 pub mod q148_waited_member_blade_total_test;
 pub mod q271_colorful_dreams_test;
 pub mod q273_fired_debut_ability_cost_paid_test;

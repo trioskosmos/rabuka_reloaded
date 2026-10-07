@@ -944,7 +944,7 @@ let source = cost.source_str().unwrap_or("");
                         card_id,
                         gs.player1.stage.stage
                     );
-                    gs.mods.add_orientation_modifier(card_id, "wait");
+                    gs.set_orientation(card_id, "wait");
                     gs.last_cost_waited_members.push(card_id);
                 }
             } else {
@@ -1509,7 +1509,7 @@ let source = cost.source_str().unwrap_or("");
                             .get_orientation_modifier(id)
                             .is_some_and(|o| o == "wait");
                         if !already_waited {
-                            gs.mods.add_orientation_modifier(id, "wait");
+                            gs.set_orientation(id, "wait");
                         }
                     }
                 } else {
@@ -1539,10 +1539,10 @@ let source = cost.source_str().unwrap_or("");
                     if candidates.len() <= count {
                         for &card_id in &candidates {
                             if state_change == "wait" {
-                                gs.mods.add_orientation_modifier(card_id, "wait");
+                                gs.set_orientation(card_id, "wait");
                                 gs.last_cost_waited_members.push(card_id);
                             } else if state_change == "rest" || state_change == "rested" {
-                                gs.mods.add_orientation_modifier(card_id, "rest");
+                                gs.set_orientation(card_id, "rest");
                             }
                         }
                     } else {
@@ -1595,7 +1595,7 @@ let source = cost.source_str().unwrap_or("");
                         && sub_cost.self_cost_any() == Some(true)
                     {
                         if let Some(id) = gs.activating_card {
-                            gs.mods.add_orientation_modifier(id, "wait");
+                            gs.set_orientation(id, "wait");
                         }
                     } else if let Err(e) = self.pay_cost(gs, sub_cost) {
                         log::debug!("Warning: sub-cost payment error: {}", e);

@@ -2418,7 +2418,7 @@ if util::distinct_should_dedupe(distinct) {
                     self.selection.moved_cards.push(card_id);
                 }
                 if state_change.as_deref() == Some("wait") {
-                    gs.mods.add_orientation_modifier(card_id, "wait");
+                    gs.set_orientation(card_id, "wait");
                 }
                 log::debug!("[DEPLOY_POSITION] target={} position={} placed={} next=debut_side_effects", target, position, placed);
                 log_move_result(gs.resolve_target_player(&target), &gs.card_database, card_id, source_zone, "stage");
@@ -2501,11 +2501,11 @@ if util::distinct_should_dedupe(distinct) {
         if let Some(ref sc) = state_change {
             if sc == "wait" {
                 for card_id in moved_cards {
-                    gs.mods.add_orientation_modifier(*card_id, "wait");
+                    gs.set_orientation(*card_id, "wait");
                 }
             } else if sc == "active" {
                 for card_id in moved_cards {
-                    gs.mods.add_orientation_modifier(*card_id, "active");
+                    gs.set_orientation(*card_id, "active");
                 }
                 if Zone::from_str(destination) == Some(Zone::Energy) {
                     let p = match target.unwrap_or("self") {
@@ -2932,7 +2932,7 @@ pub fn execute_selected_cards_from_zone(
         if let Some(sc) = state_change {
             if sc == "wait" {
                 for &cid in &moved {
-                    gs.mods.add_orientation_modifier(cid, "wait");
+                    gs.set_orientation(cid, "wait");
                 }
             }
         }
@@ -3528,7 +3528,7 @@ pub fn execute_selected_cards_from_zone(
         player.energy_zone.set_indices_waited(indices);
         for cid in to_mark {
             gs.mods.clear_all_for_card(cid);
-            gs.mods.add_orientation_modifier(cid, "wait");
+            gs.set_orientation(cid, "wait");
         }
         Ok(())
     }

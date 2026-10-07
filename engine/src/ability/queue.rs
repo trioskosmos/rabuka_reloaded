@@ -256,6 +256,38 @@ impl AbilityQueue {
         self.entries.get(index)
     }
 
+    /// True while the current entry's cost is a `SequentialCost` that yielded
+    /// mid-payment: at least one sub-cost has been paid
+    /// (`cost_paid_index > 0`, recorded by `pay_cost_inner` before it returns
+    /// on a pending choice) but not all of them.
+    ///
+    /// Rule 9.4.2 runs sub-costs in order, so such an entry's cost is NOT paid
+    /// yet — the remaining sub-costs (e.g. the hand discard of 「メンバーを
+    /// ウェイトにし、手札を1枚控え室に置く」) still have to run. Callers that
+    /// would otherwise mark `cost_paid` on a cost choice must leave it false so
+    /// the resume path re-enters `pay_ability_cost` at `cost_paid_index`.
+    pub fn has_unpaid_sequential_sub_cost(&self) -> bool {
+        let Some(entry) = self.current_entry() else {
+            return false;
+        };
+        if entry.cost_paid_index == 0 {
+            return false;
+        }
+        let Some(cost) = entry.ability.cost.as_ref() else {
+            return false;
+        };
+        if !matches!(
+            cost.action,
+            crate::ability::enums::ActionType::SequentialCost
+        ) {
+            return false;
+        }
+        cost.compound
+            .actions
+            .as_ref()
+            .is_some_and(|a| a.len() > usize::from(entry.cost_paid_index))
+    }
+
     /// Number of entries pending or completed
     pub fn len(&self) -> usize {
         self.entries.len()

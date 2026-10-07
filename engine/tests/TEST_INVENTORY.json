@@ -1,20 +1,20 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-06T08:12:52.602984+00:00",
+  "generated_at": "2026-10-07T00:35:38.965910+00:00",
   "stats": {
     "total_cards": 2674,
     "cards_with_abilities": 1664,
     "total_abilities": 2132,
     "unique_abilities": 996
   },
-  "n_files": 1042,
-  "n_tests": 4333,
+  "n_files": 1045,
+  "n_tests": 4343,
   "total_cards": 818,
-  "covered_cards": 814,
-  "abilities_on_covered": 990,
+  "covered_cards": 816,
+  "abilities_on_covered": 993,
   "trigger_counts": {
     "起動": [
-      101,
+      102,
       102
     ],
     "登場": [
@@ -38,7 +38,7 @@
       126
     ],
     "自動": [
-      82,
+      84,
       84
     ]
   },
@@ -52,7 +52,7 @@
       75
     ],
     "gain_resource": [
-      171,
+      173,
       174
     ],
     "sequential": [
@@ -68,7 +68,7 @@
       2
     ],
     "draw_card": [
-      45,
+      46,
       47
     ],
     "change_state": [
@@ -186,12 +186,12 @@
   },
   "cond_counts": {
     "none": [
-      575,
+      576,
       577
     ],
     "location_condition": [
       76,
-      78
+      77
     ],
     "comparison_condition": [
       59,
@@ -202,8 +202,8 @@
       2
     ],
     "group_condition": [
-      48,
-      48
+      47,
+      47
     ],
     "card_count_condition": [
       93,
@@ -218,7 +218,7 @@
       15
     ],
     "movement:baton_touch": [
-      22,
+      23,
       23
     ],
     "temporal_condition": [
@@ -246,8 +246,8 @@
       5
     ],
     "state_change_condition": [
-      1,
-      1
+      3,
+      3
     ],
     "card_blade_condition": [
       1,
@@ -284,7 +284,7 @@
       56
     ],
     "PR": [
-      55,
+      58,
       61
     ],
     "bp3": [
@@ -321,11 +321,11 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 857,
+    "L2+choice": 860,
     "L2": 105,
-    "none": 6,
     "L1+choice": 27,
-    "L1": 1
+    "L1": 1,
+    "none": 3
   },
   "qa_rulings": {
     "covered": 280,
@@ -398,10 +398,8 @@
     ]
   },
   "specific_requirements": {
-    "total": 151,
-    "thin_idxs": [
-      618
-    ]
+    "total": 152,
+    "thin_idxs": []
   },
   "lifecycle": {
     "total": 15,
@@ -1082,7 +1080,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4333,
+  "n_test_fns_parsed": 4343,
   "abilities": [
     {
       "idx": 0,
@@ -2922,6 +2920,7 @@
         "engine/tests/test_modules/effects/gain/blades/constants/conditional_constant_blade_bonuses_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/per_waited_opponent_member_constant_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/eri_debut_up_to_two_opponent_members_to_wait_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/per_card/pr_023_each_wait_transition_grants_blade_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs",
         "engine/tests/test_modules/effects/state/orientation_gated/erena_debut_cost_nine_or_less_opponent_wait_test.rs",
         "engine/tests/test_modules/effects/state/orientation_gated/two_or_more_opponent_wait_members_constant_heart06_test.rs",
@@ -2951,6 +2950,7 @@
         "declined_energy_preserves_energy_stage_and_requirement_743",
         "declining_the_optional_self_wait_does_not_wait_the_opponent",
         "deploy_filter_excludes_cost_five_and_wrong_group_743",
+        "each_further_wait_transition_grants_another_blade",
         "eli_bp5_a_mu_member_below_cost_nine_is_rejected_on_cost_alone",
         "eli_bp5_look_select_optional_skip_keeps_hand",
         "eli_bp5_no_eligible_look_discards_all",
@@ -2958,10 +2958,9 @@
         "eli_bp5_skip_costs_skips_look_entirely",
         "erena_active_no_heart",
         "erena_default_active_no_heart",
-        "erena_in_wait_gains_heart05",
-        "erena_wait_not_on_stage"
+        "erena_in_wait_gains_heart05"
       ],
-      "covering_test_count": 82,
+      "covering_test_count": 85,
       "direct_tests": [
         "a_cheap_mus_baton_touch_activates_nothing",
         "a_duplicate_named_member_cannot_be_paid_for_the_cost",
@@ -13597,16 +13596,28 @@
         "PL!S-PR-047-PR"
       ],
       "base": "PL!-PR-025",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
-      "direct_tests": [],
-      "direct_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/jidou/leaves_stage/baton_displaced_cost_gate_blades_arriver_pl_pr_025_test.rs"
+      ],
+      "covering_tests": [
+        "baton_over_cost_seven_arriver_gains_nothing",
+        "hs_pr_040_baton_over_cost_nine_arriver_gains_two_blades",
+        "pr_025_baton_over_cost_nine_arriver_gains_two_blades",
+        "s_pr_047_baton_over_cost_nine_arriver_gains_two_blades"
+      ],
+      "covering_test_count": 4,
+      "direct_tests": [
+        "baton_over_cost_seven_arriver_gains_nothing",
+        "hs_pr_040_baton_over_cost_nine_arriver_gains_two_blades",
+        "pr_025_baton_over_cost_nine_arriver_gains_two_blades",
+        "s_pr_047_baton_over_cost_nine_arriver_gains_two_blades"
+      ],
+      "direct_test_count": 4,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -14352,6 +14363,7 @@
         "engine/tests/test_modules/effects/gain/blades/live_start/mymai_tonight_test.rs",
         "engine/tests/test_modules/effects/gain/blades/live_start/optional_discard_success_zone_blades_maki_bp3_006_r_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/eri_debut_up_to_two_opponent_members_to_wait_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/per_card/pr_023_each_wait_transition_grants_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/q46_kanako_all_heart_timing_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/turn_scope_regression_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/color_choice/chosen_colour_is_a_replacement_not_a_grant_test.rs",
@@ -14465,7 +14477,7 @@
         "audit_set_zero_removes_requirement",
         "audit_sufficient_hearts_passes"
       ],
-      "covering_test_count": 923,
+      "covering_test_count": 926,
       "direct_tests": [
         "a_card_in_the_success_zone_blocks_the_bonus",
         "a_live_in_the_waitroom_is_not_a_candidate",
@@ -14498,7 +14510,7 @@
         "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
         "debut_both_waitrooms_member_restore_shrinks_own_waitroom"
       ],
-      "direct_test_count": 399,
+      "direct_test_count": 402,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -19185,6 +19197,7 @@
         "engine/tests/test_modules/effects/gain/blades/constants/conditional_constant_blade_bonuses_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/per_waited_opponent_member_constant_blade_test.rs",
         "engine/tests/test_modules/effects/gain/blades/per_card/eri_debut_up_to_two_opponent_members_to_wait_test.rs",
+        "engine/tests/test_modules/effects/gain/blades/per_card/pr_023_each_wait_transition_grants_blade_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_cost9_member_test.rs",
         "engine/tests/test_modules/effects/state/orientation_gated/wait_state_condition_constants_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/pb2_debut_wait_opponent_up_to_three_printed_hearts_pl_pb2_033_n_test.rs",
@@ -19202,6 +19215,7 @@
         "an_expensive_non_mus_baton_touch_activates_nothing",
         "center_grants_at_least_two_blades_pl_sp_bp4_003",
         "constant_blade_per_waited_opponent_member",
+        "each_further_wait_transition_grants_another_blade",
         "eli_bp5_a_mu_member_below_cost_nine_is_rejected_on_cost_alone",
         "eli_bp5_look_select_optional_skip_keeps_hand",
         "eli_bp5_no_eligible_look_discards_all",
@@ -19219,10 +19233,9 @@
         "four_printed_hearts_is_never_offered",
         "no_eligible_opponent_member_is_harmless",
         "one_of_several_eligible_is_chosen",
-        "only_the_qualifying_member_is_affected",
-        "our_own_low_heart_member_is_not_a_target"
+        "one_wait_transition_grants_one_blade"
       ],
-      "covering_test_count": 41,
+      "covering_test_count": 44,
       "direct_tests": [
         "a_cheap_mus_baton_touch_activates_nothing",
         "a_duplicate_named_member_cannot_be_paid_for_the_cost",
@@ -40956,16 +40969,20 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/gain/blades/per_card/pr_023_each_wait_transition_grants_blade_test.rs",
         "engine/tests/test_modules/effects/state/wait_activation/self_wait_named_gate_draw_two_discard_one_reactivate_pl_pr_022_pr_test.rs"
       ],
       "covering_tests": [
         "both_named_members_reactivate_maki",
+        "each_further_wait_transition_grants_another_blade",
         "no_named_member_on_stage_pays_the_wait_cost_and_draws_nothing",
         "one_named_member_draws_two_and_discards_one_then_stays_waited",
+        "one_wait_transition_grants_one_blade",
         "only_one_activation_per_turn",
-        "three_unnamed_members_do_not_satisfy_2人とも"
+        "three_unnamed_members_do_not_satisfy_2人とも",
+        "turn_cap_of_three_blocks_a_fourth_grant"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 8,
       "direct_tests": [],
       "direct_test_count": 0,
       "is_null": false,
@@ -40982,24 +40999,38 @@
         "自動"
       ],
       "action": "gain_resource",
-      "condition": "location_condition",
+      "condition": "state_change_condition",
       "set": "PR",
       "cards": [
         "PL!-PR-023-PR"
       ],
       "base": "PL!-PR-023",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
-      "direct_tests": [],
-      "direct_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/effects/gain/blades/per_card/pr_023_each_wait_transition_grants_blade_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/pr_023_kidou_wait_member_discard_draw_test.rs"
+      ],
+      "covering_tests": [
+        "each_further_wait_transition_grants_another_blade",
+        "kidou_asks_which_member_when_two_are_eligible",
+        "kidou_is_refused_a_second_time_in_the_same_turn",
+        "kidou_waits_a_member_discards_one_and_draws_one",
+        "one_wait_transition_grants_one_blade",
+        "turn_cap_of_three_blocks_a_fourth_grant"
+      ],
+      "covering_test_count": 6,
+      "direct_tests": [
+        "each_further_wait_transition_grants_another_blade",
+        "one_wait_transition_grants_one_blade",
+        "turn_cap_of_three_blocks_a_fourth_grant"
+      ],
+      "direct_test_count": 3,
       "is_null": false,
-      "use_limit": null,
+      "use_limit": 3,
       "watches_abilities": false,
       "effect_cause": false,
       "jidou_partners": [
@@ -41020,16 +41051,30 @@
         "PL!-PR-023-PR"
       ],
       "base": "PL!-PR-023",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
-      "direct_tests": [],
-      "direct_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/effects/gain/blades/per_card/pr_023_each_wait_transition_grants_blade_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/pr_023_kidou_wait_member_discard_draw_test.rs"
+      ],
+      "covering_tests": [
+        "each_further_wait_transition_grants_another_blade",
+        "kidou_asks_which_member_when_two_are_eligible",
+        "kidou_is_refused_a_second_time_in_the_same_turn",
+        "kidou_waits_a_member_discards_one_and_draws_one",
+        "one_wait_transition_grants_one_blade",
+        "turn_cap_of_three_blocks_a_fourth_grant"
+      ],
+      "covering_test_count": 6,
+      "direct_tests": [
+        "each_further_wait_transition_grants_another_blade",
+        "one_wait_transition_grants_one_blade",
+        "turn_cap_of_three_blocks_a_fourth_grant"
+      ],
+      "direct_test_count": 3,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -53410,7 +53455,7 @@
         "自動"
       ],
       "action": "sequential",
-      "condition": "group_condition",
+      "condition": "state_change_condition",
       "set": "sd2",
       "cards": [
         "PL!N-sd2-010-SD2"
@@ -53514,10 +53559,9 @@
         "ayumu_no_wait_with_non_nijigasaki_ally",
         "ayumu_waits_opp_low_blade_when_stage_only_nijigasaki",
         "kanata_pays_wait_and_gains_two_blade",
-        "kanata_skip_optional_wait_gains_nothing",
-        "shioriko_auto_activates_waited_ally"
+        "kanata_skip_optional_wait_gains_nothing"
       ],
-      "direct_test_count": 7,
+      "direct_test_count": 6,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -53562,9 +53606,10 @@
       ],
       "covering_test_count": 12,
       "direct_tests": [
+        "shioriko_auto_activates_waited_ally",
         "shizuku_kidou_draws_after_waiting_self"
       ],
-      "direct_test_count": 1,
+      "direct_test_count": 2,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,

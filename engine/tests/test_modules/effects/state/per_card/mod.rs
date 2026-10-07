@@ -18,6 +18,7 @@ pub mod mei_per_distinct_catchu_member_energy_activation_test;
 pub mod member_activation_debut_and_live_start_test;
 pub mod nijigasaki_bp1_006_promoted_pay_two_draw_one_test;
 pub mod pl_sp_bp4_008_rightside_debut_energy_activation_test;
+pub mod pr_023_kidou_wait_member_discard_draw_test;
 pub mod q137_already_waited_cost_test;
 pub mod sd2_nijigasaki_abilities_gap_test;
 pub mod success_score_energy_pl_bp4_004_r_test;

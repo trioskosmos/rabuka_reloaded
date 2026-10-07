@@ -1321,9 +1321,7 @@ impl super::TurnEngine {
         // move_card_from_hand_to_stage so the card is on the stage (the rule is
         // about the area) and before any ability trigger can observe the orientation.
         if game_state.replacement_appear_wait_applies(card_id, area as usize) {
-            game_state
-                .mods
-                .add_orientation_modifier(card_id, "wait");
+            game_state.set_orientation(card_id, "wait");
         }
 
         // Per Q24, baton touch step 2 (old card → waitroom) happens before step 4

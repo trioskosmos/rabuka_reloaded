@@ -17,7 +17,7 @@ pub(crate) fn drain_under_cards_to_energy_zone(
         let is_energy = gs.card_database.get_card(cid).is_some_and(|c| c.is_energy());
         if is_energy {
             gs.resolve_target_player_mut(target).energy_zone.cards.push(cid);
-            gs.mods.add_orientation_modifier(cid, "wait");
+            gs.set_orientation(cid, "wait");
         } else {
             gs.resolve_target_player_mut(target).waitroom.add_card(cid);
         }

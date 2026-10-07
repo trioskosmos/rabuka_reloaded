@@ -1208,7 +1208,12 @@ impl<'a> ConditionContext<'a> {
                     return actual >= target_count;
                 }
             }
-            let is_opponent = condition.get_target().unwrap_or("self") == "opponent";
+            let target_name = condition.get_target().unwrap_or("self");
+            let is_opponent = target_name == "opponent";
+            // 「自分か相手のステージにいるメンバーがウェイト状態になるたび」
+            // (PL!-PR-023-PR) — the transitioned member may belong to either
+            // player, so membership is tested against the union of stages.
+            let either_side = target_name == "either" || target_name == "both";
             // First pass: check recently_state_changed for actual transitions.
             // This is the primary source — only cards that actually changed state
             // should satisfy the condition.
@@ -1217,7 +1222,24 @@ impl<'a> ConditionContext<'a> {
             } else {
                 self.resolve_condition_player("self")
             };
-            let stage_set: HashSet<i16> = target_player.stage.stage.iter().copied().collect();
+            let stage_set: HashSet<i16> = if either_side {
+                self.game_state
+                    .player1
+                    .stage
+                    .stage
+                    .iter()
+                    .chain(self.game_state.player2.stage.stage.iter())
+                    .copied()
+                    .collect()
+            } else {
+                target_player.stage.stage.iter().copied().collect()
+            };
+            log::debug!(
+                "[STATE_CHANGE_COND] eval target={} either_side={} staged_members={}",
+                target_name,
+                either_side,
+                stage_set.len()
+            );
             // 自分のカードの効果 scoping (e.g. Maki pb1-015 ab#1): only
             // transitions caused by the watcher's own side satisfy the
             // trigger. The cause is recorded at push time; "" = unknown and

@@ -644,7 +644,7 @@ impl AbilityResolver {
                     state_change,
                     gs.mods.get_orientation_modifier(*card_id)
                 );
-                gs.mods.add_orientation_modifier(*card_id, &state_change);
+                gs.set_orientation(*card_id, &state_change);
                 log::debug!(
                     "[EXEC_CHANGE_STATE] after: card_id={} ori={:?}",
                     card_id,
@@ -697,63 +697,10 @@ impl AbilityResolver {
                 gs.last_state_change_wait_to_active_count = actual_count;
             }
 
-            // Compare snapshot with current state to detect actual transitions.
-            if let Some(before) = gs.state_snapshot_before_change.take() {
-                // Attribute the transitions to the effect's owner for
-                // 自分のカードの効果 scoping: activating card's owner, else
-                // the queue entry player, else unknown ("").
-                let cause_pid: String = gs
-                    .activating_card
-                    .and_then(|cid| {
-                        if gs.player1.contains_card(cid) {
-                            Some(gs.player1.id.to_string())
-                        } else if gs.player2.contains_card(cid) {
-                            Some(gs.player2.id.to_string())
-                        } else {
-                            None
-                        }
-                    })
-                    .or_else(|| {
-                        gs.ability_queue
-                            .current_entry()
-                            .map(|e| e.player_id.to_string())
-                    })
-                    .unwrap_or_default();
-                for (card_id, before_ori) in &before {
-                    let after_ori = gs.mods.orientation_modifiers.get(card_id).copied();
-                    if *before_ori != after_ori {
-                        let from_str = before_ori
-                            .unwrap_or(CardOrientation::Active)
-                            .as_str()
-                            .to_string();
-                        let to_str = after_ori
-                            .unwrap_or(CardOrientation::Active)
-                            .as_str()
-                            .to_string();
-                        gs.recently_state_changed.push((
-                            *card_id,
-                            from_str.clone(),
-                            to_str.clone(),
-                            cause_pid.clone(),
-                        ));
-                        // Turn-scoped attributed log (cleared only at the turn
-                        // boundary) — consumed by temporal state-change
-                        // conditions like Q203.
-                        gs.turn_state_changes.push((
-                            gs.activating_card.unwrap_or(-1),
-                            *card_id,
-                            from_str.clone(),
-                            to_str.clone(),
-                        ));
-                        log::debug!(
-                            "[STATE_CHANGE] detected: card={} {}→{}",
-                            card_id,
-                            from_str,
-                            to_str
-                        );
-                    }
-                }
-            }
+            // Transitions are recorded by `set_orientation` as each modifier is
+            // applied (recently_state_changed + turn_state_changes + the
+            // [STATE_CHANGE] log), so the snapshot is only consumed here.
+            let _ = gs.state_snapshot_before_change.take();
 
             // Re-trigger auto abilities for both players — a member's state
             // change may satisfy state_change_condition on an auto ability

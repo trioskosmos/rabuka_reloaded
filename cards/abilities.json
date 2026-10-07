@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-06T18:37:48.094432",
+  "generated_at": "2026-10-06T19:59:57.689697",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "6401eb76",
+  "engine_commit": "20fc0308",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -25927,27 +25927,33 @@
     },
     {
       "full_text": "{{jidou.png|自動}}[ターン3回]自分か相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "[ターン3回]自分か相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "自分か相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
       "card_count": 1,
       "cards": [
         "PL!-PR-023-PR | 絢瀬絵里 (ab#0)"
       ],
       "triggers": "自動",
-      "use_limit": null,
+      "use_limit": 3,
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "[ターン3回]自分か相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る",
+        "text": "自分か相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "blade",
         "count": 1,
         "trigger_type": "each_time",
         "condition": {
-          "type": "location_condition",
-          "location": "stage",
+          "type": "state_change_condition",
+          "text": "自分か相手のステージにいるメンバーがウェイト状態になる",
+          "trigger_event": {
+            "type": "state_change",
+            "from_state": "active",
+            "to_state": "wait"
+          },
           "target": "either",
-          "text": "[ターン3回]自分か相手のステージにいるメンバーがウェイト状態になる"
+          "location": "stage",
+          "card_type": "member_card"
         }
       }
     },
@@ -34299,22 +34305,24 @@
               "location": "stage"
             },
             {
-              "text": "自分のステージにいる『虹ヶ咲』のメンバー1人がウェイト状態になったとき",
-              "group_names": [
-                "虹ヶ咲"
-              ],
-              "target": "self",
-              "location": "stage",
-              "card_type": "member_card",
-              "count": 1,
               "type": "state_change_condition",
-              "from_state": "active",
-              "to_state": "wait",
+              "text": "自分のステージにいる『虹ヶ咲』のメンバー1人がウェイト状態になったとき",
               "trigger_event": {
                 "type": "state_change",
                 "from_state": "active",
                 "to_state": "wait"
-              }
+              },
+              "target": "self",
+              "count": 1,
+              "operator": "=",
+              "unit": "人",
+              "group_names": [
+                "虹ヶ咲"
+              ],
+              "location": "stage",
+              "card_type": "member_card",
+              "from_state": "active",
+              "to_state": "wait"
             }
           ]
         },
@@ -35356,15 +35364,22 @@
       "effect": {
         "text": "自分のステージにいる『虹ヶ咲』のメンバー1人がウェイト状態になったとき、手札を1枚控え室に置いてもよい。そうしたとき、そのメンバーをアクティブにし、ライブ終了時まで、そのメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "condition": {
+          "type": "state_change_condition",
           "text": "自分のステージにいる『虹ヶ咲』のメンバー1人がウェイト状態になったとき",
+          "trigger_event": {
+            "type": "state_change",
+            "from_state": "active",
+            "to_state": "wait"
+          },
+          "target": "self",
+          "count": 1,
+          "operator": "=",
+          "unit": "人",
           "group_names": [
             "虹ヶ咲"
           ],
-          "target": "self",
           "location": "stage",
-          "card_type": "member_card",
-          "count": 1,
-          "type": "group_condition"
+          "card_type": "member_card"
         },
         "action": "sequential",
         "actions": [

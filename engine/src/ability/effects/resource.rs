@@ -1599,6 +1599,35 @@ pub(crate) fn execute_gain_surplus_heart(
             single_fixed_heart,
         } = req.clone();
         let card_db = self.card_db();
+        // 「そのバトンタッチで登場したメンバーは…を得る」 (PL!-PR-025-PR, PL!S-PR-047-PR,
+        // PL!HS-PR-040-PR): the activating member is the REPLACED one — her condition
+        // carries trigger_event.location=discard — so the printed target is the member
+        // that ARRIVED in that baton touch, never every member standing on stage.
+        let baton_arriver: SmallVec<[i16; 8]> = match effect.condition.as_deref() {
+            Some(cond) if cond.get_movement() == Some("baton_touch") => {
+                let loc = cond
+                    .get_location()
+                    .or_else(|| cond.get_trigger_event().and_then(|t| t.location.as_deref()))
+                    .unwrap_or("");
+                let self_replaced =
+                    matches!(Zone::from_str(loc), Some(Zone::Discard | Zone::Waitroom));
+                let arriving = gs.baton_touch_arriving_card_id;
+                log::debug!(
+                    "[BATON_ARRIVER] loc={} self_replaced={} arriving={:?}",
+                    loc,
+                    self_replaced,
+                    arriving
+                );
+                let mut only: SmallVec<[i16; 8]> = SmallVec::new();
+                if self_replaced {
+                    if let Some(id) = arriving {
+                        only.push(id);
+                    }
+                }
+                only
+            }
+            _ => SmallVec::new(),
+        };
         let mut filter = effect.filter_subset();
         filter.exclude_self = exclude_self_id;
         let exclude_names: Vec<String> = effect
@@ -1731,6 +1760,14 @@ pub(crate) fn execute_gain_surplus_heart(
             all_candidates.retain(|cid| current_blade_eligible.contains(cid));
         }
 
+        if !baton_arriver.is_empty() {
+            log::debug!(
+                "[BATON_ARRIVER] overriding {} stage candidate(s) with {:?}",
+                all_candidates.len(),
+                baton_arriver
+            );
+            all_candidates = baton_arriver;
+        }
         // Filter by position if the effect specifies one (e.g. "center"). Read
         // once and applied to both the blade and the heart target list, so the
         // constraint cannot hold for one and be skipped for the other.

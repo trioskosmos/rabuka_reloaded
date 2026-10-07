@@ -1276,7 +1276,15 @@ impl super::TurnEngine {
                 if game_state.ability_queue.start_next() {
                     let saved_moved = game_state.recently_moved_cards.take();
                     let saved_from_zone = game_state.recently_moved_from_zone.take();
-                    game_state.recently_state_changed.clear();
+                    // `recently_state_changed` is deliberately NOT cleared here.
+                    // Movement batches are carried on their queue entry
+                    // (`trigger_moved_cards`), so hiding the global one is free —
+                    // but state-change entries carry nothing, and the entries this
+                    // path resolves were created FROM this batch
+                    // (「メンバーがウェイト状態になるたび、ブレードを得る」): clearing before
+                    // resolution made every one of them re-evaluate against an
+                    // empty record and drop. The normal path clears it after
+                    // processing (abilities.rs process_current_ability).
                     game_state.process_current_ability();
                     if game_state.recently_moved_cards.is_none() {
                         game_state.recently_moved_cards = saved_moved;
@@ -1458,7 +1466,18 @@ impl super::TurnEngine {
         game_state.set_just_completed(snap.just_completed_key);
         game_state.process_pending_auto_abilities(&player_id);
         game_state.just_completed_ability_key = None;
-        game_state.clear_movement_tracking();
+        Self::clear_tracking_preserving_queued_triggers(game_state);
+    }
+
+    /// Post-completion tracking cleanup. A paused queue (ordering prompt)
+    /// means entries created from the state-change record are still waiting
+    /// to resolve against it, so the record has to outlive this call.
+    fn clear_tracking_preserving_queued_triggers(game_state: &mut GameState) {
+        if game_state.has_pending_choice() {
+            game_state.clear_movement_tracking_keep_state_changes();
+        } else {
+            game_state.clear_movement_tracking();
+        }
     }
 
     /// Reprocess path: the ability is still executing, so restore the saved
@@ -1511,7 +1530,7 @@ impl super::TurnEngine {
             game_state.just_completed_ability_key = None;
         }
         game_state.process_with_completed_key(snap.just_completed_key, &player_id);
-        game_state.clear_movement_tracking();
+        Self::clear_tracking_preserving_queued_triggers(game_state);
     }
 
     /// Paid-finish path: record use-limit, fire post-resolution each_time

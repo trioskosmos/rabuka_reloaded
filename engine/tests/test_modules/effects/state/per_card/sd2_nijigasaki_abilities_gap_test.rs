@@ -179,14 +179,23 @@ fn shioriko_auto_activates_waited_ally() {
     let db = load_real_database();
     let mut g = TestGame::new(db.clone());
     let shi = g.id(SHIORIKO);
-    let ally = g.id(ALLY);
+    // The condition is "虹 member BECAME wait" — so the wait has to be a real
+    // engine transition, not a hand-placed modifier. 桜坂しずく's 起動 waits
+    // herself, which is exactly that transition.
+    let ally = g.id(SHIZUKU);
     g.state.player1.stage.stage = [ally, shi, -1];
-    g.state.mods.add_orientation_modifier(ally, "wait"); // a 虹 member is waited
-    g.state.player1.hand.cards.push(g.id(FILLER)); // a card to discard for the cost
+    g.state.player1.hand.cards.push(g.id(FILLER)); // 015's discard cost
+    g.state.player1.hand.cards.push(g.id(FILLER)); // 010's discard cost
+    g.give_energy(4);
+    seed_decks(&mut g);
 
-    fire(&mut g, shi, "自動");
+    g.activate_ability(ally);
+    drain(&mut g, true); // waits the ally, then pays 010's optional discard
 
-    assert!(!is_waited(&g, ally), "010: auto leg activates the waited 虹 member");
+    assert!(
+        !is_waited(&g, ally),
+        "010: auto leg activates the waited 虹 member"
+    );
     assert_eq!(
         g.state.mods.get_blade_modifier(ally),
         2,

@@ -780,7 +780,7 @@ impl GameState {
                                 // §9.7.2.1: Compute trigger multiplicity before
                                 // the effect block closes -- condition and effect
                                 // are only in scope here.
-                                trigger_multiplicity = Self::trigger_instance_count(
+                                trigger_multiplicity = self.trigger_instance_count(
                                     moved_cards,
                                     effect,
                                     &self.card_database,
@@ -1065,11 +1065,21 @@ impl GameState {
 
     /// §9.7.2.1: Count how many standby entries to create for a trigger event.
     ///
+    /// For `state_change_condition`, counts the transitions in the current
+    /// batch that match its from/to — 「メンバーがウェイト状態になるたび、ブレードを
+    /// 得る」 (PL!-PR-023-PR) awards ONE blade per member that turned wait,
+    /// including several turned wait by a single effect, so a single standby
+    /// entry would pay only once for the whole batch. Scope/group filters are
+    /// re-checked at resolution (can_activate_effect), so counting on
+    /// from/to + "still on a stage" can cost an extra no-op entry, never a
+    /// missed trigger.
+    ///
     /// For `card_count_condition` with `source: "preceding_moved"`, counts
     /// cards in the event batch matching the condition's filters.  Returns 1
     /// for batch patterns ("すべて", "1枚以丁E, self_target, count=1+op=>=).
     /// All other condition types return 1 (single standby instance).
     fn trigger_instance_count(
+        &self,
         moved_cards: &[i16],
         effect: &crate::card::AbilityEffect,
         card_db: &crate::card::CardDatabase,
@@ -1078,6 +1088,35 @@ impl GameState {
             Some(c) => c,
             None => return 1,
         };
+        if matches!(condition.as_ref(), crate::card::Condition::State { .. })
+            && (condition.get_from_state().is_some() || condition.get_to_state().is_some())
+            // Event triggers only: a temporal look-back (「このターン中に…アクティブに
+            // していたメンバー1人につき」) counts its own members, not this batch.
+            && condition.get_temporal().is_none()
+        {
+            let from = condition.get_from_state();
+            let to = condition.get_to_state();
+            let matched = self
+                .recently_state_changed
+                .iter()
+                .filter(|(cid, cfrom, cto, _)| {
+                    *cid >= 0
+                        && from.is_some_and(|f| f == cfrom.as_str())
+                        && to.is_some_and(|t| t == cto.as_str())
+                        && (self.player1.stage.stage.contains(cid)
+                            || self.player2.stage.stage.contains(cid))
+                })
+                .count()
+                .u8_count();
+            log::debug!(
+                "[TRIGGER_MULT] state_change {}→{} matched={} in batch of {}",
+                from.unwrap_or("?"),
+                to.unwrap_or("?"),
+                matched,
+                self.recently_state_changed.len()
+            );
+            return matched.max(1);
+        }
         if !matches!(condition.as_ref(), crate::card::Condition::Location { .. })
             || condition.get_source() != Some("preceding_moved")
         {
@@ -1818,7 +1857,9 @@ fn trigger_auto_ability_by_index_refs(
             let had_recent_appearances = !self.recently_appeared_cards.is_empty();
             self.clear_recently_moved_batch();
             self.recently_appeared_cards.clear();
-            self.recently_state_changed.clear();
+            // Deferred so a cost paid here (a state change itself) survives
+            // until the watcher behind the pending choice reads it.
+            self.clear_state_change_window_deferred("after process_current_ability");
             // Save flag for the post-loop batch scan below;
             // process_current_ability's internal scan (line 742) already ran
             // before the clear above, so each_time watchers from the
@@ -1901,7 +1942,7 @@ fn trigger_auto_ability_by_index_refs(
             self.trigger_auto_abilities_for_player_with_event(player_id, &moved);
             self.clear_recently_moved_batch();
             self.recently_appeared_cards.clear();
-            self.recently_state_changed.clear();
+            self.clear_state_change_window("after post-loop TAS scan");
             // Re-enter the loop to process any abilities just enqueued
             // by the watcher scan (e.g. Hazuki Ren each_time after discard).
             // Keep this_batch_triggered_ability_ids alive through the recursive
@@ -3013,7 +3054,19 @@ fn trigger_auto_ability_by_index_refs(
     pub fn clear_movement_tracking(&mut self) {
         self.clear_recently_moved_batch();
         self.recently_appeared_cards.clear();
-        self.recently_state_changed.clear();
+        self.clear_state_change_window("clear_movement_tracking");
+    }
+
+    /// Movement/appearance cleanup that PRESERVES the state-change record.
+    ///
+    /// Used when the queue paused for a choice (the 「複数の自動能力が同時に発動
+    /// しました」 ordering prompt) right after a scan: the entries enqueued from
+    /// `recently_state_changed` still have to re-evaluate it at resolution, and
+    /// clearing it here dropped every one of them. Movement batches do not need
+    /// this — they ride on their queue entry (`trigger_moved_cards`).
+    pub fn clear_movement_tracking_keep_state_changes(&mut self) {
+        self.clear_recently_moved_batch();
+        self.recently_appeared_cards.clear();
     }
 
     pub fn should_trigger_live_success(&self, player: &Player) -> bool {
@@ -3447,7 +3500,7 @@ fn trigger_auto_ability_by_index_refs(
         self.live_success_p1_extra = 0;
         self.live_success_p2_extra = 0;
         self.last_state_change_wait_to_active_count = 0;
-        self.recently_state_changed.clear();
+        self.clear_state_change_window("Active-phase entry / turn boundary");
         // NOTE: turn_state_changes is NOT cleared here -- this runs on every
         // Active-phase entry (each player's normal phase), but 「このターン、E        // spans the whole round (both players' main phases + live). It is
         // cleared at the real turn boundary in advance_phase (victory

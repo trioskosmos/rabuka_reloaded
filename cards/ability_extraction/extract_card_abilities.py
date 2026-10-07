@@ -94,11 +94,15 @@ def extract_trigger(text: str) -> tuple[list, int | None, str]:
     text = text.strip().lstrip('"').lstrip("\u201c").lstrip("\u201d").strip()
     effect = text
 
-    # Handle ［ターン1回］ bracket format (non-icon turn limit notation)
-    bracket_turn_match = re.search(r"［ターン1回］", effect)
+    # Handle ［ターン1回］ bracket format (non-icon turn limit notation).
+    # The corpus also prints the halfwidth form with a number, e.g.
+    # PL!-PR-023-PR's bare "[ターン3回]" — both shapes are the same limit.
+    bracket_turn_match = re.search(r"[［\[]ターン(\d+)回[］\]]", effect)
     if bracket_turn_match:
-        use_limit = 1
-        effect = effect.replace("［ターン1回］", "", 1).strip()
+        use_limit = int(bracket_turn_match.group(1))
+        effect = (
+            effect[: bracket_turn_match.start()] + effect[bracket_turn_match.end() :]
+        ).strip()
 
     # First, remove / prefix trigger patterns
     slash_matches = SLASH_TRIGGER_PATTERN.findall(text)

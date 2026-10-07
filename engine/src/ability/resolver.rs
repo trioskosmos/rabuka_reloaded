@@ -1120,8 +1120,8 @@ impl AbilityResolver {
         }
         dbg.p("RESULT", "cost paid ✓");
         // Gated on the verdict gate, not on `not(no_std)`: `push_verdict` is
-        // itself gated, but these two `String`s (and the formatting of the
-        // source/destination/count fields) were built on every costed ability
+        // itself gated, but these two `String`s and the formatting of the
+        // source/destination/count fields were built on every costed ability
         // resolution and then discarded.
         #[cfg(not(feature = "no_std"))]
         if crate::ability::log::debug_enabled() {
@@ -1141,6 +1141,58 @@ impl AbilityResolver {
             });
         }
         Ok(())
+    }
+
+    /// Resume a sequential cost that yielded mid-payment.
+    ///
+    /// `pay_cost_inner` records `cost_paid_index` and returns as soon as a
+    /// sub-cost creates a choice (Rule 9.4.2: sub-costs run in order), so the
+    /// choice that just resolved may have been only the FIRST half of the
+    /// cost. `finalize_choice` calls this before marking the cost paid: any
+    /// sub-cost still outstanding (e.g. the hand discard of 「メンバーを
+    /// ウェイトにし、手札を1枚控え室に置く」) is paid here, and may pause
+    /// again for its own prompt — the outer `resume_queue_with_choice` then
+    /// stores that new choice and we come back later.
+    ///
+    /// No-op unless a sequential cost is genuinely half-paid
+    /// (`cost_paid_index > 0` and `< len`), so single-cost and costless
+    /// abilities keep their old path untouched.
+    pub(super) fn resume_sequential_cost(&mut self, gs: &mut GameState) -> Result<(), String> {
+        let ability = {
+            let Some(entry) = gs.ability_queue.current_entry() else {
+                log::debug!("[COST_RESUME] no current queue entry — nothing to resume");
+                return Ok(());
+            };
+            if entry.cost_paid || entry.effect_started {
+                log::debug!(
+                    "[COST_RESUME] bail: cost_paid={} effect_started={} (already settled)",
+                    entry.cost_paid, entry.effect_started
+                );
+                return Ok(());
+            }
+            if !gs.ability_queue.has_unpaid_sequential_sub_cost() {
+                log::debug!(
+                    "[COST_RESUME] bail: not a half-paid sequential cost (cost_paid_index={})",
+                    entry.cost_paid_index
+                );
+                return Ok(());
+            }
+            let total = entry
+                .ability
+                .cost
+                .as_ref()
+                .and_then(|c| c.compound.actions.as_ref())
+                .map_or(0, |a| a.len());
+            log::debug!(
+                "[COST_RESUME] source={:?} sequential sub-costs {}..{} still unpaid — resuming payment",
+                entry.card_id,
+                entry.cost_paid_index,
+                total
+            );
+            entry.ability.clone()
+        };
+        let mut dbg = AbDebug::new();
+        self.pay_ability_cost(gs, &ability, false, &mut dbg)
     }
 
     /// Record the turn-limit key early (before the effect runs) unless the

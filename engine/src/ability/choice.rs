@@ -247,9 +247,19 @@ impl super::resolver::AbilityResolver {
                 }
             }
         }
-        // If a deferred cost (is_select_action=true stage selection) just had
-        // its state change applied during handle_stage_selection, mark the cost
-        // as paid so the ability queue can transition to the effect phase.
+        // A cost choice just resolved (e.g. the is_select_action=true stage
+        // selection of a change_state sub-cost, applied by
+        // handle_stage_selection). A sequential cost yields MID-cost
+        // (cost_paid_index < len), so pay whatever sub-costs are still
+        // outstanding BEFORE declaring the cost paid — otherwise the trailing
+        // 「手札を1枚控え室に置く」 of 「メンバーをウェイトにし、手札を1枚
+        // 控え室に置く」 would be skipped and the effect would run for free.
+        if !sub_choice && self.awaiting.choice.is_none() {
+            self.resume_sequential_cost(gs)?;
+        }
+        // No sub-cost left (or the cost is a single one already applied by
+        // handle_stage_selection): mark the cost paid so the ability queue
+        // can transition to the effect phase.
         if !sub_choice && self.awaiting.choice.is_none() {
             if let Some(e) = gs.ability_queue.current_entry_mut() {
                 if !e.cost_paid && !e.effect_started {
@@ -384,7 +394,7 @@ impl super::resolver::AbilityResolver {
                     self.selection.moved_cards.push(card_id);
                 }
                 if state_change.as_deref() == Some("wait") {
-                    gs.mods.add_orientation_modifier(card_id, "wait");
+                    gs.set_orientation(card_id, "wait");
                 }
                 let pid = gs
                     .ability_queue
@@ -2193,7 +2203,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                             .is_some_and(|e| !e.effect_started)
                     {
                         for &cid in &cards {
-                            gs.mods.add_orientation_modifier(cid, "wait");
+                            gs.set_orientation(cid, "wait");
                             gs.last_cost_waited_members.push(cid);
                         }
                     }

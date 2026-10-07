@@ -250,7 +250,7 @@ pub(crate) fn execute_energy_state_change(
                     if skip.contains(card_id) {
                         continue;
                     }
-                    gs.mods.add_orientation_modifier(*card_id, "wait");
+                    gs.set_orientation(*card_id, "wait");
                 }
                 // Counter + positions move together through the zone rebuild
                 // (skipping immune members). No blind arithmetic.
@@ -270,14 +270,10 @@ pub(crate) fn execute_energy_state_change(
             }
             "active" => {
                 for card_id in &active_cards {
-                    gs.mods.add_orientation_modifier(*card_id, "active");
-                    // Turn-scoped attributed log (see GameState::turn_state_changes).
-                    gs.turn_state_changes.push((
-                        gs.activating_card.unwrap_or(-1),
-                        *card_id,
-                        "wait".to_string(),
-                        "active".to_string(),
-                    ));
+                    // `active_cards` are WAITED energies, but that wait lives
+                    // in the zone's waited-set, not in a modifier — so state
+                    // the origin explicitly or the transition is invisible.
+                    gs.set_orientation_from(*card_id, "wait", "active");
                 }
                 // Same positions the ids were taken from (parallel arrays).
                 {

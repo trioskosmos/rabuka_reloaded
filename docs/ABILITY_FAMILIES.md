@@ -24,7 +24,7 @@ file), NOT verified assertions — see TEST_COVERAGE.md for depth semantics.
 | [live_success_score](#live_success_score) | 31 | 31 | 1 |
 | [other:起動:sequential](#other:起動:sequential) | 28 | 28 | 1 |
 | [other:ライブ成功時:sequential](#other:ライブ成功時:sequential) | 25 | 24 | 1 |
-| [auto_gain](#auto_gain) | 24 | 22 | 1 |
+| [auto_gain](#auto_gain) | 24 | 24 | 1 |
 | [other:常時:gain_resource](#other:常時:gain_resource) | 23 | 23 | 1 |
 | [other:自動:sequential](#other:自動:sequential) | 19 | 19 | 1 |
 | [debut_draw](#debut_draw) | 18 | 18 | 1 |
@@ -44,7 +44,7 @@ file), NOT verified assertions — see TEST_COVERAGE.md for depth semantics.
 | [other:自動:draw_card](#other:自動:draw_card) | 7 | 7 | 1 |
 | [other:ライブ開始時:conditional_on_result](#other:ライブ開始時:conditional_on_result) | 7 | 7 | 1 |
 | [other:ライブ開始時:choice](#other:ライブ開始時:choice) | 7 | 7 | 1 |
-| [other:起動:draw_card](#other:起動:draw_card) | 6 | 5 | 1 |
+| [other:起動:draw_card](#other:起動:draw_card) | 6 | 6 | 1 |
 | [constant_restriction](#constant_restriction) | 6 | 6 | 1 |
 | [other:ライブ開始時:look_and_select](#other:ライブ開始時:look_and_select) | 6 | 6 | 1 |
 | [activation_cost_self_to_discard_recover](#activation_cost_self_to_discard_recover) | 5 | 5 | 1 |
@@ -781,7 +781,7 @@ Triggers: ライブ開始時, 登場 — 33/33 L0-covered.
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
-| `PL!-bp3-002` | L2+choice | 82 | {{toujyou.png/登場}}手札を1枚控え室に置いてもよい：相手のステージにいるコスト4以下のメンバーを2人までウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png/ブレード}}は、エールで公開する枚数を増やさない。） |
+| `PL!-bp3-002` | L2+choice | 85 | {{toujyou.png/登場}}手札を1枚控え室に置いてもよい：相手のステージにいるコスト4以下のメンバーを2人までウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png/ブレード}}は、エールで公開する枚数を増やさない。） |
 | `PL!HS-bp1-001` | L2+choice | 63 | {{toujyou.png/登場}}エネルギーを2枚アクティブにする。 |
 | `PL!N-bp3-006` | L2+choice | 60 | {{toujyou.png/登場}}このメンバーをウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png/ブレード}}は、エールで公開する枚数を増やさない。） |
 | `PL!-bp5-333` | L2+choice | 39 | {{toujyou.png/登場}}このメンバーをウェイトにしてもよい：相手のステージにいるコスト9以下のメンバー1人をウェイトにする。 |
@@ -882,13 +882,13 @@ Triggers: 起動 — 28/28 L0-covered.
 | `PL!SP-bp7-010` | L2+choice | 11 | {{kidou.png/起動}}このメンバーをステージから控え室に置く：自分のエネルギー置き場にあるエネルギー1枚をエネルギーデッキに置く。その後、自分の控え室からカードを1枚手札に加える。 |
 | `PL!SP-bp7-003` | L2+choice | 10 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札のコストが10か20のメンバーカードを1枚公開する：これにより公開したカードをこのメンバーの下に置く。その後、カードを2枚引く。 |
 | `PL!N-pb1-003` | L2+choice | 8 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}このカードを手札から控え室に置く：カードを1枚引き、ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は{{icon_blade.p |
+| `PL!-PR-022` | L2+choice | 8 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにする：自分のステージに「星空 凛」か「小泉花陽」がいる場合、カードを2枚引き、手札を1枚控え室に置く。2人ともいる場合、さらにこのメンバーをアクティブにする。 |
 | `PL!-pb2-007` | L2+choice | 7 | {{kidou.png/起動}}このメンバーをステージから控え室に置く：自分の控え室から『μ's』のライブカードを1枚手札に加える。その後、自分の成功ライブカード置き場にある『μ's』のカード1枚につき、エネルギーを1枚アクティブにする。 |
 | `PL!S-bp3-008` | L2+choice | 7 | {{kidou.png/起動}}このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。それがスコア6以上の『Aqours』のライブカードの場合、エネルギーを4枚アクティブにする。 |
 | `PL!S-bp7-011` | L2+choice | 7 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにする：自分のデッキの下からカードを2枚控え室に置く。それらがすべて『Aqours』のメンバーカードの場合、このメンバーをアクティブにし、ライブ終了時まで、{{icon |
 | `PL!N-bp3-007` | L2+choice | 6 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる |
 | `PL!SP-bp1-009` | L2+choice | 6 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}：カードを1枚引き、手札を1枚控え室に置く。 |
 | `PL!-bp3-001` | L2+choice | 5 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにする：カードを1枚引き、手札を1枚控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png/ブレード}}は、エールで公開する枚数を増やさない。） |
-| `PL!-PR-022` | L2+choice | 5 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにする：自分のステージに「星空 凛」か「小泉花陽」がいる場合、カードを2枚引き、手札を1枚控え室に置く。2人ともいる場合、さらにこのメンバーをアクティブにする。 |
 | `PL!N-bp5-003` | L2+choice | 4 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を1枚控え室に置く：自分の控え室にあるライブカードを1枚選び、そのカードのスコアに等しい数の{{icon_energy.png/E}}を支払ってもよい。そうした場合、そのライブカードを手 |
 | `PL!N-bp7-023` | L2+choice | 4 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにする：カードを2枚引き、手札を2枚控え室に置く。 |
 
@@ -928,7 +928,7 @@ Triggers: ライブ成功時 — 24/25 L0-covered.
 
 ## auto_gain
 
-Triggers: 自動 — 22/24 L0-covered.
+Triggers: 自動 — 24/24 L0-covered.
 
 ### variant: True — 24 abilities
 
@@ -954,10 +954,10 @@ Triggers: 自動 — 22/24 L0-covered.
 | `PL!SP-PR-024` | L2+choice | 10 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分がエールしたとき、エールにより公開された自分のカードの中に、{{icon_score.png/スコア}}を持つ『Liella!』のライブカードが1枚以上ある場合、ライブ終了時まで、{{h |
 | `PL!SP-pb2-022` | L2+choice | 7 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき、ライブ終了時まで、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード |
 | `PL!SP-bp7-016` | L2+choice | 7 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分のカードの効果によって、自分のエネルギー置き場にエネルギーが置かれたとき、ライブ終了時まで、{{icon_blade.png/ブレード}}を得る。 |
+| `PL!-PR-023` | L2+choice | 6 | {{jidou.png/自動}}[ターン3回]自分か相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_blade.png/ブレード}}を得る。 |
+| `PL!-PR-025` | L2+choice | 4 | {{jidou.png/自動}}このメンバーがステージから控え室に置かれたとき、このメンバーがコスト9以上のメンバーとバトンタッチしていた場合、ライブ終了時まで、そのバトンタッチで登場したメンバーは{{icon_blade.png/ブレード}}{{icon_b |
 | `PL!N-PR-023` | L2+choice | 3 | {{jidou.png/自動}}{{turn1.png/ターン1回}}自分がエールしたとき、エールにより公開された自分のカードの中に同じグループ名を持つメンバーカードが3枚以上ある場合、ライブ終了時まで、{{heart_01.png/heart01}}{{he |
 | `PL!SP-bp2-020` | L2+choice | 2 | {{jidou.png/自動}}{{turn1.png/ターン1回}}エールにより公開された自分のカードの中にブレードハートを持つカードがないとき、ライブ終了時まで、{{heart_02.png/heart02}}を得る。 |
-| `PL!-PR-025` | none | 0 | {{jidou.png/自動}}このメンバーがステージから控え室に置かれたとき、このメンバーがコスト9以上のメンバーとバトンタッチしていた場合、ライブ終了時まで、そのバトンタッチで登場したメンバーは{{icon_blade.png/ブレード}}{{icon_b |
-| `PL!-PR-023` | none | 0 | {{jidou.png/自動}}[ターン3回]自分か相手のステージにいるメンバーがウェイト状態になるたび、ライブ終了時まで、{{icon_blade.png/ブレード}}を得る。 |
 
 ## other:常時:gain_resource
 
@@ -969,8 +969,8 @@ Triggers: 常時 — 23/23 L0-covered.
 |---|---|---|---|
 | `PL!-sd1-001` | L2+choice | 494 | {{jyouji.png/常時}}自分の成功ライブカード置き場にあるカード1枚につき、{{icon_blade.png/ブレード}}を得る。 |
 | `PL!HS-bp2-006` | L2+choice | 54 | {{jyouji.png/常時}}自分のステージにいるほかの『みらくらぱーく！』のメンバー1人につき、{{icon_blade.png/ブレード}}を得る。 |
+| `PL!-bp3-002` | L2+choice | 44 | {{jyouji.png/常時}}相手のステージにいるウェイト状態のメンバー1人につき、{{icon_blade.png/ブレード}}を得る。 |
 | `PL!HS-bp5-004` | L2+choice | 42 | {{jyouji.png/常時}}自分のステージにいるコスト4以上の『スリーズブーケ』以外のメンバー1人につき、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}を得る。 |
-| `PL!-bp3-002` | L2+choice | 41 | {{jyouji.png/常時}}相手のステージにいるウェイト状態のメンバー1人につき、{{icon_blade.png/ブレード}}を得る。 |
 | `PL!N-pb1-011` | L2+choice | 35 | {{jyouji.png/常時}}このメンバーの下にあるエネルギーカード1枚につき、{{icon_blade.png/ブレード}}を得る。 |
 | `PL!N-bp7-007` | L2+choice | 33 | {{jyouji.png/常時}}このメンバーの下にあるエネルギーカード1枚につき、{{heart_02.png/heart02}}を得る。 |
 | `PL!-bp5-111` | L2+choice | 28 | {{jyouji.png/常時}}自分のステージにいるこのメンバー以外の『A-RISE』のメンバー1人につき、{{heart_05.png/heart05}}を得る。 |
@@ -1351,7 +1351,7 @@ Triggers: ライブ開始時 — 7/7 L0-covered.
 
 ## other:起動:draw_card
 
-Triggers: 起動 — 5/6 L0-covered.
+Triggers: 起動 — 6/6 L0-covered.
 
 ### variant: (no variant) — 6 abilities
 
@@ -1362,7 +1362,7 @@ Triggers: 起動 — 5/6 L0-covered.
 | `PL!-PR-012` | L2+choice | 16 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：カードを1枚引く。 |
 | `PL!N-sd2-015` | L2+choice | 12 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：カードを1枚引く。（ウェイト状態のメンバーが持つ{{icon_blade.png/ブレード}}は、エールで公開する枚数を増やさない。） |
 | `PL!N-bp3-008` | L2+choice | 8 | {{kidou.png/起動}}{{turn1.png/ターン1回}}このメンバー以外の『虹ヶ咲』のメンバー1人をウェイトにする：カードを1枚引く。 |
-| `PL!-PR-023` | none | 0 | {{kidou.png/起動}}{{turn1.png/ターン1回}}メンバー1人をウェイトにし、手札を1枚控え室に置く：カードを1枚引く。 |
+| `PL!-PR-023` | L2+choice | 6 | {{kidou.png/起動}}{{turn1.png/ターン1回}}メンバー1人をウェイトにし、手札を1枚控え室に置く：カードを1枚引く。 |
 
 ## constant_restriction
 
@@ -1444,7 +1444,7 @@ Triggers: ライブ成功時 — 4/4 L0-covered.
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
-| `PL!-sd1-019` | L2+choice | 923 | {{live_success.png/ライブ成功時}}自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。 |
+| `PL!-sd1-019` | L2+choice | 926 | {{live_success.png/ライブ成功時}}自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。 |
 | `PL!-bp5-001` | L2+choice | 36 | {{live_success.png/ライブ成功時}}手札を1枚控え室に置いてもよい：自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。その中からカードを1枚手札に加える。残りを控え室に置く。 |
 | `PL!S-bp5-007` | L2+choice | 7 | {{live_success.png/ライブ成功時}}自分のデッキの上からカードを4枚見る。その中からハートに{{heart_04.png/heart04}}を2つ以上持つメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。 |
 | `PL!HS-bp6-028` | L2+choice | 6 | {{live_success.png/ライブ成功時}}このターン、自分が余剰ハートを1つ以上持っている場合、自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。 |

@@ -4893,11 +4893,25 @@ def _try_ability_filter(text):
 def _try_state_change(text):
     """State change event: member transitions between active/wait.
     E.g. アクティブ状態からウェイト状態になった (member went from active to wait).
+
+    Also covers a transition into wait with NO stated starting state
+    (「自分か相手のステージにいるメンバーがウェイト状態になるたび」, PL!-PR-023-PR):
+    stage members are active unless marked wait, so the effective start is
+    active. Cause-attributed transitions (「自分のカードの効果によってウェイト状態に…」)
+    carry a scope other rules own (_try_self_became_wait, and this rule's own
+    self_effect_only branch when アクティブ状態 IS named) — leave those alone.
     """
-    if "アクティブ状態からウェイト状態になった" not in text and not (
+    named_active = "アクティブ状態からウェイト状態になった" in text or (
         "アクティブ状態" in text and "ウェイト状態" in text
-    ):
-        return None
+    )
+    becomes_wait = "ウェイト状態になる" in text or "ウェイト状態になった" in text
+    if not named_active:
+        if not becomes_wait:
+            return None
+        if any(
+            k in text for k in ("効果によって", "効果で", "コストを支払うため")
+        ):
+            return None
     result = {
         "type": "state_change_condition",
         "text": text,
@@ -4905,7 +4919,7 @@ def _try_state_change(text):
     }
 
     # Detect direction
-    if "ウェイト状態になった" in text or "アクティブ状態から" in text:
+    if "ウェイト状態にな" in text or "アクティブ状態から" in text:
         result["trigger_event"]["from_state"] = "active"
         result["trigger_event"]["to_state"] = "wait"
     else:
@@ -5822,7 +5836,8 @@ def _try_discard_hand_reactivate_optional(text):
         trig_text = trig_text[: -len("になったとき")] + "になったとき"
     group_leg = parse_condition(trig_text)
     if (not isinstance(group_leg, dict)
-            or group_leg.get("type") != "group_condition"
+            or group_leg.get("type") not in ("group_condition",
+                                             "state_change_condition")
             or not group_leg.get("group_names")):
         return None
     trigger_cond = dict(group_leg)
