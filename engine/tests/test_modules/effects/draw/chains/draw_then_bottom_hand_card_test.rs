@@ -572,9 +572,8 @@ fn all_three_cards_parse_to_identical_sequential() {
         );
         let effect = ab.effect.as_ref().unwrap();
         let actions = effect
-            .compound
-            .actions
-            .as_ref()
+            .compound_branch()
+            .and_then(|c| c.actions.as_ref())
             .expect("sequential has actions");
         assert_eq!(actions.len(), 2, "{card_no}: two sub-actions");
 

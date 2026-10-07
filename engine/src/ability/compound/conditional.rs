@@ -22,10 +22,11 @@ pub(crate) fn route_conditional_branch(
     chose_yes: bool,
     is_negation: bool,
 ) -> Option<Box<AbilityEffect>> {
+    let c = effect.compound_branch();
     match (chose_yes, is_negation) {
-        (true, true) => effect.compound.optional_action.clone(),
-        (true, false) => effect.compound.conditional_action.clone(),
-        (false, true) => effect.compound.conditional_action.clone(),
+        (true, true) => c.and_then(|c| c.optional_action.clone()),
+        (true, false) => c.and_then(|c| c.conditional_action.clone()),
+        (false, true) => c.and_then(|c| c.conditional_action.clone()),
         (false, false) => None,
     }
 }
@@ -36,14 +37,14 @@ pub(crate) fn execute_conditional_alternative(
     gs: &mut GameState,
     effect: &AbilityEffect,
 ) -> Result<(), String> {
-    let has_primary = effect.compound.primary_effect.is_some();
+    let has_primary = effect.primary_effect().is_some();
     let has_alternative = effect.alternative_effect_any().is_some();
 
     if has_primary && has_alternative {
         let ctx = crate::ability::condition::ConditionContext::with_moved_cards(gs, &resolver.selection.moved_cards);
 
-        if effect.compound.alternative_condition.is_some() && effect.condition.is_some() {
-            if let Some(ref alt_cond) = effect.compound.alternative_condition {
+        if effect.alternative_condition().is_some() && effect.condition.is_some() {
+            if let Some(ref alt_cond) = effect.alternative_condition() {
                 if ctx.evaluate_condition(alt_cond) {
                     if let Some(alt_effect) = effect.alternative_effect_any() {
                         return resolver.execute_effect(gs, alt_effect);
@@ -52,7 +53,7 @@ pub(crate) fn execute_conditional_alternative(
             }
             if let Some(ref cond) = effect.condition {
                 if ctx.evaluate_condition(cond) {
-                    if let Some(ref primary_effect) = effect.compound.primary_effect {
+                    if let Some(ref primary_effect) = effect.primary_effect() {
                         return resolver.execute_effect(gs, primary_effect);
                     }
                 }
@@ -74,7 +75,7 @@ pub(crate) fn execute_conditional_alternative(
                     return resolver.execute_effect(gs, alt_effect);
                 }
             } else {
-                if let Some(ref primary_effect) = effect.compound.primary_effect {
+                if let Some(ref primary_effect) = effect.primary_effect() {
                     return resolver.execute_effect(gs, primary_effect);
                 }
             }
@@ -84,7 +85,7 @@ pub(crate) fn execute_conditional_alternative(
             return resolver.execute_effect(gs, alt_effect);
         }
     } else if has_primary {
-        if let Some(ref primary_effect) = effect.compound.primary_effect {
+        if let Some(ref primary_effect) = effect.primary_effect() {
             return resolver.execute_effect(gs, primary_effect);
         }
     }

@@ -393,9 +393,8 @@ fn the_parsed_effect_carries_the_dispatchable_reference() {
         // 「引いた数」 (引く as subtract) 30 rules ahead of action_042_look_at, so the
         // looked cards were drawn straight into hand and the select never ran.
         let look = eff
-            .compound
-            .look_action
-            .as_ref()
+            .look_action()
+            .map(|b| b.as_ref())
             .unwrap_or_else(|| panic!("{card_no}: the look half must exist"));
         assert_eq!(
             look.action,

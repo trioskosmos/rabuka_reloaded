@@ -956,13 +956,13 @@ impl super::TurnEngine {
             use crate::ability::resolver::AbilityResolver;
             let ctx = ConditionContext::new(game_state);
             if gained.action == ActionType::ConditionalAlternative {
-                let alt_cond = gained.compound.alternative_condition.as_ref();
+                let alt_cond = gained.alternative_condition();
                 let base_cond = gained.condition.as_ref();
                 let alt_met = alt_cond.is_some_and(|c| ctx.evaluate_condition(c));
                 let base_met = base_cond.is_some_and(|c| ctx.evaluate_condition(c));
                 if alt_met || base_met {
                     let alt_eff = gained.alternative_effect_any();
-                    let prim_eff = gained.compound.primary_effect.as_deref();
+                    let prim_eff = gained.primary_effect().map(|pe| pe.as_ref());
                     let effect_to_apply = if alt_met { alt_eff } else { prim_eff };
                     if let Some(apply) = effect_to_apply {
                         let mut resolver =

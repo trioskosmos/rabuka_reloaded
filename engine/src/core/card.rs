@@ -1253,6 +1253,24 @@ fn excluded_matches(excluded: &[String], included: &str) -> bool {
 }
 
 impl AbilityCost {
+    /// Borrow the compound branch of the wrapped effect, if any.
+    ///
+    /// `AbilityCost` is a newtype over `AbilityEffect`; this forwards
+    /// [`AbilityEffect::compound_branch`] so cost handlers can read the branch
+    /// without reaching through `.0`.
+    pub fn compound_branch(&self) -> Option<&CompoundBranch> {
+        self.0.compound_branch()
+    }
+
+    /// Mutably borrow the compound branch, creating it if absent.
+    pub fn compound_branch_mut(&mut self) -> &mut CompoundBranch {
+        self.0.compound_branch_mut()
+    }
+
+    /// Forward of [`AbilityEffect::actions`] for cost handlers.
+    pub fn actions(&self) -> Option<&Vec<Box<AbilityEffect>>> {
+        self.0.actions()
+    }
     /// Build a `CardFilter` containing the same 7 base filter fields that
     /// `AbilityEffect::filter_subset` exposes. Mirrors that method so cost
     /// handlers can use the same consolidation pattern as effect handlers.
@@ -1758,8 +1776,8 @@ pub struct AbilityEffect {
     pub target: Option<ArcStr>,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub condition: Option<Arc<Condition>>,
-    #[cfg_attr(feature = "serde_support", serde(flatten))]
-    pub compound: Box<CompoundBranch>,
+    #[cfg_attr(feature = "serde_support", serde(default, flatten))]
+    pub compound: Option<Box<CompoundBranch>>,
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub kind: Option<EkBox>,
     pub non_stackable: Option<bool>,
@@ -1813,9 +1831,8 @@ impl AbilityEffect {
         if self.action == crate::ability::enums::ActionType::PayEnergy {
             return self.energy_count_any().or(self.count).unwrap_or(0);
         }
-        self.compound
-            .actions
-            .as_deref()
+        self.compound_branch()
+            .and_then(|c| c.actions.as_deref())
             .unwrap_or(&[])
             .iter()
             .fold(0u8, |acc, s| acc.saturating_add(s.energy_cost_total()))
@@ -1830,9 +1847,8 @@ impl AbilityEffect {
         {
             return true;
         }
-        self.compound
-            .actions
-            .as_deref()
+        self.compound_branch()
+            .and_then(|c| c.actions.as_deref())
             .unwrap_or(&[])
             .iter()
             .any(|s| s.has_optional_payment())
@@ -1853,14 +1869,81 @@ impl AbilityEffect {
                 .saturating_mul(groups_on_stage);
             return printed.saturating_sub(reduction);
         }
-        self.compound
-            .actions
-            .as_deref()
+        self.compound_branch()
+            .and_then(|c| c.actions.as_deref())
             .unwrap_or(&[])
             .iter()
             .fold(0u8, |acc, s| {
                 acc.saturating_add(s.effective_energy_cost_total(groups_on_stage))
             })
+    }
+
+    /// Borrow the compound branch, if any.
+    ///
+    /// `compound` is now `Option<Box<CompoundBranch>>` (the unconditional `Box`
+    /// was a guaranteed heap allocation on every `AbilityEffect` clone, and
+    /// ~95% of effects have no compound branch at all). Callers that used to
+    /// read `self.compound.<field>` go through this so the `Option` is unwound
+    /// in exactly one place rather than at 14 call sites.
+    pub fn compound_branch(&self) -> Option<&CompoundBranch> {
+        self.compound.as_deref()
+    }
+
+    /// Mutably borrow the compound branch, creating it if absent.
+    ///
+    /// The mirror of [`Self::compound_branch`] for callers that need to write
+    /// into the branch (e.g. clearing `primary_effect` mid-resolution). The `Box`
+    /// allocation is unavoidable here — a compound branch that didn't exist
+    /// before is being created — but it only happens on the rare write paths,
+    /// never on the read-heavy hot loop.
+    pub fn compound_branch_mut(&mut self) -> &mut CompoundBranch {
+        self.compound.get_or_insert_with(|| Box::new(CompoundBranch::default()))
+    }
+
+    /// Read-only accessors for each compound branch field, unwinding the
+    /// `Option<Box<CompoundBranch>>` once. Mirrors [`Self::compound_branch`] but
+    /// returns the field directly so call sites stay one-liners instead of
+    /// `compound_branch().and_then(|c| c.X)`. The `Box` allocation is skipped on the
+    /// common case where the effect has no compound branch at all.
+    #[inline]
+    pub fn look_action(&self) -> Option<&Box<AbilityEffect>> {
+        self.compound.as_deref().and_then(|c| c.look_action.as_ref())
+    }
+    #[inline]
+    pub fn select_action(&self) -> Option<&Box<AbilityEffect>> {
+        self.compound.as_deref().and_then(|c| c.select_action.as_ref())
+    }
+    #[inline]
+    pub fn actions(&self) -> Option<&Vec<Box<AbilityEffect>>> {
+        self.compound.as_deref().and_then(|c| c.actions.as_ref())
+    }
+    #[inline]
+    pub fn primary_effect(&self) -> Option<&Box<AbilityEffect>> {
+        self.compound.as_deref().and_then(|c| c.primary_effect.as_ref())
+    }
+    #[inline]
+    pub fn alternative_condition(&self) -> Option<&Arc<Condition>> {
+        self.compound.as_deref().and_then(|c| c.alternative_condition.as_ref())
+    }
+    #[inline]
+    pub fn result_condition(&self) -> Option<&Arc<Condition>> {
+        self.compound.as_deref().and_then(|c| c.result_condition.as_ref())
+    }
+    #[inline]
+    pub fn followup_action(&self) -> Option<&Box<AbilityEffect>> {
+        self.compound.as_deref().and_then(|c| c.followup_action.as_ref())
+    }
+    #[inline]
+    pub fn optional_action(&self) -> Option<&Box<AbilityEffect>> {
+        self.compound.as_deref().and_then(|c| c.optional_action.as_ref())
+    }
+    #[inline]
+    pub fn conditional_action(&self) -> Option<&Box<AbilityEffect>> {
+        self.compound.as_deref().and_then(|c| c.conditional_action.as_ref())
+    }
+    #[inline]
+    pub fn conditional_negation(&self) -> Option<bool> {
+        self.compound.as_deref().and_then(|c| c.conditional_negation)
     }
 
     /// Build EffectKind from an action string and the matching effect JSON.
@@ -2874,7 +2957,7 @@ impl AbilityEffect {
             return Cow::Borrowed(&steps[..]);
         }
         match self.action {
-            ActionType::Sequential => match self.compound.actions {
+            ActionType::Sequential => match self.compound_branch().and_then(|c| c.actions.as_ref()) {
                 Some(ref actions) => Cow::Borrowed(&actions[..]),
                 None => Cow::Owned(Vec::new()),
             },
@@ -2888,25 +2971,31 @@ impl AbilityEffect {
             return steps.clone();
         }
         match self.action {
-            ActionType::Sequential => self.compound.actions.clone().unwrap_or_default(),
+            ActionType::Sequential => self
+                .compound_branch()
+                .and_then(|c| c.actions.clone())
+                .unwrap_or_default(),
             ActionType::LookAndSelect => {
                 let mut out: Vec<Box<AbilityEffect>> = Vec::new();
-                if let Some(ref la) = self.compound.look_action {
-                    out.push(la.clone());
-                }
-                if let Some(ref sa) = self.compound.select_action {
-                    out.push(sa.clone());
-                }
-                if let Some(ref fu) = self.compound.followup_action {
-                    out.push(fu.clone());
+                if let Some(c) = self.compound_branch() {
+                    if let Some(ref la) = c.look_action {
+                        out.push(la.clone());
+                    }
+                    if let Some(ref sa) = c.select_action {
+                        out.push(sa.clone());
+                    }
+                    if let Some(ref fu) = c.followup_action {
+                        out.push(fu.clone());
+                    }
                 }
                 out
             }
             ActionType::ConditionalAlternative => {
                 let mut out: Vec<Box<AbilityEffect>> = Vec::new();
-                let mut primary = self.compound.primary_effect.clone();
+                let c = self.compound_branch();
+                let mut primary = c.and_then(|c| c.primary_effect.clone());
                 let mut alternative = self.alternative_effect_any().cloned();
-                let condition = self.compound.alternative_condition.clone();
+                let condition = c.and_then(|c| c.alternative_condition.clone());
                 if let Some(mut alt) = alternative.take() {
                     if let Some(cond) = condition {
                         alt.condition = Some(cond);
@@ -2920,15 +3009,17 @@ impl AbilityEffect {
             }
             ActionType::ConditionalOnResult => {
                 let mut out: Vec<Box<AbilityEffect>> = Vec::new();
-                if let Some(ref pri) = self.compound.primary_effect {
-                    out.push(pri.clone());
-                }
-                if let Some(ref follow) = self.compound.followup_action {
-                    let mut f = follow.clone();
-                    if let Some(rc) = self.compound.result_condition.clone() {
-                        f.condition = Some(rc);
+                if let Some(c) = self.compound_branch() {
+                    if let Some(ref pri) = c.primary_effect {
+                        out.push(pri.clone());
                     }
-                    out.push(f);
+                    if let Some(ref follow) = c.followup_action {
+                        let mut f = follow.clone();
+                        if let Some(rc) = c.result_condition.clone() {
+                            f.condition = Some(rc);
+                        }
+                        out.push(f);
+                    }
                 }
                 out
             }
@@ -2937,12 +3028,15 @@ impl AbilityEffect {
                     action: ActionType::ConditionalOptional,
                     ..Default::default()
                 };
-                if let Some(ref oa) = self.compound.optional_action {
-                    step.text = oa.text.clone();
+                if let Some(c) = self.compound_branch() {
+                    if let Some(ref oa) = c.optional_action {
+                        step.text = oa.text.clone();
+                    }
+                    let step_c = step.compound_branch_mut();
+                    step_c.optional_action = c.optional_action.clone();
+                    step_c.conditional_action = c.conditional_action.clone();
+                    step_c.conditional_negation = c.conditional_negation;
                 }
-                step.compound.optional_action = self.compound.optional_action.clone();
-                step.compound.conditional_action = self.compound.conditional_action.clone();
-                step.compound.conditional_negation = self.compound.conditional_negation;
                 vec![Box::new(step)]
             }
             _ => Vec::new(),

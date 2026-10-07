@@ -2137,10 +2137,10 @@ fn conditions_on_card(card: &Card) -> Vec<(usize, &'static str, Arc<crate::card:
         if let Some(c) = effect.condition.clone() {
             found.push((ability_idx, "condition", c));
         }
-        if let Some(c) = effect.compound.alternative_condition.clone() {
+        if let Some(c) = effect.alternative_condition().clone() {
             found.push((ability_idx, "alternative_condition", c));
         }
-        if let Some(c) = effect.compound.result_condition.clone() {
+        if let Some(c) = effect.result_condition().clone() {
             found.push((ability_idx, "result_condition", c));
         }
     }

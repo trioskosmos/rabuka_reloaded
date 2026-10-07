@@ -237,7 +237,7 @@ mod bytecode_validation {
             );
             println!(
                 "  compound actions: {:?}",
-                eff.compound.actions.as_ref().map(|a| a.len())
+                eff.compound_branch().and_then(|c| c.actions.as_ref()).map(|a| a.len())
             );
             println!(
                 "  effect_steps: {:?}",

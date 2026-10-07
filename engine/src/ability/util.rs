@@ -39,9 +39,8 @@ pub use selection::{classify_selection, get_selection_indices, resolve_selection
 pub fn effect_uses_selected_cards(effect: &AbilityEffect) -> bool {
     effect.source == Some(Zone::SelectedCards)
         || effect
-            .compound
-            .actions
-            .as_ref()
+            .compound_branch()
+            .and_then(|c| c.actions.as_ref())
             .is_some_and(|actions| {
                 actions
                     .iter()
@@ -174,8 +173,8 @@ pub fn find_modify_cost<'a>(
         return Some(effect);
     }
     if effect.action == ActionType::Sequential {
-        if let Some(ref actions) = effect.compound.actions {
-            for sub in actions {
+        if let Some(actions) = effect.actions() {
+            for sub in actions.iter().map(|b| b.as_ref()) {
                 if let Some(found) = find_modify_cost(sub, op, loc) {
                     return Some(found);
                 }

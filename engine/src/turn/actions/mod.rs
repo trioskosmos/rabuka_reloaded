@@ -363,7 +363,7 @@ impl super::TurnEngine {
             ActionType::MoveCards => {
                 cost.source_zone() == Some(Zone::Hand) && cost.self_cost_any().unwrap_or(false)
             }
-            ActionType::SequentialCost => cost.compound.actions.as_ref().is_some_and(|actions| {
+            ActionType::SequentialCost => cost.actions().is_some_and(|actions| {
                 actions
                     .iter()
                     .any(|action| Self::cost_has_hand_self_move(action.as_ref()))

@@ -73,7 +73,7 @@ impl AbilityResolver {
         for &card_id in &cards {
             player.waitroom.add_card(card_id);
         }
-        if let Some(ref followup) = effect.compound.followup_action {
+        if let Some(followup) = effect.followup_action() {
             let mut existing = gs.ability_queue.take_pending_actions();
             existing.push(followup.as_ref().clone());
             gs.ability_queue.set_pending_actions(existing);
@@ -197,11 +197,11 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         self.owner.executing = Some(effect.clone());
 
-        if let Some(ref look_action) = effect.compound.look_action {
+        if let Some(ref look_action) = effect.look_action() {
             self.execute_effect(gs, look_action)?;
         }
 
-        if let Some(ref select_action) = effect.compound.select_action {
+        if let Some(ref select_action) = effect.select_action() {
             return self.offer_looked_at_selection(gs, effect, select_action);
         }
         Ok(())

@@ -62,9 +62,8 @@ fn debut_steps(game: &TestGame, card: &str) -> Vec<rabuka_engine::card::AbilityE
         ActionType::Sequential,
         "the 登場 clause has TWO effects, so it must be a sequence, not a bare gain_ability"
     );
-    eff.compound
-        .actions
-        .as_ref()
+    eff.compound_branch()
+        .and_then(|c| c.actions.as_ref())
         .expect("a sequential carries its steps")
         .iter()
         .map(|b| (**b).clone())

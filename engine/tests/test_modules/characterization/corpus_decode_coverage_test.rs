@@ -88,7 +88,7 @@ fn every_duration_in_the_corpus_is_parseable() {
                 bad.insert(format!("{card_no}: duration={d:?}"));
             }
         }
-        if let Some(actions) = eff.compound.actions.as_ref() {
+        if let Some(actions) = eff.compound_branch().and_then(|c| c.actions.as_ref()) {
             for sub in actions {
                 scan(sub, card_no, bad, seen);
             }
@@ -141,7 +141,7 @@ fn no_per_unit_divisor_in_the_corpus_is_zero() {
                 bad.insert(format!("{card_no}: per_unit_count=0"));
             }
         }
-        if let Some(actions) = eff.compound.actions.as_ref() {
+        if let Some(actions) = eff.compound_branch().and_then(|c| c.actions.as_ref()) {
             for sub in actions {
                 scan(sub, card_no, bad, seen);
             }
@@ -243,7 +243,7 @@ fn collect_custom(
     if eff.action == ActionType::Custom {
         out.insert(format!("{card_no}: {:?}", eff.text.as_ref()));
     }
-    if let Some(actions) = eff.compound.actions.as_ref() {
+    if let Some(actions) = eff.compound_branch().and_then(|c| c.actions.as_ref()) {
         for sub in actions {
             collect_custom(sub, card_no, out, seen);
         }

@@ -1988,7 +1988,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
             .ability_queue
             .current_entry()
             .and_then(|e| e.ability.effect.as_ref())
-            .and_then(|ef| ef.compound.select_action.clone())
+            .and_then(|ef| ef.compound_branch().and_then(|c| c.select_action.clone()))
             .or_else(|| {
                 self.owner.executing.as_ref().and_then(|ef| {
                     if ef.action == ActionType::SelectCards {
@@ -2143,9 +2143,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
                             .as_ref()
                             .is_some_and(|z| z.to_str() == "under_member")
                             || eff
-                                .compound
-                                .primary_effect
-                                .as_ref()
+                                .compound_branch()
+                                .and_then(|c| c.primary_effect.as_ref())
                                 .is_some_and(|pe| {
                                     pe.source
                                         .as_ref()
@@ -2404,16 +2403,14 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
             .and_then(|e| e.ability.effect.as_ref())
             .map(|ef| {
                 // Single-effect shape: `compound.select_action`, or the effect itself.
+                let c = ef.compound_branch();
                 ef.max.unwrap_or(false)
-                    || ef.compound
-                        .select_action
-                        .as_ref()
+                    || c.and_then(|c| c.select_action.as_ref())
                         .is_some_and(|sa| sa.max.unwrap_or(false))
                     // Sequential shape (「…選び、デッキの上に置く」 parses as
                     // select → move): the 「まで」 lives on the select STEP.
-                    || ef.compound.actions.as_ref().is_some_and(|steps| {
-                        steps.iter().any(|a| a.max.unwrap_or(false))
-                    })
+                    || c.and_then(|c| c.actions.as_ref())
+                        .is_some_and(|steps| steps.iter().any(|a| a.max.unwrap_or(false)))
             })
             .unwrap_or(false);
         let picked_now = mapped_indices.len();
@@ -2832,7 +2829,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                                 if eff.any_number_any().unwrap_or(false) {
                                     return true;
                                 }
-                                if let Some(ref alt_cond) = eff.compound.alternative_condition {
+                                if let Some(ref alt_cond) = eff.compound_branch().and_then(|c| c.alternative_condition.clone()) {
                                     let ctx =
                                         ConditionContext::with_moved_cards(gs, &self.selection.moved_cards);
                                     ctx.evaluate_condition(alt_cond)
@@ -2984,8 +2981,8 @@ gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
                             log::debug!(
                                 "[SELFOR] after_set: target={:?} has_la={} has_sa={}",
                                 modified.target,
-                                modified.compound.look_action.is_some(),
-                                modified.compound.select_action.is_some()
+                                modified.compound_branch().and_then(|c| c.look_action.clone()).is_some(),
+                                modified.compound_branch().and_then(|c| c.select_action.clone()).is_some()
                             );
                             self.awaiting.choice = None;
                             gs.ability_queue.set_pending_actions(vec![*modified]);
@@ -3463,9 +3460,9 @@ modified.destination = Some(Zone::from_source_str(dest));
             {
                 effect
                     .alternative_effect_any()
-                    .or(effect.compound.primary_effect.as_deref())
+                    .or(effect.compound_branch().and_then(|c| c.primary_effect.as_deref()))
             } else {
-                effect.compound.primary_effect.as_deref()
+                effect.compound_branch().and_then(|c| c.primary_effect.as_deref())
             };
             if let Some(sub_effect) = chosen {
                 *effect = sub_effect.clone();
@@ -3739,9 +3736,15 @@ modified.destination = Some(Zone::from_source_str(dest));
             })
             .or(entry_eff);
         if let Some(effect) = effect {
-            let is_negation = effect.compound.conditional_negation.unwrap_or(false);
+            let is_negation = effect
+                .compound_branch()
+                .and_then(|c| c.conditional_negation)
+                .unwrap_or(false);
             if chose_yes && !is_negation {
-                if let Some(optional) = effect.compound.optional_action.as_ref() {
+                if let Some(optional) = effect
+                    .compound_branch()
+                    .and_then(|c| c.optional_action.as_ref())
+                {
                     if optional.action == ActionType::PayEnergy {
                         let mut payment = optional.clone();
                         payment.set_optional(Some(false));
@@ -3837,14 +3840,14 @@ modified.destination = Some(Zone::from_source_str(dest));
     ) -> Option<Vec<Box<crate::card::AbilityEffect>>> {
         let cost = gs.entry_cost()?;
         if cost.action == super::enums::ActionType::ChoiceCondition {
-            return cost.compound.actions.clone();
+            return cost.compound_branch().and_then(|c| c.actions.clone());
         }
-        cost.compound
-            .actions
-            .iter()
+cost.compound_branch()
+            .and_then(|c| c.actions.as_deref())
+            .into_iter()
             .flatten()
             .find(|step| step.action == super::enums::ActionType::ChoiceCondition)
-            .and_then(|step| step.compound.actions.clone())
+            .and_then(|step| step.compound_branch().and_then(|c| c.actions.as_deref()).map(|a| a.to_vec()))
     }
 
     pub(in crate::ability::choice) fn handle_choice_condition(
@@ -3967,32 +3970,36 @@ modified.destination = Some(Zone::from_source_str(dest));
         if effect.action_by_any().is_none() {
             // Don't override - keep any explicitly set action_by
         }
-        if let Some(ref mut la) = effect.compound.look_action {
-            Self::set_chosen_target(la, target);
-        }
-        if let Some(ref mut sa) = effect.compound.select_action {
-            Self::set_chosen_target(sa, target);
-        }
-        if let Some(ref mut actions) = effect.compound.actions {
-            for a in actions.iter_mut() {
-                Self::set_chosen_target(a, target);
-            }
-        }
+        // Walk `effect_steps` BEFORE taking the compound branch borrow:
+        // `compound_branch_mut()` holds a mutable borrow on `effect` for the
+        // rest of this scope, so the two cannot overlap.
         if let Some(ref mut steps) = effect.effect_steps {
             for s in steps.iter_mut() {
                 Self::set_chosen_target(s, target);
             }
         }
-        if let Some(ref mut oa) = effect.compound.optional_action.as_mut() {
+        let c = effect.compound_branch_mut();
+        if let Some(ref mut la) = c.look_action {
+            Self::set_chosen_target(la, target);
+        }
+        if let Some(ref mut sa) = c.select_action {
+            Self::set_chosen_target(sa, target);
+        }
+        if let Some(ref mut actions) = c.actions {
+            for a in actions.iter_mut() {
+                Self::set_chosen_target(a, target);
+            }
+        }
+        if let Some(ref mut oa) = c.optional_action.as_mut() {
             Self::set_chosen_target(oa, target);
         }
-        if let Some(ref mut pri) = effect.compound.primary_effect {
+        if let Some(ref mut pri) = c.primary_effect {
             Self::set_chosen_target(pri, target);
         }
-        if let Some(ref mut ca) = effect.compound.conditional_action {
+        if let Some(ref mut ca) = c.conditional_action {
             Self::set_chosen_target(ca, target);
         }
-        if let Some(ref mut fu) = effect.compound.followup_action {
+        if let Some(ref mut fu) = c.followup_action {
             Self::set_chosen_target(fu, target);
         }
     }

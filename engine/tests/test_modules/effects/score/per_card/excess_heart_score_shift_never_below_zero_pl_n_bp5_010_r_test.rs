@@ -178,9 +178,8 @@ fn the_no_excess_branch_is_negated_surplus_heart() {
         .expect("ライブ成功時 ability has an effect");
 
     let acts = eff
-        .compound
-        .actions
-        .as_ref()
+        .compound_branch()
+        .and_then(|c| c.actions.as_ref())
         .expect("a sequential's steps live in compound.actions");
     let no_excess = acts
         .iter()

@@ -69,7 +69,7 @@ fn s9_lki_survives_sequential_stage_move_and_ignores_current_stage_card() {
         action: ActionType::Sequential,
         ..Default::default()
     };
-    sequential.compound.actions = Some(vec![Box::new(move_stage_member)]);
+    sequential.compound_branch_mut().actions = Some(vec![Box::new(move_stage_member)]);
     let mut resolver = AbilityResolver::new(game.state.card_database.clone(), None);
     resolver
         .execute_effect(&mut game.state, &sequential)

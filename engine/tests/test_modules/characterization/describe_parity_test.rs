@@ -14,22 +14,25 @@ use rabuka_engine::core::card::AbilityEffect;
 
 fn collect_nodes<'a>(eff: &'a AbilityEffect, out: &mut Vec<&'a AbilityEffect>) {
     out.push(eff);
-    let c = &eff.compound;
-    if let Some(ref v) = c.actions {
-        for a in v {
-            collect_nodes(a, out);
+    // `compound` is `Option<Box<CompoundBranch>>`; unwrap it once here rather
+    // than reaching through the option at every field.
+    if let Some(c) = eff.compound_branch() {
+        if let Some(ref v) = c.actions {
+            for a in v {
+                collect_nodes(a, out);
+            }
         }
-    }
-    for child in [
-        &c.look_action,
-        &c.select_action,
-        &c.primary_effect,
-        &c.followup_action,
-        &c.optional_action,
-        &c.conditional_action,
-    ] {
-        if let Some(ref b) = *child {
-            collect_nodes(b, out);
+        for child in [
+            &c.look_action,
+            &c.select_action,
+            &c.primary_effect,
+            &c.followup_action,
+            &c.optional_action,
+            &c.conditional_action,
+        ] {
+            if let Some(ref b) = *child {
+                collect_nodes(b, out);
+            }
         }
     }
     if let Some(b) = eff.alternative_effect_any() {

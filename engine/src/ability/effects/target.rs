@@ -96,8 +96,7 @@ impl AbilityResolver {
             && effect.multiple_targets_any().unwrap_or(false)
             && effect.target.as_deref() == Some("deck");
         let primary_is_move_cards_both = effect
-            .compound
-            .primary_effect
+            .primary_effect()
             .as_ref()
             .is_some_and(|pe| {
                 pe.action == crate::ability::enums::ActionType::MoveCards

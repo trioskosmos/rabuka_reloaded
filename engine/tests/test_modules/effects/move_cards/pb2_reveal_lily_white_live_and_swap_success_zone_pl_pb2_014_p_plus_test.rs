@@ -79,9 +79,8 @@ fn the_effect_places_the_revealed_card_into_the_success_zone() {
     // Leg (2) of the two-step effect — the placement. Leg (1) is pinned by
     // `the_take_from_the_success_zone_is_the_first_leg_and_the_placement_the_second`.
     let place = eff
-        .compound
-        .actions
-        .as_ref()
+        .compound_branch()
+        .and_then(|c| c.actions.as_ref())
         .expect("a sequential's legs live in compound.actions")[1]
         .as_ref()
         .clone();
@@ -138,9 +137,8 @@ fn the_take_from_the_success_zone_is_the_first_leg_and_the_placement_the_second(
         eff.text
     );
     let legs = eff
-        .compound
-        .actions
-        .as_ref()
+        .compound_branch()
+        .and_then(|c| c.actions.as_ref())
         .expect("a sequential's legs live in compound.actions");
     assert_eq!(legs.len(), 2, "(1) take from the success zone, (2) place into it");
 

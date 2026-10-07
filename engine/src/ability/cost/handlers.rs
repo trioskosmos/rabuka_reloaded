@@ -169,8 +169,8 @@ impl AbilityResolver {
     pub fn validate_cost(&self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
         match cost.action {
             ActionType::SequentialCost => {
-                if let Some(ref costs) = cost.compound.actions {
-                    for sub_cost in costs {
+                if let Some(costs) = cost.actions() {
+                    for sub_cost in costs.iter().map(|b| b.as_ref()) {
                         self.validate_cost(gs, sub_cost)?;
                     }
                 }
@@ -292,8 +292,8 @@ let source = cost.source_str().unwrap_or("");
         }
         match cost.action {
             ActionType::SequentialCost => {
-                if let Some(ref costs) = cost.compound.actions {
-                    for sub_cost in costs {
+                if let Some(costs) = cost.actions() {
+                    for sub_cost in costs.iter().map(|b| b.as_ref()) {
                         Self::validate_mandatory_cost(gs, sub_cost, activating_card)?;
                     }
                 }
@@ -983,7 +983,7 @@ let source = cost.source_str().unwrap_or("");
             //   The cost requires drawing 3+ cards from deck. If the resource
             //   is insufficient, validate_cost rejects the entire cost.
             ActionType::SequentialCost => {
-                if let Some(ref costs) = cost.compound.actions {
+                if let Some(costs) = cost.actions() {
                     let start_idx =
                         gs.ability_queue
                             .current_entry()
@@ -1040,9 +1040,8 @@ let source = cost.source_str().unwrap_or("");
             }
             ActionType::ChoiceCondition => {
                 let texts: Vec<String> = cost
-                    .compound
-                    .actions
-                    .as_ref()
+                    .compound_branch()
+                    .and_then(|c| c.actions.as_ref())
                     .map(|o| o.iter().map(|opt| opt.text.to_string()).collect())
                     .unwrap_or_default();
                 self.awaiting.choice = Some(Choice::SelectTarget {
@@ -1589,9 +1588,9 @@ let source = cost.source_str().unwrap_or("");
                 }
             }
             // Handle sequential_cost sub-costs — pay each after user confirmed
-            if let Some(ref costs) = cost.compound.actions {
-                for sub_cost in costs {
-                    if sub_cost.state_change_any() == Some("wait")
+if let Some(costs) = cost.actions() {
+                    for sub_cost in costs.iter().map(|b| b.as_ref()) {
+                        if sub_cost.state_change_any() == Some("wait")
                         && sub_cost.self_cost_any() == Some(true)
                     {
                         if let Some(id) = gs.activating_card {

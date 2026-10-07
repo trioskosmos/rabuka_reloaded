@@ -347,21 +347,19 @@ fn the_parse_is_a_look_select_with_an_optional_stage_followup() {
     );
 
     // \u{30c7}\u{30ad}\u{30ad}\u{306e}\u{4e0a}\u{304b}\u{3089}\u{30ab}\u{30fc}\u{30c9}\u{3092}5\u{679a}\u{898b}\u{308b}
-    let look = eff
-        .compound
-        .look_action
-        .as_deref()
-        .expect("\u{30c7}\u{30ad}\u{30ad}\u{306e}\u{4e0a}\u{304b}\u{3089}\u{30ab}\u{30fc}\u{30c9}\u{3092}5\u{679a}\u{898b}\u{308b}");
+let look = eff
+            .look_action()
+            .map(|b| b.as_ref())
+            .expect("\u{30c7}\u{30ad}\u{30ad}\u{306e}\u{4e0a}\u{304b}\u{3089}\u{30ab}\u{30fc}\u{30c9}\u{3092}5\u{679a}\u{898b}\u{308b}");
     assert_eq!(look.action, ActionType::LookAt);
     assert_eq!(look.source_str(), Some("deck_top"), "\u{30c7}\u{30ad}\u{30ad}\u{306e}\u{4e0a}\u{304b}\u{3089}");
     assert_eq!(look.count, Some(5), "\u{30ab}\u{30fc}\u{30c9}\u{3092}5\u{679a}");
 
     // \u{305d}\u{306e}\u{4e2d}\u{304b}\u{3089}\u{2026}\u{3092}1\u{679a}\u{307e}\u{3067}\u{516c}\u{958b}\u{3059}\u{308b}
-    let sel = eff
-        .compound
-        .select_action
-        .as_deref()
-        .expect("\u{305d}\u{306e}\u{4e2d}\u{304b}\u{3089}\u{2026}\u{3092}1\u{679a}\u{307e}\u{3067}\u{516c}\u{958b}\u{3059}\u{308b}");
+let sel = eff
+            .select_action()
+            .map(|b| b.as_ref())
+            .expect("\u{305d}\u{306e}\u{4e2d}\u{304b}\u{3089}\u{2026}\u{3092}1\u{679a}\u{307e}\u{3067}\u{516c}\u{958b}\u{3059}\u{308b}");
     assert_eq!(sel.action, ActionType::SelectCards);
     assert_eq!(sel.count, Some(1), "1\u{679a}\u{307e}\u{3067}");
     assert_eq!(
@@ -394,11 +392,10 @@ fn the_parse_is_a_look_select_with_an_optional_stage_followup() {
     );
 
     // \u{767b}\u{5834}\u{3055}\u{305b}\u{308b}\u{304b}\u{3001}\u{624b}\u{724c}\u{306b}\u{52a0}\u{3048}\u{308b}
-    let fu = eff
-        .compound
-        .followup_action
-        .as_deref()
-        .expect("\u{767b}\u{5834}\u{3055}\u{305b}\u{308b}\u{304b}\u{3001}\u{624b}\u{724c}\u{306b}\u{52a0}\u{3048}\u{308b} \u{2014} the stage leg");
+let fu = eff
+            .followup_action()
+            .map(|b| b.as_ref())
+            .expect("\u{767b}\u{5834}\u{3055}\u{305b}\u{308b}\u{304b}\u{3001}\u{624b}\u{724c}\u{306b}\u{52a0}\u{3048}\u{308b} \u{2014} the stage leg");
     assert_eq!(
         fu.action,
         ActionType::Choice,

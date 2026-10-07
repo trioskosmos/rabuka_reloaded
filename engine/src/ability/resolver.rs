@@ -1178,7 +1178,7 @@ impl AbilityResolver {
                 .ability
                 .cost
                 .as_ref()
-                .and_then(|c| c.compound.actions.as_ref())
+                .and_then(|c| c.compound_branch().and_then(|c| c.actions.as_ref()))
                 .map_or(0, |a| a.len());
             log::debug!(
                 "[COST_RESUME] source={:?} sequential sub-costs {}..{} still unpaid — resuming payment",
@@ -1508,7 +1508,7 @@ impl AbilityResolver {
         // (the parser sets it per pay step), so the reduction has to be
         // materialised step by step rather than on the compound root.
         if cost.action == crate::ability::enums::ActionType::SequentialCost {
-            let steps = cost.compound.actions.as_ref()?;
+            let steps = cost.compound_branch().and_then(|c| c.actions.as_ref())?;
             let mut adjusted_steps = Vec::with_capacity(steps.len());
             let mut any = false;
             for step in steps {
@@ -1522,7 +1522,7 @@ impl AbilityResolver {
             }
             if any {
                 let mut adjusted = cost.clone();
-                adjusted.compound.actions = Some(adjusted_steps);
+                adjusted.compound_branch_mut().actions = Some(adjusted_steps);
                 return Some(adjusted);
             }
         }

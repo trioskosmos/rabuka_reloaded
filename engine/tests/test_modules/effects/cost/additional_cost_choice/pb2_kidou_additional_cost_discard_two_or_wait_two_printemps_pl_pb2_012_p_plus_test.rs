@@ -235,7 +235,7 @@ fn the_additional_cost_parses_as_a_choice_condition_inside_cost() {
         ab.cost.as_ref().expect("起動 has a cost").clone()
     };
 
-    let root = cost.compound.actions.as_ref().expect("costs are a list");
+    let root = cost.compound_branch().and_then(|c| c.actions.as_ref()).expect("costs are a list");
     assert_eq!(
         root.len(),
         2,
@@ -249,7 +249,7 @@ fn the_additional_cost_parses_as_a_choice_condition_inside_cost() {
     );
 
     let additional = &root[1];
-    let options = additional.compound.actions.as_ref().expect("the choice has options");
+    let options = additional.compound_branch().and_then(|c| c.actions.as_ref()).expect("the choice has options");
     assert_eq!(
         options.len(),
         2,
@@ -286,7 +286,7 @@ fn the_effect_is_only_the_recover_step() {
         ab.effect.as_ref().expect("起動 has an effect").clone()
     };
     assert!(
-        eff.compound.actions.is_none(),
+        eff.compound_branch().and_then(|c| c.actions.clone()).is_none(),
         "「自分の控え室から『Printemps』のライブカードを1枚手札に加える」 is a single step, so \
          the effect must not be a sequence. It was a `sequential` whose first legs were the \
          two payment options — the payment had leaked into the effect: {eff:?}"

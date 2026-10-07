@@ -87,7 +87,7 @@ fn distortion_parse_increase_half_is_increase() {
         .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
         .expect("distortion should have ライブ開始時");
     let eff = ab.effect.as_ref().expect("has effect");
-    let actions = eff.compound.actions.as_ref().expect("sequential actions");
+    let actions = eff.compound_branch().and_then(|c| c.actions.as_ref()).expect("sequential actions");
     assert_eq!(actions.len(), 2, "2 top-level actions (per-unit pair + gated score)");
 
     // Action 0: nested sequential with the two need-heart modifications
@@ -97,7 +97,7 @@ fn distortion_parse_increase_half_is_increase() {
         rabuka_engine::ability::enums::ActionType::Sequential,
         "action0 must be the nested per-unit sequential"
     );
-    let subs = first.compound.actions.as_ref().expect("nested actions");
+    let subs = first.compound_branch().and_then(|c| c.actions.as_deref()).expect("nested actions");
     assert_eq!(subs.len(), 2);
     assert_eq!(subs[0].operation_any(), Some("decrease"), "step0 heart00 decrease");
     assert_eq!(subs[0].value_or_count(0), 2, "step0 value=2 (heart00 x2)");

@@ -3020,12 +3020,12 @@ pub fn execute_selected_cards_from_zone(
         let select_action = self
             .owner.executing
             .as_ref()
-            .and_then(|ef| ef.compound.select_action.clone())
+            .and_then(|ef| ef.compound_branch().and_then(|c| c.select_action.clone()))
             .or_else(|| {
                 gs.ability_queue
                     .current_entry()
                     .and_then(|e| e.ability.effect.as_ref())
-                    .and_then(|ef| ef.compound.select_action.clone())
+                    .and_then(|ef| ef.compound_branch().and_then(|c| c.select_action.clone()))
             })
             .or_else(|| {
                 self.owner.executing.as_ref().and_then(|ef| {

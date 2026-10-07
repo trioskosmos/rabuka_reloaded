@@ -467,16 +467,13 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
         }
 
         "look_and_select" => {
-            let look_count = effect.compound.look_action.as_ref().and_then(|a| a.count);
-            let select_count = effect
-                .compound
-                .select_action
-                .as_ref()
+            let c = effect.compound_branch();
+            let look_count = c.and_then(|c| c.look_action.as_ref()).and_then(|a| a.count);
+            let select_count = c
+                .and_then(|c| c.select_action.as_ref())
                 .and_then(|a| a.count);
-            let select_dest: Option<&str> = effect
-                .compound
-                .select_action
-                .as_ref()
+            let select_dest: Option<&str> = c
+                .and_then(|c| c.select_action.as_ref())
                 .and_then(|a| a.destination.map(|z| z.as_str()))
                 .map(|s| zone_label_inner(Some(s), ja));
             if let (Some(lc), Some(sc)) = (look_count, select_count) {
@@ -553,9 +550,9 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
         "do_nothing" => String::new(),
 
         "sequential" => {
-            if let Some(ref actions) = effect.compound.actions {
+            if let Some(actions) = effect.actions() {
                 let parts: Vec<String> =
-                    actions.iter().map(|a| describe_effect(a, ja)).collect();
+                    actions.iter().map(|a| describe_effect(a.as_ref(), ja)).collect();
                 if parts.len() == 1 {
                     parts[0].clone()
                 } else if ja {
@@ -830,8 +827,8 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
         }
 
         "sequential_cost" => {
-            if let Some(ref costs) = effect.compound.actions {
-                let parts: Vec<String> = costs.iter().map(|c| describe_cost(c, ja)).collect();
+            if let Some(costs) = effect.actions() {
+                let parts: Vec<String> = costs.iter().map(|c| describe_cost(c.as_ref(), ja)).collect();
                 let combined = parts.join("\n");
                 if costs.last().and_then(|c| c.optional).unwrap_or(false) {
                     if ja {
@@ -864,10 +861,9 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
         }
 
         "conditional_on_optional" => {
-            let parts: Vec<String> = [effect
-                .compound
-                .conditional_action
-                .as_ref()
+            let c = effect.compound_branch();
+            let parts: Vec<String> = [c
+                .and_then(|c| c.conditional_action.as_ref())
                 .map(|a| describe_effect(a, ja))]
             .into_iter()
             .flatten()
@@ -886,16 +882,11 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
         }
 
         "conditional_on_result" => {
+            let c = effect.compound_branch();
             let parts: Vec<String> = [
-                effect
-                    .compound
-                    .primary_effect
-                    .as_ref()
+                c.and_then(|c| c.primary_effect.as_ref())
                     .map(|a| describe_effect(a, ja)),
-                effect
-                    .compound
-                    .followup_action
-                    .as_ref()
+                c.and_then(|c| c.followup_action.as_ref())
                     .map(|a| describe_effect(a, ja)),
             ]
             .into_iter()
@@ -911,10 +902,9 @@ pub fn describe_effect(effect: &AbilityEffect, ja: bool) -> String {
         }
 
         "conditional_alternative" => {
-            let primary = effect
-                .compound
-                .primary_effect
-                .as_ref()
+            let c = effect.compound_branch();
+            let primary = c
+                .and_then(|c| c.primary_effect.as_ref())
                 .map(|a| describe_effect(a, ja));
             let alt = effect
                 .alternative_effect_any()

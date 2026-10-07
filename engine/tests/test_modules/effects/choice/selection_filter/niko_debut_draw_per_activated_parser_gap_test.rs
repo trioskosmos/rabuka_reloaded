@@ -88,9 +88,8 @@ fn debut_draw_ability(game: &TestGame) -> std::sync::Arc<rabuka_engine::card::Ab
             continue;
         }
         let legs = effect
-            .compound
-            .actions
-            .as_ref()
+            .compound_branch()
+            .and_then(|c| c.actions.as_ref())
             .expect("a sequential carries its legs");
         if legs.len() == 2
             && legs[1].action == rabuka_engine::ability::enums::ActionType::DrawCard
@@ -127,7 +126,7 @@ fn niko_debut_draw_ability_carries_the_activation_half() {
         "the payout depends on the offer, so the container is a CONDITIONAL sequential"
     );
 
-    let legs = effect.compound.actions.as_ref().expect("two legs");
+    let legs = effect.compound_branch().and_then(|c| c.actions.as_ref()).expect("two legs");
     let offer = legs[0].as_ref();
 
     assert_eq!(
@@ -179,7 +178,7 @@ fn niko_debut_draw_payout_per_unit_is_parsed() {
     let game = TestGame::new(db);
     let ability = debut_draw_ability(&game);
     let effect = ability.effect.as_deref().expect("has an effect");
-    let legs = effect.compound.actions.as_ref().expect("two legs");
+    let legs = effect.compound_branch().and_then(|c| c.actions.as_ref()).expect("two legs");
     let payout = legs[1].as_ref();
 
     assert_eq!(

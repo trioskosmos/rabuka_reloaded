@@ -19,7 +19,10 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let steps: &[Box<AbilityEffect>] = match effect.compound.actions.as_deref() {
+        let steps: &[Box<AbilityEffect>] = match effect
+            .compound_branch()
+            .and_then(|c| c.actions.as_deref())
+        {
             Some(actions) => actions,
             None => &[],
         };

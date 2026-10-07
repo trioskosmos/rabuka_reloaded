@@ -1427,7 +1427,7 @@ impl<'a> ConditionContext<'a> {
         if let Some(effect) = condition.get_effect() {
             // The effect stores a condition-like AbilityEffect. Evaluate it
             // via evaluate_effect_condition which checks negated card presence.
-            if effect.compound.conditional_negation.unwrap_or(false) {
+            if effect.conditional_negation().unwrap_or(false) {
                 if let Some(card_type) = &effect.card_type_any() {
                     let loc_binding = effect.location_any();
                     let loc = loc_binding.unwrap_or("hand");

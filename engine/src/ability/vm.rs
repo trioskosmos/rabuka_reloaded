@@ -1570,7 +1570,7 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
         cost_reduction_per_group,
         watches_ability_resolution,
         fires_on_opponent_effects,
-        compound: Box::new(crate::card::CompoundBranch {
+        compound: Some(Box::new(crate::card::CompoundBranch {
             look_action,
             select_action,
             actions,
@@ -1581,7 +1581,7 @@ fn decode_ability_effect_direct(bc: &mut BcReader, _variant: u8) -> Option<Abili
             optional_action,
             conditional_action,
             conditional_negation,
-        }),
+        })),
         kind,
     };
 
@@ -1597,37 +1597,40 @@ impl AbilityEffect {
         if let Some(kind) = Self::kind_from_action(self.action.to_str(), json_val) {
             self.kind = Some(ek_box_new(kind));
         }
-        if let Some(ref mut sub) = self.compound.look_action {
+        let Some(c) = self.compound.as_mut() else {
+            return;
+        };
+        if let Some(ref mut sub) = c.look_action {
             if let Some(sub_json) = json_val.get("look_action") {
                 sub.populate_from_json(sub_json);
             }
         }
-        if let Some(ref mut sub) = self.compound.select_action {
+        if let Some(ref mut sub) = c.select_action {
             if let Some(sub_json) = json_val.get("select_action") {
                 sub.populate_from_json(sub_json);
             }
         }
-        if let Some(ref mut sub) = self.compound.followup_action {
+        if let Some(ref mut sub) = c.followup_action {
             if let Some(sub_json) = json_val.get("followup_action") {
                 sub.populate_from_json(sub_json);
             }
         }
-        if let Some(ref mut sub) = self.compound.primary_effect {
+        if let Some(ref mut sub) = c.primary_effect {
             if let Some(sub_json) = json_val.get("primary_effect") {
                 sub.populate_from_json(sub_json);
             }
         }
-        if let Some(ref mut sub) = self.compound.optional_action {
+        if let Some(ref mut sub) = c.optional_action {
             if let Some(sub_json) = json_val.get("optional_action") {
                 sub.populate_from_json(sub_json);
             }
         }
-        if let Some(ref mut sub) = self.compound.conditional_action {
+        if let Some(ref mut sub) = c.conditional_action {
             if let Some(sub_json) = json_val.get("conditional_action") {
                 sub.populate_from_json(sub_json);
             }
         }
-        if let Some(ref mut actions) = self.compound.actions {
+        if let Some(ref mut actions) = c.actions {
             if let Some(json_actions) = json_val.get("actions").and_then(|a| a.as_array()) {
                 for (i, action) in actions.iter_mut().enumerate() {
                     if i < json_actions.len() {

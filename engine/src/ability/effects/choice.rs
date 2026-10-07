@@ -106,7 +106,7 @@ impl AbilityResolver {
         // genuinely mean a filter on the options and still propagate.
         let should_propagate_group = effect.group_names_any().is_some()
             && effect.alternative_count_type_any().is_none()
-            && effect.compound.alternative_condition.is_none()
+            && effect.alternative_condition().is_none()
             && !options_have_own_groups
             && !effect.text.contains("につき");
         let propagated_options: Option<Vec<Box<AbilityEffect>>> = if should_propagate_group {

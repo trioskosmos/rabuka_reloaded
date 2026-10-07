@@ -1627,12 +1627,27 @@ fn double_baton_options(
 /// Whether `card` has a play_baton_touch effect that can replace more than one
 /// member at a time.
 fn has_double_baton(card: &Card) -> bool {
-    card.resolved_abilities().any(|ability| {
-        ability.effect.as_ref().is_some_and(|ef| {
+    // `peek()` — read-only, and this runs once per hand card per action
+    // generation. `resolved_abilities()` would pay an `Arc::clone` per ability
+    // purely to test two fields; the `resolve()` arm covers a not-yet-decoded
+    // slot.
+    let mut owned;
+    for ar in &card.abilities {
+        let ability = match ar.peek() {
+            Some(a) => a,
+            None => {
+                owned = ar.resolve();
+                &owned
+            }
+        };
+        if ability.effect.as_ref().is_some_and(|ef| {
             ef.action == crate::ability::enums::ActionType::PlayBatonTouch
                 && ef.count.unwrap_or(1) > 1
-        })
-    })
+        }) {
+            return true;
+        }
+    }
+    false
 }
 
 /// What the main phase found for one stage area while considering one hand
@@ -2261,9 +2276,9 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 actions.push(ua);
             };
             for (ability_index, ar) in card.abilities.iter().enumerate() {
-                // `peek()` — read-only, so repeat generation passes skip
+// `peek()` — read-only, so repeat generation passes skip
                 // the `resolve()` atomic entirely (see `AbilityRef::peek`).
-                let owned;
+let owned;
                 let ability = match ar.peek() {
                     Some(a) => a,
                     None => {
@@ -2286,11 +2301,23 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
     // Also check discard pile for cards that activate from discard
     // (activation_condition_parsed with location = discard)
-    for &card_id in &active_player.waitroom.cards {
-        if let Some(card) = game_state.card_database.get_card(card_id) {
-            for (ability_index, ar) in card.abilities.iter().enumerate() {
-                let ability = ar.resolve();
-                if !crate::ability::util::activates_from_discard(&ability) {
+for &card_id in &active_player.waitroom.cards {
+            if let Some(card) = game_state.card_database.get_card(card_id) {
+                for (ability_index, ar) in card.abilities.iter().enumerate() {
+                    // `peek()` first: this loop runs once per waitroom ability on
+                    // every action-generation call, and `resolve()` costs an
+                    // `Arc::clone` (an atomic RMW on the decode slot shared by
+                    // every worker thread) purely to read a few fields. The
+                    // `resolve()` arm covers a not-yet-decoded slot.
+let owned;
+                    let ability = match ar.peek() {
+                        Some(a) => a,
+                        None => {
+                            owned = ar.resolve();
+                            &owned
+                        }
+                    };
+                    if !crate::ability::util::activates_from_discard(&ability) {
                     continue;
                 }
                 if !crate::ability::util::ability_trigger_can_activate(&ability) {

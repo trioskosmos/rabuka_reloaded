@@ -27,9 +27,15 @@ pub(crate) fn execute_conditional_on_result(
         return Ok(());
     }
 
-    let primary_action = effect.compound.primary_effect.as_ref();
-    let result_condition = effect.compound.result_condition.as_ref();
-    let followup_action = effect.compound.followup_action.as_ref();
+    let primary_action = effect
+        .compound_branch()
+        .and_then(|c| c.primary_effect.as_ref());
+    let result_condition = effect
+        .compound_branch()
+        .and_then(|c| c.result_condition.as_ref());
+    let followup_action = effect
+        .compound_branch()
+        .and_then(|c| c.followup_action.as_ref());
 
     if let Some(primary) = primary_action {
         if let Err(e) = resolver.execute_effect(gs, primary) {
@@ -38,7 +44,7 @@ pub(crate) fn execute_conditional_on_result(
         }
         if resolver.awaiting.choice.is_some() {
             let mut finish = effect.clone();
-            finish.compound.primary_effect = None;
+            finish.compound_branch_mut().primary_effect = None;
             finish.condition = None;
             gs.ability_queue.save_pending_actions(vec![finish]);
             return Ok(());
@@ -90,9 +96,16 @@ pub(crate) fn execute_conditional_on_optional(
     gs: &mut GameState,
     effect: &AbilityEffect,
 ) -> Result<(), String> {
-    let optional_action = effect.compound.optional_action.as_ref();
-    let conditional_action = effect.compound.conditional_action.as_ref();
-    let is_negation = effect.compound.conditional_negation.unwrap_or(false);
+    let optional_action = effect
+        .compound_branch()
+        .and_then(|c| c.optional_action.as_ref());
+    let conditional_action = effect
+        .compound_branch()
+        .and_then(|c| c.conditional_action.as_ref());
+    let is_negation = effect
+        .compound_branch()
+        .and_then(|c| c.conditional_negation)
+        .unwrap_or(false);
 
     if let (Some(opt), Some(cond)) = (optional_action, conditional_action) {
         if opt.action == ActionType::PayEnergy {

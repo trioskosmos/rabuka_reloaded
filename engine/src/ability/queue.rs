@@ -314,9 +314,7 @@ impl AbilityQueue {
         ) {
             return false;
         }
-        cost.compound
-            .actions
-            .as_ref()
+        cost.actions()
             .is_some_and(|a| a.len() > usize::from(entry.cost_paid_index))
     }
 

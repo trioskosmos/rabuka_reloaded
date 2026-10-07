@@ -190,7 +190,7 @@ impl AbilityResolver {
             effect.source_or("none"),
             effect.destination.map(|z| z.as_str()).unwrap_or("none"),
             effect.effect_steps.is_some(),
-            effect.compound.actions.is_some()
+            effect.actions().is_some()
         );
         #[cfg(not(feature = "no_std"))]
         let exec_snapshot = crate::ability::log::buffer_len();

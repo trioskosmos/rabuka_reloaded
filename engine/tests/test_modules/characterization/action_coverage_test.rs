@@ -13,7 +13,7 @@ fn has_action(card: &rabuka_engine::card::Card, target: &ActionType) -> bool {
             if eff.action == *target {
                 return true;
             }
-            if let Some(ref actions) = eff.compound.actions {
+            if let Some(actions) = eff.compound_branch().and_then(|c| c.actions.as_deref()) {
                 for sub in actions {
                     if sub.action == *target {
                         return true;
@@ -38,11 +38,11 @@ fn all_action_types_fire_without_crash() {
         for ab in card.resolved_abilities() {
             if let Some(ref eff) = ab.effect {
                 action_types.insert(eff.action);
-                if let Some(ref actions) = eff.compound.actions {
-                    for sub in actions {
-                        action_types.insert(sub.action);
-                    }
+if let Some(actions) = eff.compound_branch().and_then(|c| c.actions.as_deref()) {
+                for sub in actions {
+                    action_types.insert(sub.action);
                 }
+            }
             }
         }
     }

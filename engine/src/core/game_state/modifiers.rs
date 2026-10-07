@@ -1444,9 +1444,9 @@ fn commit_constant_results(
                                     }
                                 }
                             }
-                            crate::ability::enums::ActionType::Sequential => {
-                                if let Some(ref actions) = effect.compound.actions {
-                                    // A nested condition needs its own context: the one
+crate::ability::enums::ActionType::Sequential => {
+                if let Some(actions) = effect.actions() {
+                    // A nested condition needs its own context: the one
                                     // inside `constant_entry_gate_met` is gone by the time
                                     // the accumulation half runs. Same construction as that
                                     // helper — `skip_phase_gate` for the same reason.
@@ -1458,7 +1458,7 @@ fn commit_constant_results(
                                     };
                                     let mut ctx = crate::ability::condition::ConditionContext::new_with_self(self, self_player);
                                     ctx.skip_phase_gate = true;
-                                    for sub in actions {
+for sub in actions.iter().map(|b| b.as_ref()) {
                                         let sub_cond = sub
                                             .condition
                                             .as_ref()
@@ -2856,8 +2856,8 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
                 }
             }
             ActionType::Sequential => {
-                if let Some(ref actions) = effect.compound.actions {
-                    for sub in actions {
+                if let Some(actions) = effect.actions() {
+                    for sub in actions.iter().map(|b| b.as_ref()) {
                         self.apply_success_zone_effect(cid, player_idx, sub);
                     }
                 }

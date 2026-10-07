@@ -523,7 +523,7 @@ fn evaluate_delayed_mari(game: &mut TestGame, card_id: i16) -> bool {
         rabuka_engine::ability::enums::ActionType::ConditionalAlternative
     );
     let ctx = ConditionContext::new(&game.state);
-    let alt_cond = gained.compound.alternative_condition.as_ref();
+    let alt_cond = gained.compound_branch().and_then(|c| c.alternative_condition.as_ref());
     let base_cond = gained.condition.as_ref();
     let alt_met = alt_cond.is_some_and(|c| ctx.evaluate_condition(c));
     let base_met = base_cond.is_some_and(|c| ctx.evaluate_condition(c));
@@ -533,7 +533,7 @@ fn evaluate_delayed_mari(game: &mut TestGame, card_id: i16) -> bool {
     let effect_to_apply = if alt_met {
         gained.alternative_effect_any()
     } else {
-        gained.compound.primary_effect.as_deref()
+        gained.compound_branch().and_then(|c| c.primary_effect.as_deref())
     };
     let mut resolver = AbilityResolver::new(game.state.card_database.clone(), Some(card_id));
     resolver.session.activating_card_id = Some(card_id);

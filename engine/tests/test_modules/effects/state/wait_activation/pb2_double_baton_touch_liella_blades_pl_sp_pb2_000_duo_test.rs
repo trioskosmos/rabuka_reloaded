@@ -105,7 +105,7 @@ fn the_debut_is_a_two_step_per_unit_sequence() {
             ActionType::Sequential,
             "…カードを1枚引く。…得る — the 登場 clause has TWO effects"
         );
-        let steps = eff.compound.actions.as_ref().expect("a sequential carries steps");
+        let steps = eff.compound_branch().and_then(|c| c.actions.as_ref()).expect("a sequential carries steps");
         assert_eq!(steps.len(), 2, "{card}: draw step, then blade step");
 
         // Step 1: draw 1 per Liella! member this baton touch sent to the 控え室.
