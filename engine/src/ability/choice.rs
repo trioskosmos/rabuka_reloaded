@@ -1017,6 +1017,11 @@ impl super::resolver::AbilityResolver {
             self.session.activating_card_id, zone, ctx.indices, ctx.filtered_indices, ctx.count, ctx.allow_skip, ctx.is_reveal, context
         );
 
+        // §4.13: the zone string was parsed five times in
+        // this function; parse it once and match the Copy
+        // enum.
+        let zone_enum = Zone::from_str(zone);
+
         // Distinguish cost vs effect: cost handler only fires when effect NOT yet started.
         // effect_started is false during cost payment, true during effect execution.
         let effect_started = gs
@@ -1025,7 +1030,7 @@ impl super::resolver::AbilityResolver {
             .is_some_and(|e| e.effect_started);
 
         // Handle reveal action: push selected cards to revealed_cards, don't discard.
-        if ctx.is_reveal && Zone::from_str(zone) == Some(Zone::Hand) {
+        if ctx.is_reveal && zone_enum == Some(Zone::Hand) {
             return self.handle_reveal_selection(gs, &ctx, &context);
         }
 
@@ -1060,11 +1065,11 @@ impl super::resolver::AbilityResolver {
         log::trace!(
             "[COST] hand-payment routing: zone={} is_hand={} has_cost={} effect_started={}",
             zone,
-            Zone::from_str(zone) == Some(Zone::Hand),
+            zone_enum == Some(Zone::Hand),
             gs.entry_cost().is_some(),
             effect_started
         );
-        if Zone::from_str(zone) == Some(Zone::Hand) && gs.entry_cost().is_some() && !effect_started
+        if zone_enum == Some(Zone::Hand) && gs.entry_cost().is_some() && !effect_started
         {
             return self.handle_hand_cost_payment(
                 gs,
@@ -1080,7 +1085,7 @@ impl super::resolver::AbilityResolver {
             );
         }
 
-        if Zone::from_str(zone) == Some(Zone::Energy)
+        if zone_enum == Some(Zone::Energy)
             && !effect_started
             && ctx.destination.as_deref() != Some("under_member")
         {
@@ -1101,7 +1106,7 @@ impl super::resolver::AbilityResolver {
         if self.resume_under_member_placement(gs, zone, &ctx, &context) {
             return self.resume_pending_actions(gs);
         }
-        match Zone::from_str(zone) {
+        match zone_enum {
             Some(Zone::Hand) => {
                 return self.handle_hand_selection(gs, &ctx, &context, &mut validate_card);
             }

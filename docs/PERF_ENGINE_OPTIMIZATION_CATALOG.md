@@ -159,14 +159,43 @@ not drop them because the counter did not move.**
 - [x] §4.6 `waited_stage_cards` → `SmallVec`
 - [x] §4.7 `performer_owned_ids` → three-zone scan
 - [ ] §4.8 hoist `filter_subset()` at `card.rs:3460`, guard the weighted 2nd pass
-- [ ] §4.9 `Active` phase: parse `constant_cannot_activate_members` once
+- [x] §4.9 `Active` phase: parse `constant_cannot_activate_members` once —
+      landed 2026-10-07: parsed once into `SmallVec<[i16; 8]>` at the top
+      of the `Phase::Active` arm; the `HashSet`→`SmallVec` half landed with
+      it (`tick_delayed_cannot_active_for` now takes `&[i16]`)
 - [ ] §4.10 precomputed `SuppressAbilityTrigger` mask (needs §15.1)
-- [ ] §4.11 `Ability::trigger_mask()` — replaces 26 `has_trigger` parses
-- [ ] §4.12 `ConditionContext` stage-first probe (zero risk; do not use
-      `current_entry().player_id` — that is a gameplay change)
-- [ ] §4.13 remaining duplicate `Zone::from_str` sites
-- [ ] §4.14 `reprocess_counts` `HashMap` → `SmallVec`
-- [ ] §4.15 `post_cost_position_gate` per-resolution `Vec`
+- [x] §4.11 `Ability::trigger_mask()` — replaces 26 `has_trigger` parses —
+      landed 2026-10-07: `TriggerMask`, a `u8` bitset over the `TriggerKind`
+      enum, cached in a `OnceLock` on `Ability` (serde-skipped, so no wire
+      change); `has_trigger` is one AND. Decoded abilities live in
+      process-global `OnceLock` slots, so the parse runs at most once per
+      ability index per process. Corpus-equivalence gate added:
+      `characterization/trigger_mask_corpus_test.rs`. Follow-on landed with
+      it: `TriggerPositionMask` caches the 左サイド/センター/右サイド
+      keyword scan of the `triggers` text (the `check_trigger_position`
+      shape), used by action generation — see the §4.11 section.
+- [~] §4.12 `ConditionContext` stage-first probe — **checked 2026-10-07,
+      already correct**: `Player::contains_card` probes the 3-slot `stage`
+      first and short-circuits, so the common case is one 3-element scan,
+      not the "up to twelve large-`Vec` scans" the item assumed; the
+      literal fix would be a no-op or a regression for hand cards. Moved
+      to §16. The real redundancy is the 4×-per-resolution construction
+      (§8.2b), which stays open.
+- [~] §4.13 remaining duplicate `Zone::from_str` sites — the doc's named
+      sites landed 2026-10-07 (`choice.rs::handle_select_card` ×5,
+      `util.rs::count_in_zone` ×2); the remaining ~140 sites are
+      single-parse-per-function and stay open
+- [x] §4.14 `reprocess_counts` `HashMap` → `SmallVec` —
+      landed 2026-10-07: `SmallVec<[((i16, usize), u8); 8]>`
+      with a linear `position` scan in
+      `process_player_abilities_depth`
+- [x] §4.15 `post_cost_position_gate` per-resolution `Vec` —
+      landed 2026-10-07: `SmallVec<[Keyword; 3]>` (at most
+      three keywords qualify), so no heap allocation on any
+      resolution. The doc's "no collection" inline loop was
+      rejected: it would duplicate the position semantics
+      that `check_keywords` already owns — the SmallVec keeps
+      one source of truth and still removes the allocation
 - [ ] §4.6b `set_indices_waited/active` buffers + bitmap
 
 #### Tier 1 — effect-tree clones (§5)
@@ -202,7 +231,13 @@ not drop them because the counter did not move.**
 - [!] §6.9 `ConditionContext` snapshot — **highest risk in the document**; needs a
       1,000-game AI self-play state-trace diff
 - [ ] §6.11 `filter_subset` / `CardFilter::from_effect` single-bind
-- [ ] §6.12 `CardFilter::matches` 10 hash probes → 1
+- [x] §6.12 `CardFilter::matches` 10 hash probes → 1 —
+      the single-probe threading landed earlier;
+      2026-10-07 fixed the three leftover duplicate
+      probes it missed (`original_blade_limit`,
+      `original_heart_total`, `cost_total` branches
+      re-ran `db.get_card(id)` despite `card` being
+      in scope)
 - [ ] §6.13 dense `Vec` card index (land with §15.1)
 
 #### Tier 1 — scans (§7)
@@ -211,10 +246,19 @@ not drop them because the counter did not move.**
 - [x] §7.1 `card_name_matches_group` fast path + corpus equivalence test
 - [ ] §7.1b remaining `get_card_names` call sites (`util.rs:953/1053`,
       `card.rs:643/3692`) and `normalize_name` per-card sites
-- [ ] §7.3 `card_matches_characters` normalise the filter once, not per card
+- [x] §7.3 `card_matches_characters` normalise the filter
+      once, not per card — landed: needles are
+      canonicalised once at generation time
+      (`parser_utils.squash_name_needles`), so the
+      per-card `normalize_name` is gone. The remaining
+      `get_card_names` allocation per call is §7.1b's
+      family
 - [ ] §7.5 `check_invalid_energy_cards` probe per card + `SmallVec` in
       `check_invalid_live_cards`
-- [ ] §7.6 `MoveCards` `Vec::leak` — **an actual leak**, fix regardless of perf
+- [x] §7.6 `MoveCards` `Vec::leak` — **an actual leak** — landed 2026-10-07:
+      the exclusion list lives in a function-local `Vec<String>` borrowed by
+      the filter (`move/mod.rs::resolve_from_standard_zone`); the §7.6(2)
+      `to_string()`-for-the-contains-check allocation went with it
 - [ ] §7.7 `resolve_source_revealed_cards` O(R²) → single pass (preserve order —
       `filtered_indices` depends on it)
 - [ ] §7.8 `resolve_from_revealed_cards` O(n) removes in a loop
@@ -1569,6 +1613,15 @@ skip the second pass entirely when the weighted set is empty.**
 
 ### 4.9 Shape: a `str::parse::<i16>()` per candidate × per entry, for a constant
 
+**LANDED 2026-10-07.** Both halves: the member list is parsed once
+into a `SmallVec<[i16; 8]>` at the top of the `Phase::Active` arm
+(`phases.rs`), and the `HashSet<i16>` built to feed
+`tick_delayed_cannot_active_for` is gone — `all_card_ids()` already
+returns a `SmallVec<[i16; 64]>`, and the function now takes `&[i16]`
+(`game_modifiers.rs`). Player-level entries ("p1"/"p2") still fail
+the parse and never match, exactly as before. The three test callers
+of `tick_delayed_cannot_active_for` were updated to pass the slice.
+
 `turn/phases.rs:110-138` (the `Active` phase):
 
 ```rust
@@ -1632,6 +1685,32 @@ suppression determines which abilities fire, so a bug here is gameplay.
 
 ### 4.11 Shape: the trigger string re-split on every `has_trigger`
 
+**LANDED 2026-10-07** — as `TriggerMask`, a `u8` bitset over the
+`TriggerKind` enum (`triggers.rs`), cached in a `OnceLock` on
+`Ability` (`core/card.rs`). The field is `serde`-skipped (a pure
+function of `triggers`, never a wire field), and `PartialEq`/`Eq`
+are manual so two identical abilities compare equal regardless of
+whether either mask has been computed. `has_trigger` is one bitwise
+AND. Because decoded abilities live in process-global `OnceLock`
+slots (`ability_store`), the parse runs at most once per ability
+index **per process** — the "hoist to before the game" form. The
+lazy `OnceLock` (rather than a bytecode-baked field) is what keeps
+runtime-constructed abilities — gained abilities, `ability_ops.rs` —
+correct without a second mechanism. The catalogue's gate is landed
+as `characterization/trigger_mask_corpus_test.rs`: every bytecode
+ability's mask is asserted equal to a fresh `parse_triggers` for
+all eight `TriggerKind`s.
+
+**Follow-on, landed the same day:** `TriggerPositionMask`
+(`core/zones.rs`) caches the 左サイド/センター/右サイド keyword scan
+of the `triggers` text — the `check_trigger_position` shape — in a
+second `OnceLock` on `Ability`. Action generation
+(`turn/actions/mod.rs`, `game/game_setup.rs`) called
+`check_trigger_position` per stage card, three substring scans of
+the text each; it now calls `Ability::trigger_position_allows`,
+one bit test. The corpus test asserts the position mask against
+`check_trigger_position` for every ability and every `MemberArea`.
+
 `core/card.rs:826`:
 
 ```rust
@@ -1665,6 +1744,16 @@ the fold must produce the same membership set.
 `has_trigger` for all 9 `TriggerKind`s.
 
 ### 4.12 Shape: `ConditionContext` construction, four times per resolution
+
+**CHECKED 2026-10-07 — already correct, do not apply the fix below.**
+`Player::contains_card` (`core/player.rs:651-658`) probes the
+3-slot `stage` **first** and short-circuits, so the common case
+(activating card on stage) is one 3-element scan, not the "up to
+twelve large-`Vec` scans" this item assumed. The literal stage-first
+probe below would be a no-op for stage cards and a small regression
+for hand cards (two extra 3-element scans before the fallback). The
+real redundancy is the 4×-per-resolution `ConditionContext`
+construction itself — that is §8.2b, which stays open.
 
 `ability/condition.rs:72-84` (`resolve_self_player`):
 
@@ -1721,6 +1810,12 @@ card-selection resume. **Risk:** trivial. **Outcomes:** cannot change.
 
 ### 4.14 A `HashMap` allocated per queue-drain invocation, for a bounded set
 
+**LANDED 2026-10-07** — `SmallVec<[((i16, usize), u8); 8]>`
+with a linear `position` scan in `process_player_abilities_depth`
+(`core/game_state/abilities.rs`). The guard's key space is the
+abilities in one drain pass, so the linear scan is over a
+handful of entries and nothing allocates.
+
 `core/game_state/abilities.rs:1640`:
 
 ```rust
@@ -1738,6 +1833,14 @@ handful of entries by construction.
 **Scale:** 1–2 allocations per drain. **Risk:** trivial. **Outcomes:** cannot change.
 
 ### 4.15 `post_cost_position_gate` allocates a `Vec` on every resolution
+
+**LANDED 2026-10-07** — as `SmallVec<[Keyword; 3]>`: at most
+three keywords qualify (Center / LeftSide / RightSide), so the
+collection is inline and nothing allocates, on any resolution.
+The doc's "no collection" inline loop was rejected — it would
+duplicate the position semantics `check_keywords` already owns;
+the SmallVec keeps one source of truth and still removes the
+allocation.
 
 `ability/gates.rs:167-191`:
 
@@ -2769,6 +2872,13 @@ and is out of scope** — this catalogue only unifies the *mechanism*.
 
 ### 7.3 `card_matches_characters` normalises the filter, per card, per name
 
+**LANDED** — the needles are canonicalised once at generation
+time (`parser_utils.squash_name_needles`), and `get_card_names`
+returns `name_key` parts, so both sides are raw strings and the
+per-card `normalize_name` is gone (the landed code carries the
+comment). What remains is the `get_card_names` allocation per
+call — that is §7.1b's family, not this item.
+
 `ability/util.rs:946-961`:
 
 ```rust
@@ -2839,6 +2949,18 @@ nothing to adopt.
 **Scale:** small. **Risk:** trivial. **Outcomes:** cannot change.
 
 ### 7.6 `MoveCards` — `Vec::leak` per group-referenced discard move
+
+**LANDED 2026-10-07.** (1) The exclusion list now lives in a
+function-local `Vec<String>` (`stage_group_exclusion`) declared
+before `filter` so the borrow outlives it, and
+`filter.exclude_group_names` is set from `as_deref()` — no more
+per-execution leak. The doc's worry that the `&'static` lifetime is
+"load-bearing for the borrow of `c`/`player`" was wrong: `filter`
+is itself a function local, so a function-local owner suffices.
+(2) The `stage_groups.contains(&card.group.to_string())`
+comparison now compares `&str` (`card.group` is a `Box<str>`, not
+an `ArcStr` as this section said), so the contains check no longer
+allocates. (3) fell out of §7.1's landed fast path.
 
 `ability/effects/move/mod.rs:1293-1325`:
 
@@ -4729,6 +4851,7 @@ Recorded so nobody re-audits them. Each was read, not assumed.
 | **`Gate tables`** | Confirmed landed as `const` fn-pointer arrays (`gates.rs:52-89, 255-261`), correctly `#[inline]`. |
 | **`Condition` `Box`→`Arc`** | Measured negative. The `Condition` boxes are fine; `EffectFilter` (§5.1, §6.4) is the real representation cost. |
 | **`PlayerId` comparisons** | `Arc<str>` `PartialEq` is a 2-byte `memcmp`, not a pointer compare. Nothing to win (§7.14). |
+| **`ConditionContext` stage-first probe** (§4.12) | `Player::contains_card` already probes the 3-slot stage first and short-circuits; the common case is one 3-element scan. The literal fix would be a no-op or a regression. The 4×-per-resolution construction is §8.2b (open). |
 | **`miniz_oxide`** | One `OnceLock` inflate of ~92 KB per process, before timing starts (§13.7). |
 | **`describe.rs`** | The only semi-hot caller is `choice.rs:2690` (`describe_effect_en`, a 44-arm `String`-building match) on the re-prompt branch. Not a target. |
 | **Memory pressure** | No growth while games run. All resident card data ~2.4 MB. The allocator share is CPU time, not memory. |

@@ -1,6 +1,6 @@
 use crate::card::{BladeColor, HeartColor};
 use crate::types::AbilityApplication;
-use crate::{HashMap, HashSet};
+use crate::HashMap;
 #[cfg(feature = "no_std")]
 use alloc::{string::String, vec::Vec};
 use smallvec::SmallVec;
@@ -639,11 +639,15 @@ impl GameModifiers {
     }
 
     /// Q280: Owner-scoped tick — decrement delayed_cannot_active counters ONLY for
-    /// cards currently owned by `owned` (the active turn player). Flags belonging to
-    /// other players are left untouched so they persist until that player's own next
-    /// active phase ("このエネルギーは次のターンのアクティブフェイズにアクティブしない"
+    /// cards currently owned by `owned` (the active turn player). Flags belonging
+    /// to other players are left untouched so they persist until that player's own
+    /// next active phase ("このエネルギーは次のターンのアクティブフェイズにアクティブしない"
     /// must survive an opponent's intervening turn).
-    pub fn tick_delayed_cannot_active_for(&mut self, owned: &HashSet<i16>) {
+    ///
+    /// Takes a slice, not a `HashSet`: the caller's id set is a
+    /// `SmallVec` and both it and `delayed_cannot_active` are
+    /// tiny, so a linear scan beats hashing (catalogue §4.9).
+    pub fn tick_delayed_cannot_active_for(&mut self, owned: &[i16]) {
         self.delayed_cannot_active.retain(|&id, count| {
             if !owned.contains(&id) {
                 return true;

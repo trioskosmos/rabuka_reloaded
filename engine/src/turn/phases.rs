@@ -107,6 +107,20 @@ impl super::TurnEngine {
                     // Per-card constant_cannot_activate_members (e.g. "このメンバーはアクティブ
                     // フェイズにアクティブにしない") still applies.
                     let turn_player = game_state.active_player();
+                    // Per-card `constant_cannot_activate_members`,
+                    // parsed once for the phase: player-level
+                    // entries ("p1"/"p2") fail the parse and never
+                    // match a card id, so filtering them out up
+                    // front is equivalent to the per-card
+                    // `parse::<i16>() == Ok(cid)` test this
+                    // replaces (catalogue §4.9). Nothing in the
+                    // block mutates the list, so the parse is
+                    // loop-invariant.
+                    let constant_blocked: SmallVec<[i16; 8]> = game_state
+                        .constant_cannot_activate_members
+                        .iter()
+                        .filter_map(|x| x.parse::<i16>().ok())
+                        .collect();
                     let to_activate: Vec<i16> = turn_player
                         .stage
                         .stage
@@ -120,13 +134,7 @@ impl super::TurnEngine {
                             }
                             // Skip members with a constant cannot_activate restriction
                             // (per-card, e.g. "このメンバーはアクティブフェイズにアクティブにしない")
-                            // Compare via parse (no alloc); player-level entries
-                            // ("p1"/"p2") fail the parse and never match a card id.
-                            if game_state
-                                .constant_cannot_activate_members
-                                .iter()
-                                .any(|x| x.parse::<i16>() == Ok(cid))
-                            {
+                            if constant_blocked.contains(&cid) {
                                 return None;
                             }
                             // Skip members with an active delayed_cannot_active flag
@@ -157,8 +165,11 @@ impl super::TurnEngine {
                         active_energy,
                         excluded_energy
                     );
-                    let owned: crate::HashSet<i16> =
-                        turn_player.all_card_ids().into_iter().collect();
+                    // §4.9: `all_card_ids` already returns a
+                    // `SmallVec`; the previous `HashSet` collect
+                    // allocated and hashed ~15 ids only to feed a
+                    // membership test that a slice scan serves.
+                    let owned = turn_player.all_card_ids();
                     for &cid in &to_activate {
                         game_state.mods.add_orientation_modifier(cid, "active");
                     }

@@ -9,7 +9,6 @@ use crate::ability::enums::Zone;
 use crate::card::Condition;
 use crate::core::types::{AbilityTrigger, Duration, Phase, ReplacementEffect, TurnPhase};
 use crate::player::Player;
-use crate::HashMap;
 use smallvec::SmallVec;
 
 /// Check whether a prohibition_effects entry of the form
@@ -1752,7 +1751,12 @@ fn trigger_auto_ability_by_index_refs(
             "player2" => "p2",
             other => other,
         };
-        let mut reprocess_counts: HashMap<(i16, usize), u8> = HashMap::default();
+        // §4.14: the guard's key space is the abilities
+        // in one drain pass — a handful — so a SmallVec
+        // with a linear scan beats a HashMap (and its
+        // first-insert allocation) per invocation.
+        let mut reprocess_counts: SmallVec<[((i16, usize), u8); 8]> =
+            SmallVec::new();
         let mut batch_rerun = true;
         while batch_rerun {
             batch_rerun = false;
@@ -1833,9 +1837,18 @@ fn trigger_auto_ability_by_index_refs(
             // Infinite loop guard: track how many times the same ability is processed
             if let Some(entry) = self.ability_queue.current_entry() {
                 let key = (entry.card_id.unwrap_or(-1), entry.ability_index);
-                let count = reprocess_counts.entry(key).or_insert(0);
-                *count += 1;
-                if *count > 5 {
+                let idx = match reprocess_counts
+                    .iter()
+                    .position(|(k, _)| *k == key)
+                {
+                    Some(idx) => idx,
+                    None => {
+                        reprocess_counts.push((key, 0));
+                        reprocess_counts.len() - 1
+                    }
+                };
+                reprocess_counts[idx].1 += 1;
+                if reprocess_counts[idx].1 > 5 {
                     let card_name = entry
                         .card_id
                         .and_then(|id| self.card_database.get_card(id))
@@ -1846,7 +1859,7 @@ fn trigger_auto_ability_by_index_refs(
                         card_name,
                         entry.card_no,
                         entry.ability.full_text,
-                        *count
+                        reprocess_counts[idx].1
                     );
                     break;
                 }

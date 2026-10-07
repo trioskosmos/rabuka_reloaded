@@ -4,6 +4,7 @@
 use crate::ability::types::Choice;
 use crate::card::{Ability, AbilityEffect};
 use crate::game_state::GameState;
+use smallvec::SmallVec;
 
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -177,13 +178,27 @@ pub fn post_cost_position_gate(
     let binding = vec![];
     let keywords = ability.keywords.as_ref().unwrap_or(&binding);
     
-    // Only check position-related keywords post-cost
-    let position_keywords: Vec<crate::card::Keyword> = keywords.iter()
-        .filter(|k| matches!(k, crate::card::Keyword::Center | crate::card::Keyword::LeftSide | crate::card::Keyword::RightSide))
-        .cloned()
-        .collect();
-        
-    if !position_keywords.is_empty() && !resolver.check_keywords(gs, &position_keywords, position) {
+    // Only check position-related keywords post-cost.
+    // §4.15: at most three keywords qualify (Center /
+    // LeftSide / RightSide), so a SmallVec holds them
+    // inline — the previous `Vec` allocated on every
+    // gate call, including the common no-keyword case.
+    let mut position_keywords: SmallVec<[crate::card::Keyword; 3]> =
+        SmallVec::new();
+    for k in keywords {
+        if matches!(
+            k,
+            crate::card::Keyword::Center
+                | crate::card::Keyword::LeftSide
+                | crate::card::Keyword::RightSide
+        ) {
+            position_keywords.push(k.clone());
+        }
+    }
+
+    if !position_keywords.is_empty()
+        && !resolver.check_keywords(gs, &position_keywords, position)
+    {
         GateResult::stop("position requirement not met", "position_fail")
     } else {
         GateResult::Continue

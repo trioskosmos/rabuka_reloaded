@@ -1243,6 +1243,14 @@ impl AbilityResolver {
             None
         };
 
+        // §7.6: the stage-group exclusion list is built per
+        // call and only this function's local `filter` reads
+        // it, so the list lives in a local and is borrowed —
+        // the previous `Vec::leak` here persisted for the
+        // game's lifetime, one leaked allocation per
+        // invocation of this effect. Declared before
+        // `filter` so the borrow outlives it.
+        let mut stage_group_exclusion: Option<Vec<String>> = None;
         let mut filter = util::filter_from_parts_full(
             card_type,
             group,
@@ -1308,7 +1316,15 @@ impl AbilityResolver {
                 }
                 if let Some(card) = card_db.get_card(cid) {
                     if !card.group.is_empty() {
-                        if !stage_groups.contains(&card.group.to_string()) {
+                        // §7.6(2): compare as &str —
+                        // the to_string() allocated a
+                        // String just for the contains
+                        // check, then a second one for
+                        // the push.
+                        if !stage_groups
+                            .iter()
+                            .any(|g| g.as_str() == card.group.as_ref())
+                        {
                             stage_groups.push(card.group.to_string());
                         }
                     } else {
@@ -1324,12 +1340,10 @@ impl AbilityResolver {
                 }
             }
             if !stage_groups.is_empty() {
-                let groups_vec: Vec<String> = stage_groups.into_iter().collect();
-                // This &'static leak persists for the game's lifetime.
-                let leaked = Vec::leak(groups_vec);
-                filter.exclude_group_names = Some(leaked);
+                stage_group_exclusion = Some(stage_groups.into_iter().collect());
             }
         }
+        filter.exclude_group_names = stage_group_exclusion.as_deref();
 
         // Only log when the filter actually constrains heart selection. Every
         // unfiltered take printed an all-None line; over a full suite that was

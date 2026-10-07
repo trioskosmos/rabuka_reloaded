@@ -82,6 +82,64 @@ pub fn parse_triggers(triggers: &str) -> impl Iterator<Item = TriggerKind> + '_ 
     triggers.split(',').filter_map(TriggerKind::from_token)
 }
 
+impl TriggerKind {
+    /// This kind's bit in a precomputed [`TriggerMask`].
+    ///
+    /// The bit positions are an in-memory contract only — the mask
+    /// is never serialized (`Ability::trigger_mask` is serde-skipped)
+    /// — but they must stay stable, because decoded abilities are
+    /// cached process-globally behind `OnceLock` slots
+    /// (`ability_store`), so a mask computed under one layout must
+    /// stay readable for the whole process.
+    pub const fn bit(self) -> u8 {
+        1 << (self as u8)
+    }
+}
+
+/// The set of [`TriggerKind`]s an ability carries, precomputed from
+/// its `triggers` text so trigger scans test a bit instead of
+/// re-splitting the string on every call. The scans run 18–24 times
+/// per turn (docs/PERF_ENGINE_COMBINED.md §2.1) and walk every
+/// ability on every card they visit, so the per-call parse was the
+/// hot one (docs/PERF_ENGINE_OPTIMIZATION_CATALOG.md §4.11).
+///
+/// A pure function of the `triggers` field: two abilities with the
+/// same `triggers` text always produce the same mask, which is what
+/// makes caching it inside `Ability` sound.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TriggerMask(u8);
+
+impl TriggerMask {
+    /// The empty set — an ability with no `triggers` field.
+    pub const EMPTY: Self = Self(0);
+
+    /// Parse a `triggers` field (e.g. `"ライブ開始時, 登場"`) into
+    /// its mask. Unknown tokens are ignored, exactly as
+    /// [`parse_triggers`] ignores them.
+    pub fn parse(triggers: &str) -> Self {
+        let mut mask = Self::EMPTY;
+        for kind in parse_triggers(triggers) {
+            mask = mask.union(Self::of(kind));
+        }
+        mask
+    }
+
+    /// The set containing exactly `kind`.
+    pub const fn of(kind: TriggerKind) -> Self {
+        Self(kind.bit())
+    }
+
+    /// Whether the set contains `kind`.
+    pub const fn contains(self, kind: TriggerKind) -> bool {
+        self.0 & kind.bit() != 0
+    }
+
+    /// Union of two sets.
+    pub const fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+}
+
 /// Canonical English trigger key recorded in structured-log metadata and used to
 /// match a `trigger_evaluation` entry against its eventual `ability_resolution`.
 /// Kept in one place so trigger-scan, resolver, and negated-skip all agree.

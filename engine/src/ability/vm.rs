@@ -1347,6 +1347,10 @@ fn decode_ability(bc: &mut BcReader) -> Option<Ability> {
         cost,
         effect,
         keywords,
+        #[cfg(not(feature = "no_std"))]
+        trigger_mask: Default::default(),
+        #[cfg(not(feature = "no_std"))]
+        trigger_position_mask: Default::default(),
     })
 }
 

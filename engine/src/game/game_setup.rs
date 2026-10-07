@@ -2106,12 +2106,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
         (active_player.stage.stage[2], "right"),
     ];
 
-    for (card_id, area_name) in stage_positions {
+    for (slot, &(card_id, area_name)) in stage_positions.iter().enumerate() {
         if card_id == -1 {
             continue;
         }
         if let Some(card) = game_state.card_database.get_card(card_id) {
-            let card_position: MemberArea = area_name.parse().unwrap_or(MemberArea::Center);
+            // The slot index IS the area: `stage_positions` is ordered
+            // left/center/right, which is `MemberArea::from_index`'s
+            // 0/1/2 — no string parse (and no `String` allocation on
+            // `from_str`'s error path) needed.
+            let card_position = MemberArea::from_index(slot).unwrap_or(MemberArea::Center);
             // PRINTED abilities PLUS runtime-gained ones
             // (「…が持つ起動能力をすべて得る」). A gained activation is a real
             // activation — `handle_use_ability`'s `find_gained_activation`
@@ -2121,41 +2125,27 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
             // it. Gained slots carry the shared
             // `GAINED_ABILITY_INDEX_BASE + gained_idx` encoding, which is what
             // `handle_use_ability` decodes back to this exact entry.
-            let activatable: Vec<(usize, crate::Arc<crate::card::Ability>)> = card
-                .abilities
-                .iter()
-                .enumerate()
-                .map(|(printed_index, ar)| (printed_index, ar.resolve()))
-                .chain(
-                    game_state
-                        .gained_card_abilities
-                        .get(&card_id)
-                        .into_iter()
-                        .flatten()
-                        .enumerate()
-                        .map(|(gained_index, gained)| {
-                            (
-                                crate::ability::types::GAINED_ABILITY_INDEX_BASE + gained_index,
-                                crate::Arc::new(gained.clone()),
-                            )
-                        }),
-                )
-                .collect();
-            for (ability_index, ability) in activatable {
-                if !crate::ability::util::ability_trigger_can_activate(&ability) {
-                    continue;
+            //
+            // The gates and action construction run as a closure over the two
+            // ability sources, so neither needs an intermediate collection:
+            // printed abilities are `AbilityRef`s borrowed through `peek()`
+            // (no atomic RMW after the first decode), and gained abilities are
+            // borrowed straight from `gained_card_abilities` instead of being
+            // deep-cloned into a fresh `Arc` on every pass.
+            let mut offer_activation = |ability_index: usize, ability: &crate::card::Ability| {
+                if !crate::ability::util::ability_trigger_can_activate(ability) {
+                    return;
                 }
                 // 「…場合のみ起動できる」 — withhold the action when the gate does not hold.
                 // The resolver enforces this too, but only at resolve time and only while
                 // the cost is unpaid, so without this the player was offered an action that
                 // could not be taken. See `ability_activation_gate_holds`.
-                if !crate::ability::util::ability_activation_gate_holds(game_state, &ability)
+                if !crate::ability::util::ability_activation_gate_holds(game_state, ability)
                 {
-                    continue;
+                    return;
                 }
-                if !crate::zones::check_trigger_position(ability.triggers.as_deref(), card_position)
-                {
-                    continue;
+                if !ability.trigger_position_allows(card_position) {
+                    return;
                 }
                 if !crate::zones::check_effect_position(
                     ability
@@ -2164,18 +2154,18 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         .and_then(|e| e.activation_position_any()),
                     card_position,
                 ) {
-                    continue;
+                    return;
                 }
 
                 // Skip abilities that can only activate from the discard pile
-                if crate::ability::util::activates_from_discard(&ability) {
-                    continue;
+                if crate::ability::util::activates_from_discard(ability) {
+                    return;
                 }
 
                 let ability_key = (card_id, ability_index, game_state.turn_number);
                 if let Some(use_limit) = ability.use_limit {
                     if !crate::ability::util::ability_under_use_limit(game_state, &ability_key, use_limit) {
-                        continue;
+                        return;
                     }
                 }
 
@@ -2193,7 +2183,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 let (base_cost, effective_cost) = if ability.cost.is_some() {
                     crate::ability::util::ability_effective_cost(
                         game_state,
-                        &ability,
+                        ability,
                         stage_groups,
                     )
                 } else {
@@ -2203,7 +2193,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     if !c.has_optional_payment()
                         && effective_cost > active_player.energy_zone.active_count()
                     {
-                        continue;
+                        return;
                     }
                     // Mandatory non-energy costs (discard, wait, ...) must
                     // also be payable or the ability is not offered
@@ -2216,7 +2206,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     )
                     .is_err()
                     {
-                        continue;
+                        return;
                     }
                 }
                 let mut ua = make_action_params(
@@ -2269,6 +2259,27 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     ));
                 }
                 actions.push(ua);
+            };
+            for (ability_index, ar) in card.abilities.iter().enumerate() {
+                // `peek()` — read-only, so repeat generation passes skip
+                // the `resolve()` atomic entirely (see `AbilityRef::peek`).
+                let owned;
+                let ability = match ar.peek() {
+                    Some(a) => a,
+                    None => {
+                        owned = ar.resolve();
+                        &owned
+                    }
+                };
+                offer_activation(ability_index, ability);
+            }
+            if let Some(gained_list) = game_state.gained_card_abilities.get(&card_id) {
+                for (gained_index, gained) in gained_list.iter().enumerate() {
+                    offer_activation(
+                        crate::ability::types::GAINED_ABILITY_INDEX_BASE + gained_index,
+                        gained,
+                    );
+                }
             }
         }
     }

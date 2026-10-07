@@ -29,6 +29,9 @@
 - Soft choice guards are a CI failure: `if <expr>.has_pending_choice() { … }` is banned. Use `drain_choices_strict(&[…], &[…])` — an empty `allowed` list makes any prompt a failure, and the call no-ops on an empty queue, so it needs no guard. See `engine/tests/WRITING_TESTS.md` §H and the ratchet in `engine/tests/SOFT_GUARD_BASELINE.json`.
 
 ## Work habits
+- **Scope default: Rust engine + parser only.** The C port (`engine_c_wip/`) is out of scope unless explicitly asked.
+- **Find first, edit later.** When asked to investigate, report findings without editing; wait for the explicit go-ahead before touching files.
+- **Compile errors: read and fix.** When a build or test fails, read the errors and fix them. Do not editorialize about whether an error is pre-existing — just fix it.
 - Before writing a new gameplay test, search existing tests for similar ability text (same clause shapes) and copy the setup/drain/assert idiom.
 - When a test fails, classify: test bug (wrong expectation/setup), engine bug (fix engine + keep test), or parser gap (regenerate + golden-diff). State which in the commit message.
 - **Gaps are FIXED end-to-end, never documented around.** A parser gap means: add the parser pattern, regenerate `abilities.json` + bytecode, add the engine evaluation branch if missing, and make the test assert the card's full printed behavior. NEVER convert a failing test to `#[ignore]`, delete it, or weaken its assertions to pin broken/partial behavior. Documenting a gap in the audit doc is a complement to fixing it, not a substitute.

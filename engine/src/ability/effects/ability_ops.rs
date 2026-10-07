@@ -509,6 +509,10 @@ pub(crate) fn execute_gain_ability(
                 cost: None,
                 effect: Some(gained),
                 keywords: None,
+                #[cfg(not(feature = "no_std"))]
+                trigger_mask: Default::default(),
+                #[cfg(not(feature = "no_std"))]
+                trigger_position_mask: Default::default(),
             };
             gained_constant = GameState::ability_matches_trigger(
                 &gained_ability,
@@ -732,6 +736,10 @@ pub(crate) fn execute_gain_ability(
                             cost: ability.cost.clone(),
                             effect: ability.effect.clone(),
                             keywords: ability.keywords.clone(),
+                            #[cfg(not(feature = "no_std"))]
+                            trigger_mask: Default::default(),
+                            #[cfg(not(feature = "no_std"))]
+                            trigger_position_mask: Default::default(),
                         };
                         gs.gained_card_abilities
                             .entry(activating_card)

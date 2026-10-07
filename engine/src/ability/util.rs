@@ -1777,7 +1777,9 @@ impl<'a> CardFilter<'a> {
         // Per Q116 (lines 2487-2488): current total blade ≥ 10 condition uses
         // modified values.
         if let Some(bl) = self.original_blade_limit {
-            let card_blade = db.get_card(id).map(|c| c.blade).unwrap_or(0);
+            // §6.12: `card` is already bound above —
+            // this was a second probe of the same key.
+            let card_blade = card.map(|c| c.blade).unwrap_or(0);
             if !compare_counts(self.original_blade_operator, card_blade, bl) {
                 return false;
             }
@@ -1785,8 +1787,7 @@ impl<'a> CardFilter<'a> {
         // 「元々持つハートの数がN以下/つ以上」 — total PRINTED hearts. A member with
         // no printed hearts totals 0 and so satisfies 「1つ以下」.
         if let Some(hl) = self.original_heart_total {
-            let total = db
-                .get_card(id)
+            let total = card
                 .and_then(|c| c.base_heart.as_ref())
                 .map(|bh| bh.hearts.values().fold(0u8, |acc, n| acc.saturating_add(*n)))
                 .unwrap_or(0);
@@ -1798,7 +1799,8 @@ impl<'a> CardFilter<'a> {
         // satisfy the total-budget comparison (e.g. card.cost <= 4).
         if let Some(ct) = self.cost_total {
             if let Some(op) = self.cost_total_operator {
-                let card_cost = db.get_card(id).and_then(|c| c.cost).unwrap_or(99);
+                // §6.12: `card` is already bound above.
+                let card_cost = card.and_then(|c| c.cost).unwrap_or(99);
                 if !compare_counts(Some(op), card_cost, ct) {
                     return false;
                 }
@@ -2265,7 +2267,10 @@ pub fn count_in_zone(
     filter: &CardFilter,
     card_db: &CardDatabase,
 ) -> u8 {
-    if Zone::from_str(zone) == Some(Zone::UnderMember) {
+    // §4.13: the same zone string was parsed
+    // twice here; parse it once.
+    let zone_enum = Zone::from_str(zone);
+    if zone_enum == Some(Zone::UnderMember) {
         let cards: Vec<i16> = player
             .stage
             .under_cards
@@ -2279,7 +2284,7 @@ pub fn count_in_zone(
         zone_cards(player, zone),
         card_db,
         filter,
-        Zone::from_str(zone) == Some(Zone::Stage),
+        zone_enum == Some(Zone::Stage),
     )
 }
 

@@ -957,7 +957,7 @@ pub struct SpecialHeart {
     pub hearts: HeartMap,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct Ability {
     #[cfg_attr(feature = "serde_support", serde(default = "default_empty_string"))]
@@ -978,7 +978,43 @@ pub struct Ability {
     pub cost: Option<Box<AbilityCost>>,
     pub effect: Option<Box<AbilityEffect>>,
     pub keywords: Option<Vec<Keyword>>,
+    /// Precomputed [`TriggerMask`] for `triggers`, parsed once on
+    /// first use and cached here. Decoded abilities live behind
+    /// process-global `OnceLock` slots (`ability_store`), so the
+    /// parse runs at most once per ability index for the whole
+    /// process — every trigger scan after the first tests a bit
+    /// instead of re-splitting the `triggers` text
+    /// (docs/PERF_ENGINE_OPTIMIZATION_CATALOG.md §4.11). A pure
+    /// function of `triggers`, so it is serde-skipped: never a
+    /// wire field.
+    #[cfg(not(feature = "no_std"))]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
+    pub(crate) trigger_mask: std::sync::OnceLock<crate::triggers::TriggerMask>,
+    /// Precomputed [`TriggerPositionMask`] for the position
+    /// keywords in `triggers` — same caching rationale as
+    /// `trigger_mask`, for the action-generation position gate.
+    #[cfg(not(feature = "no_std"))]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
+    pub(crate) trigger_position_mask: std::sync::OnceLock<crate::zones::TriggerPositionMask>,
 }
+
+// PartialEq/Eq are manual: the two mask fields are caches of pure
+// functions of `triggers`, and a derived impl would compare the
+// OnceLock contents — making two otherwise-identical abilities
+// unequal when only one has had its mask computed.
+impl PartialEq for Ability {
+    fn eq(&self, other: &Self) -> bool {
+        self.full_text == other.full_text
+            && self.triggerless_text == other.triggerless_text
+            && self.triggers == other.triggers
+            && self.use_limit == other.use_limit
+            && self.is_null == other.is_null
+            && self.cost == other.cost
+            && self.effect == other.effect
+            && self.keywords == other.keywords
+    }
+}
+impl Eq for Ability {}
 
 #[cfg(feature = "serde_support")]
 fn default_empty_string() -> String {
@@ -986,14 +1022,66 @@ fn default_empty_string() -> String {
 }
 
 impl Ability {
-    /// Does this ability carry the given trigger kind? Parses the `triggers`
-    /// text into kinds via [`crate::triggers::parse_triggers`]; the single
-    /// source of truth for trigger matching across resolver, trigger scans,
-    /// and UI. Replaces scattered substring `contains()` checks.
+    /// The precomputed trigger mask for this ability's `triggers`
+    /// text, parsed on first call and cached in the struct. On
+    /// `no_std` builds there is no cache; `has_trigger` parses
+    /// directly.
+    #[cfg(not(feature = "no_std"))]
+    pub fn trigger_mask(&self) -> crate::triggers::TriggerMask {
+        *self.trigger_mask.get_or_init(|| {
+            crate::triggers::TriggerMask::parse(self.triggers.as_deref().unwrap_or(""))
+        })
+    }
+
+    /// The precomputed stage-position mask for the position
+    /// keywords in this ability's `triggers` text — the cached
+    /// form of the scan `check_trigger_position` performs.
+    #[cfg(not(feature = "no_std"))]
+    pub fn trigger_position_mask(&self) -> crate::zones::TriggerPositionMask {
+        *self.trigger_position_mask.get_or_init(|| {
+            crate::zones::TriggerPositionMask::parse(self.triggers.as_deref().unwrap_or(""))
+        })
+    }
+
+    /// Does this ability carry the given trigger kind? The single
+    /// source of truth for trigger matching across resolver,
+    /// trigger scans, and UI. Replaces scattered substring
+    /// `contains()` checks.
+    ///
+    /// Tests the precomputed [`TriggerMask`] (one bitwise AND)
+    /// instead of re-parsing the `triggers` text on every call;
+    /// the mask is parsed once per ability and cached, and
+    /// decoded abilities are cached process-globally, so the
+    /// parse happens at most once per ability index per process.
     pub fn has_trigger(&self, kind: crate::triggers::TriggerKind) -> bool {
-        self.triggers
-            .as_deref()
-            .is_some_and(|t| crate::triggers::parse_triggers(t).any(|k| k == kind))
+        #[cfg(not(feature = "no_std"))]
+        {
+            self.trigger_mask().contains(kind)
+        }
+        #[cfg(feature = "no_std")]
+        {
+            self.triggers
+                .as_deref()
+                .is_some_and(|t| crate::triggers::parse_triggers(t).any(|k| k == kind))
+        }
+    }
+
+    /// Whether a card in `area` may activate this ability under
+    /// the position keywords embedded in its trigger text — the
+    /// cached form of [`crate::zones::check_trigger_position`],
+    /// which action generation called per stage card.
+    pub fn trigger_position_allows(
+        &self,
+        area: crate::zones::MemberArea,
+    ) -> bool {
+        #[cfg(not(feature = "no_std"))]
+        {
+            self.trigger_position_mask().allows(area)
+        }
+        #[cfg(feature = "no_std")]
+        {
+            crate::zones::check_trigger_position(self.triggers.as_deref(), area)
+        }
     }
 
     /// Return the text with any leading trigger clause (e.g. `【自】`) stripped.

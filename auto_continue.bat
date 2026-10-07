@@ -7,9 +7,9 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 15,
+    [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "now keep doing this finding issues a/b testing and making it faster and improve code while you are at it. don't be lazy fully audit the full rust engine for potential speed ups. not just a little, not automatic overview bullshit, manually comb through the code. "
+    [string]$Message = "continue what you are doing. if done do more full audits for potential to increase speed or streamline engine and parser so it is easier to work with. do not split files superfluously, organise functions to make more sense"
 )
 
 Add-Type -AssemblyName System.Windows.Forms

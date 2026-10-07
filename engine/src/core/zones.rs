@@ -172,6 +172,47 @@ pub fn check_trigger_position(triggers: Option<&str>, card_position: MemberArea)
     true
 }
 
+/// The stage-position requirements embedded in an ability's
+/// trigger text (左サイド/右サイド/センター), precomputed so
+/// action generation tests bits instead of running three
+/// substring scans of the text per stage card. The cached
+/// form of [`check_trigger_position`]; a pure function of
+/// the `triggers` field, so it is safe to cache inside
+/// `Ability` (see `Ability::trigger_position_mask`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TriggerPositionMask(u8);
+
+impl TriggerPositionMask {
+    /// Scan a `triggers` field for the position keywords.
+    pub fn parse(triggers: &str) -> Self {
+        let mut mask = 0u8;
+        if triggers.contains("左サイド") {
+            mask |= 1;
+        }
+        if triggers.contains("センター") {
+            mask |= 2;
+        }
+        if triggers.contains("右サイド") {
+            mask |= 4;
+        }
+        Self(mask)
+    }
+
+    /// Whether a card in `area` satisfies every requirement
+    /// the text carries — [`check_trigger_position`]'s exact
+    /// semantics: each present keyword must match the card's
+    /// area (so two different requirements are unsatisfable),
+    /// and no requirements at all is always true.
+    pub fn allows(self, area: MemberArea) -> bool {
+        let area_bit = match area {
+            MemberArea::LeftSide => 1,
+            MemberArea::Center => 2,
+            MemberArea::RightSide => 4,
+        };
+        self.0 & !area_bit == 0
+    }
+}
+
 /// Check if a card matches the required stage position from a parsed
 /// `activation_position` field (e.g. "center", "left", "right", or comma-separated "left_side,right_side").
 pub fn check_effect_position(effect_pos: Option<&str>, card_position: MemberArea) -> bool {

@@ -16,8 +16,7 @@ fn delayed_cannot_active_expires_after_one_owner_tick() {
     assert!(game.state.mods.is_delayed_cannot_active(himeno));
 
     // Tick (simulate next Active phase processing) — owner-scoped for the card's owner
-    let owned: std::collections::HashSet<i16> =
-        game.state.player1.all_card_ids().into_iter().collect();
+    let owned = game.state.player1.all_card_ids();
     game.state.mods.tick_delayed_cannot_active_for(&owned);
 
     // After one tick, flag should be 0 → is_delayed_cannot_active returns false
@@ -37,8 +36,7 @@ fn repeated_delayed_cannot_active_does_not_extend_owner_ticks() {
     game.state.mods.add_delayed_cannot_active(himeno, 1);
     game.state.mods.add_delayed_cannot_active(himeno, 1);
 
-    let owned: std::collections::HashSet<i16> =
-        game.state.player1.all_card_ids().into_iter().collect();
+    let owned = game.state.player1.all_card_ids();
     game.state.mods.tick_delayed_cannot_active_for(&owned); // 1 → 0
     assert!(!game.state.mods.is_delayed_cannot_active(himeno));
 }

@@ -28,6 +28,12 @@
 
 use super::GameState;
 
+// `ToString` comes with the std prelude on host builds; under
+// `no_std` it must be named explicitly (same pattern as
+// `ability/enums.rs`).
+#[cfg(feature = "no_std")]
+use alloc::string::ToString;
+
 impl GameState {
     /// Apply an orientation change AND record the transition.
     ///

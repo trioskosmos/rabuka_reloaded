@@ -26,4 +26,5 @@ pub mod prohibition_layer_characterization_test;
 pub mod seed_reproduces_game_test;
 pub mod size_budget_test;
 pub mod strict_engine_bug_expected_fail_test;
+pub mod trigger_mask_corpus_test;
 pub mod zero_tested_action_types_test;
