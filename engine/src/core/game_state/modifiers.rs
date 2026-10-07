@@ -1,5 +1,5 @@
 use crate::core::constants::CountCast;
-use super::GameState;
+use super::{GameState, RevealedCardMeta};
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -963,6 +963,17 @@ fn commit_constant_results(
                                 }],
                             });
                         }
+                        // A `delayed` (「次のターン」) restriction belongs to the
+                        // runtime arm in effects/restriction.rs — log that this
+                        // 常時 pass deliberately did NOT accumulate it.
+                        if matches!(effect.action, crate::ability::enums::ActionType::Restriction)
+                            && effect.delayed_any().unwrap_or(false)
+                        {
+                            log::debug!(
+                                "[CONSTANT_SKIP] delayed restriction rt={:?} — runtime arm owns it",
+                                effect.restriction_type_any()
+                            );
+                        }
                         match effect.action {
                             crate::ability::enums::ActionType::GainResource => {
                                 match effect.resource_any().unwrap_or("") {
@@ -1232,7 +1243,18 @@ fn commit_constant_results(
                                     *acc.exp_score.entry(card_id).or_insert(0) += sv;
                                 }
                             }
-                            crate::ability::enums::ActionType::Restriction => {
+                            // `delayed` restrictions (「次のターン」) are transient: the
+                            // runtime arm in effects/restriction.rs stores them
+                            // (delayed_prohibition_effects / mods.delayed_cannot_active).
+                            // Accumulating them here — the 常時 pass — would turn a
+                            // one-turn flag into a standing prohibition
+                            // (constant_cannot_activate_members / exp_prohibition).
+                            // Today's 常時-only collector means no corpus card reaches
+                            // this arm delayed; the guard keeps a future
+                            // constant+delayed shape honest (falls to `_ => {}`).
+                            crate::ability::enums::ActionType::Restriction
+                                if !effect.delayed_any().unwrap_or(false) =>
+                            {
                                 if let Some(rt) = effect.restriction_type_any() {
                                     let card_name = self
                                         .card_database
@@ -2259,6 +2281,57 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
             if index < self.revealed_card_meta.len() {
                 self.revealed_card_meta.remove(index);
             }
+        }
+    }
+
+    /// Remove the card at `index` together with its meta entry, keeping the
+    /// two vectors prefix-aligned. Returns `None` when out of bounds.
+    pub fn remove_revealed_at(&mut self, index: usize) -> Option<i16> {
+        if index >= self.revealed_cards.len() {
+            return None;
+        }
+        let card_id = self.revealed_cards.remove(index);
+        if index < self.revealed_card_meta.len() {
+            self.revealed_card_meta.remove(index);
+        }
+        Some(card_id)
+    }
+
+    /// Remove every occurrence of `card_id` from the revealed pool, moving the
+    /// meta entries out in lockstep. Returns the meta of the FIRST removed
+    /// occurrence so a caller that puts the card back can re-attach it;
+    /// `None` when the card was absent or had no tracked meta.
+    pub fn remove_revealed_card_all(&mut self, card_id: i16) -> Option<RevealedCardMeta> {
+        let mut first_meta = None;
+        let mut index = 0;
+        while index < self.revealed_cards.len() {
+            if self.revealed_cards[index] == card_id {
+                self.revealed_cards.remove(index);
+                if index < self.revealed_card_meta.len() {
+                    let meta = self.revealed_card_meta.remove(index);
+                    if first_meta.is_none() {
+                        first_meta = Some(meta);
+                    }
+                }
+            } else {
+                index += 1;
+            }
+        }
+        first_meta
+    }
+
+    /// Give every revealed card a meta slot by appending owner-less entries
+    /// for the untracked tail (raw pushes). Run before re-adding cards so the
+    /// appended meta lands next to its own card.
+    pub fn pad_revealed_meta_tail(&mut self) {
+        while self.revealed_card_meta.len() < self.revealed_cards.len() {
+            self.revealed_card_meta.push(RevealedCardMeta {
+                source: None,
+                source_name: None,
+                is_private: false,
+                owner: None,
+                reveal_type: String::new(),
+            });
         }
     }
 

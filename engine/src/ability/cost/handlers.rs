@@ -333,7 +333,7 @@ let source = cost.source_str().unwrap_or("");
         if matching < count {
             // Nothing eligible to sacrifice — treat as declined.
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
+                entry.mark_cost_paid();
                 entry.optional_cost_result = Some(false);
                 entry.pending_actions.clear();
             }
@@ -370,7 +370,7 @@ let source = cost.source_str().unwrap_or("");
         if hand_len == 0 {
             log::debug!("  └─ skip (optional all-hand discard, hand is empty)");
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
+                entry.mark_cost_paid();
                 entry.optional_cost_result = Some(false);
             }
             return;
@@ -544,7 +544,7 @@ let source = cost.source_str().unwrap_or("");
                 // But if we just don't have enough cards in hand for a general optional cost (like having 0 cards when needing 1), we should auto-skip it.
                 log::debug!("  └─ skip (optional, not enough eligible cards in hand)");
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.cost_paid = true;
+                    entry.mark_cost_paid();
                     entry.optional_cost_result = Some(false);
                 }
                 return Ok(true);
@@ -560,7 +560,7 @@ let source = cost.source_str().unwrap_or("");
             if is_optional {
                 log::debug!("  └─ skip (optional any_number, no eligible cards in hand)");
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.cost_paid = true;
+                    entry.mark_cost_paid();
                     entry.optional_cost_result = Some(false);
                 }
                 return Ok(true);
@@ -1106,7 +1106,7 @@ let source = cost.source_str().unwrap_or("");
                     if active_count == 0 {
                         // No energy to pay — treat as skip
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                            entry.cost_paid = true;
+                            entry.mark_cost_paid();
                             entry.optional_cost_result = Some(false);
                         }
                         let pp = gs.player_prefix();
@@ -1149,7 +1149,7 @@ let source = cost.source_str().unwrap_or("");
                     let active = player.energy_zone.active_count();
                     if active < energy {
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                            entry.cost_paid = true;
+                            entry.mark_cost_paid();
                             entry.optional_cost_result = Some(false);
                         }
                         let pp = gs.player_prefix();
@@ -1383,7 +1383,7 @@ let source = cost.source_str().unwrap_or("");
         committed.set_optional(Some(false));
         self.pay_cost_move_cards(gs, &committed)?;
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
-            entry.cost_paid = true;
+            entry.mark_cost_paid();
             entry.optional_cost_result = Some(true);
         }
         gs.record_cost_paid();
@@ -1403,7 +1403,7 @@ let source = cost.source_str().unwrap_or("");
             self.awaiting.choice = None;
             self.awaiting.energy_payment = None;
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
+                entry.mark_cost_paid();
                 // If the cost has an alternative_effect ("unless you pay"),
                 // schedule it as a pending command so it fires after skip.
                 let alt = entry
@@ -1460,7 +1460,7 @@ let source = cost.source_str().unwrap_or("");
                 .map(|e| e.pending_actions.iter().any(&gated_move))
                 .unwrap_or(false);
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
-            entry.cost_paid = true;
+            entry.mark_cost_paid();
             entry.optional_cost_result = Some(true);
             if !has_cost && is_gated_effect_move {
                 entry.effect_started = false;
@@ -1676,7 +1676,7 @@ let source = cost.source_str().unwrap_or("");
         self.awaiting.energy_payment = None;
         let accepted = selected != "skip_optional_cost" && selected != "0";
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
-            entry.cost_paid = true;
+            entry.mark_cost_paid();
             entry.optional_cost_result = Some(accepted);
         }
         if accepted {

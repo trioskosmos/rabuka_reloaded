@@ -2280,7 +2280,7 @@ fn trigger_auto_ability_by_index_refs(
             );
             if !cost_already_paid && !is_deferred {
                 if let Some(e) = self.ability_queue.current_entry_mut() {
-                    e.cost_paid = true;
+                    e.mark_cost_paid();
                 }
             }
             if let Some(e) = self.ability_queue.current_entry_mut() {

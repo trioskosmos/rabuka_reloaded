@@ -1437,7 +1437,9 @@ impl<'a> ConditionContext<'a> {
                     let cards = util::zone_cards(player, loc);
                     let matching = match zone {
                         Some(crate::ability::enums::Zone::RevealedCards) => {
-                            self.game_state.revealed_cards.to_vec()
+                            // Same 「自分の」 scope as the card-side helpers: the
+                            // pool holds both performers' reveals, tagged by seat.
+                            self.revealed_cards_scoped_to(Some(target))
                         }
                         _ => cards.to_vec(),
                     };

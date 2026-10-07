@@ -2480,7 +2480,7 @@ _ACTION_RULES: List[ActionRule] = [
     ActionRule(name='action_019_activate_ability', match='支払って発動させる', action='activate_ability', setter=_set_action_019),
     ActionRule(name='action_020_restriction', match='ライブできない', action='restriction', setter=_set_action_020),
     ActionRule(name='action_021_restriction', match='アクティブにしない', action='restriction', setter=_set_action_021),
-    ActionRule(name='action_022_restriction', condition=lambda t: 'アクティブしない' in t and 'アクティブにしない' not in t, action='restriction', defaults={'restriction_type': 'cannot_active', 'delayed': True}),
+    ActionRule(name='action_022_restriction', condition=lambda t: 'アクティブしない' in t and 'アクティブにしない' not in t, action='restriction', defaults={'restriction_type': 'cannot_activate', 'delayed': True}),
     ActionRule(name='action_023_restriction', match='ウェイトしない', action='restriction', setter=_set_action_023),
     ActionRule(name='action_024_restriction', match='バトンタッチで控え室に置けない', action='restriction', defaults={'restriction_type': 'cannot_baton_touch'}),
     ActionRule(name='action_025_restriction', match='置くことができない', action='restriction', setter=_set_action_025),

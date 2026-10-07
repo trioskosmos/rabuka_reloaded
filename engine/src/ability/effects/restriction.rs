@@ -55,14 +55,16 @@ impl AbilityResolver {
         }
         // Handle cannot_activate restrictions — store for checking during Active phase
         //
-        // `cannot_activate` joins the delayed arm ONLY when it is delayed: a
-        // standing effect-emitted `cannot_activate` stays owned by the
-        // constants path (game_state/modifiers.rs), and routing it into the
-        // non-delayed player-level arm here would block EVERY member of the
-        // target player instead of the one card. `delayed` is the parser's
-        // 「次のターン」 marker (HS-PR-038 ab#1 and friends).
+        // ONE normalized type reaches here: the parser collapses every
+        // 「アクティブにならない」 spelling to `cannot_activate`, with `delayed`
+        // as the orthogonal 「次のターン」 marker (HS-PR-038 ab#1 and the bp7
+        // energy/member wait cards). A standing (non-delayed) effect-emitted
+        // `cannot_activate` stays owned by the constants path
+        // (game_state/modifiers.rs); routing it into the non-delayed arm here
+        // would block EVERY member of the target player instead of the one
+        // card. `cannot_activate_by_effect` is the separate effect-only
+        // spelling (「効果によってはアクティブにならない」).
         if restriction_type == Some("cannot_activate_by_effect")
-            || restriction_type == Some("cannot_active")
             || (delayed && restriction_type == Some("cannot_activate"))
         {
             if delayed {

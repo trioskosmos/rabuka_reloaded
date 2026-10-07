@@ -851,6 +851,7 @@ impl super::TurnEngine {
             return;
         }
         let saved_revealed = core::mem::take(&mut game_state.revealed_cards);
+        let saved_revealed_meta = core::mem::take(&mut game_state.revealed_card_meta);
         let saved_activating_card = game_state.activating_card;
         let saved_queue = core::mem::take(&mut game_state.ability_queue);
         let delayed = core::mem::take(&mut game_state.delayed_gained_effects);
@@ -883,7 +884,23 @@ impl super::TurnEngine {
                 owner.id,
                 snap.yell_cards.len()
             );
+            let seat = game_state.seat_index_by_id(&owner.id);
             game_state.revealed_cards = snap.yell_cards.iter().map(|yc| yc.card_id).collect();
+            // Owner tags for the swapped-in snapshot: every yell card in it was
+            // revealed by the snapshot's performer, so a `target=self` condition
+            // still sees its own reveals. Meta stays index-aligned with the
+            // temporary card list; the saved meta is restored below.
+            game_state.revealed_card_meta = snap
+                .yell_cards
+                .iter()
+                .map(|_| crate::game_state::RevealedCardMeta {
+                    source: None,
+                    source_name: None,
+                    is_private: false,
+                    owner: Some(seat),
+                    reveal_type: "yell".into(),
+                })
+                .collect();
             game_state.activating_card = Some(*card_id);
             use crate::ability::condition::ConditionContext;
             use crate::ability::enums::ActionType;
@@ -908,6 +925,7 @@ impl super::TurnEngine {
             }
         }
         game_state.revealed_cards = saved_revealed;
+        game_state.revealed_card_meta = saved_revealed_meta;
         game_state.activating_card = saved_activating_card;
         game_state.ability_queue = saved_queue;
         log::debug!(

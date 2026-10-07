@@ -160,6 +160,23 @@ pub struct AbilityQueueEntry {
     pub condition_cache: SmallVec<[(String, bool); 2]>,
 }
 
+impl AbilityQueueEntry {
+    /// The single write path for `cost_paid`.
+    ///
+    /// "Settled" covers both a PAID cost and a DECLINED optional one — the
+    /// cost phase is over either way. Declining does NOT count as a payment
+    /// for trackers like 「コストを支払うため」; payment paths pair this with
+    /// `GameState::record_cost_paid`, decline paths do not.
+    ///
+    /// Never call on an entry whose `SequentialCost` is half-paid
+    /// (`AbilityQueue::has_unpaid_sequential_sub_cost`): leaving `cost_paid`
+    /// false is what lets the resume path re-enter `pay_ability_cost` at
+    /// `cost_paid_index`.
+    pub fn mark_cost_paid(&mut self) {
+        self.cost_paid = true;
+    }
+}
+
 /// Unified ability queue with proper state management
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
@@ -254,6 +271,21 @@ impl AbilityQueue {
 
     pub fn get_entry(&self, index: usize) -> Option<&AbilityQueueEntry> {
         self.entries.get(index)
+    }
+
+    /// Mark the CURRENT entry's cost settled (no-op when no entry is
+    /// current). Single queue-level write path — see
+    /// `AbilityQueueEntry::mark_cost_paid` for the rules.
+    pub fn mark_cost_paid(&mut self) {
+        if let Some(entry) = self.current_entry_mut() {
+            entry.mark_cost_paid();
+        }
+    }
+
+    /// True when the current entry's cost phase has settled (paid or
+    /// declined). No current entry reads as NOT paid.
+    pub fn current_cost_paid(&self) -> bool {
+        self.current_entry().is_some_and(|e| e.cost_paid)
     }
 
     /// True while the current entry's cost is a `SequentialCost` that yielded

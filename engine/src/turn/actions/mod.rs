@@ -58,8 +58,7 @@ impl ResumeSnapshot {
     /// computation previously smeared across the three branches, with the
     /// single CHOICE_RESUME_BRANCH debug line.
     fn capture(game_state: &mut GameState, had_pending_sequential: bool) -> (Self, ResumeOutcome) {
-        let entry = game_state.ability_queue.current_entry();
-        let cost_was_paid = entry.is_some_and(|e| e.cost_paid);
+        let cost_was_paid = game_state.ability_queue.current_cost_paid();
         let effect_started = game_state
             .ability_queue
             .current_entry()

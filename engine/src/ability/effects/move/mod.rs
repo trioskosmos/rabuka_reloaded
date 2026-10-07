@@ -606,9 +606,8 @@ impl AbilityResolver {
             .iter()
             .rev()
             .map(|&i| {
-                let id = gs.revealed_cards[i];
-                gs.revealed_cards.remove(i);
-                id
+                gs.remove_revealed_at(i)
+                    .expect("matching index within revealed_cards")
             })
             .collect();
         gs.remove_from_source_hands(&taken);
@@ -1582,6 +1581,7 @@ impl AbilityResolver {
         } else {
             gs.player1_cheer_revealed_cards.is_empty()
         };
+        let mut restored_metas = Vec::new();
         let cards: Vec<i16> = if !cheer_is_empty {
             let cheer_buf = if c.use_p2 {
                 &mut gs.player2_cheer_revealed_cards
@@ -1589,7 +1589,9 @@ impl AbilityResolver {
                 &mut gs.player1_cheer_revealed_cards
             };
             let cbuf: SmallVec<[i16; 8]> = core::mem::take(cheer_buf);
-            gs.revealed_cards.retain(|id| !cbuf.contains(id));
+            for &cid in &cbuf {
+                restored_metas.push(gs.remove_revealed_card_all(cid));
+            }
             cbuf.to_vec()
         } else {
             // Filter to only include cards owned by the target player.
@@ -1615,13 +1617,23 @@ impl AbilityResolver {
                 .copied()
                 .collect();
             for &cid in &owned {
-                gs.revealed_cards.retain(|id| *id != cid);
+                restored_metas.push(gs.remove_revealed_card_all(cid));
             }
             owned
         };
         if cards.len() > count {
             // Put cards back so prompt_card_selection can find them.
+            gs.pad_revealed_meta_tail();
             gs.revealed_cards.extend(cards.iter().copied());
+            gs.revealed_card_meta.extend(restored_metas.into_iter().map(|meta| {
+                meta.unwrap_or_else(|| crate::game_state::RevealedCardMeta {
+                    source: None,
+                    source_name: None,
+                    is_private: false,
+                    owner: None,
+                    reveal_type: String::new(),
+                })
+            }));
             let filter = util::filter_from_parts_full(
                 c.card_type_filter,
                 c.group_name,
@@ -2906,7 +2918,9 @@ pub fn execute_selected_cards_from_zone(
             Some(Zone::RevealedCards) => {
                 for &idx in filtered_indices.iter().rev() {
                     if idx < gs.revealed_cards.len() {
-                        let card_id = gs.revealed_cards.remove(idx);
+                        let card_id = gs
+                            .remove_revealed_at(idx)
+                            .expect("index bounds checked above");
                         self.selection.cards.push(card_id);
                     }
                 }

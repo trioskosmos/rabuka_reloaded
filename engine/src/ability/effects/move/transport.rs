@@ -103,13 +103,16 @@ impl AbilityResolver {
         dst: &str,
     ) -> Vec<i16> {
         let cards: Vec<i16> = {
-            let revealed = &mut gs.revealed_cards;
+            let (revealed, revealed_meta) = (&mut gs.revealed_cards, &mut gs.revealed_card_meta);
             let mut result = Vec::new();
             let mut removed: Vec<usize> = indices.to_vec();
             removed.sort_by(|a, b| b.cmp(a));
             for &i in &removed {
                 if i < revealed.len() {
                     let cid = revealed.remove(i);
+                    if i < revealed_meta.len() {
+                        revealed_meta.remove(i);
+                    }
                     if validate_card(cid) {
                         result.push(cid);
                     }

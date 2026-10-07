@@ -263,7 +263,7 @@ impl super::resolver::AbilityResolver {
         if !sub_choice && self.awaiting.choice.is_none() {
             if let Some(e) = gs.ability_queue.current_entry_mut() {
                 if !e.cost_paid && !e.effect_started {
-                    e.cost_paid = true;
+                    e.mark_cost_paid();
                 }
             }
         }
@@ -767,14 +767,14 @@ impl super::resolver::AbilityResolver {
                 gs.mods.last_cost_moved_card_ids = self.selection.moved_cards.clone();
                 gs.set_recently_moved_batch(self.selection.moved_cards.clone(), Some("hand"));
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.cost_paid = true;
+                    entry.mark_cost_paid();
                     entry.optional_cost_result = Some(true);
                 }
                 gs.record_cost_paid();
             } else if allow_skip {
                 log::debug!("[COST] source={:?} hand payment skipped: no cards moved, optional_cost_result=false", self.session.activating_card_id);
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.cost_paid = true;
+                    entry.mark_cost_paid();
                     entry.optional_cost_result = Some(false);
                 }
             }
@@ -929,7 +929,7 @@ impl super::resolver::AbilityResolver {
         gs.mods.last_cost_moved_card_ids = self.selection.moved_cards.clone();
         gs.set_recently_moved_batch(self.selection.moved_cards.clone(), Some("hand"));
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
-            entry.cost_paid = true;
+            entry.mark_cost_paid();
         }
         self.awaiting.choice = None;
         Ok(())
@@ -952,7 +952,7 @@ impl super::resolver::AbilityResolver {
             player.energy_zone.pay_energy(count_paid.u8_count())?;
             gs.mods.last_cost_energy_count += count_paid.u8_count();
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
+                entry.mark_cost_paid();
                 entry.optional_cost_result = Some(true);
             }
             gs.record_cost_paid();
@@ -1655,7 +1655,7 @@ impl super::resolver::AbilityResolver {
         if revealed_card_ids.is_empty() && ctx.allow_skip && !effect_started {
             self.selection.cards.clear();
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
+                entry.mark_cost_paid();
                 entry.optional_cost_result = Some(false);
             }
             return self.finalize_choice(gs, context);
@@ -1895,7 +1895,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
         if card_ids.is_empty() && cost.optional.unwrap_or(false) {
             self.selection.cards.clear();
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
+                entry.mark_cost_paid();
                 entry.optional_cost_result = Some(false);
             }
             return self.finalize_choice(gs, context);
@@ -1904,7 +1904,7 @@ gs.set_recently_moved_batch(valid_ids.into(), Some(Zone::SuccessLiveZone.to_str(
             return Err("Not enough valid cards to reveal for cost".to_string());
         }
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
-            entry.cost_paid = true;
+            entry.mark_cost_paid();
             entry.optional_cost_result = Some(!card_ids.is_empty());
         }
         if !card_ids.is_empty() {

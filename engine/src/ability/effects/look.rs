@@ -700,9 +700,21 @@ pub fn execute_reveal(
             let card_db = &gs.card_database;
             let filter = util::CardFilter::from_effect(effect);
             if filter.has_filter() {
-                // Filter revealed_cards in-place
-                gs.revealed_cards
-                    .retain(|cid| filter.matches(card_db, *cid, false));
+                // Filter revealed_cards in place, dropping meta in lockstep so
+                // owner tags stay aligned with their cards.
+                let (revealed, revealed_meta) =
+                    (&mut gs.revealed_cards, &mut gs.revealed_card_meta);
+                let mut index = 0;
+                while index < revealed.len() {
+                    if filter.matches(card_db, revealed[index], false) {
+                        index += 1;
+                    } else {
+                        revealed.remove(index);
+                        if index < revealed_meta.len() {
+                            revealed_meta.remove(index);
+                        }
+                    }
+                }
             }
             let available = gs.revealed_cards.len();
             let max_select = if optional || any_number {

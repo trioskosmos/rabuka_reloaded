@@ -132,7 +132,7 @@ impl<'a> ConditionContext<'a> {
         // ある場合」 (PL!-pb2-005) — was silently never checked, and the ability
         // fired off cards that do not carry the icon.
         let check_cards: Vec<i16> = match Zone::from_str(location) {
-            Some(Zone::RevealedCards) => self.game_state.revealed_cards.to_vec(),
+            Some(Zone::RevealedCards) => self.revealed_cards_scoped(condition),
             Some(Zone::Stage) => player
                 .stage
                 .stage
@@ -639,7 +639,7 @@ impl<'a> ConditionContext<'a> {
             Some(Zone::Energy) => player.energy_zone.cards.to_vec(),
             Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
             Some(Zone::SuccessLiveZone) => player.success_live_card_zone.cards.to_vec(),
-            Some(Zone::RevealedCards) => self.game_state.revealed_cards.to_vec(),
+            Some(Zone::RevealedCards) => self.revealed_cards_scoped(condition),
             _ => return true,
         };
         // If a group filter is specified, only check distinctness within that group
@@ -762,8 +762,15 @@ impl<'a> ConditionContext<'a> {
     /// to either side, and a clause with no explicit target keeps the
     /// historical unscoped read.
     fn revealed_cards_scoped(&self, condition: &Condition) -> Vec<i16> {
+        self.revealed_cards_scoped_to(condition.get_target())
+    }
+
+    /// As [`Self::revealed_cards_scoped`], for call sites whose target comes
+    /// from an effect sub-condition rather than the `Condition` itself
+    /// (`evaluate_complex_condition`'s `effect.target_name()`).
+    pub(crate) fn revealed_cards_scoped_to(&self, target: Option<&str>) -> Vec<i16> {
         let gs = &self.game_state;
-        let wanted_seat = match condition.get_target() {
+        let wanted_seat = match target {
             Some(target @ ("self" | "opponent")) => {
                 let player = self.resolve_condition_player(target);
                 Some(gs.seat_index_by_id(&player.id))
@@ -1675,7 +1682,7 @@ impl<'a> ConditionContext<'a> {
                 .and_then(|gn| gn.first().map(|s| s.as_str()));
             let location = condition.get_location().unwrap_or("");
             let source_cards: Vec<i16> = match Zone::from_str(location) {
-                Some(Zone::RevealedCards) => self.game_state.revealed_cards.to_vec(),
+                Some(Zone::RevealedCards) => self.revealed_cards_scoped(condition),
                 Some(Zone::Stage) => player
                     .stage
                     .stage
@@ -2229,6 +2236,9 @@ impl<'a> ConditionContext<'a> {
 
         let actual = match Zone::from_str(location) {
             Some(Zone::RevealedCards) => {
+                // Same 「自分の」 scope as evaluate_location_condition: the pool
+                // holds both performers' yell reveals, tagged by seat.
+                let scoped = self.revealed_cards_scoped(condition);
                 if condition.get_unit() == Some("types") && !hc.is_empty() {
                     let required_colors: Vec<crate::card::HeartColor> = hc
                         .iter()
@@ -2236,7 +2246,7 @@ impl<'a> ConditionContext<'a> {
                         .collect();
                     let is_blade = condition.get_heart_source() == Some("blade");
                     let actual = self.count_distinct_heart_types(
-                        &self.game_state.revealed_cards,
+                        &scoped,
                         &required_colors,
                         is_blade,
                         None,
@@ -2250,7 +2260,7 @@ impl<'a> ConditionContext<'a> {
                     );
                     actual
                 } else {
-                    count_filtered(&self.game_state.revealed_cards, card_type)
+                    count_filtered(&scoped, card_type)
                 }
             }
             Some(Zone::Stage) => {
@@ -3303,6 +3313,41 @@ let actual = if condition.get_member_has_resource_under() == Some(true) {
         if !self.stage_satisfies_positioned_characters(condition, player, push_rich) {
             return false;
         }
+        // Appearance-source validation runs BEFORE both branches: a condition
+        // may name characters AND pin a source (「○○が手札以外から登場」). The
+        // check used to live only in the no-characters else-branch, so a
+        // combined shape skipped source validation entirely.
+        if let Some(expected_source) = condition.get_appearance_source() {
+            // WHO appeared is not always the activating card. For a 「登場」
+            // ability the two coincide, but a watcher (自動 — 中須かすみ
+            // 「自分の控え室からメンバーが登場したとき」) resolves on ANOTHER
+            // card's arrival: `activating_card_id` is the watcher, which never
+            // moved, so reading its source always failed and the draw never
+            // fired. Test every card that arrived on this stage instead — for
+            // the self-referential shape the activating card is on the stage
+            // and carries its own source, so both spellings land here.
+            //
+            // `non_hand` is the inverse spelling (HS-PR-038 ab#0
+            // 「手札以外から登場したとき」): a member played from the hand
+            // ALSO appears (turn/phases.rs records its origin as "hand"), so
+            // it must NOT satisfy this. Only an arrival recorded with a
+            // different origin counts; the hand placements are the two
+            // paths that record "hand" explicitly, everything else is
+            // effect-driven (source = the moved-from zone) or unrecorded.
+            let ok = stage_ids.iter().any(|&cid| {
+                let source = self.game_state.get_card_appearance_source(cid);
+                if expected_source == "non_hand" {
+                    self.game_state.has_card_appeared_this_turn(cid)
+                        && source != Some("hand")
+                } else {
+                    source == Some(expected_source)
+                }
+            });
+            if !ok {
+                push_rich(&format!("登場元不一致: 期待={}", expected_source), false);
+                return false;
+            }
+        }
         if condition.get_characters().is_some() {
             log::debug!(
                 "[APPEARANCE] checking characters: {:?} against stage_ids={:?}",
@@ -3311,37 +3356,6 @@ let actual = if condition.get_member_has_resource_under() == Some(true) {
             );
             self.stage_satisfies_characters(condition, stage_ids, push_rich)
         } else {
-            if let Some(expected_source) = condition.get_appearance_source() {
-                // WHO appeared is not always the activating card. For a 「登場」
-                // ability the two coincide, but a watcher (自動 — 中須かすみ
-                // 「自分の控え室からメンバーが登場したとき」) resolves on ANOTHER
-                // card's arrival: `activating_card_id` is the watcher, which never
-                // moved, so reading its source always failed and the draw never
-                // fired. Test every card that arrived on this stage instead — for
-                // the self-referential shape the activating card is on the stage
-                // and carries its own source, so both spellings land here.
-                //
-                // `non_hand` is the inverse spelling (HS-PR-038 ab#0
-                // 「手札以外から登場したとき」): a member played from the hand
-                // ALSO appears (turn/phases.rs records its origin as "hand"), so
-                // it must NOT satisfy this. Only an arrival recorded with a
-                // different origin counts; the hand placements are the two
-                // paths that record "hand" explicitly, everything else is
-                // effect-driven (source = the moved-from zone) or unrecorded.
-                let ok = stage_ids.iter().any(|&cid| {
-                    let source = self.game_state.get_card_appearance_source(cid);
-                    if expected_source == "non_hand" {
-                        self.game_state.has_card_appeared_this_turn(cid)
-                            && source != Some("hand")
-                    } else {
-                        source == Some(expected_source)
-                    }
-                });
-                if !ok {
-                    push_rich(&format!("登場元不一致: 期待={}", expected_source), false);
-                    return false;
-                }
-            }
             let names = stage_ids
                 .iter()
                 .filter_map(|&cid| {
@@ -3646,7 +3660,22 @@ let actual = if condition.get_member_has_resource_under() == Some(true) {
             Some(Zone::Energy) => player.energy_zone.cards.len().u8_count(),
             Some(Zone::LiveCardZone) => player.live_card_zone.len().u8_count(),
             Some(Zone::SuccessLiveZone) => player.success_live_card_zone.len().u8_count(),
-            Some(Zone::RevealedCards) => self.game_state.revealed_cards.len().u8_count(),
+            Some(Zone::RevealedCards) => {
+                // Game-level pool, deliberately UNscoped here: `zone_len`
+                // receives the already-resolved player, not the condition, so
+                // the 「自分の」 owner tag cannot be consulted. Every corpus
+                // shape that reaches this arm carries no explicit
+                // `target` (which `revealed_cards_scoped` would leave
+                // unscoped anyway); an explicit-target count takes
+                // `resolve_zone_card_count` / `evaluate_location_condition`
+                // instead, which do scope. Revisit if a printed card ever
+                // counts the revealed pool per seat through this path.
+                log::debug!(
+                    "[ZONE_LEN] revealed_cards raw len={} (unscoped)",
+                    self.game_state.revealed_cards.len()
+                );
+                self.game_state.revealed_cards.len().u8_count()
+            }
             _ => 0,
         }
     }
@@ -4185,8 +4214,7 @@ pub(crate) fn count_cards_with_filters(
                 let card_db = &self.game_state.card_database;
                 let ct = condition.get_card_type().map(|ct| ct.as_str());
                 return self
-                    .game_state
-                    .revealed_cards
+                    .revealed_cards_scoped(condition)
                     .iter()
                     .filter(|&&id| ct.is_none() || util::card_matches_type(card_db, id, ct))
                     .map(|&id| {

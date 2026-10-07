@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-07T11:50:23.511705",
+  "generated_at": "2026-10-07T12:56:59.062100",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "9af4c0e5",
+  "engine_commit": "b8c70b28",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -2862,7 +2862,7 @@
           {
             "text": "次のターンのアクティブフェイズにアクティブしない",
             "action": "restriction",
-            "restriction_type": "cannot_active",
+            "restriction_type": "cannot_activate",
             "delayed": true,
             "count": 1
           }
@@ -7140,7 +7140,7 @@
             "text": "そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない",
             "card_type": "energy_card",
             "action": "restriction",
-            "restriction_type": "cannot_active",
+            "restriction_type": "cannot_activate",
             "delayed": true,
             "count": 1
           }
@@ -7324,7 +7324,7 @@
             "text": "それらのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない",
             "card_type": "energy_card",
             "action": "restriction",
-            "restriction_type": "cannot_active",
+            "restriction_type": "cannot_activate",
             "delayed": true,
             "count": 1
           }
@@ -37590,7 +37590,7 @@
                 "text": "そのメンバーは次のターンのアクティブフェイズにアクティブしない",
                 "card_type": "member_card",
                 "action": "restriction",
-                "restriction_type": "cannot_active",
+                "restriction_type": "cannot_activate",
                 "delayed": true,
                 "count": 1
               }
@@ -39831,7 +39831,7 @@
             "text": "そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない",
             "card_type": "energy_card",
             "action": "restriction",
-            "restriction_type": "cannot_active",
+            "restriction_type": "cannot_activate",
             "delayed": true,
             "count": 1
           }
@@ -40109,7 +40109,7 @@
             "text": "そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない",
             "card_type": "energy_card",
             "action": "restriction",
-            "restriction_type": "cannot_active",
+            "restriction_type": "cannot_activate",
             "delayed": true,
             "count": 1
           }

@@ -362,15 +362,12 @@ pub fn handle_pending_choice(
         // Leaving it false lets the resume path re-enter `pay_ability_cost`
         // at `cost_paid_index` — see `finalize_choice` / `resume_sequential_cost`.
         if !gs.ability_queue.has_unpaid_sequential_sub_cost() {
-            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
-            }
+            gs.ability_queue.mark_cost_paid();
         }
     }
 
     if !is_cost_choice {
-        let is_paid = cost_already_paid
-            || gs.ability_queue.current_entry().is_some_and(|e| e.cost_paid);
+        let is_paid = cost_already_paid || gs.ability_queue.current_cost_paid();
         if is_paid {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.effect_started = true;

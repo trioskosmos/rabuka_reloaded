@@ -165,7 +165,7 @@ Triggers: 登場 — 66/66 L0-covered.
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
-| `PL!HS-bp1-006` | L2+choice | 164 | {{toujyou.png/登場}}カードを2枚引き、手札を1枚控え室に置く。 |
+| `PL!HS-bp1-006` | L2+choice | 165 | {{toujyou.png/登場}}カードを2枚引き、手札を1枚控え室に置く。 |
 | `PL!S-bp5-009` | L2+choice | 102 | {{toujyou.png/登場}}{{icon_energy.png/E}}支払ってもよい：自分の控え室から『SaintSnow』のカードを1枚手札に加える。そうした場合、ライブ終了時まで、{{icon_blade.png/ブレード}}{{icon_blad |
 | `PL!HS-sd1-006` | L2+choice | 85 | {{toujyou.png/登場}}自分のステージに「大沢瑠璃乃」か「百生吟子」か「徒町小鈴」がいる場合、エネルギーを1枚アクティブにし、自分の控え室から『蓮ノ空』のライブカードを1枚手札に加える。 |
 | `PL!-sd1-006` | L2+choice | 84 | {{toujyou.png/登場}}手札のライブカードを1枚公開してもよい：自分の成功ライブカード置き場にあるカードを1枚手札に加える。そうした場合、これにより公開したカードを自分の成功ライブカード置き場に置く。 |
@@ -216,7 +216,7 @@ Triggers: ライブ開始時 — 64/64 L0-covered.
 |---|---|---|---|
 | `LL-bp2-001` | L2+choice | 166 | {{live_start.png/ライブ開始時}}手札の「渡辺曜」と「鬼塚夏美」と「大沢瑠璃乃」を、好きな枚数控え室に置いてもよい：ライブ終了時まで、これによって控え室に置いた枚数1枚につき、{{icon_blade.png/ブレード}}を得る。 （手札のこの |
 | `PL!-bp4-010` | L2+choice | 158 | {{live_start.png/ライブ開始時}}{{icon_energy.png/E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}を得る。 |
-| `PL!N-sd1-010` | L2+choice | 143 | {{live_start.png/ライブ開始時}}{{icon_energy.png/E}}{{icon_energy.png/E}}支払ってもよい：ライブ終了時まで、{{heart_04.png/heart04}}を得る。 |
+| `PL!N-sd1-010` | L2+choice | 144 | {{live_start.png/ライブ開始時}}{{icon_energy.png/E}}{{icon_energy.png/E}}支払ってもよい：ライブ終了時まで、{{heart_04.png/heart04}}を得る。 |
 | `PL!N-bp1-001` | L2+choice | 104 | {{live_start.png/ライブ開始時}}{{icon_energy.png/E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png/ブレード}}を得る。 |
 | `PL!-bp3-026` | L2+choice | 81 | {{live_start.png/ライブ開始時}}手札を2枚控え室に置いてもよい：ライブ終了時まで、自分のステージにいるメンバー1人は、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}{{icon_blade.png |
 | `PL!HS-PR-001` | L2+choice | 78 | {{live_start.png/ライブ開始時}}{{icon_energy.png/E}}{{icon_energy.png/E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png/ブレード}}を得る。 |
@@ -681,11 +681,11 @@ Triggers: ライブ成功時 — 41/41 L0-covered.
 | `PL!S-bp3-002` | L2+choice | 3 | {{live_success.png/ライブ成功時}}ライブの合計スコアが相手より高い場合、このカードを手札に加えてもよい。この能力は、このカードが自分のエールによって公開されている場合のみ発動する。 |
 | `PL!HS-pb1-027` | L1+choice | 3 | {{live_success.png/ライブ成功時}}自分のステージに『スリーズブーケ』のメンバーがいる場合、自分のデッキの上からカードを4枚控え室に置いてもよい。 |
 | `PL!S-bp5-019` | L2+choice | 3 | {{live_success.png/ライブ成功時}}自分か相手の成功ライブカード置き場にカードが2枚以上ある場合、エールにより公開された自分のカードの中から、メンバーカードを2枚まで手札に加える。 |
+| `PL!SP-PR-018` | L2+choice | 3 | {{live_success.png/ライブ成功時}}エールにより公開された自分のカードの中に『Liella!』のカードが7枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
 | `PL!SP-bp2-025` | L2+choice | 2 | {{live_success.png/ライブ成功時}}自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合、エールにより公開された自分のカードの中から、カードを1枚手札に加える。 |
 | `PL!SP-bp7-023` | L2+choice | 2 | {{live_success.png/ライブ成功時}}エールにより公開された自分のカードの中から、『Liella!』のカードを1枚デッキの一番上に置いてもよい。 |
 | `PL!SP-pb2-007` | L2+choice | 2 | {{live_success.png/ライブ成功時}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}支払ってもよい：自分の控え室から『Liella!』のライブカードを1枚手札に加え |
 | `PL!HS-cl1-012` | L2+choice | 2 | {{live_success.png/ライブ成功時}}自分と相手のライブの合計スコアが同じ場合、エールにより公開された自分のカードの中から、コスト9以上のメンバーカードを1枚手札に加える。 |
-| `PL!S-bp7-019` | L2+choice | 2 | {{live_success.png/ライブ成功時}}自分の控え室から『Aqours』のカードを2枚まで好きな順番でデッキの下に置く。 |
 
 ## activation_move_cards
 
@@ -1080,7 +1080,7 @@ Triggers: ライブ開始時 — 15/15 L0-covered.
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
-| `PL!SP-bp1-026` | L2+choice | 87 | {{live_start.png/ライブ開始時}}自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを成功させるための必要ハートは{{heart_02.png/heart02}}{{heart_02.png/hea |
+| `PL!SP-bp1-026` | L2+choice | 88 | {{live_start.png/ライブ開始時}}自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを成功させるための必要ハートは{{heart_02.png/heart02}}{{heart_02.png/hea |
 | `PL!-bp5-023` | L2+choice | 24 | {{live_start.png/ライブ開始時}}自分のステージにいる{{heart_01.png/heart01}}と{{heart_06.png/heart06}}以外の色のハートを持つメンバー1人につき、このカードの必要ハートを{{heart_00.pn |
 | `PL!HS-bp2-023` | L2+choice | 24 | {{live_start.png/ライブ開始時}}自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合、このカードを成功させるための必要ハートを{{heart_05.png/heart05}}減らす。 |
 | `PL!-sd1-022` | L2+choice | 19 | {{live_start.png/ライブ開始時}}自分の成功ライブカード置き場にあるカード1枚につき、このカードを成功させるための必要ハートは{{heart_00.png/heart0}}{{heart_00.png/heart0}}少なくなる。 |

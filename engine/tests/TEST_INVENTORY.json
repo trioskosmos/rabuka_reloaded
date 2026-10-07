@@ -1,6 +1,6 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-07T01:09:37.592939+00:00",
+  "generated_at": "2026-10-07T01:59:33.664969+00:00",
   "stats": {
     "total_cards": 2674,
     "cards_with_abilities": 1664,
@@ -8,7 +8,7 @@
     "unique_abilities": 996
   },
   "n_files": 1048,
-  "n_tests": 4350,
+  "n_tests": 4351,
   "total_cards": 818,
   "covered_cards": 818,
   "abilities_on_covered": 996,
@@ -1079,7 +1079,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4350,
+  "n_test_fns_parsed": 4351,
   "abilities": [
     {
       "idx": 0,
@@ -2676,7 +2676,7 @@
         "issue12_compass_can_activate_sayaka_live_start_again_q243",
         "issue12_compass_can_activate_sayaka_p_plus_live_start_again_q243"
       ],
-      "covering_test_count": 164,
+      "covering_test_count": 165,
       "direct_tests": [
         "baton_touch_does_not_lock_all_full_lanes",
         "baton_touch_moves_replaced_member_to_waitroom",
@@ -2709,7 +2709,7 @@
         "p2_success_zone_gate_allows_partial_own_revealed_member_retrieval",
         "pl_bp5_014_n_debut_look_four_takes_member_with_heart06"
       ],
-      "direct_test_count": 80,
+      "direct_test_count": 81,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -17483,7 +17483,7 @@
         "hareruya_q64_waitroom_only_five_distinct_liella_condition_met",
         "hareruya_q74_multiname_distinct_counting"
       ],
-      "covering_test_count": 87,
+      "covering_test_count": 88,
       "direct_tests": [
         "distinct_card_name_prevents_same_card_twice",
         "hareruya_q64_waitroom_only_five_distinct_liella_condition_met",
@@ -17491,6 +17491,7 @@
         "pl_sp_bp7_023_l_selected_revealed_liella_card_increases_deck_count",
         "pl_sp_pb2_007_r_paid_three_energy_recovers_liella_live",
         "pl_sp_pb2_007_r_unpayable_energy_keeps_live_in_waitroom",
+        "pl_sp_pr_018_pr_opponents_liella_reveals_add_no_energy",
         "pl_sp_pr_018_pr_seven_liella_reveals_add_one_energy_on_live_success",
         "pl_sp_pr_018_pr_six_liella_reveals_add_no_energy",
         "pl_sp_sd2_006_sd2_empty_hand_not_offered_activation_refused",
@@ -17498,7 +17499,7 @@
         "q127_wien_adds_heart00_not_in_set",
         "q127_wien_plus1_stacks_on_hareruya_set"
       ],
-      "direct_test_count": 12,
+      "direct_test_count": 13,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -53095,7 +53096,7 @@
         "issue17_suzu_cost_bonus_condition_met",
         "issue17_suzu_cost_bonus_condition_not_met"
       ],
-      "covering_test_count": 143,
+      "covering_test_count": 144,
       "direct_tests": [
         "ddd_decline_pay_does_nothing",
         "ddd_option_a_retrieves_any_member_from_waitroom",
@@ -53128,7 +53129,7 @@
         "pl_n_bp7_012_r_paid_energy_and_first_color_choice_grant_one_heart01",
         "pl_n_pb1_021_r_looks_two_reveals_rina_to_hand"
       ],
-      "direct_test_count": 65,
+      "direct_test_count": 66,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -57567,15 +57568,17 @@
         "engine/tests/test_modules/effects/energy/place/seven_liella_reveals_pl_sp_pr_018_pr_test.rs"
       ],
       "covering_tests": [
+        "pl_sp_pr_018_pr_opponents_liella_reveals_add_no_energy",
         "pl_sp_pr_018_pr_seven_liella_reveals_add_one_energy_on_live_success",
         "pl_sp_pr_018_pr_six_liella_reveals_add_no_energy"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 3,
       "direct_tests": [
+        "pl_sp_pr_018_pr_opponents_liella_reveals_add_no_energy",
         "pl_sp_pr_018_pr_seven_liella_reveals_add_one_energy_on_live_success",
         "pl_sp_pr_018_pr_six_liella_reveals_add_no_energy"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 3,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,

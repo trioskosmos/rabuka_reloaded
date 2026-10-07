@@ -59,3 +59,35 @@ fn pl_sp_pr_018_pr_six_liella_reveals_add_no_energy() {
     }
     assert_eq!(game.state.player1.energy_zone.cards.len(), zone_before);
 }
+
+#[test]
+fn pl_sp_pr_018_pr_opponents_liella_reveals_add_no_energy() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.new_id(FILLER);
+    fill_decks(&mut game, filler);
+    let me = game.id("PL!SP-PR-018-PR");
+    game.state.player1.stage.stage[1] = me;
+    game.give_energy(5);
+    fill_energy_deck(&mut game, 0, 3);
+    let zone_before = game.state.player1.energy_zone.cards.len();
+    game.state.revealed_cards.clear();
+    // 「エールによって公開された自分のカードの中に」— at LiveVictoryDetermination
+    // the pool holds BOTH performers' reveals, each tagged with its performer's
+    // seat (phases.rs:437-439). The opponent's seven Liella! cards must not
+    // count toward 自分の; p1 revealed one card, and it is not a Liella!.
+    game.state
+        .push_revealed_card(filler, None, false, Some(0), "yell");
+    for _ in 0..7 {
+        let opp = game.new_id("PL!SP-bp1-026-L");
+        game.state
+            .push_revealed_card(opp, None, false, Some(1), "yell");
+    }
+    fire_trigger(&mut game, me, AbilityTrigger::LiveSuccess, "ライブ成功時");
+    game.drain_choices();
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        zone_before,
+        "相手のエール公開分は「自分のカード」に数えない — 7枚 Liella! でもエネルギーは置かれない"
+    );
+}

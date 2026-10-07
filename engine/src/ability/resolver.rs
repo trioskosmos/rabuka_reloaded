@@ -589,10 +589,7 @@ impl AbilityResolver {
         let mut dbg = AbDebug::new();
         dbg.effect(effect);
 
-        let cost_already_paid = gs
-            .ability_queue
-            .current_entry()
-            .is_some_and(|e| e.cost_paid);
+        let cost_already_paid = gs.ability_queue.current_cost_paid();
 
         let mut activation_condition_passed = true;
         if !cost_already_paid {
@@ -1266,7 +1263,7 @@ impl AbilityResolver {
         }
         if !cost_already_paid {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
+                entry.mark_cost_paid();
             }
             // Don't record use_limit yet when the pending choice is:
             // - "conditional_optional" (may pay) — player decides at choice
@@ -1294,11 +1291,7 @@ impl AbilityResolver {
         // Mark effect as started when a pending choice comes from effect
         // execution (not cost). This prevents RWC from re-entering the
         // ability after the effect's choice resolves.
-        let is_paid = cost_already_paid
-            || gs
-                .ability_queue
-                .current_entry()
-                .is_some_and(|e| e.cost_paid);
+        let is_paid = cost_already_paid || gs.ability_queue.current_cost_paid();
         if is_paid {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.effect_started = true;
@@ -1398,10 +1391,7 @@ impl AbilityResolver {
             return Err(reason);
         }
 
-        let cost_already_paid = gs
-            .ability_queue
-            .current_entry()
-            .is_some_and(|e| e.cost_paid);
+        let cost_already_paid = gs.ability_queue.current_cost_paid();
 
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("resolve::pay_cost");
@@ -1428,7 +1418,7 @@ impl AbilityResolver {
         // Mark cost as paid when it auto-resolved without creating a pending choice.
         if !cost_already_paid && ability.cost.is_some() && self.awaiting.choice.is_none() {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
+                entry.mark_cost_paid();
             }
         }
 
