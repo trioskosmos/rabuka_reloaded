@@ -83,10 +83,21 @@ static int parse_cards(const unsigned char *blob, long len) {
     const unsigned char *p = strtab;
 
 #ifdef RB_ROM_STRINGS
-    /* Pointer array lives in ROM (card_ptrs.inc); no arena used. */
+    /* Pointer array lives in ROM (card_ptrs.inc); no arena used.
+       The ROM blob's strtab is NUL-terminated (pack.py rewrites
+       it that way), so the entry count is the NUL count -- NOT
+       g_num_cards: the table also carries each card's number,
+       JP/EN names, series and unit strings (6580 entries for
+       2639 cards), and card records index the whole table. */
     g_card_strings = g_card_strings_rom;
-    g_num_card_strings = g_num_cards;
-    (void)p; (void)strtab_len;
+    {
+        uint32_t cnt = 0;
+        const unsigned char *q;
+        for (q = strtab; q < strtab + strtab_len; q++)
+            if (*q == 0) cnt++;
+        g_num_card_strings = cnt;
+    }
+    (void)p;
 #else
     size_t cap = 256, n = 0;
     g_card_strings = malloc(cap * sizeof(char *));

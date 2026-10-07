@@ -355,7 +355,12 @@ def test_q280_energy_placement_restriction_is_delayed_per_card():
     assert move.get("state_change") == "wait", move
     assert move.get("count") == 2, move
     assert restriction.get("action") == "restriction", restriction
-    assert restriction.get("restriction_type") == "cannot_active", restriction
+    # The parser collapses every 「アクティブにならない」 spelling to the
+    # canonical `cannot_activate` (see engine ability/effects/restriction.rs:
+    # "ONE normalized type reaches here"), with `delayed` as the orthogonal
+    # 「次のターン」 marker. `cannot_active` is not a restriction_type the
+    # engine reads anywhere.
+    assert restriction.get("restriction_type") == "cannot_activate", restriction
     assert restriction.get("delayed") is True, restriction
 
 

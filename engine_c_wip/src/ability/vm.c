@@ -636,19 +636,29 @@ static int effect_decode_placement_order(AbilityEffect *e, Rdr *r, uint8_t tag)
     Rust: TAG_OBJECT_VARIANT (0x09) + variant u8 + len + fields.
     The variant selects EffectKind but C stores only action string; we consume
     the byte and ignore it. Mirrors vm.rs:decode_ability_effect_direct . */
-/* ---- TEMPORARY PROBE INSTRUMENTATION (removed before hand-off) ---- */
+/* ---- TEMPORARY PROBE INSTRUMENTATION (removed before hand-off) ----
+   Capacities are overridable so a 2 MB RAM console target
+   (Jaguar) can shrink the audit scratch; the writers are
+   bounds-checked against the same macros, so a smaller
+   capacity only reduces audit resolution, never gameplay. */
+#ifndef RB_PROBE_DROPPED_CAP
+#define RB_PROBE_DROPPED_CAP 4096
+#endif
+#ifndef RB_PROBE_KEYS_CAP
+#define RB_PROBE_KEYS_CAP 1024
+#endif
 uint32_t g_probe_seen = 0, g_probe_retained = 0, g_probe_effects = 0;
-static char g_probe_dropped[4096][48];
-static uint8_t g_probe_dropped_tag[4096];
+static char g_probe_dropped[RB_PROBE_DROPPED_CAP][48];
+static uint8_t g_probe_dropped_tag[RB_PROBE_DROPPED_CAP];
 static uint32_t g_probe_ndropped = 0;
-static char g_probe_keys[1024][48];
-static uint32_t g_probe_keycount[1024];
+static char g_probe_keys[RB_PROBE_KEYS_CAP][48];
+static uint32_t g_probe_keycount[RB_PROBE_KEYS_CAP];
 static uint32_t g_probe_nkeys = 0;
 static void probe_seen(const char *k) {
     g_probe_seen++;
     if (k) for (uint32_t i = 0; i < g_probe_nkeys; i++)
         if (!strcmp(g_probe_keys[i], k)) { g_probe_keycount[i]++; return; }
-    if (g_probe_nkeys < 1024) {
+    if (g_probe_nkeys < RB_PROBE_KEYS_CAP) {
         snprintf(g_probe_keys[g_probe_nkeys], 48, "%s", k);
         g_probe_keycount[g_probe_nkeys] = 1;
         g_probe_nkeys++;
@@ -659,7 +669,7 @@ const char *rb_probe_key(uint32_t i) { return i < g_probe_nkeys ? g_probe_keys[i
 uint32_t rb_probe_keycount(uint32_t i) { return i < g_probe_nkeys ? g_probe_keycount[i] : 0; }
 static void probe_keep(void) { g_probe_retained++; }
 static void probe_drop(const char *k, uint8_t t) {
-    if (g_probe_ndropped < 4096) {
+    if (g_probe_ndropped < RB_PROBE_DROPPED_CAP) {
         snprintf(g_probe_dropped[g_probe_ndropped], 48, "%s", k ? k : "<null>");
         g_probe_dropped_tag[g_probe_ndropped] = t;
         g_probe_ndropped++;

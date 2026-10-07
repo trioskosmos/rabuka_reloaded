@@ -158,25 +158,51 @@ pub fn count_empty_bytecode_abilities() -> usize {
 /// # RAM savings
 /// Before: All 800 abilities decoded eagerly at load = ~2.8MB
 /// After: Only ~30-45 abilities triggered per game decoded = ~120KB
-/// Absolute byte offset of `unique_abilities[idx]` within `BYTECODE`.
-/// Rebuilt from `OFFSET_DELTAS` (per-ability slice lengths) as a running
-/// prefix sum. Ability indexes are small and lookups are rare (decode is
-/// lazy/on-demand), so the linear walk is negligible.
+/// Absolute byte offset of `unique_abilities[idx]` within `BYTECODE`,
+/// precomputed at compile time as a prefix sum over `OFFSET_DELTAS`
+/// (per-ability slice lengths).
+///
+/// The old form re-walked the delta table on every call
+/// (`OFFSET_DELTAS[..idx].iter().sum()`), which is O(idx) per
+/// `get_ability`. Decodes are cached in `AbilityRef`'s slot table on
+/// std, but `no_std` targets have no cache — `AbilityRef::resolve`
+/// decodes on every access there — so the walk was paid per resolve on
+/// exactly the memory-constrained targets that can least afford a
+/// linear scan. The table is a compile-time constant, so `offset_of`
+/// is a single indexed load on every target.
+#[cfg(not(feature = "snes"))]
+const OFFSET_PREFIX: [usize; OFFSET_DELTAS.len()] = {
+    let mut out = [0usize; OFFSET_DELTAS.len()];
+    let mut sum = 0usize;
+    let mut i = 0;
+    while i < OFFSET_DELTAS.len() {
+        out[i] = sum;
+        sum += OFFSET_DELTAS[i] as usize;
+        i += 1;
+    }
+    out
+};
+
 #[cfg(not(feature = "snes"))]
 fn offset_of(idx: usize) -> usize {
-    OFFSET_DELTAS[..idx].iter().map(|&d| d as usize).sum()
+    OFFSET_PREFIX[idx]
 }
 
 const BYTECODE_MAGIC: &[u8; 4] = b"RBKA";
 const BYTECODE_VERSION: u32 = 1;
 
 #[cfg(not(feature = "gba"))]
-fn strip_bytecode_header(data: Vec<u8>) -> Vec<u8> {
+fn strip_bytecode_header(mut data: Vec<u8>) -> Vec<u8> {
     if data.len() >= 8 && &data[0..4] == BYTECODE_MAGIC {
         let ver = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
         assert!(ver == BYTECODE_VERSION, "bytecode version mismatch: got {ver}, expected {BYTECODE_VERSION} — stale blob paired with fresh code (C3). Regenerate via `python cards/compile_abilities.py`");
         log::debug!("[BYTECODE] magic RBKA version {ver} OK, stripping header");
-        return data[8..].to_vec();
+        // Drop the 8-byte header in place: `drain` memmoves the payload
+        // down inside the existing allocation instead of copying the
+        // whole ~92KB blob into a fresh `Vec`, so decompress + strip is
+        // one allocation, not two.
+        data.drain(..8);
+        return data;
     }
     log::debug!("[BYTECODE] no magic header (old blob) — accepting without version check (C3 transition)");
     data

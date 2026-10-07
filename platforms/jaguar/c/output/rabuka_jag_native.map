@@ -1,0 +1,2472 @@
+Archive member included to satisfy reference by file (symbol)
+
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_mulsi3.o)
+                              obj/ability.o (__mulsi3)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o)
+                              obj/cost.o (__divsi3)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umodsi3.o)
+                              obj/engine.o (__umodsi3)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_modsi3.o)
+                              obj/misc.o (__modsi3)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+                              obj/data.o (__adddf3)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_floatex.o)
+                              /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o) (_fpCCR)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_nedf2.o)
+                              obj/data.o (__nedf2)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gtdf2.o)
+                              obj/data.o (__gtdf2)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gedf2.o)
+                              obj/data.o (__gedf2)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_ledf2.o)
+                              obj/data.o (__ledf2)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o)
+                              obj/data.o (__eqsf2)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gesf2.o)
+                              obj/data.o (__gesf2)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_lesf2.o)
+                              obj/data.o (__lesf2)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+                              obj/card.o (__muldi3)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+                              obj/sys.o (__divdi3)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+                              obj/sys.o (__moddi3)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+                              obj/sys.o (__udivdi3)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+                              obj/engine.o (__umoddi3)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+                              obj/data.o (__truncdfsf2)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivsi3.o)
+                              /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o) (__udivsi3_internal)
+/usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_float.o)
+                              /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o) (__cmpsf2_internal)
+
+Discarded input sections
+
+ .comment       0x00000000       0x3c obj/abilities_gen.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/abilities_gen.o
+ .comment       0x00000000       0x3c obj/ability.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/ability.o
+ .comment       0x00000000       0x3c obj/ability_effects.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/ability_effects.o
+ .comment       0x00000000       0x3c obj/ability_queue.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/ability_queue.o
+ .comment       0x00000000       0x3c obj/alloc.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/alloc.o
+ .comment       0x00000000       0x3c obj/bytecode_blob.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/bytecode_blob.o
+ .comment       0x00000000       0x3c obj/bytecode_data.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/bytecode_data.o
+ .comment       0x00000000       0x3c obj/card.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/card.o
+ .comment       0x00000000       0x3c obj/choice.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/choice.o
+ .comment       0x00000000       0x3c obj/compound.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/compound.o
+ .comment       0x00000000       0x3c obj/condition.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/condition.o
+ .comment       0x00000000       0x3c obj/console.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/console.o
+ .comment       0x00000000       0x3c obj/cost.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/cost.o
+ .comment       0x00000000       0x3c obj/custom.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/custom.o
+ .comment       0x00000000       0x3c obj/data.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/data.o
+ .comment       0x00000000       0x3c obj/debug.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/debug.o
+ .comment       0x00000000       0x3c obj/deck_builder.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/deck_builder.o
+ .comment       0x00000000       0x3c obj/deck_parser.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/deck_parser.o
+ .comment       0x00000000       0x3c obj/describe.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/describe.o
+ .comment       0x00000000       0x3c obj/draw.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/draw.o
+ .comment       0x00000000       0x3c obj/dynamic_count.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/dynamic_count.o
+ .comment       0x00000000       0x3c obj/engine.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/engine.o
+ .comment       0x00000000       0x3c obj/enums.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/enums.o
+ .comment       0x00000000       0x3c obj/executor.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/executor.o
+ .comment       0x00000000       0x3c obj/game_setup.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/game_setup.o
+ .comment       0x00000000       0x3c obj/game_state_abilities.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/game_state_abilities.o
+ .comment       0x00000000       0x3c obj/game_state_core.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/game_state_core.o
+ .comment       0x00000000       0x3c obj/gen_data.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/gen_data.o
+ .comment       0x00000000       0x3c obj/gen_data_rom.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/gen_data_rom.o
+ .comment       0x00000000       0x3c obj/jag_native_main.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/jag_native_main.o
+ .comment       0x00000000       0x3c obj/live.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/live.o
+ .comment       0x00000000       0x3c obj/log.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/log.o
+ .comment       0x00000000       0x3c obj/look.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/look.o
+ .comment       0x00000000       0x3c obj/misc.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/misc.o
+ .comment       0x00000000       0x3c obj/modifiers.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/modifiers.o
+ .comment       0x00000000       0x3c obj/move.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/move.o
+ .comment       0x00000000       0x3c obj/move_missing.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/move_missing.o
+ .comment       0x00000000       0x3c obj/phase.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/phase.o
+ .comment       0x00000000       0x3c obj/resolver.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/resolver.o
+ .comment       0x00000000       0x3c obj/rules.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/rules.o
+ .comment       0x00000000       0x3c obj/score.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/score.o
+ .comment       0x00000000       0x3c obj/state.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/state.o
+ .comment       0x00000000       0x3c obj/stats_pipeline.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/stats_pipeline.o
+ .comment       0x00000000       0x3c obj/sys.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/sys.o
+ .comment       0x00000000       0x3c obj/tracking.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/tracking.o
+ .comment       0x00000000       0x3c obj/triggers.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/triggers.o
+ .comment       0x00000000       0x3c obj/types.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/types.o
+ .comment       0x00000000       0x3c obj/util.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/util.o
+ .comment       0x00000000       0x3c obj/vm.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/vm.o
+ .comment       0x00000000       0x3c obj/zones.o
+ .note.GNU-stack
+                0x00000000        0x0 obj/zones.o
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_mulsi3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umodsi3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_modsi3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_floatex.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_nedf2.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gtdf2.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gedf2.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_ledf2.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gesf2.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_lesf2.o)
+ .comment       0x00000000       0x3c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+ .comment       0x00000000       0x3c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+ .eh_frame      0x00000000       0x38 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+ .comment       0x00000000       0x3c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+ .eh_frame      0x00000000       0x3c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+ .comment       0x00000000       0x3c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+ .eh_frame      0x00000000       0x34 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+ .comment       0x00000000       0x3c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+ .eh_frame      0x00000000       0x38 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+ .comment       0x00000000       0x3c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivsi3.o)
+ .note.GNU-stack
+                0x00000000        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_float.o)
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+rom              0x00802000         0x003fe000         xr
+dram             0x00004000         0x001fc000         rw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+
+.text           0x00802000   0x270cf3
+ *(.text.startup)
+ *(.text*)
+ .text          0x00802000       0x88 obj/abilities_gen.o
+                0x00802000                get_string
+                0x00802016                bytecode_slice
+ .text          0x00802088     0x10a6 obj/ability.o
+                0x008021dc                rb_ability_ref_index
+                0x008021e2                rb_ability_ref_idx
+                0x008021f4                rb_ability_ref_resolve
+                0x0080236a                rb_ability_ref_decode
+                0x0080240c                rb_ability_ref_to_arc
+                0x00802412                rb_ability_ref_cache_size
+                0x0080245c                rb_gain_ability
+                0x00803002                rb_tick_gained
+                0x00803034                rb_gain_ability_from_source
+                0x0080303a                rb_suppress_ability_trigger
+ *fill*         0x0080312e        0x2 
+ .text          0x00803130     0x205c obj/ability_effects.o
+                0x00803820                rb_translated_execute_gain_ability_effect
+                0x008042e4                rb_translated_execute_activate_ability
+                0x00804640                rb_translated_execute_invalidate_ability
+                0x00804e7e                rb_translated_execute_suppress_ability_trigger
+                0x00804fe4                rb_translated_execute_set_card_identity_effect
+                0x008050ba                rb_ability_gain_from_source_core
+                0x008050da                rb_translated_execute_gain_ability_from_source
+ .text          0x0080518c     0x2c8c obj/ability_queue.o
+                0x0080518c                rb_queue_init
+                0x008051da                rb_queue_clear
+                0x008052e6                rb_queue_is_idle
+                0x00805308                rb_queue_is_waiting_for_choice
+                0x00805338                rb_queue_state
+                0x00805352                rb_queue_set_state
+                0x0080536a                rb_queue_current_entry
+                0x00805392                rb_queue_current_entry_mut
+                0x008053f6                rb_queue_get_entry
+                0x0080543a                rb_queue_len
+                0x00805454                rb_queue_is_empty
+                0x00805476                rb_queue_has_pending
+                0x00805498                rb_queue_iter
+                0x008054e6                rb_queue_enqueue
+                0x00805658                rb_queue_push
+                0x0080579c                rb_queue_set_entry_trigger
+                0x00805918                rb_queue_make_entry
+                0x0080595c                rb_queue_start_next
+                0x008059e8                rb_queue_complete_current
+                0x00805a44                rb_queue_set_choice_route_raw
+                0x00805b00                rb_queue_ensure_current_entry
+                0x00805c18                rb_queue_pause_for_choice
+                0x00806110                rb_queue_pause_for_auto_ability_choice
+                0x00806190                rb_queue_resume_with_choice
+                0x008061da                rb_queue_clear_completed
+                0x0080633a                rb_queue_push_constant_context
+                0x00806446                rb_queue_pop_constant_context
+                0x00806546                rb_queue_promote_entry
+                0x0080667c                rb_queue_promote_entry_by_abs
+                0x00806798                rb_queue_set_current_entry
+                0x008067c8                rb_queue_has_pending_actions
+                0x00806816                rb_queue_extend_pending_actions
+                0x008068d6                rb_queue_store_pending_actions
+                0x008069d4                rb_queue_set_pending_actions
+                0x00806ae8                rb_queue_take_pending_actions_owned
+                0x00806c8c                rb_queue_take_pending_actions
+                0x00806d9e                rb_queue_repark_pending_actions
+                0x00806dd8                rb_queue_resume_pending_actions
+                0x00806fce                rb_queue_take_resolver
+                0x00807036                rb_queue_set_resolver
+                0x00807098                rb_queue_has_resolver
+                0x008070fa                rb_queue_is_entry_available
+                0x00807144                rb_queue_has_entry_with_id
+                0x0080718c                rb_queue_pending_entries
+                0x008071ee                rb_queue_entry_player_id
+                0x00807240                rb_queue_dump_state
+                0x00807326                rb_use_limit_reached
+                0x0080739a                rb_record_use
+                0x00807470                rb_use_count
+                0x008074d2                rb_owner_of_card
+                0x008075d8                rb_drain_ability_queue
+                0x00807e06                rb_choice_set_route
+ .text          0x00807e18      0xb04 obj/alloc.o
+                0x0080841e                rb_malloc
+                0x00808424                rb_free
+                0x0080842a                rb_alloc_reset
+                0x0080842c                rb_strdup2
+                0x0080847e                rb_effect_free
+                0x0080848a                rb_put
+                0x008084ac                rb_drop_value
+                0x008084e4                rb_effect_deep_clone
+ *fill*         0x0080891c        0x4 
+ .text          0x00808920      0x470 obj/boot_native.o
+                0x00808920                _start
+                0x00808ad6                my_irq
+ .text          0x00808d90        0x0 obj/bytecode_blob.o
+ .text          0x00808d90        0x0 obj/bytecode_data.o
+ .text          0x00808d90     0x43d2 obj/card.o
+                0x008098d6                rb_card_type_from_str
+                0x0080992e                rb_card_type_str
+                0x00809954                rb_card_is_live
+                0x0080999e                rb_card_is_energy
+                0x008099e8                rb_card_is_member
+                0x00809a3c                rb_card_has_draw_icon
+                0x00809a66                rb_decode_card_by_index
+                0x00809c92                rb_free_card
+                0x00809cd4                rb_card_get_card_by_id
+                0x00809cea                rb_card_get_card_by_no
+                0x00809d22                rb_card_database_create_copy
+                0x00809d28                rb_card_num_abilities
+                0x00809d50                rb_card_get_ability_idx
+                0x00809db4                rb_decode_card_ability
+                0x00809e26                rb_card_normalize_no
+                0x00809f4e                rb_card_equivalent_rarity
+                0x0080a0fc                rb_card_series_to_group
+                0x0080a1c0                rb_map_series_to_group
+                0x0080a228                rb_card_group_name
+                0x0080a2ae                rb_card_normalize_name
+                0x0080a2c8                rb_parse_operator
+                0x0080a368                rb_parse_operation
+                0x0080a3a6                rb_distinct_info_is_distinct
+                0x0080a3d4                rb_card_state_str
+                0x0080a3fc                rb_card_state_from_str
+                0x0080a422                rb_comparison_target_str
+                0x0080a44a                rb_comparison_target_from_str
+                0x0080a46c                rb_card_property_str
+                0x0080a492                rb_card_property_from_str
+                0x0080a4ee                rb_placement_order_str
+                0x0080a508                rb_distinct_type_str
+                0x0080a52e                rb_comparison_type_str
+                0x0080a554                rb_comparison_type_from_str
+                0x0080a5d0                rb_ability_filter_str
+                0x0080a5f6                rb_ability_filter_from_str
+                0x0080a652                rb_condition_target_str
+                0x0080a678                rb_condition_card_type_str
+                0x0080a69e                rb_condition_card_type_from_str
+                0x0080a6f0                rb_location_str
+                0x0080a716                rb_card_short_label
+                0x0080a7a6                rb_ability_has_trigger
+                0x0080a8ce                rb_has_cannot_baton_touch_protection
+                0x0080a992                rb_condition_get_cache
+                0x0080aa24                rb_condition_get_group_names
+                0x0080aab6                rb_condition_get_position
+                0x0080ab78                rb_condition_get_distinct
+                0x0080ac36                rb_effect_position_any
+                0x0080ac94                rb_effect_exclude_heart_colors_any
+                0x0080acf2                rb_effect_heart_colors_any
+                0x0080ad9a                rb_effect_per_unit_heart_colors_any
+                0x0080adf8                rb_effect_options_any
+                0x0080ae40                rb_effect_repeat_limit_any
+                0x0080aef8                rb_effect_destination_any
+                0x0080af64                rb_effect_is_under_self
+                0x0080aff4                rb_effect_action_by_any
+                0x0080b052                rb_effect_action_by
+                0x0080b0b0                rb_effect_picker_any
+                0x0080b10e                rb_effect_non_stackable_any
+                0x0080b1fa                rb_card_get_card_id
+                0x0080b200                rb_card_get_card_names
+                0x0080b300                rb_card_get_card
+                0x0080b31a                rb_card_has_trigger
+                0x0080b3a2                rb_ability_triggerless_text
+                0x0080b3cc                rb_card_triggerless_text
+                0x0080b492                rb_effect_target_name
+                0x0080b4b4                rb_effect_source_or
+                0x0080b52a                rb_effect_count_or
+                0x0080b542                rb_effect_filter_subset
+                0x0080c9d6                rb_effect_value_or_count
+                0x0080ca14                rb_card_fires_on_opponent_effects
+                0x0080cb80                rb_card_energy_cost_total
+                0x0080cc08                rb_card_has_optional_payment
+                0x0080cc8c                rb_card_effective_energy_cost_total
+                0x0080cd16                rb_heartmap_len
+                0x0080cd3e                rb_heartmap_is_empty
+                0x0080cd70                rb_heartmap_values_sum
+                0x0080cdc4                rb_heartmap_get
+                0x0080ce36                rb_heartmap_contains_key
+                0x0080ce96                rb_heartmap_key_at
+                0x0080cedc                rb_heartmap_value_at
+                0x0080cf22                rb_heartmap_insert
+                0x0080cfcc                rb_heartmap_remove
+                0x0080d07e                rb_heartmap_clear
+                0x0080d0d0                rb_heartmap_entry_or_default
+ *fill*         0x0080d162        0x2 
+ .text          0x0080d164    0x118e2 obj/choice.o
+                0x0080f074                rb_get_card
+                0x0080f07a                rb_card_db_unit
+                0x0080f0e0                rb_ability_master_id
+                0x0080f0fc                rb_choice_destination
+                0x0080f1b2                rb_compound_route_conditional_branch
+                0x0080f1d4                rb_effect_answers_any
+                0x0080f268                rb_effect_resource_on_select
+                0x0080f2d2                rb_effect_alternative_count_type_any
+                0x0080f344                rb_entry_conditional_choice_effect
+                0x0080f3b6                rb_resolver_build_choice_select_cards
+                0x0080f68c                rb_resolver_card_name
+                0x0080f70e                rb_resolver_entry_effect
+                0x0080f748                rb_resolver_look_select_finalize_dest
+                0x0080f80e                rb_resolver_spawn_target
+                0x0080f960                rb_selection_context_mfi
+                0x0080fa14                rb_selection_context_mfi_count
+                0x0080fa36                rb_resolver_clear_choice_meta
+                0x0080fade                rb_resolver_clear_choice_state
+                0x0080fbb0                rb_resolver_clear_choice_state_and_resume2
+                0x0080fca6                rb_resolver_clear_choice_state_and_resume
+                0x0080fcac                rb_resolver_reschedule_pending_choice
+                0x0080fcba                rb_resolver_execute_selected_cards_from_zone
+                0x0080fdea                rb_resolver_handle_select_cards_looked_at
+                0x0080fe78                rb_resolver_move_non_selected_hand_to_deck_bottom
+                0x00810002                rb_set_chosen_target
+                0x00810014                rb_resolver_source_card_id
+                0x00810030                rb_resolver_resume_execution
+                0x00810096                rb_resolver_resume_execution_with_ctx
+                0x00810138                rb_resolver_resume_pending_actions
+                0x0081035a                rb_resolver_finalize_choice
+                0x00810702                rb_resolver_finalize_choice_with_ctx
+                0x0081071c                rb_resolver_reveal_selected_looked_at
+                0x008107be                rb_resolver_build_reprompt
+                0x00810846                rb_resolver_build_reprompt_full
+                0x008109de                rb_resolver_handle_reveal_selection
+                0x00811564                rb_resolver_handle_revealed_cards_selection
+                0x00811708                rb_resolver_handle_success_live_zone_selection
+                0x0081184e                rb_resolver_handle_entry_cost_reveal
+                0x00811ba4                rb_resolver_handle_looked_at_selection
+                0x00811edc                rb_resolver_handle_stage_selection
+                0x008123dc                rb_resolver_filter_discard_by_budget_full
+                0x00812434                rb_resolver_filter_discard_by_budget
+                0x00812474                rb_resolver_handle_draw_any_number
+                0x0081266a                rb_resolver_handle_position_change_choice
+                0x00812ec6                rb_resolver_apply_effect_modification
+                0x00812fe8                rb_resolver_handle_primary_alternative
+                0x00813180                rb_resolver_handle_position_destination
+                0x00813362                rb_resolver_handle_double_baton_touch
+                0x00813544                rb_resolver_handle_conditional_optional
+                0x008137b2                rb_resolver_handle_heart_color_selection
+                0x00813966                rb_resolver_handle_choice_condition
+                0x00813b4a                rb_resolver_handle_heart_selection
+                0x00813c50                rb_has_pending_choice
+                0x00813c6a                rb_get_pending_choice
+                0x00813c90                rb_get_pending_choice_player_id
+                0x00813d6e                rb_clear_pending_choice
+                0x00813df2                rb_resolver_continue_siblings
+                0x00814090                rb_emit_choice
+                0x008145f2                rb_resolver_handle_selection_epilogue
+                0x00815178                rb_resolver_handle_discard_selection
+                0x00815214                rb_resolver_handle_hand_selection
+                0x008167e6                rb_resolver_handle_select_card
+                0x00819430                rb_move_handle_order_selection
+                0x00819444                rb_resolver_handle_order_selection
+                0x0081a0bc                rb_resolver_handle_select_target
+                0x0081a0da                rb_order_prompt_begin
+                0x0081a21e                rb_gained_ability_index
+                0x0081a240                rb_choice_description_ja
+                0x0081a25e                rb_choice_allow_skip
+                0x0081a272                rb_choice_set_description
+                0x0081a2a2                rb_choice_set_bilingual_descriptions
+                0x0081a314                rb_ability_error_to_string
+                0x0081a33a                rb_resolver_handle_energy_zone_selection
+                0x0081a816                rb_resolver_handle_number_selection
+                0x0081a9a4                rb_resolver_handle_auto_ability_selection
+                0x0081e614                rb_resume_with_choice
+                0x0081e65a                rb_resume_with_choice_indices
+                0x0081e6aa                rb_resolver_provide_choice_result
+ *fill*         0x0081ea46        0x2 
+ .text          0x0081ea48     0x262a obj/compound.o
+                0x0081eeac                rb_cond_cache_key
+                0x0081ef04                rb_compound_save_remaining
+                0x0081ef48                rb_route_conditional_branch
+                0x0081ef7a                rb_compound_route_branch
+                0x0081efae                rb_compound_sequential
+                0x0082081e                rb_compound_conditional_alternative
+                0x00820998                rb_compound_conditional_on_result
+                0x00820ae2                rb_compound_conditional_on_optional
+                0x00820ce2                rb_compound_choice_string
+                0x00820d38                rb_compound_choice_action
+                0x00820d7c                rb_compound_handle_choice_string_selection
+                0x00820fa8                rb_compound_handle_choice_string_store
+ *fill*         0x00821072        0x2 
+ .text          0x00821074    0x128e6 obj/condition.o
+                0x00828328                rb_check_heart_type_all
+                0x00832ad0                rb_eval_condition
+                0x00833836                rb_eval_condition_for_host
+                0x00833854                rb_condition_allows
+                0x00833894                rb_check_heart_colors
+                0x00833928                rb_check_aggregate_total
+                0x00833942                rb_check_phase_gate
+ *fill*         0x0083395a        0x2 
+ .text          0x0083395c      0x278 obj/console.o
+                0x00833a9e                console_init
+                0x00833abe                console_clear
+                0x00833ade                console_putc
+                0x00833af4                console_puts
+                0x00833b0e                console_printf
+                0x00833b44                __console_out
+                0x00833b60                console_poll_buttons
+                0x00833bb6                console_frame_wait
+ .text          0x00833bd4     0x814e obj/cost.o
+                0x00835f22                rb_cost_take_stage_select_intent
+                0x00835f30                rb_cost_optional_skipped
+                0x00835f38                rb_record_cost_paid
+                0x00835f44                rb_cost_energy_count_any
+                0x0083a6d6                execute_place_energy_under_member_non_optional
+                0x0083a6dc                rb_pay_cost
+                0x0083a6f2                rb_validate_cost
+                0x0083a6f6                rb_validate_mandatory_cost
+                0x0083a732                rb_pay_deferred_costs
+                0x0083a852                rb_handle_optional_cost_payment
+                0x0083b334                rb_handle_pay_cost_all_discard
+                0x0083b60c                rb_pay_cost_change_state
+                0x0083b624                rb_compute_play_cost
+ *fill*         0x0083bd22        0x2 
+ .text          0x0083bd24      0x762 obj/custom.o
+                0x0083c23c                rb_execute_custom_effect
+ *fill*         0x0083c486        0x2 
+ .text          0x0083c488     0x1a04 obj/data.o
+                0x0083cb50                rb_num_cards
+                0x0083cb58                rb_num_abilities
+                0x0083cb60                rb_get_string
+                0x0083cb90                rb_load_rom
+                0x0083ccf2                rb_load
+                0x0083cd80                rb_load_streaming
+                0x0083cf00                rb_unload
+                0x0083cfa2                rb_register_card_copy
+                0x0083cfdc                rb_card_copy_pool_reset
+                0x0083cffe                rb_create_card_copy
+                0x0083d072                rb_card_record
+                0x0083d0bc                rb_card_record_len
+                0x0083d122                rb_card_stridx
+                0x0083d164                rb_card_ability_idx
+                0x0083d1a6                rb_card_string
+                0x0083d1d6                rb_card_unit_name
+                0x0083d248                rb_bc_slice
+                0x0083d2da                rb_card_no_scratch_bytes
+                0x0083d2ec                rb_card_no_scratch_layout_ok
+                0x0083d39a                rb_find_card_by_no
+                0x0083d480                rb_effect_data_free
+                0x0083d538                rb_effect_data_clone
+                0x0083d6a6                rb_turn_phase_display
+                0x0083d6cc                rb_phase_display
+                0x0083d6f2                rb_effect_data_card_id
+                0x0083d728                rb_effect_data_items
+                0x0083d7dc                rb_effect_data_is_p1
+                0x0083d802                rb_effect_data_old_value
+                0x0083d828                rb_effect_data_count
+                0x0083d84c                rb_effect_data_color
+                0x0083d88c                rb_phase_label_jp
+                0x0083d8b2                rb_effect_type_as_str
+                0x0083d8d8                rb_zone_id_from_ability_zone
+                0x0083d906                rb_zone_id_to_ability_zone
+                0x0083d970                rb_zone_id_from_str
+                0x0083d9e8                rb_zone_id_as_str
+                0x0083da1e                rb_zone_equivalent
+                0x0083da8e                rb_zone_matches_source
+                0x0083db1a                rb_zone_matches_dest
+                0x0083db90                rb_phase_is_live_phase
+                0x0083dbbe                rb_effect_data_amount
+                0x0083dbf2                rb_score_to_i32
+                0x0083dc7e                rb_score_to_i32_rounded
+                0x0083dd70                rb_effective_stat
+                0x0083dd8e                rb_overridden_stat
+                0x0083ddae                rb_floored_cost
+                0x0083ddd2                rb_count_u32
+                0x0083ddd8                rb_id_u32
+                0x0083dde8                rb_f32_count
+ .text          0x0083de8c      0x68e obj/debug.o
+                0x0083e0d0                rb_ability_debug_enabled
+                0x0083e0da                rb_ability_debug_set
+                0x0083e0ea                rb_abdebug_dropped_count
+                0x0083e0f2                rb_abdebug_dropped_reset
+                0x0083e100                rb_abdebug_init
+                0x0083e10e                rb_abdebug_p
+                0x0083e130                rb_abdebug_flush_to_rule_log
+                0x0083e13c                rb_abdebug_flush_to_structured_log
+                0x0083e148                rb_abdebug_ability
+                0x0083e3b4                rb_abdebug_condition
+                0x0083e452                rb_abdebug_cost_pay
+                0x0083e4d4                rb_abdebug_effect
+ *fill*         0x0083e51a        0x2 
+ .text          0x0083e51c      0x6e2 obj/deck_builder.o
+                0x0083e51c                rb_build_deck_from_card_ids
+                0x0083e7c2                rb_build_deck_from_card_numbers
+                0x0083e9bc                rb_build_deck_from_list
+                0x0083eaec                rb_init_game_from_built_decks
+                0x0083ebe4                rb_built_deck_clear
+ *fill*         0x0083ebfe        0x2 
+ .text          0x0083ec00      0xeac obj/deck_parser.o
+                0x0083ee32                rb_normalize_card_no
+                0x0083f60a                rb_parse_deck_line
+                0x0083f636                rb_parse_deck_content
+                0x0083f834                rb_parse_deck_file_ex
+                0x0083f89a                rb_parse_deck_file
+                0x0083f8c8                rb_deck_status_str
+                0x0083f8ee                rb_deck_list_to_card_numbers
+                0x0083fa62                rb_deck_card_numbers_free
+                0x0083faa0                rb_deck_list_free
+ .text          0x0083faac     0x9eae obj/describe.o
+                0x00843f24                rb_desc_free
+                0x00843f32                rb_desc_cost
+                0x00847fe4                rb_desc_effect
+                0x008489b6                rb_desc_effect_en
+                0x00848a0c                rb_desc_effect_ja
+                0x00848a64                rb_desc_cost_en
+                0x00848ab4                rb_desc_cost_ja
+                0x00848b06                rb_desc_sequential_cost
+                0x00848b0a                rb_desc_sequential_cost_en
+                0x00848b24                rb_desc_sequential_cost_ja
+                0x00848b40                rb_desc_zone_label
+                0x00848b52                rb_desc_zone_label_ja
+                0x00848b66                rb_desc_card_type_label
+                0x00848bf6                rb_desc_card_type_label_ja
+                0x00848c86                rb_desc_state_verb
+                0x00848d52                rb_desc_state_verb_ja
+                0x00848dba                rb_desc_resource_label
+                0x00848e86                rb_desc_resource_label_ja
+                0x00848eee                rb_desc_duration_label
+                0x00848ef4                rb_desc_duration_label_ja
+                0x00848fa2                rb_desc_cond_verdict_type
+                0x00848fd6                rb_desc_cond_expectation
+                0x00848fda                rb_desc_cond_actual
+                0x00849048                rb_desc_push_cond_verdict
+                0x00849132                rb_desc_apply_bilingual
+                0x008492d6                rb_desc_translate_choice_prompt_en_to_ja
+ *fill*         0x0084995a        0x2 
+ .text          0x0084995c     0x37c6 obj/draw.o
+                0x0084a424                rb_draw_cards_for_player
+                0x0084a46c                rb_draw_resolve_dynamic_count
+                0x0084a4a4                rb_effect_both_hand_keep_shuffle_under
+                0x0084ad14                rb_effect_draw_until_count
+                0x0084bf66                rb_effect_draw_card
+                0x0084bf86                rb_execute_draw_wrapper
+                0x0084bfa6                rb_effect_select_heart_color
+                0x0084c20a                rb_effect_select_number
+                0x0084c4f8                rb_effect_area_select
+                0x0084c674                rb_effect_select_effect
+                0x0084cd20                rb_resolve_gain_heart_color
+                0x0084d088                rb_make_card_effect_data
+ *fill*         0x0084d122        0x2 
+ .text          0x0084d124     0x23cc obj/dynamic_count.o
+                0x0084e606                rb_resolve_dynamic_count
+                0x0084eefa                rb_effect_count
+ .text          0x0084f4f0     0x3aea obj/engine.o
+                0x0084f8fc                rb_seed
+                0x0084f906                rb_rand
+                0x0084f934                rb_rng_checkpoint
+                0x0084f93c                rb_rng_restore
+                0x0084f946                rb_rand_range
+                0x0084f9c0                rb_lcg_new
+                0x0084f9ca                rb_lcg_next_u64
+                0x0084fa08                rb_lcg_range
+                0x0084fa78                rb_shuffle
+                0x0084fafa                rb_zone_of_str
+                0x0084fc1e                rb_draw
+                0x0084fd9c                rb_draw_energy
+                0x0084ff3c                card_matches_card_type_filter
+                0x0084ff42                rb_execute_effect_ex
+                0x00850664                rb_execute_effect
+                0x0085068c                rb_card_arrived_this_turn
+                0x008506da                rb_card_has_restriction
+                0x00851aec                rb_send_to_waitroom
+                0x00851b5a                rb_card_is_cannot_active
+                0x00851b8a                rb_complete_double_baton
+                0x0085213c                rb_play_member
+                0x0085218a                rb_play_member_ex
+                0x00852206                rb_play_double_baton_ex
+                0x008522a2                rb_activate_card
+                0x00852580                rb_complete_play_with_cost
+                0x00852724                rb_activate_ability
+                0x008527e2                rb_turn
+                0x0085288c                rb_execute_main_phase_action
+                0x008528d0                rb_game_init
+                0x00852a96                rb_print_state
+                0x00852b46                i18n_self_check
+ *fill*         0x00852fda        0x2 
+ .text          0x00852fdc     0x12da obj/enums.o
+                0x00852fdc                rb_target_player_from_str
+                0x0085304c                rb_target_player_to_str
+                0x0085306e                rb_target_player_as_str
+                0x00853090                rb_action_type_from_str
+                0x00853788                rb_action_type_to_str
+                0x008537aa                rb_action_type_label
+                0x008537cc                rb_action_type_default
+                0x008537d0                rb_condition_type_from_str
+                0x00853b3a                rb_condition_type_to_str
+                0x00853b5c                rb_select_target_kind_from_str
+                0x00853d08                rb_select_target_kind_to_str
+                0x00853de4                rb_effect_card_type_from_str
+                0x00853e44                rb_effect_card_type_as_str
+                0x00853e66                rb_effect_card_type_default
+                0x00853e6a                rb_effect_state_from_str
+                0x00853eb2                rb_effect_state_as_str
+                0x00853ed4                rb_effect_state_default
+                0x00853ed8                rb_ability_zone_from_str
+                0x0085425a                rb_ability_zone_to_str
+                0x0085427c                rb_ability_zone_as_str
+                0x0085429e                rb_ability_zone_from_source_str
+ *fill*         0x008542b6        0x2 
+ .text          0x008542b8     0x1246 obj/executor.o
+                0x00854310                rb_executor_has_executor
+                0x0085434e                rb_executor_is_structural
+                0x0085439a                rb_executor_execute
+ *fill*         0x008554fe        0x2 
+ .text          0x00855500        0x0 obj/font.o
+ .text          0x00855500     0x2776 obj/game_setup.o
+                0x00855f72                rb_setup_game
+                0x00855f9a                rb_setup_is_automatic_phase
+                0x00855fc8                rb_setup_is_live_card_set_phase
+                0x00855ff8                rb_setup_auto_advance_one
+                0x0085605e                rb_setup_settle_single_player_state
+                0x008560b2                rb_setup_settle_auto
+                0x00856140                rb_setup_choose_attacker
+                0x008561f4                rb_setup_mulligan_owner_index
+                0x00856230                rb_setup_advance_mulligan_phase
+                0x0085626e                rb_setup_resolve_hand_answer_index
+                0x008562c6                rb_setup_handle_mulligan_selection
+                0x0085640c                rb_setup_handle_mulligan_confirmation
+                0x00856cac                rb_setup_handle_mulligan_skip
+                0x00856cf8                rb_setup_mulligan_candidates
+                0x00856de2                rb_setup_stage_area_from_parameters
+                0x00856e1a                rb_setup_concede
+                0x00856e7c                rb_setup_reset_loop_detection
+                0x00856e9c                rb_setup_execute_action
+                0x00856eb0                rb_setup_execute_action_for_player
+                0x00856f64                rb_setup_stage_play_cost
+                0x00856f78                rb_setup_is_baton_touchable
+                0x00856fd8                rb_setup_has_double_baton
+                0x00856fe6                rb_setup_double_baton_options
+                0x0085714a                rb_setup_area_candidates_for
+                0x0085727e                rb_setup_play_candidates
+                0x0085752c                rb_setup_ability_candidates
+                0x0085754a                rb_setup_for_each_ability_candidate
+                0x008575e2                rb_setup_live_card_set_max
+                0x0085760e                rb_setup_live_card_candidates
+                0x0085772a                rb_setup_build_two_decks
+                0x00857822                rb_setup_deck_build_status_str
+                0x0085784a                rb_setup_series_priority
+                0x0085788a                rb_setup_rarity_priority
+                0x008578ca                rb_setup_extract_series
+                0x008578de                rb_setup_extract_rarity
+                0x00857922                rb_setup_extract_base
+                0x008579a0                rb_setup_gba_sort_key
+                0x00857b0c                rb_setup_sort_deck_for_gba
+                0x00857b34                rb_setup_flatten_and_sort_for_gba
+ *fill*         0x00857c76        0x2 
+ .text          0x00857c78     0x8914 obj/game_state_abilities.o
+                0x0085b172                rb_ability_matches_trigger
+                0x0085b192                rb_record_ability_use
+                0x0085b246                rb_ability_uses_used
+                0x0085b274                rb_ability_has_remaining_uses
+                0x0085b374                rb_opp_cause_key
+                0x0085b39e                rb_opponent_id
+                0x0085b3ac                rb_clear_gained_abilities_for_card
+                0x0085b484                rb_expire_gained_abilities
+                0x0085b5ca                rb_register_gained_ability
+                0x0085b874                rb_remove_gained_ability
+                0x0085b9d6                rb_card_num_gained_abilities
+                0x0085ba1a                rb_card_gained_ability
+                0x0085ba92                rb_resolve_card_ability_at
+                0x0085bca0                rb_card_has_ability_trigger_for
+                0x0085bdc6                rb_ability_is_invalidated
+                0x0085be32                rb_try_add_ability_invalidation
+                0x0085bfec                rb_collect_constant_hand_effect_ids
+                0x0085c090                rb_collect_constant_stage_effect_ids
+                0x0085c140                rb_resolve_constant_ability
+                0x0085c292                rb_can_place_card_in_zone
+                0x0085c5ac                rb_clear_movement_tracking
+                0x0085c61a                rb_process_with_completed_key
+                0x0085c7a0                rb_queue_yell_auto_abilities
+                0x0085ca12                rb_cond_get_str
+                0x0085ca78                rb_condition_tree_group_names
+                0x0085ca96                rb_search_player_zones_for_card
+                0x0085cab8                rb_find_card_by_number_for_player
+                0x0085cb34                rb_distinct_stage_groups
+                0x0085d6c4                rb_effective_activation_cost_for
+                0x0085d6d4                rb_effective_activation_cost
+                0x0085d6fa                rb_resolve_master_id
+                0x0085d7aa                rb_resolve_target_player
+                0x0085d7fa                rb_resolve_target_player_mut
+                0x0085d878                rb_check_permanent_loop
+                0x0085d908                rb_is_loop_detected
+                0x0085d922                rb_add_replacement_effect
+                0x0085d9c0                rb_reset_replacement_effect_flags
+                0x0085d9f4                rb_mark_replacement_effect_applied
+                0x0085da46                rb_set_opponent_live_success
+                0x0085da94                rb_reset_change_flags
+                0x0085db04                rb_inject_choice_ability_context
+                0x0085dd1c                rb_wire_pending_choice_player_id
+                0x0085dde6                rb_entry_has_pending_choice
+                0x0085de00                rb_entry_cost
+                0x0085de6e                rb_entry_effect
+                0x0085dedc                rb_entry_destination
+                0x0085df82                rb_entry_ability_copy
+                0x0085e004                rb_entry_destination_copy
+                0x0085e122                rb_entry_trigger_moved_cards
+                0x0085e1ba                rb_entry_snapshot_last_energy_placed_by_effect
+                0x0085e1d4                rb_entry_snapshot_last_energy_placed_by_player
+                0x0085e1fa                rb_entry_snapshot_last_area_move_card_id
+                0x0085e216                rb_entry_snapshot_last_area_move_by_player
+                0x0085e23c                rb_trigger_auto_ability
+                0x0085e5d0                rb_trigger_auto_ability_by_index
+                0x0085e728                rb_fire_opponent_cause_watchers_for_move
+                0x0085ed2a                rb_hooked_by_foreign_cause
+                0x0085edae                rb_trigger_each_time_for_member
+                0x0085f092                rb_trigger_auto_abilities_for_player_with_event
+                0x0085f0d0                rb_trigger_auto_abilities_for_movement
+                0x0085f136                rb_trigger_auto_abilities_for_movement_current
+                0x0085f1b8                rb_trigger_auto_abilities
+                0x0085f250                rb_fire_auto
+                0x0085f26a                rb_fire_all_auto
+                0x0085f296                rb_record_event
+                0x0085f302                rb_fire_recorded_auto
+                0x0085f396                rb_process_current_ability
+                0x0085fb1c                rb_fire_auto_and_pending
+                0x0085fb46                rb_process_player_abilities
+                0x0085fb86                rb_process_pending_auto_abilities
+                0x0085fb94                rb_process_player_abilities_depth
+                0x0085fbda                rb_queue_reset
+                0x0085fc58                rb_apply_ability_effects
+                0x0085fc8c                rb_collect_constant_hand
+                0x0085fd60                rb_collect_live_modifiers
+                0x0085ff30                rb_queue_set_pending_choice
+                0x0085ff82                rb_get_pending_choice_json
+                0x0086005c                rb_entry_choice_card_no
+                0x00860082                rb_entry_conditional_choice
+                0x008600c8                rb_build_ability_queue_entry_public_full
+                0x008601d0                rb_queue_trigger_abilities
+                0x008601e8                rb_process_player_abilities_depth_full
+ .text          0x0086058c     0x2148 obj/game_state_core.o
+                0x0086086e                rb_gsc_first_attacker_index
+                0x00860888                rb_gsc_second_attacker_index
+                0x008608a2                rb_gsc_active_player_index
+                0x008608dc                rb_gsc_active_player
+                0x00860944                rb_gsc_is_first_turn
+                0x00860968                rb_gsc_current_turn_phase
+                0x008609ca                rb_gsc_phase_invariant
+                0x00860a1a                rb_gsc_can_player_act
+                0x00860b7a                rb_gsc_opponent_has_performed
+                0x00860bda                rb_gsc_mulligan_owner_index
+                0x00860c16                rb_gsc_game_has_ended
+                0x00860c3a                rb_gsc_reject_if_ended
+                0x00860c5e                rb_gsc_concede
+                0x00860ce0                rb_gsc_concede_both
+                0x00860d16                rb_gsc_seat_player_mut
+                0x00860d42                rb_gsc_seat_player
+                0x00860d6e                rb_gsc_const_active_player
+                0x00860dd6                rb_gsc_seated_pair
+                0x00860e32                rb_gsc_try_player_by_id_mut
+                0x00860f1c                rb_gsc_try_player_by_id
+                0x00861006                rb_gsc_seat_index_by_id
+                0x00861084                rb_gsc_cheer_count_by_id
+                0x008610fe                rb_gsc_set_cheer_count_by_id
+                0x0086117c                rb_gsc_seat_cheer_count
+                0x0086119e                rb_gsc_score_bonus_by_id
+                0x0086121c                rb_gsc_seat_score_bonus
+                0x00861242                rb_gsc_clear_effect_tracking
+                0x00861276                rb_gsc_last_area_move_card_id
+                0x00861290                rb_gsc_last_area_move_by_player
+                0x008612aa                rb_gsc_last_cost_wait_member
+                0x008612d4                rb_gsc_recently_moved_cards
+                0x0086134c                rb_gsc_set_recently_moved_cards
+                0x008613bc                rb_gsc_last_energy_placed_by_effect
+                0x008613de                rb_gsc_last_energy_placed_by_player
+                0x008613f8                rb_gsc_current_ability_source_card_id
+                0x00861446                rb_gsc_push_revealed_card
+                0x00861480                rb_gsc_player_prefix_id
+                0x0086158a                rb_gsc_zone_snapshot
+                0x0086168a                rb_gsc_zone_is_private
+                0x00861698                rb_gsc_resolve_index_any_player
+                0x00861d46                rb_gsc_choice_offered_labels
+                0x00861d6c                rb_gsc_choice_option_count
+                0x00861dbe                rb_gsc_push_rule_log_fmt
+                0x00861e04                rb_gsc_log_entry
+                0x00861ef4                rb_gsc_push_choice_offered
+                0x00861fc8                rb_gsc_push_choice_resolved
+                0x00862040                rb_gsc_push_performance_snapshot
+                0x00862096                rb_gsc_record_ability_application
+                0x008623a6                rb_gsc_print_trace_node
+ .text          0x008626d4        0x0 obj/gen_data.o
+ .text          0x008626d4       0x7e obj/gen_data_rom.o
+                0x008626d4                rb_load_gen_data
+ *fill*         0x00862752        0x2 
+ .text          0x00862754      0x324 obj/jag_native_main.o
+                0x00862820                jag_native_main
+ .text          0x00862a78     0x6346 obj/live.o
+                0x00865230                rb_calc_stage_hearts
+                0x00865236                rb_process_yell_revealed_card_icons
+                0x00865498                rb_perform_live
+                0x00866e76                rb_determine_live_winners
+                0x00866eea                rb_populate_live_verdicts
+                0x00866ef6                rb_finalize_snapshot_fields
+                0x00866f16                rb_compute_surplus_and_flags
+                0x00866f2c                rb_blade_color_to_heart
+                0x00866f4c                rb_score_delta_since
+                0x00866fac                rb_compute_pregame_scores
+                0x00867156                rb_fmt_player_id
+                0x008671b4                rb_try_take_success_zone_choice
+                0x008671f2                rb_try_create_success_replacement_choice
+                0x00867690                rb_handle_success_replacement_choice
+                0x008679be                rb_enrich_from_applications
+                0x008679ca                rb_apply_deferred_reyell
+                0x00867bf0                rb_rebuild_stage_hearts_with_yell
+                0x00867bfc                rb_record_pretrigger_live_results
+                0x00867c08                rb_drain_pending_live_success_choices
+                0x00867c16                rb_revert_live_success_score_modifiers
+                0x00867c22                rb_process_delayed_gained_effects
+                0x00867c42                rb_merge_late_score_apps
+                0x00867c58                rb_handle_live_success_choice
+                0x00867ea8                rb_process_player_live_result
+                0x0086805e                rb_move_live_to_success_and_handle_wins
+                0x008686f2                rb_execute_live_victory_determination
+                0x00868bac                rb_backtrack_allocate
+                0x00868c10                rb_try_surplus_compositions
+                0x00868c78                rb_card_ok_with_wildcard
+                0x00868c8c                rb_bt_search
+                0x00868ce2                rb_try_phase4
+                0x00868dba                rb_try_all_distribution
+ *fill*         0x00868dbe        0x2 
+ .text          0x00868dc0      0xe7a obj/log.o
+                0x0086914a                rb_log_dropped_count
+                0x00869152                rb_log_dropped_reset
+                0x00869160                rb_log_set_enabled
+                0x0086916a                rb_log_free_item
+                0x00869176                rb_log_push_verdict
+                0x008692d2                rb_log_push_verdict_condition
+                0x0086944c                rb_log_push_verdict_cost
+                0x008695d6                rb_log_push_verdict_effect
+                0x00869738                rb_log_push_verdict_child
+                0x008698a4                rb_log_push_verdict_item
+                0x0086996c                rb_log_buffer_len
+                0x0086998e                rb_log_clear_verdicts
+                0x008699e4                rb_log_drain_verdicts
+                0x00869ad4                rb_log_drain_verdicts_since
+ *fill*         0x00869c3a        0x2 
+ .text          0x00869c3c     0x6d88 obj/look.o
+                0x0086bf4e                rb_look_clear
+                0x0086bfb2                rb_look_reset_all
+                0x0086c018                rb_look_from_deck
+                0x0086c044                rb_look_remove
+                0x0086c10a                rb_look_add
+                0x0086c156                rb_looked_at_pool
+                0x0086c1e6                rb_look_slot_pending_select
+                0x0086c1f0                rb_look_slot_reprompt_followup
+                0x0086c1fa                rb_effect_look_at
+                0x0086c262                rb_effect_select_cards
+                0x0086cadc                rb_look_resume_indices
+                0x0086e70e                rb_look_resume
+                0x0086e952                rb_effect_reveal_until_live_card
+                0x0086eaf4                rb_effect_reveal_until_chosen_card
+                0x0086ebdc                rb_effect_reveal_until_target
+                0x0086ee30                rb_effect_reveal_per_group
+                0x0086f0ce                rb_effect_reveal
+                0x0086f8ea                rb_effect_select
+                0x00870022                rb_effect_look_and_select
+ .text          0x008709c4     0x89d4 obj/misc.o
+                0x0087592a                rb_effect_pay_cost_all_discard
+                0x00875aaa                rb_effect_gain_surplus_heart
+                0x00875ac0                rb_misc_position_destinations
+                0x00878470                rb_misc_finalize_formation_change
+                0x00878982                rb_position_change_with_destination
+                0x008789ec                rb_effect_place_energy_under_member_non_optional
+                0x00878d72                rb_execute_misc_effect
+                0x008792a6                rb_misc_handle_both_targets
+                0x00879308                rb_execute_misc_effect_ex
+ .text          0x00879398     0x4de2 obj/modifiers.o
+                0x0087ae04                rb_mods_init
+                0x0087ae60                rb_mods_clear_card
+                0x0087ae70                rb_mods_get_blade
+                0x0087aea2                rb_mods_add_blade
+                0x0087af2a                rb_mods_set_blade
+                0x0087af96                rb_mods_get_heart
+                0x0087affc                rb_mods_add_heart
+                0x0087b0c8                rb_mods_get_need_heart
+                0x0087b110                rb_mods_add_need_heart
+                0x0087b1ee                rb_mods_set_need_heart
+                0x0087b28a                rb_mods_get_score
+                0x0087b2c2                rb_mods_add_score
+                0x0087b362                rb_mods_set_score
+                0x0087b3e6                rb_mods_get_cost
+                0x0087b41e                rb_mods_add_cost
+                0x0087b4be                rb_mods_set_cost
+                0x0087b542                rb_mods_get_orientation
+                0x0087b582                rb_mods_set_orientation
+                0x0087b5f6                rb_mods_is_delayed_cannot_active
+                0x0087b61e                rb_mods_add_delayed_cannot_active
+                0x0087b644                rb_mods_tick_delayed_for
+                0x0087b6ac                rb_mods_get_blade_set
+                0x0087b6cc                rb_mods_clear_blade_set
+                0x0087b6e6                rb_mods_get_score_set
+                0x0087b70e                rb_mods_clear_score_set
+                0x0087b730                rb_mods_get_cost_set
+                0x0087b758                rb_mods_clear_cost_set
+                0x0087b77a                rb_mods_remove_blade
+                0x0087b81a                rb_mods_remove_heart
+                0x0087b90c                rb_mods_remove_score
+                0x0087b9ca                rb_mods_remove_cost
+                0x0087ba88                rb_mods_set_heart_override
+                0x0087bade                rb_mods_remove_heart_override
+                0x0087bb06                rb_mods_get_heart_override
+                0x0087bb54                rb_mods_set_heart_copy
+                0x0087bb76                rb_mods_get_heart_copy
+                0x0087bb9c                rb_mods_set_blade_type
+                0x0087bbba                rb_mods_clear_blade_type
+                0x0087bbd6                rb_mods_get_blade_type
+                0x0087bbfa                rb_mods_set_heart_color_multiplier
+                0x0087bc18                rb_mods_get_heart_color_multiplier
+                0x0087bc3c                rb_mods_trace_len
+                0x0087bc4c                rb_mods_trace_push
+                0x0087be4c                rb_mods_add_blade_with_trace
+                0x0087bf5c                rb_mods_add_heart_with_trace
+                0x0087c092                rb_modifier_total_entry
+                0x0087c0ac                rb_record_card_appearance
+                0x0087c1ac                rb_get_card_appearance_source
+                0x0087c206                rb_zone_id_to_movement_zone
+                0x0087c224                rb_appearance_source_matches
+                0x0087c2bc                rb_has_card_appeared_this_turn
+                0x0087c2f2                rb_clear_card_appearance_tracking
+                0x0087c312                rb_record_baton_touch
+                0x0087c374                rb_get_baton_touch_count
+                0x0087c3a8                rb_clear_baton_touch_tracking
+                0x0087c400                rb_record_card_movement
+                0x0087c63a                rb_clear_card_movement_tracking
+                0x0087c6a8                rb_remove_revealed_card
+                0x0087c720                rb_remove_revealed_cost_card
+                0x0087c798                rb_remove_from_source_hands
+                0x0087c868                rb_record_stage_position_swap
+                0x0087ca06                rb_mods_count_as_multiple_weight
+                0x0087ca1e                rb_mods_weighted_zone_count
+                0x0087cbfe                rb_mods_replacement_appear_wait_applies
+                0x0087d02e                rb_clear_revealed_cards
+                0x0087d044                rb_recalculate_constant_cost_modifiers
+                0x0087df0c                rb_evaluate_success_zone_constant_modifiers
+                0x0087df18                rb_evaluate_success_zone_constant_abilities
+                0x0087df50                rb_restore_performance_need_heart_modifiers
+                0x0087e0c2                rb_on_cards_left_zones
+ *fill*         0x0087e17a        0x2 
+ .text          0x0087e17c     0xae32 obj/move.o
+                0x0087fd00                rb_drain_under_cards_to_energy_zone
+                0x008801e8                rb_move_under_member_pos
+                0x008802de                rb_move_place_card_under_member
+                0x008803a2                rb_move_resolve_cost_limit_reference
+                0x00881546                rb_move_looked_at_matches
+                0x008815ae                rb_move_prompt_card_selection
+                0x008832f2                rb_move_optional_gate_source
+                0x00883376                rb_move_gate_optional_source
+                0x008836ca                rb_move_resolve_from_deck
+                0x00883730                rb_move_resolve_from_deck_bottom
+                0x00883780                rb_move_resolve_from_energy_deck
+                0x00883e10                rb_move_resolve_from_stage
+                0x00883e54                rb_move_resolve_from_recently_moved
+                0x00883f92                rb_move_resolve_from_looked_at
+                0x00884876                rb_move_resolve_from_under_member
+                0x008848ba                rb_move_take_cards_from_standard_zone
+                0x0088491c                rb_move_resolve_cards_from_source
+                0x00884954                rb_move_resolve_from_zone
+                0x008849aa                rb_move_resolve_from_standard_zone
+                0x00884a16                rb_move_resolve_from_revealed_cards
+                0x00885202                rb_move_resolve_from_those_cards
+                0x00885484                rb_move_resolve_from_selected_cards
+                0x00885574                rb_move_resolve_source_revealed_cards
+                0x00885c44                rb_move_place_card_with_stage_choice
+                0x0088672a                rb_move_maybe_prompt_success_replacement
+                0x008867fc                rb_move_prompt_deck_top_or_bottom
+                0x00886836                rb_move_fire_debut_side_effects
+                0x00886a7c                rb_move_execute_stage_placement_choices
+                0x00886af0                rb_move_finalize_card_movement
+                0x00886e04                rb_move_handle_select_position
+                0x008871bc                rb_move_from_revealed
+                0x0088745e                rb_move_from_under_member
+                0x008877de                rb_move_place_energy_under_member_selected
+                0x00887804                rb_effect_selected_energy_zone_cards
+                0x00887826                rb_move_handle_energy_zone_selection
+                0x00887c62                rb_move_execute_move_cards
+                0x00888194                rb_move_execute_move_cards_both
+                0x0088826e                rb_move_execute_selected_cards_from_zone
+                0x008888e0                rb_move_handle_select_cards_looked_at
+                0x00888fa8                rb_effect_move_cards
+ *fill*         0x00888fae        0x2 
+ .text          0x00888fb0     0x16b4 obj/move_missing.o
+                0x0088903a                rb_move_maybe_prompt_deck_order
+                0x0088921e                rb_move_execute_move_cards_ported
+                0x0088a020                rb_move_resolve_source_looked_at
+                0x0088a466                rb_move_ask_optional_move_gate
+ .text          0x0088a664     0x402a obj/phase.o
+                0x0088bb3c                rb_perf_nhm_count
+                0x0088bb44                rb_perf_nhm_at
+                0x0088bb56                rb_player_refresh
+                0x0088bc9e                rb_check_victory_condition
+                0x0088bce4                rb_check_invalid_live_cards
+                0x0088be22                rb_check_invalid_energy_cards
+                0x0088bf2a                rb_check_orphaned_under_cards
+                0x0088c05c                rb_check_invalid_resolution_zone
+                0x0088c1de                rb_check_timing
+                0x0088c620                rb_resolve_rps_if_both_chosen
+                0x0088cada                rb_handle_rps_choice_p1
+                0x0088cafe                rb_handle_rps_choice_p2
+                0x0088d21e                rb_advance_phase
+                0x0088d252                rb_normalize_member_name
+                0x0088d280                rb_backtrack
+                0x0088d2d8                rb_build_alt_cost_candidates
+                0x0088d338                rb_find_distinct_assignment_k
+                0x0088d382                rb_has_distinct_assignment_k
+                0x0088d386                rb_can_assign_hand_for_alt_cost
+                0x0088d3b6                rb_play_time_cost_reduction_amount
+                0x0088d416                rb_play_time_alt_cost_chars
+                0x0088d500                rb_has_play_time_alt_cost_hand_cards
+                0x0088d598                rb_discard_play_time_alt_cost
+                0x0088d5b8                rb_shuffle_waitroom_members_to_deck_bottom
+                0x0088d5cc                rb_phase_name
+                0x0088d5f2                rb_log_phase
+                0x0088d5f4                _3ds_tdbg
+                0x0088d5f6                rb_log_turn_start
+                0x0088d5f8                rb_handle_set_live_card
+                0x0088d6c6                rb_handle_live_card_selection
+                0x0088d862                rb_handle_live_card_confirmation
+                0x0088dadc                rb_handle_live_card_skip
+                0x0088db4e                rb_handle_play_member_to_stage
+                0x0088dd46                rb_setup_initial_energy
+                0x0088ddba                rb_3ds_tdbg
+                0x0088ddbc                rb_execute_performance_phase
+                0x0088ddc8                rb_play_time_cost_reduction_hook
+                0x0088e068                rb_rps_choice_name
+                0x0088e08e                rb_push_rps_log
+                0x0088e134                rb_generate_action_candidates
+                0x0088e680                rb_generate_possible_actions
+ *fill*         0x0088e68e        0x2 
+ .text          0x0088e690     0x34d8 obj/resolver.o
+                0x0088f2fc                rb_find_card_stage_position
+                0x0088f33e                rb_resolver_zone_for_card
+                0x0088f478                rb_resolver_use_limit_reached
+                0x0088f4aa                rb_resolver_get_pending_choice
+                0x0088f4d0                rb_resolver_pending_choice
+                0x0088f4f6                rb_resolver_current_ability_is_activation
+                0x0088f514                rb_resolver_cached_condition_verdict
+                0x0088f610                rb_resolver_store_condition_verdict
+                0x0088f770                rb_resolver_store_pending_choice
+                0x008914ea                rb_resolver_emit_pay_skip_gate
+                0x008915ac                rb_resolver_card_matches_type
+                0x008915b2                rb_resolver_card_matches_cost_limit
+                0x008915ca                rb_resolver_fmt_card
+                0x00891638                rb_resolver_fmt_ids
+                0x008916d2                rb_resolver_merge_group_names
+                0x0089180e                rb_can_activate_effect
+                0x0089182e                rb_resolver_trigger_infos
+                0x00891a8a                rb_resolve_ability
+                0x00891ac6                rb_resolver_drain_verdicts
+                0x00891b06                rb_resolver_drain_verdicts_since
+                0x00891b4c                rb_resolver_push_verdict
+ .text          0x00891b68        0x0 obj/romdata.o
+ .text          0x00891b68     0x8b26 obj/rules.o
+                0x00893e20                rb_rules_forget
+                0x00893ea4                rb_rules_execute_modify_required_hearts
+                0x00894904                rb_rules_execute_modify_required_hearts_standard
+                0x00894a94                rb_rules_execute_modify_required_hearts_success
+                0x00894d44                rb_rules_execute_specify_heart_color
+                0x00894e12                rb_rules_resolve_gain_heart_color
+                0x00895032                rb_rules_execute_choose_required_hearts
+                0x00895104                rb_rules_execute_set_cost
+                0x00895384                rb_rules_execute_modify_cost
+                0x00895b56                rb_rules_execute_activation_cost
+                0x00895d6e                rb_rules_execute_set_cost_to_use
+                0x00895e14                rb_rules_position_limited_targets
+                0x00895eb8                rb_rules_same_name_targets
+                0x0089605e                rb_rules_is_broadly_self
+                0x00896114                rb_rules_implicit_heart_target
+                0x008962e0                rb_rules_try_create_target_selection_choice
+                0x008970e8                rb_rules_handle_both_targets
+                0x00897222                rb_rules_execute_select_heart_color
+                0x00897454                rb_rules_move_non_selected_hand_to_deck_bottom
+                0x0089747a                rb_rules_execute_both_hand_keep_shuffle_under
+                0x00897490                rb_rules_execute_select_number
+                0x00897792                rb_rules_execute_area_select
+                0x008979e6                rb_rules_execute_choose_target_player
+                0x00897d38                rb_rules_execute_select_effect
+                0x00897f80                rb_rules_per_card_choice_repeats
+                0x00897fe0                rb_rules_make_card_effect_data
+                0x0089804e                rb_rules_execute_choice
+                0x00898ba0                rb_rules_execute_activation_restriction
+                0x00898c58                rb_rules_execute_reduce_live_card_set_limit
+                0x00898cde                rb_rules_execute_modify_limit
+                0x00898ed4                rb_rules_execute_re_yell
+                0x008990ae                rb_rules_execute_perform_yell
+                0x0089962e                rb_rules_execute_modify_yell_count
+                0x00899838                rb_rules_register_replacement_effect
+                0x008999b4                rb_rules_run_replacement_effects
+                0x00899c98                rb_rules_record_wait_immune_by_effect
+                0x00899caa                rb_rules_is_wait_immune
+                0x00899cf8                rb_rules_record_cannot_live_by_effect
+                0x00899d6c                rb_rules_execute_restriction
+                0x0089a18e                rb_rules_cannot_live_player
+                0x0089a1d4                rb_rules_cannot_activate_player
+                0x0089a21a                rb_rules_clear_turn_state
+                0x0089a244                rb_rules_n_delayed_prohibitions
+                0x0089a25a                rb_rules_delayed_prohibition
+                0x0089a29a                rb_rules_note_changed_state_members
+                0x0089a2f4                rb_rules_take_changed_state_members
+                0x0089a352                rb_rules_note_moved_cards
+                0x0089a3ac                rb_rules_note_selected_cards
+                0x0089a406                rb_rules_set_conditional_choice
+                0x0089a460                rb_rules_get_conditional_choice
+                0x0089a484                rb_rules_choice_repeats_remaining
+                0x0089a49e                rb_rules_consume_choice_repeat
+                0x0089a4c2                rb_rules_note_keep_shuffle_selected
+                0x0089a516                rb_rules_keep_shuffle_phase
+                0x0089a52c                rb_rules_keep_shuffle_count
+                0x0089a542                rb_rules_sub_choice_created
+                0x0089a558                rb_rules_count_at_save
+                0x0089a572                rb_rules_owner_executing
+                0x0089a590                rb_rules_resolving_replacement
+                0x0089a5a6                rb_rules_take_pending_replacement
+                0x0089a5d0                rb_rules_apply_pending_replacement
+ *fill*         0x0089a68e        0x2 
+ .text          0x0089a690     0x4394 obj/score.o
+                0x0089bf3e                rb_execute_modify_score
+                0x0089ce84                rb_execute_modify_required_hearts
+                0x0089e04a                rb_execute_modify_required_hearts_standard
+                0x0089e208                rb_execute_modify_yell_count
+                0x0089e37a                rb_execute_modify_limit
+                0x0089e52e                rb_execute_modify_required_hearts_success
+ .text          0x0089ea24     0x9068 obj/state.o
+                0x0089f8ea                rb_effect_energy_placement
+                0x0089fbca                rb_effect_energy_state_change
+                0x008a0b46                rb_effect_change_state
+                0x008a2f32                rb_effect_set_cost
+                0x008a33ee                rb_effect_set_blade_type
+                0x008a38e0                rb_effect_set_blade_count
+                0x008a3e08                rb_effect_set_heart_copy_from_under
+                0x008a4112                rb_effect_set_heart_type_applied
+                0x008a48cc                rb_effect_set_heart_type
+                0x008a52b4                rb_effect_activation_cost
+                0x008a5582                rb_effect_set_card_identity
+                0x008a5750                rb_effect_set_card_identity_all_regions
+                0x008a5996                rb_effect_reduce_live_card_set_limit
+                0x008a5b06                rb_effect_specify_heart_color
+                0x008a5da2                rb_effect_set_cost_to_use
+                0x008a5f38                rb_all_blade_timing_record
+                0x008a6032                rb_all_blade_timing_clear
+                0x008a60b0                rb_effect_all_blade_timing
+                0x008a63d2                rb_effect_modify_cost
+                0x008a7488                rb_record_movement
+                0x008a74e6                rb_effect_position_change
+                0x008a75ba                rb_resume_position_change
+                0x008a77b8                rb_effect_rotation
+                0x008a785e                rb_card_total_hearts
+                0x008a78e2                rb_card_get_score
+                0x008a78f4                rb_check_heart_requirement
+                0x008a79f8                rb_card_need_heart_satisfied
+                0x008a7a0c                rb_heart_color_index
+                0x008a7a1a                rb_heart_color_from_index
+                0x008a7a3c                rb_heart_color_short_label
+                0x008a7a64                rb_heart_color_as_str
+ .text          0x008a7a8c      0xa88 obj/stats_pipeline.o
+                0x008a7dcc                rb_member_original_hearts
+                0x008a7e1a                rb_apply_additive_heart_mods
+                0x008a7e26                rb_effective_blade_parts
+                0x008a7e9c                rb_member_heart_detail
+                0x008a7fda                rb_effective_blade
+                0x008a8064                rb_effective_need_heart
+                0x008a8272                rb_need_satisfied
+                0x008a83d8                rb_stage_hearts_pipeline
+ .text          0x008a8514     0x162a obj/sys.o
+                0x008a87c2                malloc
+                0x008a887c                free
+                0x008a88c4                calloc
+                0x008a88fa                realloc
+                0x008a89ce                memcpy
+                0x008a89f0                memmove
+                0x008a8a3c                memset
+                0x008a8a5c                memcmp
+                0x008a8a94                memchr
+                0x008a8aba                strlen
+                0x008a8ad4                strcmp
+                0x008a8b0c                strncmp
+                0x008a8b58                strcpy
+                0x008a8b6e                strncpy
+                0x008a8b98                strcat
+                0x008a8bb8                strncat
+                0x008a8bf4                strchr
+                0x008a8c18                strrchr
+                0x008a8c4a                strstr
+                0x008a8cbe                strspn
+                0x008a8cfe                strcspn
+                0x008a8d58                strpbrk
+                0x008a8d96                strtok
+                0x008a8e4c                strdup
+                0x008a8eaa                strcasecmp
+                0x008a8f26                strncasecmp
+                0x008a8fb6                qsort
+                0x008a8fec                abs
+                0x008a8ff8                labs
+                0x008a9004                rand
+                0x008a9030                srand
+                0x008a9040                strtol
+                0x008a914a                strtoul
+                0x008a9150                strtoll
+                0x008a9170                atoi
+                0x008a9186                atol
+                0x008a919c                exit
+                0x008a919e                abort
+                0x008a91a0                vsnprintf
+                0x008a9980                snprintf
+                0x008a99a2                sprintf
+                0x008a99c4                printf
+                0x008a9a1e                fprintf
+                0x008a9a78                puts
+                0x008a9aaa                fputs
+                0x008a9ad4                putchar
+                0x008a9ae8                fputc
+                0x008a9afc                fflush
+                0x008a9b00                time
+                0x008a9b10                clock
+                0x008a9b14                clock_gettime
+                0x008a9b28                fopen
+                0x008a9b2e                fclose
+                0x008a9b32                fread
+                0x008a9b36                fseek
+                0x008a9b3a                ftell
+ *fill*         0x008a9b3e        0x2 
+ .text          0x008a9b40      0x71c obj/tracking.o
+                0x008a9b40                rb_reset_loop_detection
+                0x008a9b5a                rb_reset_keyword_tracking
+                0x008a9c0e                rb_clear_play_scoped_baton_touch
+                0x008a9c48                rb_add_yell_count_modifier
+                0x008a9c84                rb_effective_cheer_checks_required
+                0x008a9d66                rb_perform_cheer_check
+                0x008a9fb2                rb_check_required_hearts
+                0x008a9fd2                rb_is_action_prohibited
+                0x008aa05c                rb_refresh_yell_sources
+ .text          0x008aa25c     0x4b7a obj/triggers.o
+                0x008ace6e                rb_trigger_is
+                0x008ace9c                rb_trigger_from_token
+                0x008ad04c                rb_trigger_debut
+                0x008ad3e6                rb_should_trigger_live_success
+                0x008ad5a2                rb_drain_live_success_choices
+                0x008ad5ec                rb_fire_debut
+                0x008ad622                rb_check_expired_effects
+                0x008adcca                rb_recalc_constants
+                0x008adcd6                rb_is_trigger_suppressed
+                0x008ade8a                rb_trigger_live_success
+                0x008ae478                rb_trigger_auto_abilities_for_player
+                0x008ae498                rb_canonical_trigger
+                0x008ae5a6                rb_trigger_live_start
+                0x008aeb72                rb_trigger_zone_id
+                0x008aeb8c                rb_trigger_zone_label
+                0x008aeba6                rb_parse_triggers
+ *fill*         0x008aedd6        0x2 
+ .text          0x008aedd8     0x2592 obj/types.o
+                0x008aef88                rb_step_output_init
+                0x008aef9e                rb_step_output_from_value
+                0x008aefe2                rb_step_output_merge
+                0x008af112                rb_step_output_add_card
+                0x008af134                rb_step_output_has_cards
+                0x008af146                rb_step_output_value
+                0x008af156                rb_step_output_accepted
+                0x008af166                rb_step_output_to_json
+                0x008af304                rb_value_ref_init_literal
+                0x008af328                rb_value_ref_init_step
+                0x008af386                rb_value_ref_init_accepted
+                0x008af3e4                rb_value_ref_init_offset
+                0x008af44e                rb_value_ref_kind_to_str
+                0x008af476                rb_value_ref_kind_str
+                0x008af4a6                rb_value_ref_kind_from_str
+                0x008af53c                rb_value_ref_resolve
+                0x008af5e4                rb_value_ref_merge
+                0x008af5e6                rb_value_ref_is_literal
+                0x008af600                rb_zone_snapshot_make
+                0x008af626                rb_zone_snapshot_from_game_state
+                0x008af6a8                rb_trace_node_new
+                0x008af70c                rb_trace_node_with_card
+                0x008af75a                rb_trace_node_with_before
+                0x008af78a                rb_trace_node_with_after
+                0x008af7ba                rb_trace_node_from_game_state
+                0x008af84e                rb_trace_node_add_child
+                0x008af886                rb_trace_node_free
+                0x008af8ca                rb_effect_pipeline_new
+                0x008af932                rb_effect_pipeline_free
+                0x008af988                rb_step_state_init
+                0x008af9a0                rb_step_state_new
+                0x008af9d4                rb_step_state_record
+                0x008af9fa                rb_step_state_get
+                0x008afaaa                rb_step_state_clear
+                0x008afac4                rb_step_state_free
+                0x008afaee                rb_step_state_record_value
+                0x008afb40                rb_step_state_record_cards
+                0x008afbce                rb_ability_error_format
+                0x008afd5a                rb_exec_context_kind_to_str
+                0x008afd82                rb_exec_context_kind_from_str
+                0x008afe18                rb_las_kind_to_str
+                0x008afe44                rb_las_kind_from_str
+                0x008afeb8                rb_full_choice_new_select_card
+                0x008aff2e                rb_full_choice_new_select_target
+                0x008affa0                rb_full_choice_new_select_position
+                0x008b0012                rb_full_choice_new_select_heart_color
+                0x008b00ca                rb_full_choice_set_description
+                0x008b00f2                rb_full_choice_set_bilingual
+                0x008b0154                rb_full_choice_set_options
+                0x008b01c4                rb_full_choice_set_hc_options
+                0x008b0234                rb_full_choice_set_aa_options
+                0x008b02a4                rb_full_choice_set_ls_options
+                0x008b0314                rb_full_choice_description_ja
+                0x008b0332                rb_full_choice_allow_skip
+                0x008b0346                rb_full_choice_to_header
+                0x008b05b6                rb_full_choice_to_json
+                0x008b063c                rb_full_choice_free
+                0x008b0642                rb_choice_result_new_card_selected
+                0x008b06b4                rb_choice_result_new_skip
+                0x008b06f0                rb_choice_result_new_target
+                0x008b0740                rb_choice_result_kind
+                0x008b0752                rb_choice_result_is_skip
+                0x008b076e                rb_choice_result_kind_to_str
+                0x008b0794                rb_choice_result_kind_from_str
+                0x008b08bc                rb_choice_result_free
+                0x008b08c2                rb_choice_route_to_str
+                0x008b08ea                rb_choice_route_from_str
+                0x008b09a4                rb_choice_route_new
+                0x008b0a2e                rb_choice_route_from_kind
+                0x008b0a4e                rb_choice_route_kind_from_header
+                0x008b0a6e                rb_repeat_prompt_choice
+                0x008b0b22                rb_trigger_event_init
+                0x008b0b38                rb_trigger_event_add_moved
+                0x008b0b5a                rb_trigger_event_add_appeared
+                0x008b0bac                rb_trigger_event_has_moved
+                0x008b0bbe                rb_trigger_event_has_appeared
+                0x008b0bd0                rb_trigger_event_has_position_change
+                0x008b0bda                rb_trigger_event_has_energy_placed
+                0x008b0be4                rb_trigger_event_copy
+                0x008b0bfc                rb_effect_spawn_context_init
+                0x008b0c12                rb_choice_builder_new
+                0x008b0c88                rb_choice_builder_build
+                0x008b0cd2                rb_choice_builder_free
+                0x008b0cd8                rb_choice_builder_card_type
+                0x008b0d16                rb_choice_builder_cost_limit
+                0x008b0d58                rb_choice_builder_cost_total
+                0x008b0d9a                rb_choice_builder_cost_values
+                0x008b0e00                rb_choice_builder_group
+                0x008b0e2e                rb_choice_builder_characters
+                0x008b0ea8                rb_choice_builder_heart_colors
+                0x008b0f1c                rb_choice_builder_require_all_heart_colors
+                0x008b0f30                rb_choice_builder_name_fragments
+                0x008b0fa4                rb_choice_builder_destination
+                0x008b0fd2                rb_choice_builder_discard_remaining
+                0x008b0fe6                rb_choice_builder_is_select_action
+                0x008b0ffa                rb_choice_builder_target_player_id
+                0x008b1028                rb_choice_builder_blind
+                0x008b103c                rb_choice_builder_is_reveal
+                0x008b1050                rb_choice_builder_picker
+                0x008b107e                rb_choice_builder_description_en
+                0x008b10ac                rb_choice_builder_description_ja
+                0x008b10da                rb_choice_builder_filtered_indices
+                0x008b1128                rb_arcstr_serialize
+                0x008b11e0                rb_arcstr_deserialize
+                0x008b122a                rb_look_and_select_step_look
+                0x008b1290                rb_look_and_select_step_select
+                0x008b12ec                rb_look_and_select_step_finalize
+ *fill*         0x008b136a        0x2 
+ .text          0x008b136c     0x8d06 obj/util.o
+                0x008b2c80                rb_compare_counts
+                0x008b2daa                rb_cost_threshold_met
+                0x008b3074                rb_card_has_blade_heart
+                0x008b30a0                rb_card_has_blade_heart_strict
+                0x008b30bc                rb_card_has_score_icon
+                0x008b30e0                rb_card_has_all_blade
+                0x008b3128                rb_card_matches_type
+                0x008b3136                rb_orientation_matches_state
+                0x008b317e                rb_group_name_first
+                0x008b319a                rb_effect_group_name
+                0x008b3276                rb_card_matches_characters
+                0x008b328c                rb_card_matches_cost_limit
+                0x008b348e                rb_card_matches_cost_limit_op
+                0x008b3494                rb_card_matches_name_fragments
+                0x008b34aa                rb_card_matches_name_constraint
+                0x008b3638                rb_heart_gain_per_entry
+                0x008b3660                rb_is_all_heart_type
+                0x008b36ea                rb_constant_per_unit_zone
+                0x008b379c                rb_target_player_index
+                0x008b3886                rb_target_player_label
+                0x008b397e                rb_parse_duration
+                0x008b3a08                rb_activation_position_index
+                0x008b3a9e                rb_stage_position_index
+                0x008b3b56                rb_pos_to_area
+                0x008b3ba8                rb_card_at_position
+                0x008b3c9c                rb_zone_cards
+                0x008b3cbc                rb_zone_card_ids
+                0x008b3cdc                rb_count_in_zone
+                0x008b3e28                rb_get_zone_card_count
+                0x008b3f4e                rb_remove_card_from_zone
+                0x008b41ee                rb_place_card_in_zone
+                0x008b4926                rb_move_card
+                0x008b49d8                rb_move_cards
+                0x008b4a90                rb_resolve_indices_to_ids
+                0x008b4b18                rb_distinct_should_dedupe
+                0x008b4b2c                rb_dedupe_by_normalized_name
+                0x008b4b4c                rb_apply_distinct_filter
+                0x008b4bb0                rb_count_distinct_member_name_units
+                0x008b4f08                rb_classify_selection
+                0x008b4f26                rb_zone_remove_at_indices
+                0x008b537c                rb_find_modify_cost
+                0x008b5544                rb_calculate_per_unit_multiplier
+                0x008b5790                rb_max_distinct_names
+                0x008b58ca                rb_prune_dominated
+                0x008b5a96                rb_util_push_temporary_effect
+                0x008b5db0                rb_push_temporary_effect
+                0x008b5e90                rb_check_card_property
+                0x008b5fc6                rb_filter_current_blade
+                0x008b60e2                rb_set_card_identity
+                0x008b61ce                rb_card_matches_identity_str
+                0x008b6a7e                rb_card_matches_group_str
+                0x008b6a8c                rb_card_matches_any_group
+                0x008b6ad2                rb_card_matches_effect_group
+                0x008b6b0c                rb_count_in_zone_filtered
+                0x008b7304                rb_calculate_play_cost_reduction
+                0x008b7568                rb_filter_from_parts
+                0x008b76d0                rb_filter_from_parts_full
+                0x008b77ac                rb_has_cannot_baton_touch_protection_util
+                0x008b77b2                rb_exclude_self
+                0x008b77e4                rb_parse_heart_color
+                0x008b7aa4                rb_card_matches_heart_colors
+                0x008b7b96                rb_card_matches_all_heart_colors
+                0x008b8ada                rb_matching_indices_filter
+                0x008b8b88                rb_get_selection_indices_filter
+                0x008b8bcc                rb_resolve_selection
+                0x008b8cce                rb_get_selection_indices
+                0x008b8dc4                rb_matching_indices
+                0x008b8f50                rb_matching_ids
+                0x008b8f78                rb_count_matching_filter
+                0x008b8fa0                rb_build_candidate_pool
+                0x008b90b0                rb_resolve_per_unit_count
+                0x008b9258                rb_constant_per_unit_units
+                0x008b9672                rb_count_matching
+                0x008b974e                rb_resolve_discard_per_unit_count
+                0x008b9778                rb_matching_ids_filtered
+                0x008b9acc                rb_count_matching_distinct
+                0x008b9d10                rb_filter_distinct
+ *fill*         0x008ba072        0x2 
+ .text          0x008ba074     0xa4e8 obj/vm.o
+                0x008bd5e6                rb_free_condition
+                0x008bd636                rb_probe_nkeys
+                0x008bd63e                rb_probe_key
+                0x008bd664                rb_probe_keycount
+                0x008bd684                rb_probe_reset
+                0x008bd6a4                rb_probe_ndropped_keys
+                0x008bd6ac                rb_probe_dropped_key
+                0x008bd6d2                rb_probe_dropped_tag
+                0x008bd6ee                rb_keyword_from_str
+                0x008bd73c                rb_count_empty_bytecode_abilities
+                0x008bd75e                rb_free_ability
+                0x008bd76a                build_compound
+                0x008bd8cc                build_location
+                0x008bd97e                build_comparison
+                0x008bdb6a                build_movement
+                0x008bdc44                build_group
+                0x008bdca2                build_appearance
+                0x008bddfc                build_temporal
+                0x008bdf9c                build_state
+                0x008be014                build_resource
+                0x008be048                build_abilityfilter
+                0x008be07c                build_scorethreshold
+                0x008be0b0                build_choice
+                0x008be214                build_complex
+                0x008be36e                build_positioncond
+                0x008be3a2                build_opponentchoice
+                0x008be3d6                build_opponentlivesuccess
+                0x008be40a                build_noexcessheart
+                0x008be43e                build_alwaystrue
+                0x008be472                build_anyof
+                0x008be4d0                build_allrevealedmatchheartcolor
+                0x008be504                rb_condition_get_positions_characters
+                0x008be566                build_unsupported
+                0x008be59a                build_filter
+                0x008be5f0                offset_of
+                0x008be61e                rd_i64
+                0x008be65a                rd_key
+                0x008be6bc                populate_from_json
+                0x008be6be                rb_zone_to_str
+                0x008be6c4                rb_zone_from_source_str
+                0x008be6ca                rb_zone_as_str
+                0x008be6d0                rb_note_decode_fallback
+                0x008be976                rb_decode_keywords
+                0x008c0660                rb_decode_ability
+                0x008c0a3a                rb_get_ability
+                0x008c0a88                decode_condition_direct
+                0x008c3e96                rb_decode_fallback_count
+                0x008c3e9e                rb_decode_fallback_abilities
+                0x008c3efe                rb_verify_generated_tables
+ .text          0x008c455c     0x2c16 obj/zones.o
+                0x008c466a                rb_member_area_to_index
+                0x008c4726                rb_member_area_to_str
+                0x008c475e                rb_member_area_front
+                0x008c477e                rb_zone_invariant
+                0x008c4806                rb_zone_draw
+                0x008c4890                rb_zone_draw_bottom
+                0x008c490e                rb_zone_draw_multiple
+                0x008c49d2                rb_zone_refresh
+                0x008c4b2e                rb_member_area_to_tag
+                0x008c4b4e                rb_member_area_from_tag
+                0x008c4b74                rb_check_trigger_position
+                0x008c4c1c                rb_check_effect_position
+                0x008c4f6a                rb_stage_get_area
+                0x008c4f86                rb_stage_set_area
+                0x008c4fa0                rb_stage_position_change
+                0x008c4fc2                rb_stage_position_change_with_bags
+                0x008c4fee                rb_stage_first_empty
+                0x008c5016                rb_stage_place_under_card
+                0x008c5068                rb_stage_get_under_cards
+                0x008c50c4                rb_stage_under_cards_with_hosts
+                0x008c5152                rb_stage_recycle_under_cards
+                0x008c52a2                rb_stage_can_place_card
+                0x008c52d0                rb_stage_formation_change
+                0x008c56ee                rb_energy_can_place_card
+                0x008c571c                rb_energy_add_card
+                0x008c5756                rb_energy_pay
+                0x008c577e                rb_energy_activate_all
+                0x008c5790                rb_energy_active_count
+                0x008c57a4                rb_energy_set_active_count
+                0x008c57c2                rb_energy_add_active
+                0x008c57fa                rb_energy_sub_active
+                0x008c5820                rb_live_can_place_card
+                0x008c5824                rb_live_add_card
+                0x008c585a                rb_live_clear
+                0x008c58a4                rb_live_len
+                0x008c58b8                rb_hand_add
+                0x008c58e0                rb_hand_remove_card
+                0x008c593c                rb_hand_len
+                0x008c5950                rb_hand_is_empty
+                0x008c596c                rb_waitroom_add
+                0x008c599c                rb_waitroom_take_all
+                0x008c59e6                rb_waitroom_shuffle
+                0x008c5a44                rb_waitroom_len
+                0x008c5a58                rb_waitroom_remove_card
+                0x008c5aac                rb_success_add
+                0x008c5adc                rb_success_len
+                0x008c5af0                rb_resolution_add_for_owner
+                0x008c5b58                rb_resolution_add
+                0x008c5bac                rb_resolution_clear
+                0x008c5c26                rb_resolution_len
+                0x008c5c40                rb_resolution_swap_slots
+                0x008c5cd8                rb_member_area_from_index
+                0x008c5cf0                rb_deck_shuffle
+                0x008c5d4e                rb_deck_is_empty
+                0x008c5d84                rb_deck_len
+                0x008c5db2                rb_energy_deck_draw
+                0x008c5e48                rb_energy_deck_is_empty
+                0x008c5e7e                rb_live_calculate_score
+                0x008c600e                rb_stage_get_available_hearts
+                0x008c6034                rb_stage_get_available_hearts_i32
+                0x008c6164                rb_exclusion_add
+                0x008c61a4                rb_player_set_main_deck
+                0x008c623e                rb_player_set_energy_deck
+                0x008c62d8                rb_player_get_card_index_by_id
+                0x008c62fe                rb_player_is_area_locked
+                0x008c633a                rb_player_remove_member_from_stage_with_recycling
+                0x008c64fc                rb_player_move_card_from_hand_to_stage
+                0x008c6840                rb_player_calculate_stage_hearts
+                0x008c6866                rb_player_activate_all_energy
+                0x008c6878                rb_player_activate_all_energy_exclude
+                0x008c689e                rb_player_all_card_ids
+                0x008c6ba2                rb_player_draw_card
+                0x008c6c7c                rb_player_draw_energy
+                0x008c6dd0                rb_player_contains_card
+                0x008c70b4                rb_zone_track_deployment
+ *fill*         0x008c7172        0x2 
+ .text          0x008c7174       0x22 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_mulsi3.o)
+                0x008c7174                __mulsi3_internal
+                0x008c7174                __mulsi3
+ *fill*         0x008c7196        0x2 
+ .text          0x008c7198       0x2e /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o)
+                0x008c7198                __divsi3_internal
+                0x008c7198                __divsi3
+ *fill*         0x008c71c6        0x2 
+ .text          0x008c71c8       0x2e /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umodsi3.o)
+                0x008c71c8                __umodsi3
+ *fill*         0x008c71f6        0x2 
+ .text          0x008c71f8       0x2e /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_modsi3.o)
+                0x008c71f8                __modsi3
+ *fill*         0x008c7226        0x2 
+ .text          0x008c7228      0xa4a /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+                0x008c7282                __subdf3
+                0x008c7288                __adddf3
+                0x008c7660                __muldf3
+                0x008c781a                __divdf3
+                0x008c7ab2                __negdf2
+                0x008c7b1c                __cmpdf2_internal
+                0x008c7bea                __cmpdf2
+ *fill*         0x008c7c72        0x2 
+ .text          0x008c7c74       0x8e /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_floatex.o)
+                0x008c7c74                __clear_sticky_bit
+                0x008c7c8e                $_exception_handler
+ *fill*         0x008c7d02        0x2 
+ .text          0x008c7d04       0x22 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_nedf2.o)
+                0x008c7d04                __nedf2
+ *fill*         0x008c7d26        0x2 
+ .text          0x008c7d28       0x22 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gtdf2.o)
+                0x008c7d28                __gtdf2
+ *fill*         0x008c7d4a        0x2 
+ .text          0x008c7d4c       0x22 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gedf2.o)
+                0x008c7d4c                __gedf2
+ *fill*         0x008c7d6e        0x2 
+ .text          0x008c7d70       0x22 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_ledf2.o)
+                0x008c7d70                __ledf2
+ *fill*         0x008c7d92        0x2 
+ .text          0x008c7d94       0x1a /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o)
+                0x008c7d94                __eqsf2
+ *fill*         0x008c7dae        0x2 
+ .text          0x008c7db0       0x1a /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gesf2.o)
+                0x008c7db0                __gesf2
+ *fill*         0x008c7dca        0x2 
+ .text          0x008c7dcc       0x1a /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_lesf2.o)
+                0x008c7dcc                __lesf2
+ *fill*         0x008c7de6        0x2 
+ .text          0x008c7de8       0x28 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+                0x008c7de8                __muldi3
+ .text          0x008c7e10       0xde /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+                0x008c7e10                __divdi3
+ *fill*         0x008c7eee        0x2 
+ .text          0x008c7ef0       0xfa /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+                0x008c7ef0                __moddi3
+ *fill*         0x008c7fea        0x2 
+ .text          0x008c7fec       0xae /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+                0x008c7fec                __udivdi3
+ *fill*         0x008c809a        0x2 
+ .text          0x008c809c       0xb0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+                0x008c809c                __umoddi3
+ .text          0x008c814c      0x398 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+                0x008c814c                __unordsf2
+                0x008c818e                __unorddf2
+                0x008c81e2                __floatunsidf
+                0x008c8236                __floatsidf
+                0x008c82ae                __floatunsisf
+                0x008c82c4                __floatsisf
+                0x008c82da                __extendsfdf2
+                0x008c8360                __truncdfsf2
+                0x008c8468                __fixdfsi
+                0x008c84d0                __fixsfsi
+ .text          0x008c84e4       0x5c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivsi3.o)
+                0x008c84e4                __udivsi3_internal
+                0x008c84e4                __udivsi3
+ .text          0x008c8540      0x79e /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_float.o)
+                0x008c8584                __subsf3
+                0x008c858a                __addsf3
+                0x008c8854                __mulsf3
+                0x008c898c                __divsf3
+                0x008c8b76                __negsf2
+                0x008c8bd4                __cmpsf2_internal
+                0x008c8c6e                __cmpsf2
+ *(.rodata*)
+ .rodata        0x008c8cde     0x15f0 obj/abilities_gen.o
+                0x008c8cde                ABILITY_LOCS
+ .rodata.str1.1
+                0x008ca2ce     0x8738 obj/ability.o
+                                0x1b1 (size before relaxing)
+ .rodata.str1.1
+                0x008d2a06        0x0 obj/ability_effects.o
+                                0x30e (size before relaxing)
+ .rodata.str1.1
+                0x008d2a06        0x0 obj/ability_queue.o
+                                0x1d0 (size before relaxing)
+ .rodata        0x008d2a06    0x181e2 obj/bytecode_blob.o
+                0x008d2a06                RBKA_BYTECODE
+                0x008eabe4                RBKA_BYTECODE_LEN
+ .rodata        0x008eabe8    0x180ff obj/bytecode_data.o
+                0x008eabe8                BYTECODE_C3
+                0x008ecdde                BYTECODE_C2
+                0x008f42d1                BYTECODE_C1
+                0x008fb7de                BYTECODE_C0
+ .rodata.str1.1
+                0x00902ce7        0x0 obj/card.o
+                                0x68c (size before relaxing)
+ *fill*         0x00902ce7        0x1 
+ .rodata        0x00902ce8       0xa0 obj/card.o
+ .rodata.str1.1
+                0x00902d88        0x0 obj/choice.o
+                                0xea6 (size before relaxing)
+ .rodata        0x00902d88       0x34 obj/choice.o
+ .rodata.str1.1
+                0x00902dbc        0x0 obj/compound.o
+                                0x1ac (size before relaxing)
+ .rodata.str1.1
+                0x00902dbc        0x0 obj/condition.o
+                                0x9c7 (size before relaxing)
+ .rodata        0x00902dbc        0xc obj/condition.o
+ .rodata.str1.1
+                0x00902dc8        0x0 obj/cost.o
+                                0x714 (size before relaxing)
+ .rodata.str1.1
+                0x00902dc8        0x0 obj/custom.o
+                                 0x73 (size before relaxing)
+ .rodata.str1.1
+                0x00902dc8        0x0 obj/data.o
+                                0x4a1 (size before relaxing)
+ .rodata        0x00902dc8      0x262 obj/data.o
+ .rodata.str1.1
+                0x0090302a        0x0 obj/debug.o
+                                0x1e0 (size before relaxing)
+ .rodata        0x0090302a       0x50 obj/debug.o
+ .rodata.str1.1
+                0x0090307a        0x0 obj/deck_builder.o
+                                  0xc (size before relaxing)
+ .rodata.str1.1
+                0x0090307a        0x0 obj/deck_parser.o
+                                0x166 (size before relaxing)
+ .rodata        0x0090307a       0x18 obj/deck_parser.o
+ .rodata.str1.1
+                0x00903092        0x0 obj/describe.o
+                               0x2331 (size before relaxing)
+ .rodata        0x00903092       0x90 obj/describe.o
+                0x009030f6                rb_desc_choice_prompt_templates_en_count
+                0x009030fa                rb_desc_choice_prompt_templates_en
+ .rodata.str1.1
+                0x00903122        0x0 obj/draw.o
+                                0x42b (size before relaxing)
+ .rodata.str1.1
+                0x00903122        0x0 obj/dynamic_count.o
+                                0x29a (size before relaxing)
+ .rodata.str1.1
+                0x00903122        0x0 obj/engine.o
+                                0x8f9 (size before relaxing)
+ .rodata        0x00903122       0x1c obj/engine.o
+ .rodata.str1.1
+                0x0090313e        0x0 obj/enums.o
+                                0xddc (size before relaxing)
+ .rodata        0x0090313e      0x350 obj/enums.o
+ .rodata.str1.1
+                0x0090348e        0x0 obj/executor.o
+                                0x57b (size before relaxing)
+ .rodata        0x0090348e      0x258 obj/executor.o
+ .rodata        0x009036e6      0x808 obj/font.o
+                0x009036e6                font_light8x8
+ .rodata.str1.1
+                0x00903eee        0x0 obj/game_setup.o
+                                0x15c (size before relaxing)
+ .rodata        0x00903eee       0x90 obj/game_setup.o
+ .rodata.str1.1
+                0x00903f7e        0x0 obj/game_state_abilities.o
+                                0x96a (size before relaxing)
+ .rodata        0x00903f7e       0xac obj/game_state_abilities.o
+ .rodata.str1.1
+                0x0090402a        0x0 obj/game_state_core.o
+                                0x2e9 (size before relaxing)
+ .rodata        0x0090402a       0x1c obj/game_state_core.o
+ .rodata        0x00904046     0xe552 obj/gen_data.o
+                0x00904046                RBKA_CARD_ABILITY_PAIRS
+                0x00906156                RBKA_STRINGS_FNV
+                0x0090bf96                RBKA_STRINGS_TABLE_FNV
+                0x0090bf9a                RBKA_STRINGS_TABLE_LEN
+                0x0090bf9e                RBKA_STRINGS_OFFSETS
+                0x00911de2                RBKA_OFFSET_DELTAS
+                0x00912594                RBKA_NUM_ABILITIES
+ .rodata.str1.1
+                0x00912598        0x0 obj/jag_native_main.o
+                                 0xc8 (size before relaxing)
+ .rodata.str1.1
+                0x00912598        0x0 obj/live.o
+                                0x694 (size before relaxing)
+ .rodata.str1.1
+                0x00912598        0x0 obj/log.o
+                                 0x84 (size before relaxing)
+ .rodata.str1.1
+                0x00912598        0x0 obj/look.o
+                                0x2f6 (size before relaxing)
+ .rodata.str1.1
+                0x00912598        0x0 obj/misc.o
+                                0x7f6 (size before relaxing)
+ .rodata        0x00912598        0xc obj/misc.o
+ .rodata.str1.1
+                0x009125a4        0x0 obj/modifiers.o
+                                0x224 (size before relaxing)
+ .rodata        0x009125a4       0x50 obj/modifiers.o
+ .rodata.cst32  0x009125f4       0x40 obj/modifiers.o
+                                 0x20 (size before relaxing)
+ .rodata.str1.1
+                0x00912634        0x0 obj/move.o
+                                0x57f (size before relaxing)
+ .rodata        0x00912634       0x1c obj/move.o
+ .rodata.str1.1
+                0x00912650        0x0 obj/move_missing.o
+                                0x1b4 (size before relaxing)
+ .rodata.str1.1
+                0x00912650        0x0 obj/phase.o
+                                0x2a1 (size before relaxing)
+ .rodata        0x00912650       0x44 obj/phase.o
+ .rodata.str1.1
+                0x00912694        0x0 obj/resolver.o
+                                0x511 (size before relaxing)
+ .rodata.str1.1
+                0x00912694        0x0 obj/rules.o
+                                0xa57 (size before relaxing)
+ .rodata        0x00912694        0xc obj/rules.o
+ .rodata.str1.1
+                0x009126a0        0x0 obj/score.o
+                                0x2f9 (size before relaxing)
+ .rodata.str1.1
+                0x009126a0        0x0 obj/state.o
+                                0xdb2 (size before relaxing)
+ .rodata        0x009126a0       0x54 obj/state.o
+ .rodata.str1.1
+                0x009126f4        0x0 obj/stats_pipeline.o
+                                 0xff (size before relaxing)
+ .rodata.str1.1
+                0x009126f4        0x0 obj/sys.o
+                                  0x7 (size before relaxing)
+ .rodata.str1.1
+                0x009126f4        0x0 obj/tracking.o
+                                 0x35 (size before relaxing)
+ .rodata.str1.1
+                0x009126f4        0x0 obj/triggers.o
+                                0x793 (size before relaxing)
+ .rodata.str1.1
+                0x009126f4        0x0 obj/types.o
+                                0x34c (size before relaxing)
+ .rodata.cst32  0x009126f4        0x0 obj/types.o
+                                 0x20 (size before relaxing)
+ .rodata.cst16  0x009126f4       0x10 obj/types.o
+ .rodata        0x00912704       0x48 obj/types.o
+ .rodata.str1.1
+                0x0091274c        0x0 obj/util.o
+                                0x5b8 (size before relaxing)
+ .rodata.str1.1
+                0x0091274c        0x0 obj/vm.o
+                                0xde2 (size before relaxing)
+ .rodata        0x0091274c       0xc8 obj/vm.o
+ .rodata.str1.1
+                0x00912814        0x0 obj/zones.o
+                                 0x89 (size before relaxing)
+ *(.rdata*)
+ *(.romdata)
+ .romdata       0x00912814   0x1604df obj/romdata.o
+                0x00912814                cards_bin
+                0x009ab2b2                abstr_bin
+                0x00a5e0d1                gen_data_jag_bin
+                0x00a667d7                cards_bin_len
+                0x00a667db                abstr_bin_len
+                0x00a667df                gen_data_jag_len
+                0x00a667e3                card_ptrs_table
+                0x00a6ceb3                abstr_ptrs_table
+
+.rela.dyn       0x00a72cf4        0x0
+ .rela.got      0x00a72cf4        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+
+.data           0x00004000       0x78 load address 0x00a72cf3
+ *(.data*)
+ .data          0x00004000       0x10 obj/abilities_gen.o
+                0x00004000                CARD_ABILITY_PAIRS
+                0x00004004                STRINGS_OFFSETS
+                0x00004008                OFFSET_DELTAS
+                0x0000400c                BYTECODE
+ .data          0x00004010        0x0 obj/ability.o
+ .data          0x00004010        0x0 obj/ability_effects.o
+ .data          0x00004010        0x0 obj/ability_queue.o
+ .data          0x00004010        0x0 obj/alloc.o
+ .data          0x00004010        0x0 obj/boot_native.o
+ .data          0x00004010        0x0 obj/bytecode_blob.o
+ .data          0x00004010        0x0 obj/bytecode_data.o
+ .data          0x00004010        0x0 obj/card.o
+ .data          0x00004010        0xc obj/choice.o
+ .data          0x0000401c        0x4 obj/compound.o
+ .data          0x00004020        0x0 obj/condition.o
+ .data          0x00004020        0x0 obj/console.o
+ .data          0x00004020        0x4 obj/cost.o
+ .data          0x00004024        0x0 obj/custom.o
+ .data          0x00004024        0x0 obj/data.o
+ .data          0x00004024        0x0 obj/debug.o
+ .data          0x00004024        0x0 obj/deck_builder.o
+ .data          0x00004024        0x0 obj/deck_parser.o
+ .data          0x00004024        0x0 obj/describe.o
+ .data          0x00004024        0x0 obj/draw.o
+ .data          0x00004024        0x0 obj/dynamic_count.o
+ .data          0x00004024        0x0 obj/engine.o
+ .data          0x00004024        0x0 obj/enums.o
+ .data          0x00004024        0x0 obj/executor.o
+ .data          0x00004024        0x0 obj/font.o
+ .data          0x00004024        0x0 obj/game_setup.o
+ .data          0x00004024        0x4 obj/game_state_abilities.o
+ .data          0x00004028        0x0 obj/game_state_core.o
+ .data          0x00004028        0x0 obj/gen_data.o
+ .data          0x00004028        0xc obj/gen_data_rom.o
+                0x00004028                g_card_ability_pairs
+                0x0000402c                g_strings_offsets
+                0x00004030                g_offset_deltas
+ .data          0x00004034        0x8 obj/jag_native_main.o
+                0x00004034                g_strings_rom
+                0x00004038                g_card_strings_rom
+ .data          0x0000403c        0x0 obj/live.o
+ .data          0x0000403c        0x0 obj/log.o
+ .data          0x0000403c        0x4 obj/look.o
+ .data          0x00004040        0x4 obj/misc.o
+ .data          0x00004044        0x0 obj/modifiers.o
+ .data          0x00004044        0x0 obj/move.o
+ .data          0x00004044        0x0 obj/move_missing.o
+ .data          0x00004044        0x0 obj/phase.o
+ .data          0x00004044        0x0 obj/resolver.o
+ .data          0x00004044        0x0 obj/romdata.o
+ .data          0x00004044        0x0 obj/rules.o
+ .data          0x00004044        0x0 obj/score.o
+ .data          0x00004044        0x0 obj/state.o
+ .data          0x00004044        0x0 obj/stats_pipeline.o
+ .data          0x00004044        0x4 obj/sys.o
+ .data          0x00004048        0x0 obj/tracking.o
+ .data          0x00004048        0x0 obj/triggers.o
+ .data          0x00004048        0x4 obj/types.o
+                0x00004048                RB_PAY_SKIP_TARGET
+ .data          0x0000404c        0x0 obj/util.o
+ .data          0x0000404c        0x0 obj/vm.o
+ .data          0x0000404c        0x0 obj/zones.o
+ .data          0x0000404c        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_mulsi3.o)
+ .data          0x0000404c        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o)
+ .data          0x0000404c        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umodsi3.o)
+ .data          0x0000404c        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_modsi3.o)
+ .data          0x0000404c        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+ .data          0x0000404c       0x1c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_floatex.o)
+                0x0000404c                _fpCCR
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_nedf2.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gtdf2.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gedf2.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_ledf2.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gesf2.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_lesf2.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivsi3.o)
+ .data          0x00004068        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_float.o)
+ *(.got*)
+ .got           0x00004068        0x4 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+ .got.plt       0x0000406c        0xc /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+                0x0000406c                _GLOBAL_OFFSET_TABLE_
+ *(.got.plt*)
+
+.bss            0x00048000   0x1dafbc
+ *(.bss*)
+ .bss           0x00048000        0x0 obj/abilities_gen.o
+ .bss           0x00048000     0x1ecc obj/ability.o
+ .bss           0x00049ecc        0x0 obj/ability_effects.o
+ .bss           0x00049ecc        0x0 obj/ability_queue.o
+ .bss           0x00049ecc        0x0 obj/alloc.o
+ .bss           0x00049ecc        0x0 obj/boot_native.o
+ .bss           0x00049ecc        0x0 obj/bytecode_blob.o
+ .bss           0x00049ecc        0x0 obj/bytecode_data.o
+ .bss           0x00049ecc     0x637c obj/card.o
+ .bss           0x00050248      0x81c obj/choice.o
+ .bss           0x00050a64      0x410 obj/compound.o
+                0x00050a64                g_deferred_conditional_gate
+ .bss           0x00050e74        0x0 obj/condition.o
+ .bss           0x00050e74        0x8 obj/console.o
+ .bss           0x00050e7c      0xab8 obj/cost.o
+ .bss           0x00051934      0x104 obj/custom.o
+ .bss           0x00051a38     0x4034 obj/data.o
+ .bss           0x00055a6c      0x40d obj/debug.o
+ *fill*         0x00055e79        0x3 
+ .bss           0x00055e7c        0x0 obj/deck_builder.o
+ .bss           0x00055e7c        0x0 obj/deck_parser.o
+ .bss           0x00055e7c        0x0 obj/describe.o
+ .bss           0x00055e7c        0x0 obj/draw.o
+ .bss           0x00055e7c        0x0 obj/dynamic_count.o
+ .bss           0x00055e7c       0x24 obj/engine.o
+ .bss           0x00055ea0        0x0 obj/enums.o
+ .bss           0x00055ea0        0x0 obj/executor.o
+ .bss           0x00055ea0        0x0 obj/font.o
+ .bss           0x00055ea0      0x204 obj/game_setup.o
+ .bss           0x000560a4     0x2214 obj/game_state_abilities.o
+ .bss           0x000582b8      0x180 obj/game_state_core.o
+ .bss           0x00058438        0x0 obj/gen_data.o
+ .bss           0x00058438        0x0 obj/gen_data_rom.o
+ .bss           0x00058438   0x107b62 obj/jag_native_main.o
+ *fill*         0x0015ff9a        0x2 
+ .bss           0x0015ff9c     0x4168 obj/live.o
+ .bss           0x00164104      0x410 obj/log.o
+ .bss           0x00164514      0x2ac obj/look.o
+ .bss           0x001647c0        0x0 obj/misc.o
+ .bss           0x001647c0     0x8000 obj/modifiers.o
+ .bss           0x0016c7c0        0x0 obj/move.o
+ .bss           0x0016c7c0        0x0 obj/move_missing.o
+ .bss           0x0016c7c0      0xd44 obj/phase.o
+ .bss           0x0016d504      0xa24 obj/resolver.o
+ .bss           0x0016df28        0x0 obj/romdata.o
+ .bss           0x0016df28     0x9604 obj/rules.o
+ .bss           0x0017752c        0x0 obj/score.o
+ .bss           0x0017752c     0x1a64 obj/state.o
+ .bss           0x00178f90        0x0 obj/stats_pipeline.o
+ .bss           0x00178f90    0x60014 obj/sys.o
+                0x00178f90                stderr
+                0x00178f94                stdout
+                0x00178f98                stdin
+ .bss           0x001d8fa4        0x0 obj/tracking.o
+ .bss           0x001d8fa4        0x0 obj/triggers.o
+ .bss           0x001d8fa4        0x0 obj/types.o
+ .bss           0x001d8fa4     0x8000 obj/util.o
+ .bss           0x001e0fa4    0x42018 obj/vm.o
+                0x001e0fa4                g_probe_effects
+                0x001e0fa8                g_probe_retained
+                0x001e0fac                g_probe_seen
+ .bss           0x00222fbc        0x0 obj/zones.o
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_mulsi3.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umodsi3.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_modsi3.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_floatex.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_nedf2.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gtdf2.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gedf2.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_ledf2.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gesf2.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_lesf2.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivsi3.o)
+ .bss           0x00222fbc        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_float.o)
+ *(COMMON)
+                0x00000001                        ASSERT (((ADDR (.data) + SIZEOF (.data)) <= 0x42000), shell .data overflowed into the text screen at $42000)
+                0x00000000                        ASSERT (((ADDR (.bss) + SIZEOF (.bss)) <= 0x1e0000), .bss (GameState + arenas) overflowed into the stack below $1F0000)
+
+/DISCARD/
+ *(.comment*)
+ *(.note*)
+ *(.eh_frame*)
+                0x00a72cf3                        __data_lma = LOADADDR (.data)
+                0x00004000                        __data_vma = ADDR (.data)
+                0x00004078                        __data_end = (ADDR (.data) + SIZEOF (.data))
+                0x00048000                        __bss_start = ADDR (.bss)
+                0x00222fbc                        __bss_end = (ADDR (.bss) + SIZEOF (.bss))
+LOAD obj/abilities_gen.o
+LOAD obj/ability.o
+LOAD obj/ability_effects.o
+LOAD obj/ability_queue.o
+LOAD obj/alloc.o
+LOAD obj/boot_native.o
+LOAD obj/bytecode_blob.o
+LOAD obj/bytecode_data.o
+LOAD obj/card.o
+LOAD obj/choice.o
+LOAD obj/compound.o
+LOAD obj/condition.o
+LOAD obj/console.o
+LOAD obj/cost.o
+LOAD obj/custom.o
+LOAD obj/data.o
+LOAD obj/debug.o
+LOAD obj/deck_builder.o
+LOAD obj/deck_parser.o
+LOAD obj/describe.o
+LOAD obj/draw.o
+LOAD obj/dynamic_count.o
+LOAD obj/engine.o
+LOAD obj/enums.o
+LOAD obj/executor.o
+LOAD obj/font.o
+LOAD obj/game_setup.o
+LOAD obj/game_state_abilities.o
+LOAD obj/game_state_core.o
+LOAD obj/gen_data.o
+LOAD obj/gen_data_rom.o
+LOAD obj/jag_native_main.o
+LOAD obj/live.o
+LOAD obj/log.o
+LOAD obj/look.o
+LOAD obj/misc.o
+LOAD obj/modifiers.o
+LOAD obj/move.o
+LOAD obj/move_missing.o
+LOAD obj/phase.o
+LOAD obj/resolver.o
+LOAD obj/romdata.o
+LOAD obj/rules.o
+LOAD obj/score.o
+LOAD obj/state.o
+LOAD obj/stats_pipeline.o
+LOAD obj/sys.o
+LOAD obj/tracking.o
+LOAD obj/triggers.o
+LOAD obj/types.o
+LOAD obj/util.o
+LOAD obj/vm.o
+LOAD obj/zones.o
+LOAD /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a
+OUTPUT(output/rabuka_jag_native.elf elf32-m68k)
+
+.debug_line     0x00000000     0x1869
+ .debug_line    0x00000000       0x54 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_mulsi3.o)
+ .debug_line    0x00000054       0x5c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o)
+ .debug_line    0x000000b0       0x58 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umodsi3.o)
+ .debug_line    0x00000108       0x58 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_modsi3.o)
+ .debug_line    0x00000160      0x3d0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+ .debug_line    0x00000530       0x63 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_floatex.o)
+ .debug_line    0x00000593       0x52 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_nedf2.o)
+ .debug_line    0x000005e5       0x52 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gtdf2.o)
+ .debug_line    0x00000637       0x52 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gedf2.o)
+ .debug_line    0x00000689       0x52 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_ledf2.o)
+ .debug_line    0x000006db       0x50 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o)
+ .debug_line    0x0000072b       0x50 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gesf2.o)
+ .debug_line    0x0000077b       0x50 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_lesf2.o)
+ .debug_line    0x000007cb       0xd5 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+ .debug_line    0x000008a0      0x202 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+ .debug_line    0x00000aa2      0x23b /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+ .debug_line    0x00000cdd      0x1ab /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+ .debug_line    0x00000e88      0x1ed /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+ .debug_line    0x00001075      0x4d2 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+ .debug_line    0x00001547       0x6d /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivsi3.o)
+ .debug_line    0x000015b4      0x2b5 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_float.o)
+
+.debug_line_str
+                0x00000000      0x112
+ .debug_line_str
+                0x00000000      0x112 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_mulsi3.o)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umodsi3.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_modsi3.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_floatex.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_nedf2.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gtdf2.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gedf2.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_ledf2.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gesf2.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_lesf2.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivsi3.o)
+                                0x112 (size before relaxing)
+ .debug_line_str
+                0x00000112        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_float.o)
+                                0x112 (size before relaxing)
+
+.debug_info     0x00000000     0x156e
+ .debug_info    0x00000000       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_mulsi3.o)
+ .debug_info    0x00000024       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o)
+ .debug_info    0x00000048       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umodsi3.o)
+ .debug_info    0x0000006c       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_modsi3.o)
+ .debug_info    0x00000090       0x25 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+ .debug_info    0x000000b5       0x25 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_floatex.o)
+ .debug_info    0x000000da       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_nedf2.o)
+ .debug_info    0x000000fe       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gtdf2.o)
+ .debug_info    0x00000122       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gedf2.o)
+ .debug_info    0x00000146       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_ledf2.o)
+ .debug_info    0x0000016a       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o)
+ .debug_info    0x0000018e       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gesf2.o)
+ .debug_info    0x000001b2       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_lesf2.o)
+ .debug_info    0x000001d6      0x185 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+ .debug_info    0x0000035b      0x361 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+ .debug_info    0x000006bc      0x36b /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+ .debug_info    0x00000a27      0x317 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+ .debug_info    0x00000d3e      0x334 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+ .debug_info    0x00001072      0x4b3 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+ .debug_info    0x00001525       0x24 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivsi3.o)
+ .debug_info    0x00001549       0x25 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_float.o)
+
+.debug_abbrev   0x00000000      0x9e8
+ .debug_abbrev  0x00000000       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_mulsi3.o)
+ .debug_abbrev  0x00000014       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o)
+ .debug_abbrev  0x00000028       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umodsi3.o)
+ .debug_abbrev  0x0000003c       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_modsi3.o)
+ .debug_abbrev  0x00000050       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+ .debug_abbrev  0x00000064       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_floatex.o)
+ .debug_abbrev  0x00000078       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_nedf2.o)
+ .debug_abbrev  0x0000008c       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gtdf2.o)
+ .debug_abbrev  0x000000a0       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gedf2.o)
+ .debug_abbrev  0x000000b4       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_ledf2.o)
+ .debug_abbrev  0x000000c8       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o)
+ .debug_abbrev  0x000000dc       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gesf2.o)
+ .debug_abbrev  0x000000f0       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_lesf2.o)
+ .debug_abbrev  0x00000104       0xf0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+ .debug_abbrev  0x000001f4      0x178 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+ .debug_abbrev  0x0000036c      0x171 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+ .debug_abbrev  0x000004dd      0x163 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+ .debug_abbrev  0x00000640      0x170 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+ .debug_abbrev  0x000007b0      0x210 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+ .debug_abbrev  0x000009c0       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivsi3.o)
+ .debug_abbrev  0x000009d4       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_float.o)
+
+.debug_aranges  0x00000000      0x2a0
+ .debug_aranges
+                0x00000000       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_mulsi3.o)
+ .debug_aranges
+                0x00000020       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o)
+ .debug_aranges
+                0x00000040       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umodsi3.o)
+ .debug_aranges
+                0x00000060       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_modsi3.o)
+ .debug_aranges
+                0x00000080       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+ .debug_aranges
+                0x000000a0       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_floatex.o)
+ .debug_aranges
+                0x000000c0       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_nedf2.o)
+ .debug_aranges
+                0x000000e0       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gtdf2.o)
+ .debug_aranges
+                0x00000100       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gedf2.o)
+ .debug_aranges
+                0x00000120       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_ledf2.o)
+ .debug_aranges
+                0x00000140       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o)
+ .debug_aranges
+                0x00000160       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gesf2.o)
+ .debug_aranges
+                0x00000180       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_lesf2.o)
+ .debug_aranges
+                0x000001a0       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+ .debug_aranges
+                0x000001c0       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+ .debug_aranges
+                0x000001e0       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+ .debug_aranges
+                0x00000200       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+ .debug_aranges
+                0x00000220       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+ .debug_aranges
+                0x00000240       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+ .debug_aranges
+                0x00000260       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivsi3.o)
+ .debug_aranges
+                0x00000280       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_float.o)
+
+.debug_str      0x00000000      0x503
+ .debug_str     0x00000000      0x503 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_mulsi3.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divsi3.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umodsi3.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_modsi3.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_double.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_floatex.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_nedf2.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gtdf2.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gedf2.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_ledf2.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_eqsf2.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_gesf2.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_lesf2.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+                                0x2a5 (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+                                0x2dd (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+                                0x2dd (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+                                0x2de (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+                                0x2de (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+                                0x29a (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivsi3.o)
+                                0x11e (size before relaxing)
+ .debug_str     0x00000503        0x0 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_float.o)
+                                0x11e (size before relaxing)
+
+.debug_frame    0x00000000      0x134
+ .debug_frame   0x00000000       0x2c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_muldi3.o)
+ .debug_frame   0x0000002c      0x108 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+
+.debug_loclists
+                0x00000000      0xf2c
+ .debug_loclists
+                0x00000000      0x2a7 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+ .debug_loclists
+                0x000002a7      0x2b1 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+ .debug_loclists
+                0x00000558      0x2d9 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+ .debug_loclists
+                0x00000831      0x2e6 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+ .debug_loclists
+                0x00000b17      0x415 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)
+
+.debug_rnglists
+                0x00000000       0x91
+ .debug_rnglists
+                0x00000000       0x20 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_divdi3.o)
+ .debug_rnglists
+                0x00000020       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_moddi3.o)
+ .debug_rnglists
+                0x00000034       0x1c /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_udivdi3.o)
+ .debug_rnglists
+                0x00000050       0x14 /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(_umoddi3.o)
+ .debug_rnglists
+                0x00000064       0x2d /usr/bin/../lib/gcc/m68k-unknown-linux-gnu/17.0.0/libgcc.a(fpgnulib.o)

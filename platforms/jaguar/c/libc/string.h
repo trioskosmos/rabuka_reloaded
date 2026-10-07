@@ -24,5 +24,7 @@ size_t strcspn(const char *s, const char *set);
 char  *strpbrk(const char *s, const char *set);
 char  *strtok(char *s, const char *delim);
 char  *strdup(const char *s);
+int    strcasecmp(const char *a, const char *b);
+int    strncasecmp(const char *a, const char *b, size_t n);
 
 #endif

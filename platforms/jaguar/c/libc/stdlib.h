@@ -17,6 +17,9 @@ long long strtoll(const char *s, char **end, int base);
 int    abs(int v);
 long   labs(long v);
 
+void   qsort(void *base, size_t nmemb, size_t size,
+             int (*compar)(const void *, const void *));
+
 int    rand(void);
 void   srand(unsigned int seed);
 

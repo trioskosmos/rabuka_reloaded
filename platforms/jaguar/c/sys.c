@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 /* ---- console output hook (implemented in console.c) ---- */
 void __console_out(int c);
@@ -21,10 +22,11 @@ void __console_out(int c);
 /*                     ALLOCATOR (free list, coalescing)                */
 /* ===================================================================== */
 /* Heap budget: 2 MB DRAM total. GameState is ~1.04 MB of .bss, the
- * engine's RB_NO_MALLOC arena is 256 KB (RB_ARENA_SIZE), so the
- * libc heap gets 384 KB — enough for the decode/free churn of a
- * full match with headroom. */
-#define HEAP_SIZE (384u * 1024u)
+ * engine's audit scratch is ~35 KB, so the libc heap gets
+ * 128 KB — enough for the decode/free churn of a full match
+ * (g_card_off ~10 KB one-time, effect trees a few KB live at
+ * once) with the rest left to the stack. */
+#define HEAP_SIZE (128u * 1024u)
 
 typedef struct blk {
     size_t size;            /* payload size (excluding header) */
@@ -70,6 +72,12 @@ void *malloc(size_t n) {
 
 void free(void *p) {
     if (!p) return;
+    /* rb_load_streaming() frees the ROM-resident buffers its
+       read callback returns (data.c). Those addresses live in
+       cart ROM, far outside g_heap -- freeing one would read a
+       garbage block header and corrupt the list. Ignore them. */
+    if ((const unsigned char *)p < g_heap ||
+        (const unsigned char *)p >= g_heap + HEAP_SIZE) return;
     blk_t *b = (blk_t *)p - 1;
     b->free = 1;
     /* coalesce with the next neighbour(s) */
@@ -217,6 +225,87 @@ char *strdup(const char *s) {
     char *p = (char *)malloc(n);
     if (p) memcpy(p, s, n);
     return p;
+}
+
+int strcasecmp(const char *a, const char *b) {
+    while (*a && tolower((unsigned char)*a) == tolower((unsigned char)*b)) { a++; b++; }
+    return tolower((unsigned char)*a) - tolower((unsigned char)*b);
+}
+
+int strncasecmp(const char *a, const char *b, size_t n) {
+    while (n--) {
+        int ca = tolower((unsigned char)*a), cb = tolower((unsigned char)*b);
+        if (ca != cb) return ca - cb;
+        if (!*a) return 0;
+        a++; b++;
+    }
+    return 0;
+}
+
+/* ===================================================================== */
+/*                                SORT                                   */
+/* ===================================================================== */
+/* qsort: in-place quicksort (median-of-three pivot, Lomuto
+   partition, insertion sort under 16 entries, smaller side
+   recursed first so the stack stays O(log n)). The engine
+   sorts at most a few thousand entries (card pair index,
+   mask lists, decks). */
+static void qsort_swap(char *a, char *b, size_t w) {
+    while (w--) { char t = *a; *a = *b; *b = t; a++; b++; }
+}
+
+static void qsort_insert(char *base, size_t n, size_t w,
+                         int (*cmp)(const void *, const void *)) {
+    for (size_t i = 1; i < n; i++) {
+        size_t j = i;
+        while (j > 0 && cmp(base + (j - 1) * w, base + j * w) > 0) {
+            qsort_swap(base + (j - 1) * w, base + j * w, w);
+            j--;
+        }
+    }
+}
+
+static size_t qsort_partition(char *base, size_t lo, size_t hi, size_t w,
+                              int (*cmp)(const void *, const void *)) {
+    size_t mid = lo + (hi - lo) / 2;
+    if (cmp(base + lo * w, base + mid * w) > 0)
+        qsort_swap(base + lo * w, base + mid * w, w);
+    if (cmp(base + lo * w, base + (hi - 1) * w) > 0)
+        qsort_swap(base + lo * w, base + (hi - 1) * w, w);
+    if (cmp(base + mid * w, base + (hi - 1) * w) > 0)
+        qsort_swap(base + mid * w, base + (hi - 1) * w, w);
+    qsort_swap(base + mid * w, base + (hi - 1) * w, w);  /* pivot to hi-1 */
+    char *pivot = base + (hi - 1) * w;
+    size_t i = lo;
+    for (size_t j = lo; j < hi - 1; j++) {
+        if (cmp(base + j * w, pivot) <= 0) {
+            qsort_swap(base + i * w, base + j * w, w);
+            i++;
+        }
+    }
+    qsort_swap(base + i * w, pivot, w);
+    return i;
+}
+
+static void qsort_range(char *base, size_t lo, size_t hi, size_t w,
+                        int (*cmp)(const void *, const void *)) {
+    while (hi - lo > 16) {
+        size_t p = qsort_partition(base, lo, hi, w, cmp);
+        if (p - lo < hi - p - 1) {
+            qsort_range(base, lo, p, w, cmp);
+            lo = p + 1;
+        } else {
+            qsort_range(base, p + 1, hi, w, cmp);
+            hi = p;
+        }
+    }
+    qsort_insert(base + lo * w, hi - lo, w, cmp);
+}
+
+void qsort(void *base, size_t nmemb, size_t size,
+           int (*compar)(const void *, const void *)) {
+    if (!base || nmemb < 2 || !size || !compar) return;
+    qsort_range((char *)base, 0, nmemb, size, compar);
 }
 
 /* ===================================================================== */
@@ -387,6 +476,33 @@ int fprintf(FILE *stream, const char *fmt, ...) {
 int puts(const char *s) {
     for (; *s; s++) __console_out(*s);
     __console_out('\n');
+    return 0;
+}
+
+int fputs(const char *s, FILE *stream) {
+    (void)stream;
+    for (; *s; s++) __console_out(*s);
+    return 0;
+}
+int putchar(int c) {
+    __console_out(c);
+    return (unsigned char)c;
+}
+int fputc(int c, FILE *stream) {
+    (void)stream;
+    __console_out(c);
+    return (unsigned char)c;
+}
+int fflush(FILE *stream) {
+    (void)stream;
+    return 0;
+}
+
+time_t time(time_t *t) { if (t) *t = 0; return 0; }
+clock_t clock(void) { return 0; }
+int clock_gettime(int clk_id, struct timespec *tp) {
+    (void)clk_id;
+    if (tp) { tp->tv_sec = 0; tp->tv_nsec = 0; }
     return 0;
 }
 

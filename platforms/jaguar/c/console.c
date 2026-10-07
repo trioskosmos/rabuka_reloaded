@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 #include "console.h"
 
 typedef uint8_t u8;

@@ -74,7 +74,25 @@ def test_select_from_live_card_zone():
 def test_select_with_oku_verb():
     # "置く" is the verb for both "place" (move_cards) and "select→place" (select).
     # If source+destination rule fires first, this becomes move_cards. It must not.
-    check('山札から1枚を選び、ライブカード置き場に置く', 'select')
+    #
+    # The select stays the head action, but a bare `select` cannot place the
+    # card: the engine's select executor only PICKS candidates into
+    # looked_at_cards and never reads `destination` (ability/effects/look.rs
+    # execute_select). So a stated placement needs the explicit move step
+    # `_select_move_step` builds — select (deck, count) then move_cards
+    # (selected_cards → the stated destination). That pair is the executable
+    # form of "choose 1 and place it".
+    result = check(
+        '山札から1枚を選び、ライブカード置き場に置く',
+        'sequential',
+    )
+    select, move = result["actions"]
+    assert select["action"] == "select", select
+    assert select["source"] == "deck", select
+    assert select["count"] == 1, select
+    assert move["action"] == "move_cards", move
+    assert move["source"] == "selected_cards", move
+    assert move["destination"] == "live_card_zone", move
 
 
 # ─── MOVE_CARDS / DRAW ────────────────────────────────────────────────────────

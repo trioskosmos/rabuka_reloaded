@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdarg.h>
+#include <stdint.h>
 
 typedef struct { int _dummy; } FILE;
 #define EOF (-1)
@@ -20,6 +21,10 @@ int sprintf(char *buf, const char *fmt, ...);
 int snprintf(char *buf, size_t n, const char *fmt, ...);
 int vsnprintf(char *buf, size_t n, const char *fmt, va_list ap);
 int puts(const char *s);
+int fputs(const char *s, FILE *stream);
+int putchar(int c);
+int fputc(int c, FILE *stream);
+int fflush(FILE *stream);
 
 /* Stream stubs (unused on bare metal; read_file() is not called). */
 FILE *fopen(const char *path, const char *mode);

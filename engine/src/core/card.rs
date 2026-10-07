@@ -1534,8 +1534,22 @@ impl EffectKind {
         action: &str,
         filter: Option<Box<EffectFilter>>,
     ) -> Option<EffectKind> {
-        let a = action.to_lowercase();
-        Some(match a.as_str() {
+        // Every real caller passes `ActionType::to_str()`, whose wire
+        // strings are canonical lowercase snake_case, so the match below
+        // hits without allocating. The lowercase copy is built only when
+        // the input actually contains a character whose lowercase mapping
+        // differs from itself — the exact condition under which the old
+        // unconditional `to_lowercase()` changed the string — so which
+        // inputs match is unchanged, but the decode path no longer pays
+        // a `String` allocation per effect.
+        let lowered;
+        let a: &str = if action.chars().all(|c| c.to_lowercase().eq([c])) {
+            action
+        } else {
+            lowered = action.to_lowercase();
+            lowered.as_str()
+        };
+        Some(match a {
             "move_cards"
             | "discard_card"
             | "discard_until_count"
