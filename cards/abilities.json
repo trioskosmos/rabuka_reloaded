@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-06T19:59:57.689697",
+  "generated_at": "2026-10-07T11:50:23.511705",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "20fc0308",
+  "engine_commit": "9af4c0e5",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -28733,9 +28733,11 @@
           "text": "手札以外から登場したとき",
           "trigger_event": {
             "type": "appearance",
-            "location": "stage"
+            "location": "stage",
+            "appearance_source": "non_hand"
           },
-          "location": "stage"
+          "location": "stage",
+          "appearance_source": "non_hand"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -28776,7 +28778,8 @@
             "text": "それは次のターンのアクティブフェイズにアクティブにならない",
             "action": "restriction",
             "restriction_type": "cannot_activate",
-            "phase": "active_phase"
+            "phase": "active_phase",
+            "delayed": true
           }
         ]
       }
@@ -30160,9 +30163,11 @@
           "text": "このメンバーが手札以外からステージに登場している場合",
           "trigger_event": {
             "type": "appearance",
-            "location": "stage"
+            "location": "stage",
+            "appearance_source": "non_hand"
           },
           "location": "stage",
+          "appearance_source": "non_hand",
           "card_type": "member_card"
         },
         "action": "sequential",

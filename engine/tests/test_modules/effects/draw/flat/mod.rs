@@ -12,6 +12,7 @@ pub mod higher_cost_member_live_success_draw_test;
 pub mod live_success_compare_revealed_draw_behaviour_test;
 pub mod live_success_compare_revealed_draw_test;
 pub mod live_success_optional_three_energy_draw_test;
+pub mod live_success_own_revealed_live_draw_pl_s_pr_046_pr_test;
 pub mod live_zone_count_gated_draw_test;
 pub mod miyashita_ai_pb1_test;
 pub mod optional_energy_catchu_trio_draw_sumire_bp7_015_n_test;

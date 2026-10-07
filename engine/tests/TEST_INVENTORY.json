@@ -1,24 +1,24 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-07T00:35:38.965910+00:00",
+  "generated_at": "2026-10-07T01:09:37.592939+00:00",
   "stats": {
     "total_cards": 2674,
     "cards_with_abilities": 1664,
     "total_abilities": 2132,
     "unique_abilities": 996
   },
-  "n_files": 1045,
-  "n_tests": 4343,
+  "n_files": 1048,
+  "n_tests": 4350,
   "total_cards": 818,
-  "covered_cards": 816,
-  "abilities_on_covered": 993,
+  "covered_cards": 818,
+  "abilities_on_covered": 996,
   "trigger_counts": {
     "起動": [
       102,
       102
     ],
     "登場": [
-      282,
+      283,
       283
     ],
     "ライブ開始時": [
@@ -34,7 +34,7 @@
       129
     ],
     "ライブ成功時": [
-      124,
+      126,
       126
     ],
     "自動": [
@@ -52,11 +52,11 @@
       75
     ],
     "gain_resource": [
-      173,
+      174,
       174
     ],
     "sequential": [
-      233,
+      234,
       234
     ],
     "unknown": [
@@ -68,7 +68,7 @@
       2
     ],
     "draw_card": [
-      46,
+      47,
       47
     ],
     "change_state": [
@@ -186,11 +186,11 @@
   },
   "cond_counts": {
     "none": [
-      576,
+      577,
       577
     ],
     "location_condition": [
-      76,
+      77,
       77
     ],
     "comparison_condition": [
@@ -214,7 +214,7 @@
       41
     ],
     "appearance_condition": [
-      14,
+      15,
       15
     ],
     "movement:baton_touch": [
@@ -284,7 +284,7 @@
       56
     ],
     "PR": [
-      58,
+      61,
       61
     ],
     "bp3": [
@@ -321,11 +321,10 @@
     ]
   },
   "depth_counts": {
-    "L2+choice": 860,
-    "L2": 105,
+    "L2+choice": 862,
+    "L2": 106,
     "L1+choice": 27,
-    "L1": 1,
-    "none": 3
+    "L1": 1
   },
   "qa_rulings": {
     "covered": 280,
@@ -1080,7 +1079,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4343,
+  "n_test_fns_parsed": 4350,
   "abilities": [
     {
       "idx": 0,
@@ -10491,16 +10490,20 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/draw/flat/live_success_own_revealed_live_draw_pl_s_pr_046_pr_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/success_pile_difference_pl_s_bp6_009_r_plus_test.rs"
       ],
       "covering_tests": [
+        "only_the_opponents_revealed_live_card_does_not_count",
+        "own_reveals_contain_a_live_card_and_draw_one_pl_s_pr_046_pr",
+        "own_reveals_without_a_live_card_draw_nothing",
         "pl_s_bp6_009_r_plus_constant_blades_apply_to_each_instance",
         "pl_s_bp6_009_r_plus_constant_blades_follow_opponent_success_pile_lead",
         "ruby_center_live_success_scores_revealed_aqours_score_icon_live",
         "ruby_live_success_requires_one_revealed_card_to_match_every_filter",
         "ruby_off_center_live_success_does_not_score"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 8,
       "direct_tests": [
         "pl_s_bp6_009_r_plus_constant_blades_apply_to_each_instance",
         "pl_s_bp6_009_r_plus_constant_blades_follow_opponent_success_pile_lead",
@@ -10538,16 +10541,20 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
+        "engine/tests/test_modules/effects/draw/flat/live_success_own_revealed_live_draw_pl_s_pr_046_pr_test.rs",
         "engine/tests/test_modules/effects/gain/blades/constants/success_pile_difference_pl_s_bp6_009_r_plus_test.rs"
       ],
       "covering_tests": [
+        "only_the_opponents_revealed_live_card_does_not_count",
+        "own_reveals_contain_a_live_card_and_draw_one_pl_s_pr_046_pr",
+        "own_reveals_without_a_live_card_draw_nothing",
         "pl_s_bp6_009_r_plus_constant_blades_apply_to_each_instance",
         "pl_s_bp6_009_r_plus_constant_blades_follow_opponent_success_pile_lead",
         "ruby_center_live_success_scores_revealed_aqours_score_icon_live",
         "ruby_live_success_requires_one_revealed_card_to_match_every_filter",
         "ruby_off_center_live_success_does_not_score"
       ],
-      "covering_test_count": 5,
+      "covering_test_count": 8,
       "direct_tests": [
         "pl_s_bp6_009_r_plus_constant_blades_apply_to_each_instance",
         "pl_s_bp6_009_r_plus_constant_blades_follow_opponent_success_pile_lead",
@@ -14348,6 +14355,7 @@
         "engine/tests/test_modules/effects/draw/flat/boosted_member_live_success_draw_test.rs",
         "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs",
         "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_test.rs",
+        "engine/tests/test_modules/effects/draw/flat/live_success_own_revealed_live_draw_pl_s_pr_046_pr_test.rs",
         "engine/tests/test_modules/effects/draw/flat/live_zone_count_gated_draw_test.rs",
         "engine/tests/test_modules/effects/draw/flat/per_own_stage_member_draw_then_discard_q146_test.rs",
         "engine/tests/test_modules/effects/energy/place/revealed_live_wait_energy_test.rs",
@@ -14401,6 +14409,7 @@
         "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_recover_live_q79_q123_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/self_to_waitroom_recover_member_own_card_is_candidate_test.rs",
         "engine/tests/test_modules/effects/recover/to_hand/success_zone_revealed_members_pl_s_bp5_019_l_test.rs",
+        "engine/tests/test_modules/effects/restriction/live_success_wait_next_active_phase_blocked_pl_hs_pr_038_pr_test.rs",
         "engine/tests/test_modules/effects/score/card_score/live_start_empty_zone_all_lily_white_pl_pb1_029_srl_test.rs",
         "engine/tests/test_modules/effects/score/card_score/live_start_reciprocal_live_heart01_threshold_live_score_test.rs",
         "engine/tests/test_modules/effects/score/card_score/success_count_revealed_score_live_pl_sp_bp5_023_l_test.rs",
@@ -14477,7 +14486,7 @@
         "audit_set_zero_removes_requirement",
         "audit_sufficient_hearts_passes"
       ],
-      "covering_test_count": 926,
+      "covering_test_count": 931,
       "direct_tests": [
         "a_card_in_the_success_zone_blocks_the_bonus",
         "a_live_in_the_waitroom_is_not_a_candidate",
@@ -14510,7 +14519,7 @@
         "dazzling_live_start_recolors_listed_blade_hearts_to_purple",
         "debut_both_waitrooms_member_restore_shrinks_own_waitroom"
       ],
-      "direct_test_count": 402,
+      "direct_test_count": 404,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -32068,6 +32077,7 @@
         "engine/tests/test_modules/effects/compound/cost_and_effect/center_wait_discard_other_group_cost_plus_two_same_area_deploy_edges_test.rs",
         "engine/tests/test_modules/effects/compound/cost_and_effect/center_wait_discard_other_group_cost_plus_two_same_area_deploy_test.rs",
         "engine/tests/test_modules/effects/deploy/paid_energy_same_name_debut_chain_q200_q201_q202_test.rs",
+        "engine/tests/test_modules/effects/draw/flat/live_success_own_revealed_live_draw_pl_s_pr_046_pr_test.rs",
         "engine/tests/test_modules/integration/per_card/hard_tier_cards_cost_copy_discount_mill_and_dual_retrieve_test.rs",
         "engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/blade_heart_two_or_fewer_discard_all_and_re_yell_test.rs",
         "engine/tests/test_modules/jidou/yell/discard_revealed_then_re_yell/dia_daisuki_both_activate_order_from_mixed_deck_test.rs",
@@ -32106,7 +32116,7 @@
         "ddd_option_b_with_two_live_cards_fetches_hasunosora_live",
         "discard_accept_then_re_yells"
       ],
-      "covering_test_count": 64,
+      "covering_test_count": 67,
       "direct_tests": [
         "center_other_member_cost_plus_two_deploy_sacrifice_and_summon_cost_plus_two_to_vacated_area",
         "center_other_member_cost_plus_two_deploy_sacrifice_from_full_stage_other_members_undisturbed",
@@ -32425,18 +32435,22 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs",
-        "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_test.rs"
+        "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_test.rs",
+        "engine/tests/test_modules/effects/draw/flat/live_success_own_revealed_live_draw_pl_s_pr_046_pr_test.rs"
       ],
       "covering_tests": [
         "hanamaru_bp3_016_success_zone_cost_increase_constant_parsed",
         "maki_sd1_006_success_zone_restriction_parsed",
         "no_reveal_configuration_satisfies_the_condition",
+        "only_the_opponents_revealed_live_card_does_not_count",
+        "own_reveals_contain_a_live_card_and_draw_one_pl_s_pr_046_pr",
+        "own_reveals_without_a_live_card_draw_nothing",
         "the_live_cards_own_draw_only_happens_inside_the_open_window",
         "you_bp3_005_live_success_trigger_is_evaluated_and_records_a_verdict",
         "you_does_not_draw_when_own_reveal_count_is_higher",
         "you_does_not_draw_when_reveal_counts_are_equal"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 10,
       "direct_tests": [
         "the_live_cards_own_draw_only_happens_inside_the_open_window",
         "you_bp3_005_live_success_trigger_is_evaluated_and_records_a_verdict"
@@ -44969,16 +44983,27 @@
         "PL!HS-PR-038-PR"
       ],
       "base": "PL!HS-PR-038",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
-      "direct_tests": [],
-      "direct_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/effects/restriction/live_success_wait_next_active_phase_blocked_pl_hs_pr_038_pr_test.rs",
+        "engine/tests/test_modules/jidou/debut_watch/non_hand_appearance_gains_heart06_pl_hs_pr_038_pr_test.rs"
+      ],
+      "covering_tests": [
+        "a_member_played_from_hand_gains_nothing",
+        "appearing_from_the_waitroom_gains_heart06",
+        "live_success_waits_one_opp_member_and_flags_it_for_next_active_phase",
+        "waited_opponent_skips_its_next_active_phase_then_wakes"
+      ],
+      "covering_test_count": 4,
+      "direct_tests": [
+        "a_member_played_from_hand_gains_nothing",
+        "appearing_from_the_waitroom_gains_heart06"
+      ],
+      "direct_test_count": 2,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -44999,16 +45024,27 @@
         "PL!HS-PR-038-PR"
       ],
       "base": "PL!HS-PR-038",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
-      "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
-      "direct_tests": [],
-      "direct_test_count": 0,
+      "covered": true,
+      "depth": "L2+choice",
+      "has_assert": true,
+      "has_choice": true,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/effects/restriction/live_success_wait_next_active_phase_blocked_pl_hs_pr_038_pr_test.rs",
+        "engine/tests/test_modules/jidou/debut_watch/non_hand_appearance_gains_heart06_pl_hs_pr_038_pr_test.rs"
+      ],
+      "covering_tests": [
+        "a_member_played_from_hand_gains_nothing",
+        "appearing_from_the_waitroom_gains_heart06",
+        "live_success_waits_one_opp_member_and_flags_it_for_next_active_phase",
+        "waited_opponent_skips_its_next_active_phase_then_wakes"
+      ],
+      "covering_test_count": 4,
+      "direct_tests": [
+        "a_member_played_from_hand_gains_nothing",
+        "appearing_from_the_waitroom_gains_heart06"
+      ],
+      "direct_test_count": 2,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -46881,22 +46917,26 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/deploy/waitroom_low_cost_pl_hs_bp6_016_r_test.rs"
+        "engine/tests/test_modules/effects/deploy/waitroom_low_cost_pl_hs_bp6_016_r_test.rs",
+        "engine/tests/test_modules/jidou/debut_watch/non_hand_appearance_gains_heart06_pl_hs_pr_038_pr_test.rs"
       ],
       "covering_tests": [
+        "a_member_played_from_hand_gains_nothing",
+        "appearing_from_the_waitroom_gains_heart06",
         "pl_hs_bp6_016_r_activation_moves_low_cost_hasunosora_member_from_waitroom_to_stage",
         "pl_hs_bp6_016_r_full_stage_terminates_without_deploy",
         "pl_hs_bp6_016_r_non_hasunosora_ignored",
         "pl_hs_bp6_016_r_too_expensive_member_not_deployed"
       ],
-      "covering_test_count": 4,
+      "covering_test_count": 6,
       "direct_tests": [
+        "appearing_from_the_waitroom_gains_heart06",
         "pl_hs_bp6_016_r_activation_moves_low_cost_hasunosora_member_from_waitroom_to_stage",
         "pl_hs_bp6_016_r_full_stage_terminates_without_deploy",
         "pl_hs_bp6_016_r_non_hasunosora_ignored",
         "pl_hs_bp6_016_r_too_expensive_member_not_deployed"
       ],
-      "direct_test_count": 4,
+      "direct_test_count": 5,
       "is_null": false,
       "use_limit": 1,
       "watches_abilities": false,
@@ -54040,14 +54080,20 @@
         "PL!S-PR-046-PR"
       ],
       "base": "PL!S-PR-046",
-      "covered": false,
-      "depth": "none",
-      "has_assert": false,
+      "covered": true,
+      "depth": "L2",
+      "has_assert": true,
       "has_choice": false,
-      "has_negative": false,
-      "covering_files": [],
-      "covering_tests": [],
-      "covering_test_count": 0,
+      "has_negative": true,
+      "covering_files": [
+        "engine/tests/test_modules/effects/draw/flat/live_success_own_revealed_live_draw_pl_s_pr_046_pr_test.rs"
+      ],
+      "covering_tests": [
+        "only_the_opponents_revealed_live_card_does_not_count",
+        "own_reveals_contain_a_live_card_and_draw_one_pl_s_pr_046_pr",
+        "own_reveals_without_a_live_card_draw_nothing"
+      ],
+      "covering_test_count": 3,
       "direct_tests": [],
       "direct_test_count": 0,
       "is_null": false,

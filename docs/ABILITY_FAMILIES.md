@@ -23,7 +23,7 @@ file), NOT verified assertions — see TEST_COVERAGE.md for depth semantics.
 | [debut_change_state](#debut_change_state) | 33 | 33 | 1 |
 | [live_success_score](#live_success_score) | 31 | 31 | 1 |
 | [other:起動:sequential](#other:起動:sequential) | 28 | 28 | 1 |
-| [other:ライブ成功時:sequential](#other:ライブ成功時:sequential) | 25 | 24 | 1 |
+| [other:ライブ成功時:sequential](#other:ライブ成功時:sequential) | 25 | 25 | 1 |
 | [auto_gain](#auto_gain) | 24 | 24 | 1 |
 | [other:常時:gain_resource](#other:常時:gain_resource) | 23 | 23 | 1 |
 | [other:自動:sequential](#other:自動:sequential) | 19 | 19 | 1 |
@@ -31,10 +31,10 @@ file), NOT verified assertions — see TEST_COVERAGE.md for depth semantics.
 | [constant_modify_cost](#constant_modify_cost) | 17 | 17 | 1 |
 | [other:ライブ開始時:modify_required_hearts](#other:ライブ開始時:modify_required_hearts) | 15 | 15 | 1 |
 | [other:ライブ開始時:change_state](#other:ライブ開始時:change_state) | 13 | 13 | 1 |
-| [other:ライブ成功時:draw_card](#other:ライブ成功時:draw_card) | 13 | 12 | 1 |
+| [other:ライブ成功時:draw_card](#other:ライブ成功時:draw_card) | 13 | 13 | 1 |
 | [constant_modify_score](#constant_modify_score) | 11 | 11 | 1 |
 | [auto_change_state](#auto_change_state) | 10 | 10 | 1 |
-| [other:登場:gain_resource](#other:登場:gain_resource) | 10 | 9 | 1 |
+| [other:登場:gain_resource](#other:登場:gain_resource) | 10 | 10 | 1 |
 | [other:起動:change_state](#other:起動:change_state) | 9 | 9 | 1 |
 | [auto_move_cards](#auto_move_cards) | 9 | 9 | 1 |
 | [other:登場:choice](#other:登場:choice) | 9 | 9 | 1 |
@@ -403,7 +403,7 @@ Triggers: 常時 — 51/51 L0-covered.
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
-| `PL!S-bp6-009` | L2+choice | 5 | {{jyouji.png/常時}}相手の成功ライブカード置き場にあるカードの枚数が自分より多いかぎり、その差に等しい数の{{icon_blade.png/ブレード}}を得る。 |
+| `PL!S-bp6-009` | L2+choice | 8 | {{jyouji.png/常時}}相手の成功ライブカード置き場にあるカードの枚数が自分より多いかぎり、その差に等しい数の{{icon_blade.png/ブレード}}を得る。 |
 
 ### variant: {'text': '自分と相手のステージにメンバーが合計6人いるかぎり', 'target': 'both', 'location': 'stage', 'card_type': 'member_card', 'count': 6, 'aggregate': 'total', 'scope': 'both', 'type': 'location_condition', 'operator': '='} — 3 abilities
 
@@ -722,11 +722,11 @@ Triggers: 起動 — 34/34 L0-covered.
 | `PL!S-bp6-008` | L2+choice | 11 | {{kidou.png/起動}}{{icon_energy.png/E}}{{icon_energy.png/E}}このメンバーをステージから控え室に置く：自分の控え室からコスト17以下の『Aqours』のメンバーカードを1枚、このメンバーがいたエリアに登場さ |
 | `PL!HS-bp5-002` | L2+choice | 8 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアに登場させる。 |
 | `PL!-PR-004` | L2+choice | 7 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_01.png/heart01}}を3以上含むライブカードを1枚手札に加える。 |
+| `PL!HS-bp6-016` | L2+choice | 6 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室からコス |
 | `PL!-bp5-009` | L2+choice | 5 | {{kidou.png/起動}}{{turn1.png/ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_06.png/heart06}}を3以上含むライブカードを1枚手札に加える。 |
 | `PL!SP-bp4-010` | L2+choice | 5 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}このメンバーをウェイトにする：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
 | `PL!N-sd2-001` | L2+choice | 5 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。 |
 | `PL!SP-sd1-011` | L2+choice | 4 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
-| `PL!HS-bp6-016` | L2+choice | 4 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}：自分の控え室からコス |
 | `PL!SP-sd2-006` | L2+choice | 3 | {{kidou.png/起動}}{{turn1.png/ターン1回}}{{icon_energy.png/E}}{{icon_energy.png/E}}手札を1枚控え室に置く：自分の控え室から『Liella!』のライブカードを1枚手札に加える。 |
 | `PL!SP-bp5-021` | L1+choice | 2 | {{kidou.png/起動}}このメンバーをステージから控え室に置く：自分のエネルギーが6枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。 |
 
@@ -843,11 +843,11 @@ Triggers: ライブ成功時 — 31/31 L0-covered.
 | `PL!SP-bp2-024` | L2+choice | 11 | {{live_success.png/ライブ成功時}}自分の手札の枚数が相手より多い場合、このカードのスコアを＋１する。 |
 | `PL!N-bp7-026` | L2+choice | 10 | {{live_success.png/ライブ成功時}}エールにより公開された自分のカードの中に、ブレードハートを持たないメンバーカードが2枚以上ある場合、このカードのスコアを＋１する。 |
 | `PL!N-bp7-025` | L2 | 9 | {{live_success.png/ライブ成功時}}エールにより公開された自分のカードの中に{{heart_01.png/heart01}}、{{heart_02.png/heart02}}、{{heart_03.png/heart03}}、{{heart_ |
+| `PL!S-bp6-009` | L2+choice | 8 | {{live_success.png/ライブ成功時}}{{center.png/センター}}エールにより公開された自分のカードの中に、{{icon_score.png/スコア}}を持つ『Aqours』のライブカードがある場合、ライブの合計スコアを＋１する。 |
 | `PL!SP-bp5-025` | L2+choice | 8 | {{live_success.png/ライブ成功時}}{{icon_energy.png/E}}を好きな数支払ってもよい：これにより支払った{{icon_energy.png/E}}4つにつき、このカードのスコアを＋１する。 |
 | `PL!SP-bp7-024` | L2 | 7 | {{live_success.png/ライブ成功時}}自分のエネルギーが相手より2枚以上多い場合、このカードのスコアを＋１する。 |
 | `PL!SP-pb2-003` | L2+choice | 7 | {{live_success.png/ライブ成功時}}このターン、自分の『Liella!』のカードの効果によってこのメンバーがエリアを移動していた場合、ライブの合計スコアを＋１する。 |
 | `PL!SP-pb2-049` | L2+choice | 6 | {{live_success.png/ライブ成功時}}自分のエネルギーが11枚以上ある場合、このカードのスコアを＋１する。 |
-| `PL!S-bp6-009` | L2+choice | 5 | {{live_success.png/ライブ成功時}}{{center.png/センター}}エールにより公開された自分のカードの中に、{{icon_score.png/スコア}}を持つ『Aqours』のライブカードがある場合、ライブの合計スコアを＋１する。 |
 | `PL!SP-bp7-028` | L2+choice | 5 | {{live_success.png/ライブ成功時}}エールにより公開された自分のカードがすべて『Liella!』の場合、このカードのスコアを＋１する。 |
 | `PL!SP-bp4-026` | L2 | 4 | {{live_success.png/ライブ成功時}}エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合、このカードのスコアを＋１する。 |
 | `PL!N-bp3-031` | L2+choice | 4 | {{live_success.png/ライブ成功時}}自分のステージにいるウェイト状態のメンバー1人につき、このカードのスコアを＋１する。 |
@@ -894,7 +894,7 @@ Triggers: 起動 — 28/28 L0-covered.
 
 ## other:ライブ成功時:sequential
 
-Triggers: ライブ成功時 — 24/25 L0-covered.
+Triggers: ライブ成功時 — 25/25 L0-covered.
 
 ### variant: (no variant) — 25 abilities
 
@@ -921,10 +921,10 @@ Triggers: ライブ成功時 — 24/25 L0-covered.
 | `PL!SP-bp7-027` | L2+choice | 5 | {{live_success.png/ライブ成功時}}自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。そのエネルギーカードは、次のターンのアクティブフェイズにアクティブしない。 |
 | `PL!SP-bp4-026` | L2 | 4 | {{live_success.png/ライブ成功時}}自分のエネルギーが11枚以上ある場合、カードを2枚引き、手札を1枚控え室に置く。 |
 | `PL!-bp6-016` | L2+choice | 4 | {{live_success.png/ライブ成功時}}自分のデッキの上からカードを3枚見る。それらを好きな順番でデッキの上に置く。 |
+| `PL!HS-PR-038` | L2+choice | 4 | {{live_success.png/ライブ成功時}}相手のステージにいるコスト4以下のメンバー1人をウェイトにする。それは次のターンのアクティブフェイズにアクティブにならない。 |
 | `PL!-bp6-011` | L2+choice | 2 | {{live_success.png/ライブ成功時}}カードを2枚引き、手札を2枚控え室に置く。 |
 | `PL!-bp6-021` | L2+choice | 2 | {{live_success.png/ライブ成功時}}『μ's』のメンバー1人をステージから控え室に置いてもよい：このカードのスコアを＋１し、自分の控え室から『μ's』のライブカード1枚を手札に加える。 |
 | `PL!SP-sd2-003` | L1+choice | 2 | {{live_success.png/ライブ成功時}}カードを1枚引く。このターン、このメンバーがエリアを移動している場合、さらにカードを1枚引く。 |
-| `PL!HS-PR-038` | none | 0 | {{live_success.png/ライブ成功時}}相手のステージにいるコスト4以下のメンバー1人をウェイトにする。それは次のターンのアクティブフェイズにアクティブにならない。 |
 
 ## auto_gain
 
@@ -1120,7 +1120,7 @@ Triggers: ライブ開始時 — 13/13 L0-covered.
 
 ## other:ライブ成功時:draw_card
 
-Triggers: ライブ成功時 — 12/13 L0-covered.
+Triggers: ライブ成功時 — 13/13 L0-covered.
 
 ### variant: (no variant) — 13 abilities
 
@@ -1130,15 +1130,15 @@ Triggers: ライブ成功時 — 12/13 L0-covered.
 | `PL!SP-bp1-024` | L2+choice | 22 | {{live_success.png/ライブ成功時}}自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。 (必要ハートを確認する時、エールで出た{{icon_b_all.png/ALLブレード}}は任意の色のハートとして扱う。) |
 | `PL!SP-bp1-024` | L2+choice | 22 | {{live_success.png/ライブ成功時}}自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。 |
 | `PL!SP-bp5-020` | L2+choice | 20 | {{live_success.png/ライブ成功時}}{{icon_energy.png/E}}支払ってもよい：カードを1枚引く。 |
+| `PL!S-bp3-005` | L2 | 10 | {{live_success.png/ライブ成功時}}エールにより公開された自分のカードの枚数が、相手がエールによって公開したカードの枚数より少ない場合、カードを1枚引く。 |
 | `PL!-bp4-023` | L2+choice | 9 | {{live_success.png/ライブ成功時}}自分が余剰ハートに{{heart_01.png/heart01}}を1つ以上持つ場合、カードを1枚引く。 |
 | `PL!SP-pb1-004` | L2+choice | 9 | {{live_success.png/ライブ成功時}}{{icon_energy.png/E}}{{icon_energy.png/E}}{{icon_energy.png/E}}支払ってもよい：カードを1枚引く。 |
 | `PL!HS-pb1-013` | L2+choice | 7 | {{live_success.png/ライブ成功時}}自分のステージに、このメンバーよりコストが高いメンバーがいる場合、カードを1枚引く。 |
-| `PL!S-bp3-005` | L2 | 7 | {{live_success.png/ライブ成功時}}エールにより公開された自分のカードの枚数が、相手がエールによって公開したカードの枚数より少ない場合、カードを1枚引く。 |
 | `PL!-pb1-032` | L2+choice | 4 | {{live_success.png/ライブ成功時}}自分の成功ライブカード置き場に『μ's』のカードがある場合、カードを1枚引く。 |
 | `PL!HS-PR-028` | L2 | 4 | {{live_success.png/ライブ成功時}}自分のステージに、元々持つハートの数より多い数のハートを持つメンバーがいる場合、カードを1枚引く。 |
 | `PL!SP-pb2-004` | L2+choice | 3 | {{live_success.png/ライブ成功時}}自分のライブカード置き場の中に元々のスコアより高いスコアのライブカードがあるか、エールにより公開された自分のカードの中に{{icon_score.png/スコア}}を持つライブカードがある場合、カードを1枚 |
+| `PL!S-PR-046` | L2 | 3 | {{live_success.png/ライブ成功時}}エールにより公開された相手のカードの中にライブカードがある場合、カードを1枚引く。 |
 | `PL!HS-pb1-021` | L2 | 2 | {{live_success.png/ライブ成功時}}自分のライブカード置き場に『DOLLCHESTRA』のカードがある場合、カードを1枚引く。 |
-| `PL!S-PR-046` | none | 0 | {{live_success.png/ライブ成功時}}エールにより公開された相手のカードの中にライブカードがある場合、カードを1枚引く。 |
 
 ## constant_modify_score
 
@@ -1181,7 +1181,7 @@ Triggers: 自動 — 10/10 L0-covered.
 
 ## other:登場:gain_resource
 
-Triggers: 登場 — 9/10 L0-covered.
+Triggers: 登場 — 10/10 L0-covered.
 
 ### variant: (no variant) — 10 abilities
 
@@ -1194,9 +1194,9 @@ Triggers: 登場 — 9/10 L0-covered.
 | `PL!N-sd2-019` | L2+choice | 12 | {{toujyou.png/登場}}ライブ終了時まで、{{heart_05.png/heart05}}を得る。 |
 | `PL!S-bp6-013` | L2+choice | 11 | {{toujyou.png/登場}}ライブ終了時まで、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}を得る。 |
 | `PL!HS-cl1-006` | L2+choice | 8 | {{toujyou.png/登場}}ライブ終了時まで、{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}{{icon_blade.png/ブレード}}を得る。 |
+| `PL!HS-PR-038` | L2+choice | 4 | {{toujyou.png/登場}}手札以外から登場したとき、ライブ終了時まで、{{heart_06.png/heart06}}を得る。 |
 | `PL!N-bp7-024` | L2 | 3 | {{toujyou.png/登場}}自分のステージに『R3BIRTH』のメンバーが3人いる場合、ライブ終了時まで、{{heart_01.png/heart01}}を得る。 |
 | `PL!HS-bp2-009` | L2+choice | 1 | {{toujyou.png/登場}}{{icon_energy.png/E}}支払ってもよい：このメンバーよりコストが低い『みらくらぱーく！』のメンバーからバトンタッチして登場した場合、ライブ終了時まで、{{heart_01.png/heart01}}{{he |
-| `PL!HS-PR-038` | none | 0 | {{toujyou.png/登場}}手札以外から登場したとき、ライブ終了時まで、{{heart_06.png/heart06}}を得る。 |
 
 ## other:起動:change_state
 
@@ -1444,7 +1444,7 @@ Triggers: ライブ成功時 — 4/4 L0-covered.
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
-| `PL!-sd1-019` | L2+choice | 926 | {{live_success.png/ライブ成功時}}自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。 |
+| `PL!-sd1-019` | L2+choice | 931 | {{live_success.png/ライブ成功時}}自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。 |
 | `PL!-bp5-001` | L2+choice | 36 | {{live_success.png/ライブ成功時}}手札を1枚控え室に置いてもよい：自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。その中からカードを1枚手札に加える。残りを控え室に置く。 |
 | `PL!S-bp5-007` | L2+choice | 7 | {{live_success.png/ライブ成功時}}自分のデッキの上からカードを4枚見る。その中からハートに{{heart_04.png/heart04}}を2つ以上持つメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。 |
 | `PL!HS-bp6-028` | L2+choice | 6 | {{live_success.png/ライブ成功時}}このターン、自分が余剰ハートを1つ以上持っている場合、自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。 |
@@ -1915,7 +1915,7 @@ Triggers: 自動 — 1/1 L0-covered.
 
 | Card | Depth | Tests | Text |
 |---|---|---|---|
-| `PL!S-bp2-004` | L2+choice | 64 | {{jidou.png/自動}}［ターン1回］エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい。これにより1枚以上のカードが控え室に置かれた場合、そのエールで得たブレードハートを失い、もう一度エールを行 |
+| `PL!S-bp2-004` | L2+choice | 67 | {{jidou.png/自動}}［ターン1回］エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい。これにより1枚以上のカードが控え室に置かれた場合、そのエールで得たブレードハートを失い、もう一度エールを行 |
 
 ## other:起動:choose_target_player
 

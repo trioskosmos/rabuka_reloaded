@@ -1780,7 +1780,10 @@ impl super::resolver::AbilityResolver {
             for &cid in &remaining {
                 player.waitroom.add_card(cid);
             }
-            gs.revealed_cards.clear();
+            // Both halves, kept index-aligned: `revealed_card_meta` exists to
+            // be read (owner scoping in condition/card.rs), and a pool clear
+            // that leaves the meta behind shifts every later owner tag.
+            gs.clear_revealed_cards();
         }
         // When user skips an optional revealed_cards selection, clear any
         // pending sequential actions (e.g. re_yell should not fire after skip).

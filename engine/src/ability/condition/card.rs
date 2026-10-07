@@ -747,6 +747,45 @@ impl<'a> ConditionContext<'a> {
         h <= need
     }
 
+    /// 「自分の」/「相手の」 scope for the GAME-level revealed pool.
+    ///
+    /// The pool holds BOTH performers' yell reveals at
+    /// LiveVictoryDetermination — nothing clears it between the two
+    /// performances (`clear_revealed_cards` runs only after LVD,
+    /// phases.rs:313) — and each entry is tagged with its performer's seat in
+    /// `revealed_card_meta.owner` (phases.rs:437-439). An explicit
+    /// `target: self|opponent` keeps only that seat's entries, so
+    /// 「エールによって公開された自分のカードの中にライブカードがある場合」
+    /// (`PL!S-PR-046-PR` ab#0 and the 19 other cards with this clause shape)
+    /// cannot be satisfied by the opponent's reveal. Entries pushed without
+    /// meta (test fixtures, effect reveals with no known owner) stay visible
+    /// to either side, and a clause with no explicit target keeps the
+    /// historical unscoped read.
+    fn revealed_cards_scoped(&self, condition: &Condition) -> Vec<i16> {
+        let gs = &self.game_state;
+        let wanted_seat = match condition.get_target() {
+            Some(target @ ("self" | "opponent")) => {
+                let player = self.resolve_condition_player(target);
+                Some(gs.seat_index_by_id(&player.id))
+            }
+            _ => None,
+        };
+        gs.revealed_cards
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| {
+                match (
+                    wanted_seat,
+                    gs.revealed_card_meta.get(*index).and_then(|m| m.owner),
+                ) {
+                    (Some(want), Some(owner)) => owner == want,
+                    _ => true,
+                }
+            })
+            .map(|(_, &cid)| cid)
+            .collect()
+    }
+
     pub(crate) fn evaluate_location_condition(&self, condition: &Condition) -> bool {
         // NOTE: negation is NOT handled here — the parser sets `negation: True` on
         // conditions derived from natural-language negatives (e.g. "ない"), and the
@@ -937,7 +976,7 @@ impl<'a> ConditionContext<'a> {
                 log::debug!("[LOC_COND] yell_trigger true but yell_occurred false → fail");
                 return false;
             }
-            self.game_state.revealed_cards.to_vec()
+            self.revealed_cards_scoped(condition)
         } else if is_both {
             let self_p = self.resolve_condition_player("self");
             let opp_p = self.resolve_condition_player("opponent");
@@ -1552,10 +1591,8 @@ impl<'a> ConditionContext<'a> {
             // every revealed member happens to satisfy.
             Some(Zone::RevealedCards) => {
                 let card_type = condition.get_card_type().map(|ct| ct.as_str());
-                self.game_state
-                    .revealed_cards
-                    .iter()
-                    .copied()
+                self.revealed_cards_scoped(condition)
+                    .into_iter()
                     .filter(|&id| {
                         card_type
                             .is_none_or(|ct| util::card_matches_type(card_db, id, Some(ct)))
@@ -3283,8 +3320,22 @@ let actual = if condition.get_member_has_resource_under() == Some(true) {
                 // fired. Test every card that arrived on this stage instead — for
                 // the self-referential shape the activating card is on the stage
                 // and carries its own source, so both spellings land here.
+                //
+                // `non_hand` is the inverse spelling (HS-PR-038 ab#0
+                // 「手札以外から登場したとき」): a member played from the hand
+                // ALSO appears (turn/phases.rs records its origin as "hand"), so
+                // it must NOT satisfy this. Only an arrival recorded with a
+                // different origin counts; the hand placements are the two
+                // paths that record "hand" explicitly, everything else is
+                // effect-driven (source = the moved-from zone) or unrecorded.
                 let ok = stage_ids.iter().any(|&cid| {
-                    self.game_state.get_card_appearance_source(cid) == Some(expected_source)
+                    let source = self.game_state.get_card_appearance_source(cid);
+                    if expected_source == "non_hand" {
+                        self.game_state.has_card_appeared_this_turn(cid)
+                            && source != Some("hand")
+                    } else {
+                        source == Some(expected_source)
+                    }
                 });
                 if !ok {
                     push_rich(&format!("登場元不一致: 期待={}", expected_source), false);

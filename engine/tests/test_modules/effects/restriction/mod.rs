@@ -4,5 +4,6 @@ pub mod alone_on_stage_cannot_live_constant_test;
 pub mod delayed_cannot_active_owner_tick_test;
 pub mod kagayaiteru_test;
 pub mod live_success_sequential_test;
+pub mod live_success_wait_next_active_phase_blocked_pl_hs_pr_038_pr_test;
 pub mod mebius_loop_comprehensive_edge_test;
 pub mod opponent_active_phase_lock_targeting_test;

@@ -2075,6 +2075,13 @@ def _set_action_021(t, a):
     a["restriction_type"] = "cannot_activate"
     a["target"] = _restriction_target(t)
     a["phase"] = "active_phase" if "アクティブフェイズ" in t else None
+    # 「次のターンのアクティブフェイズにアクティブにならない」 applies ONCE, at
+    # the NEXT active phase — that is the `delayed` per-card flag in
+    # effects/restriction.rs, keyed on the members this ability just waited
+    # (HS-PR-038 ab#1). A bare 「アクティブにならない」 stays a standing
+    # restriction, which the constants path (modifiers.rs) owns.
+    if "次のターン" in t:
+        a["delayed"] = True
     return a
 
 def _set_action_023(t, a):
@@ -4524,6 +4531,12 @@ def _try_appearance(text):
     if "控え室から" in text:
         result["appearance_source"] = "discard"
         result["trigger_event"]["appearance_source"] = "discard"
+    # Detect "appeared from outside the hand" (手札以外から登場) — a member
+    # played from the hand also 「登場」s, so this shape must exclude it.
+    # `non_hand` is matched specially by evaluate_appearance_stage.
+    if "手札以外から" in text:
+        result["appearance_source"] = "non_hand"
+        result["trigger_event"]["appearance_source"] = "non_hand"
     # Extract subject character (the one before が/を登場)
     # Pattern: 「X」が登場 → X is the subject
     # Pattern: 「A」よりコストの(大きい|高い)「B」が登場 → B is the subject
@@ -11177,6 +11190,13 @@ def _set_restriction_fields(text, result):
         result["duration"] = "this_turn"
     if "ライブ終了時まで" in text or "ライブ終了まで" in text:
         result["duration"] = "live_end"
+    # 「次のターンのアクティブフェイズにアクティブにならない」 applies ONCE, at
+    # the NEXT active phase — that is the `delayed` per-card flag in
+    # effects/restriction.rs, keyed on the members this ability just waited
+    # (HS-PR-038 ab#1). A bare 「アクティブにならない」 stays a standing
+    # restriction, which the constants path (game_state/modifiers.rs) owns.
+    if "次のターン" in text and "アクティブ" in text:
+        result["delayed"] = True
     if "メンバー" in text:
         result["card_type"] = "member_card"
     if "エネルギー" in text:
@@ -14190,6 +14210,12 @@ def _apply_recursive_fixes(d):
         ):
             if "appearance_source" not in current:
                 current["appearance_source"] = "discard"
+
+        if current.get("type") == "appearance_condition" and "手札以外から" in current.get(
+            "text", ""
+        ):
+            if "appearance_source" not in current:
+                current["appearance_source"] = "non_hand"
 
         if current.get("action") == "move_cards":
             t = current.get("text", "")
