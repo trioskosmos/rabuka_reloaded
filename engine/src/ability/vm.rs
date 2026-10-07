@@ -153,7 +153,8 @@ pub fn count_empty_bytecode_abilities() -> usize {
 /// 1. `card_loader` stores only u16 indices (no decode at load time)
 /// 2. On first trigger/access, `AbilityRef::resolve()` calls `get_ability(idx)`
 /// 3. Decode from bytecode
-/// 4. Caller wraps in Arc and drops when done — no memory leak
+/// 4. `AbilityRef` caches the `Arc<Ability>` in a per-index slot, so
+///    later resolves are a refcount bump, not a re-decode
 ///
 /// # RAM savings
 /// Before: All 800 abilities decoded eagerly at load = ~2.8MB
@@ -271,9 +272,12 @@ pub fn get_decompressed_bytecode() -> &'static [u8] {
 }
 
 pub fn get_ability(idx: usize) -> Result<Ability, DecodeError> {
-    // Every ability resolution re-decodes from the blob; there is no resolved-
-    // ability cache (see the "Lazy decoding flow" note below). This is the only
-    // place that cost is paid, so this is the only place it can be measured.
+    // Raw decode from the blob. On std builds `AbilityRef::resolve`
+    // caches the decoded `Arc<Ability>` in a per-index `OnceLock`
+    // (ability_store.rs), so this runs once per ability index per
+    // process; `no_std` has no cache and pays this per resolve. This
+    // is the only place the decode cost is paid, so the only place it
+    // can be measured.
     #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("vm::get_ability");
     if idx >= NUM_ABILITIES {

@@ -211,14 +211,13 @@ impl super::TurnEngine {
             return;
         }
 
-        let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, Option<i16>)> = Vec::new();
         // Track (card_id, ability_idx) to prevent the same card's ability from
         // firing twice when the card is both a stage member AND a live card.
         let mut seen: HashSet<(i16, usize)> = HashSet::default();
 
         {
-            let player = if player_id_clone == game_state.player1.id {
+            let player = if player_id == game_state.player1.id {
                 &game_state.player1
             } else {
                 &game_state.player2
@@ -292,10 +291,10 @@ impl super::TurnEngine {
                             LogEntry {
                                 text: format!(
                                     "{} {} [{zone_label}]: 能力確認 [ライブ開始時]",
-                                    player_id_clone, card.name
+                                    player_id, card.name
                                 ),
                                 turn: game_state.turn_number,
-                                player_label: player_id_clone.clone(),
+                                player_label: player_id.to_string(),
                                 source_card_id: Some(card_id),
                                 source_card_name: Some(card.name.to_string()),
                                 category: "trigger_evaluation".to_string(),
@@ -339,7 +338,7 @@ impl super::TurnEngine {
             game_state.trigger_auto_ability(
                 ability_id,
                 AbilityTrigger::LiveStart,
-                player_id_clone.as_str(),
+                player_id,
                 Some(card_no),
                 explicit_card_id,
                 None,
@@ -364,12 +363,11 @@ impl super::TurnEngine {
         // sources, ensuring should_trigger_live_success uses the correct requirements.
         game_state.restore_performance_need_heart_modifiers();
 
-        let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
         let mut seen: HashSet<(i16, usize)> = HashSet::default();
 
         // LiveSuccess only triggers when the live card's need_heart is satisfied
-        if !game_state.should_trigger_live_success(if player_id_clone == game_state.player1.id {
+        if !game_state.should_trigger_live_success(if player_id == game_state.player1.id {
             &game_state.player1
         } else {
             &game_state.player2
@@ -378,7 +376,7 @@ impl super::TurnEngine {
         }
 
         {
-            let player = if player_id_clone == game_state.player1.id {
+            let player = if player_id == game_state.player1.id {
                 &game_state.player1
             } else {
                 &game_state.player2
@@ -434,10 +432,10 @@ impl super::TurnEngine {
                             LogEntry {
                                 text: format!(
                                     "{} {} [{zone_label}]: 能力確認 [ライブ成功時]",
-                                    player_id_clone, card.name
+                                    player_id, card.name
                                 ),
                                 turn: game_state.turn_number,
-                                player_label: player_id_clone.clone(),
+                                player_label: player_id.to_string(),
                                 source_card_id: Some(card_id),
                                 source_card_name: Some(card.name.to_string()),
                                 category: "trigger_evaluation".to_string(),
@@ -489,10 +487,10 @@ impl super::TurnEngine {
                             LogEntry {
                                 text: format!(
                                     "{} card#{card_id} [success/獲得]: 能力確認 [ライブ成功時]",
-                                    player_id_clone
+                                    player_id
                                 ),
                                 turn: game_state.turn_number,
-                                player_label: player_id_clone.clone(),
+                                player_label: player_id.to_string(),
                                 source_card_id: Some(card_id),
                                 source_card_name: None,
                                 category: "trigger_evaluation".to_string(),
@@ -519,7 +517,7 @@ impl super::TurnEngine {
             game_state.trigger_auto_ability(
                 ability_id,
                 AbilityTrigger::LiveSuccess,
-                player_id_clone.as_str(),
+                player_id,
                 Some(card_no),
                 Some(source_card_id),
                 None,

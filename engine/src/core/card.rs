@@ -126,6 +126,117 @@ pub enum HeartColor {
     All, // All-heart (icon_all.png) — can be treated as any one color during performance check
 }
 
+/// Single macro table for HeartColor variants. Generates Display, as_str,
+/// short_label, index, from_index, and the core FromStr match arms.
+macro_rules! heart_color_table {
+    ($macro:ident) => {
+        $macro! {
+            Heart00 => "heart00", "h00", 0,
+            Heart01 => "heart01", "h01", 1,
+            Heart02 => "heart02", "h02", 2,
+            Heart03 => "heart03", "h03", 3,
+            Heart04 => "heart04", "h04", 4,
+            Heart05 => "heart05", "h05", 5,
+            Heart06 => "heart06", "h06", 6,
+            BAll   => "b_all",   "b_all", 0,
+            Draw   => "draw",    "draw",  0,
+            Score  => "score",   "score", 0,
+            All    => "all",     "all",   7,
+        }
+    };
+}
+
+impl core::fmt::Display for HeartColor {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        macro_rules! disp {
+            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
+                match self {
+                    $(HeartColor::$variant => f.write_str($s),)+
+                }
+            };
+        }
+        heart_color_table!(disp)
+    }
+}
+
+impl HeartColor {
+    pub fn index(&self) -> usize {
+        macro_rules! idx {
+            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
+                match self {
+                    $(HeartColor::$variant => $idx,)+
+                }
+            };
+        }
+        heart_color_table!(idx)
+    }
+
+    pub fn from_index(i: usize) -> Self {
+        match i {
+            0 => HeartColor::Heart00,
+            1 => HeartColor::Heart01,
+            2 => HeartColor::Heart02,
+            3 => HeartColor::Heart03,
+            4 => HeartColor::Heart04,
+            5 => HeartColor::Heart05,
+            6 => HeartColor::Heart06,
+            7 => HeartColor::All,
+            _ => HeartColor::Heart00,
+        }
+    }
+
+    pub fn short_label(&self) -> &'static str {
+        macro_rules! sl {
+            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
+                match self {
+                    $(HeartColor::$variant => $sl,)+
+                }
+            };
+        }
+        heart_color_table!(sl)
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        macro_rules! as_s {
+            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
+                match self {
+                    $(HeartColor::$variant => $s,)+
+                }
+            };
+        }
+        heart_color_table!(as_s)
+    }
+}
+
+impl core::str::FromStr for HeartColor {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        macro_rules! from_s {
+            ($($variant:ident => $str:expr, $sl:expr, $idx:expr),+ $(,)?) => {
+                Ok(match s {
+                    $($str => HeartColor::$variant,)+
+                    // `b_heart07` is a blade heart that produces COLORLESS
+                    // (heart0 / heart00) hearts. Mechanic: `b_heart07: N` grants
+                    // 2×N colorless hearts (the ×2 is applied at conversion in
+                    // live.rs / phases.rs). Colorless hearts can ONLY satisfy
+                    // heart0 requirements — never a specific color.
+                    "heart07" | "b_heart07" => HeartColor::Heart00,
+                    _ if s.starts_with("b_") => {
+                        HeartColor::from_str(&s[2..]).unwrap_or(HeartColor::Heart00)
+                    }
+                    _ => HeartColor::Heart00,
+                })
+            };
+        }
+        heart_color_table!(from_s)
+    }
+}
+
+/// Canonical string→HeartColor conversion. Use `s.parse::<HeartColor>()` instead.
+pub fn parse_heart_color(s: &str) -> HeartColor {
+    s.parse().unwrap_or(HeartColor::Heart00)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub enum BladeColor {
@@ -336,10 +447,12 @@ pub struct Card {
     pub card_type: CardType,
     #[cfg_attr(feature = "serde_support", serde(default))]
     pub series: Box<str>,
-    #[cfg_attr(
-        feature = "serde_support",
-        serde(default = "default_group_from_series")
-    )]
+    // `group` is derived from `series` by the manual
+    // `Deserialize` impl below (`map_series_to_group`).
+    // The struct itself derives only `Serialize`, which
+    // ignores field defaults, so no serde attribute
+    // belongs here (the old one referenced a function
+    // that does not exist).
     pub group: Box<str>,
     pub unit: Option<ArcStr>,
     pub cost: Option<u8>,
@@ -483,16 +596,7 @@ impl CardDatabase {
         self.live_ids[i] = card.is_live();
         self.energy_ids[i] = card.is_energy();
     }
-}
 
-
-impl Default for CardDatabase {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CardDatabase {
     pub fn new() -> Self {
         Self {
             cards: HashMap::default(),
@@ -928,6 +1032,12 @@ impl<'de> Deserialize<'de> for Card {
             special_heart: helper.special_heart,
             abilities: Vec::new(),
         })
+    }
+}
+
+impl Default for CardDatabase {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -2598,9 +2708,7 @@ impl AbilityEffect {
     filter_str_getter!(question_any, question);
 
     filter_u8_getter!(cost_limit_max_any, cost_limit_max);
-}
 
-impl AbilityEffect {
     pub fn set_card_names(&mut self, val: Vec<String>) {
         if let Some(f) = self.kind.as_mut().map(Arc::make_mut).and_then(|k| k.filter_mut()) {
             *f.card_names = val;
@@ -2630,9 +2738,7 @@ impl AbilityEffect {
     filter_setter!(set_self_target, self_target: bool);
     filter_setter!(set_target_count, target_count: u8);
     filter_setter!(set_target_member, target_member: ArcStr);
-}
 
-impl AbilityEffect {
     pub fn target_name(&self) -> &str {
         self.target.as_deref().unwrap_or("self")
     }
@@ -3788,6 +3894,50 @@ pub struct LocationSubChecks {
     pub reference_card: Option<ArcStr>,
 }
 
+/// Rich description of what event triggers a condition.
+/// Parser-produced documentary field. The engine reads from this when
+/// the corresponding flat Condition field is absent.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde_support", serde(default))]
+pub struct TriggerEvent {
+    #[cfg_attr(feature = "serde_support", serde(rename = "type"))]
+    pub event_type: Option<ArcStr>,
+    pub tense: Option<ArcStr>,
+    pub location: Option<ArcStr>,
+    pub source_character: Option<ArcStr>,
+    pub source_group: Option<ArcStr>,
+    pub cost_comparison: Option<CostComparison>,
+    pub min_count: Option<u8>,
+    pub exclude_characters: Option<Box<Vec<String>>>,
+    pub ability_filter: Option<AbilityFilter>,
+    pub self_effect_only: Option<bool>,
+    pub energy_placed: Option<bool>,
+    /// Parser-set in `_try_movement`: the text also watches an area move
+    /// (〜エリアを移動 / 移動した…). Pure energy-placement texts set False;
+    /// 〜か compounds (area-move OR energy-placed) set True.
+    pub watches_area_move: Option<bool>,
+    pub phase: Option<ArcStr>,
+    pub phase_target: Option<ArcStr>,
+    pub recurrence: Option<ArcStr>,
+    pub events: Option<Vec<TriggerEvent>>,
+    pub source: Option<ArcStr>,
+    pub destination: Option<ArcStr>,
+    pub from_state: Option<ArcStr>,
+    pub to_state: Option<ArcStr>,
+}
+
+/// Cost comparison for baton touch: e.g. "このメンバーよりコストが低い" (cost < activating).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde_support", serde(default))]
+pub struct CostComparison {
+    pub operator: Option<Operator>,
+    pub relative_to: Option<ArcStr>,
+    pub cost_limit: Option<u8>,
+    pub cost_limit_operator: Option<Operator>,
+}
+
 impl Default for Condition {
     fn default() -> Self {
         Condition::AlwaysTrue {
@@ -3870,8 +4020,7 @@ impl Condition {
     pub fn get_cache(&self) -> Option<bool> {
         self.common().and_then(|c| c.cache)
     }
-}
-impl Condition {
+
     pub fn get_text(&self) -> Option<&str> {
         #[cfg(feature = "debug_conditions")]
         {
@@ -4098,53 +4247,7 @@ impl Condition {
     pub fn get_action_reference(&self) -> Option<&str> {
         self.common().and_then(|c| c.action_reference.as_deref())
     }
-}
 
-/// Rich description of what event triggers a condition.
-/// Parser-produced documentary field. The engine reads from this when
-/// the corresponding flat Condition field is absent.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde_support", serde(default))]
-pub struct TriggerEvent {
-    #[cfg_attr(feature = "serde_support", serde(rename = "type"))]
-    pub event_type: Option<ArcStr>,
-    pub tense: Option<ArcStr>,
-    pub location: Option<ArcStr>,
-    pub source_character: Option<ArcStr>,
-    pub source_group: Option<ArcStr>,
-    pub cost_comparison: Option<CostComparison>,
-    pub min_count: Option<u8>,
-    pub exclude_characters: Option<Box<Vec<String>>>,
-    pub ability_filter: Option<AbilityFilter>,
-    pub self_effect_only: Option<bool>,
-    pub energy_placed: Option<bool>,
-    /// Parser-set in `_try_movement`: the text also watches an area move
-    /// (〜エリアを移動 / 移動した…). Pure energy-placement texts set False;
-    /// 〜か compounds (area-move OR energy-placed) set True.
-    pub watches_area_move: Option<bool>,
-    pub phase: Option<ArcStr>,
-    pub phase_target: Option<ArcStr>,
-    pub recurrence: Option<ArcStr>,
-    pub events: Option<Vec<TriggerEvent>>,
-    pub source: Option<ArcStr>,
-    pub destination: Option<ArcStr>,
-    pub from_state: Option<ArcStr>,
-    pub to_state: Option<ArcStr>,
-}
-
-/// Cost comparison for baton touch: e.g. "このメンバーよりコストが低い" (cost < activating).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde_support", serde(default))]
-pub struct CostComparison {
-    pub operator: Option<Operator>,
-    pub relative_to: Option<ArcStr>,
-    pub cost_limit: Option<u8>,
-    pub cost_limit_operator: Option<Operator>,
-}
-
-impl Condition {
     /// Build a `CardFilter` containing the 7 base filter fields, mirroring
     /// `AbilityEffect::filter_subset` and `AbilityCost::filter_subset`.
     pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
@@ -4663,11 +4766,15 @@ impl Card {
     }
 
     /// The ドロー icon, on `special_heart` — the same field as スコア, and a
-    /// different one from 全ブレード.
+    /// different one from 全ブレード。
     pub fn has_draw_icon(&self) -> bool {
         self.special_heart
             .as_ref()
             .is_some_and(|sh| sh.hearts.contains_key(&HeartColor::Draw))
+    }
+
+    pub fn get_score(&self) -> u8 {
+        self.score.unwrap_or(0)
     }
 }
 
@@ -4716,119 +4823,3 @@ pub fn check_heart_requirement(need: &BaseHeart, provided: &BaseHeart) -> bool {
     true
 }
 
-/// Single macro table for HeartColor variants. Generates Display, as_str,
-/// short_label, index, from_index, and the core FromStr match arms.
-macro_rules! heart_color_table {
-    ($macro:ident) => {
-        $macro! {
-            Heart00 => "heart00", "h00", 0,
-            Heart01 => "heart01", "h01", 1,
-            Heart02 => "heart02", "h02", 2,
-            Heart03 => "heart03", "h03", 3,
-            Heart04 => "heart04", "h04", 4,
-            Heart05 => "heart05", "h05", 5,
-            Heart06 => "heart06", "h06", 6,
-            BAll   => "b_all",   "b_all", 0,
-            Draw   => "draw",    "draw",  0,
-            Score  => "score",   "score", 0,
-            All    => "all",     "all",   7,
-        }
-    };
-}
-
-impl core::fmt::Display for HeartColor {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        macro_rules! disp {
-            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
-                match self {
-                    $(HeartColor::$variant => f.write_str($s),)+
-                }
-            };
-        }
-        heart_color_table!(disp)
-    }
-}
-
-impl HeartColor {
-    pub fn index(&self) -> usize {
-        macro_rules! idx {
-            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
-                match self {
-                    $(HeartColor::$variant => $idx,)+
-                }
-            };
-        }
-        heart_color_table!(idx)
-    }
-
-    pub fn from_index(i: usize) -> Self {
-        match i {
-            0 => HeartColor::Heart00,
-            1 => HeartColor::Heart01,
-            2 => HeartColor::Heart02,
-            3 => HeartColor::Heart03,
-            4 => HeartColor::Heart04,
-            5 => HeartColor::Heart05,
-            6 => HeartColor::Heart06,
-            7 => HeartColor::All,
-            _ => HeartColor::Heart00,
-        }
-    }
-
-    pub fn short_label(&self) -> &'static str {
-        macro_rules! sl {
-            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
-                match self {
-                    $(HeartColor::$variant => $sl,)+
-                }
-            };
-        }
-        heart_color_table!(sl)
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        macro_rules! as_s {
-            ($($variant:ident => $s:expr, $sl:expr, $idx:expr),+ $(,)?) => {
-                match self {
-                    $(HeartColor::$variant => $s,)+
-                }
-            };
-        }
-        heart_color_table!(as_s)
-    }
-}
-
-impl core::str::FromStr for HeartColor {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        macro_rules! from_s {
-            ($($variant:ident => $str:expr, $sl:expr, $idx:expr),+ $(,)?) => {
-                Ok(match s {
-                    $($str => HeartColor::$variant,)+
-                    // `b_heart07` is a blade heart that produces COLORLESS
-                    // (heart0 / heart00) hearts. Mechanic: `b_heart07: N` grants
-                    // 2×N colorless hearts (the ×2 is applied at conversion in
-                    // live.rs / phases.rs). Colorless hearts can ONLY satisfy
-                    // heart0 requirements — never a specific color.
-                    "heart07" | "b_heart07" => HeartColor::Heart00,
-                    _ if s.starts_with("b_") => {
-                        HeartColor::from_str(&s[2..]).unwrap_or(HeartColor::Heart00)
-                    }
-                    _ => HeartColor::Heart00,
-                })
-            };
-        }
-        heart_color_table!(from_s)
-    }
-}
-
-/// Canonical string→HeartColor conversion. Use `s.parse::<HeartColor>()` instead.
-pub fn parse_heart_color(s: &str) -> HeartColor {
-    s.parse().unwrap_or(HeartColor::Heart00)
-}
-
-impl Card {
-    pub fn get_score(&self) -> u8 {
-        self.score.unwrap_or(0)
-    }
-}

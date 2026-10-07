@@ -23,6 +23,55 @@ struct CardNeed {
     need: [u8; 8],
 }
 
+/// Suffix demand bounds for the allocation backtracking search.
+///
+/// `total[i]` is the sum of every card's total heart requirement from
+/// card `i` onward; `color[i][c]` is the same for a single color.
+/// The search only ever fills requirements from the pool, one pool
+/// heart per requirement unit, and a colored note can only be filled
+/// by its own color or by icon_all — so a node whose pool no longer
+/// covers these bounds cannot reach a solution. Checking the bounds
+/// prunes whole composition subtrees without changing which solution
+/// the depth-first search finds first.
+struct SuffixDemand {
+    total: Vec<u16>,
+    color: Vec<[u16; 8]>,
+}
+
+impl SuffixDemand {
+    fn new(card_needs: &[CardNeed]) -> Self {
+        let n = card_needs.len();
+        let mut total = vec![0u16; n + 1];
+        let mut color = vec![[0u16; 8]; n + 1];
+        for i in (0..n).rev() {
+            let card_total: u16 = card_needs[i].need.iter().map(|&x| u16::from(x)).sum();
+            total[i] = total[i + 1] + card_total;
+            for c in 0..8 {
+                color[i][c] = color[i + 1][c] + u16::from(card_needs[i].need[c]);
+            }
+        }
+        Self { total, color }
+    }
+
+    /// Necessary condition for the subtree at card `idx` to contain a
+    /// solution, given the pool and the current card's fills so far.
+    fn satisfied(&self, pool: &[u8; 8], filled: [u8; 8], idx: usize) -> bool {
+        let avail: u16 = pool.iter().map(|&x| u16::from(x)).sum();
+        let filled_total: u16 = filled.iter().map(|&x| u16::from(x)).sum();
+        if avail + filled_total < self.total[idx] {
+            return false;
+        }
+        for c in 1..7 {
+            if u16::from(pool[c]) + u16::from(pool[7]) + u16::from(filled[c])
+                < self.color[idx][c]
+            {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 /// One allocation of stage hearts onto a live card's requirement.
 ///
 /// Every phase in `greedy_allocate` pushes the same eleven-field record, and
@@ -2524,7 +2573,8 @@ impl super::TurnEngine {
     fn backtrack_allocate(pool: &[u8; 8], card_needs: &[CardNeed]) -> Option<Vec<Allocation>> {
         let mut allocs = Vec::new();
         let mut current_pool = *pool;
-        if Self::bt_search(&mut current_pool, card_needs, 0, &mut allocs) {
+        let demand = SuffixDemand::new(card_needs);
+        if Self::bt_search(&mut current_pool, card_needs, &demand, 0, &mut allocs) {
             Some(allocs)
         } else {
             None
@@ -2535,11 +2585,18 @@ impl super::TurnEngine {
     fn bt_search(
         pool: &mut [u8; 8],
         card_needs: &[CardNeed],
+        demand: &SuffixDemand,
         idx: usize,
         allocs: &mut Vec<Allocation>,
     ) -> bool {
         if idx >= card_needs.len() {
             return true;
+        }
+        // Phase 1a below is forced and preserves both bounds — it trades
+        // pool hearts for matching requirements one-for-one — so this
+        // entry check also covers the state after it.
+        if !demand.satisfied(pool, [0u8; 8], idx) {
+            return false;
         }
         let saved_pool = *pool;
         let saved_len = allocs.len();
@@ -2590,6 +2647,7 @@ impl super::TurnEngine {
         let found = Self::try_surplus_compositions(
             pool,
             card_needs,
+            demand,
             idx,
             &surplus_colors,
             h00_from_surplus,
@@ -2612,6 +2670,7 @@ impl super::TurnEngine {
 fn try_surplus_compositions(
         pool: &mut [u8; 8],
         card_needs: &[CardNeed],
+        demand: &SuffixDemand,
         idx: usize,
         colors: &[usize],
         remaining: u8,
@@ -2626,7 +2685,7 @@ fn try_surplus_compositions(
             if remaining > 0 {
                 return false;
             }
-            return Self::try_phase4(pool, card_needs, idx, allocs, filled);
+            return Self::try_phase4(pool, card_needs, demand, idx, allocs, filled);
         }
 
         let saved_pool = *pool;
@@ -2652,18 +2711,24 @@ fn try_surplus_compositions(
                 new_filled[c] += take;
             }
 
-            let result = Self::try_surplus_compositions(
-                pool,
-                card_needs,
-                idx,
-                colors,
-                remaining - take,
-                color_idx + 1,
-                allocs,
-                new_filled,
-            );
-            if result {
-                return true;
+            // Prune: a composition that leaves the pool unable to
+            // cover the remaining demand (this card plus every later
+            // card) cannot lead to a solution.
+            if demand.satisfied(pool, new_filled, idx) {
+                let result = Self::try_surplus_compositions(
+                    pool,
+                    card_needs,
+                    demand,
+                    idx,
+                    colors,
+                    remaining - take,
+                    color_idx + 1,
+                    allocs,
+                    new_filled,
+                );
+                if result {
+                    return true;
+                }
             }
 
             // Undo
@@ -2678,6 +2743,7 @@ fn try_surplus_compositions(
     fn try_phase4(
         pool: &mut [u8; 8],
         card_needs: &[CardNeed],
+        demand: &SuffixDemand,
         idx: usize,
         allocs: &mut Vec<Allocation>,
         mut filled: [u8; 8],
@@ -2714,6 +2780,15 @@ fn try_surplus_compositions(
             filled[0] += take;
         }
 
+        // Prune before enumerating Phase 4 distributions: with the
+        // forced phases done, icon_all is the only source left for
+        // colored deficits, so the bounds are tightest here.
+        if !demand.satisfied(pool, filled, idx) {
+            *pool = saved_pool;
+            allocs.truncate(saved_len);
+            return false;
+        }
+
         // Now compute all remaining deficits
         let total_filled_now: u8 = filled.iter().sum();
         let total_required: u8 = need.iter().sum();
@@ -2733,7 +2808,7 @@ fn try_surplus_compositions(
         let all_count = pool[7];
         if all_count == 0 && color_deficits.is_empty() {
             if Self::card_ok_with_wildcard(filled, need) {
-                return Self::bt_search(pool, card_needs, idx + 1, allocs);
+                return Self::bt_search(pool, card_needs, demand, idx + 1, allocs);
             }
         } else if all_count == 0 {
             // No icon_all but deficits exist
@@ -2749,6 +2824,7 @@ fn try_surplus_compositions(
             if Self::try_all_distribution(
                 pool,
                 card_needs,
+                demand,
                 idx,
                 allocs,
                 filled,
@@ -2772,6 +2848,7 @@ fn try_surplus_compositions(
 fn try_all_distribution(
         pool: &mut [u8; 8],
         card_needs: &[CardNeed],
+        demand: &SuffixDemand,
         idx: usize,
         allocs: &mut Vec<Allocation>,
         filled: [u8; 8],
@@ -2793,7 +2870,7 @@ fn try_all_distribution(
                 return false;
             }
             if Self::card_ok_with_wildcard(filled, cn.need) {
-                return Self::bt_search(pool, card_needs, idx + 1, allocs);
+                return Self::bt_search(pool, card_needs, demand, idx + 1, allocs);
             }
             *pool = saved_pool;
             allocs.truncate(saved_len);
@@ -2836,19 +2913,24 @@ fn try_all_distribution(
                 }
             }
 
-            let result = Self::try_all_distribution(
-                pool,
-                card_needs,
-                idx,
-                allocs,
-                new_filled,
-                deficit_indices,
-                deficits,
-                remaining - take,
-                di + 1,
-            );
-            if result {
-                return true;
+            // Prune: a distribution that leaves the pool unable to
+            // cover the remaining demand cannot lead to a solution.
+            if demand.satisfied(pool, new_filled, idx) {
+                let result = Self::try_all_distribution(
+                    pool,
+                    card_needs,
+                    demand,
+                    idx,
+                    allocs,
+                    new_filled,
+                    deficit_indices,
+                    deficits,
+                    remaining - take,
+                    di + 1,
+                );
+                if result {
+                    return true;
+                }
             }
 
             *pool = saved_pool;

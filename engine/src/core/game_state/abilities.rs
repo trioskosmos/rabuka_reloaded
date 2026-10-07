@@ -666,7 +666,6 @@ impl GameState {
         #[cfg(not(feature = "no_std"))]
         let _timer = crate::timer::Timer::start("trig::auto_scan");
         let queued_before = self.ability_queue.len();
-        let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(i16, usize, i16)> = Vec::new();
         let skip_this_card_auto_key = self.just_completed_ability_key;
         let just_completed_batch_matches =
@@ -676,7 +675,7 @@ impl GameState {
             // need `&mut self` to evaluate conditions under a temporary
             // activating card, and a borrow of self.player1 held across the loop
             // body would forbid that.
-            let scanning_player = if player_id_clone == self.player1.id {
+            let scanning_player = if player_id == self.player1.id {
                 &self.player1
             } else {
                 &self.player2
@@ -819,7 +818,7 @@ impl GameState {
                             if self.hooked_by_foreign_cause(
                                 &ability,
                                 card_id,
-                                &player_id_clone,
+                                player_id,
                                 card.name.as_ref(),
                             ) {
                                 continue;
@@ -949,7 +948,7 @@ impl GameState {
                 match zone.off_board_owner() {
                     // can't determine owner, skip
                     None => continue,
-                    Some(owner) if owner != player_id_clone => continue,
+                    Some(owner) if owner != player_id => continue,
                     Some(_) => {}
                 }
                 if let Some(card) = self.card_database.get_card(moved_card_id) {
@@ -1030,7 +1029,7 @@ impl GameState {
             }
             self.trigger_auto_ability_by_index_refs(
                 AbilityTrigger::Auto,
-                &player_id_clone,
+                player_id,
                 Some(cached_card_no.as_str()),
                 Some(card_id),
                 ability_idx,
@@ -1044,10 +1043,10 @@ impl GameState {
         // for abilities that need it during execution (e.g. Sumire's "moves").
         let queued_new = self.ability_queue.len() > queued_before;
         let deck_emptied_for_player =
-            self.deck_emptied_by_effect.as_deref() == Some(player_id_clone.as_str());
+            self.deck_emptied_by_effect.as_deref() == Some(player_id);
         if deck_emptied_for_player {
             if queued_new {
-                if player_id_clone == self.player1.id {
+                if player_id == self.player1.id {
                     self.player1.refresh();
                 } else {
                     self.player2.refresh();
@@ -1055,7 +1054,7 @@ impl GameState {
                 log::debug!(
                     "[AUTO_REFRESH] queued_new={} player={} deck_emptied_by_effect=true",
                     self.ability_queue.len() - queued_before,
-                    player_id_clone
+                    player_id
                 );
             }
             self.deck_emptied_by_effect = None;
@@ -1660,7 +1659,6 @@ fn trigger_auto_ability_by_index_refs(
         if !is_on_stage {
             return;
         }
-        let player_id_clone = player_id.to_string();
         let mut abilities: Vec<(i16, usize, i16)> = Vec::new();
         for &card_id in &player.live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(card_id) {
@@ -1723,7 +1721,7 @@ fn trigger_auto_ability_by_index_refs(
                 .unwrap_or_default();
             self.trigger_auto_ability_by_index_refs(
                 crate::game_state::AbilityTrigger::Auto,
-                &player_id_clone,
+                player_id,
                 Some(card_no.as_str()),
                 Some(cid),
                 ability_idx,

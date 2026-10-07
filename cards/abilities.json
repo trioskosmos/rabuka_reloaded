@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-07T12:56:59.062100",
+  "generated_at": "2026-10-07T17:41:57.282883",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "b8c70b28",
+  "engine_commit": "dc84c55e",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -1868,7 +1868,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージのエリアすべてに『蓮ノ空』のメンバーが登場しており、かつ名前が異なる場合、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+        "text": "自分のステージのエリアすべてに『蓮ノ空』のメンバーが登場しており、かつ名前が異なる場合、",
         "condition": {
           "type": "compound",
           "operator": "and",
@@ -3146,7 +3146,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "このターン、自分のステージにメンバーが2回以上登場している場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+        "text": "このターン、自分のステージにメンバーが2回以上登場している場合、ライブ終了時まで、",
         "condition": {
           "type": "temporal_condition",
           "temporal": "this_turn",
@@ -3324,7 +3324,7 @@
             "duration": "live_end"
           },
           {
-            "text": "合計が25の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+            "text": "合計が25の場合、ライブ終了時まで、",
             "condition": {
               "text": "合計が25の場合",
               "aggregate": "total",
@@ -3775,7 +3775,7 @@
             "duration": "live_end"
           },
           {
-            "text": "6種類以上ある場合、さらにライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+            "text": "6種類以上ある場合、さらにライブ終了時まで、",
             "condition": {
               "type": "card_count_condition",
               "count": 6,
@@ -4730,7 +4730,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、代わりに合計スコアを+2する。」を得る",
+        "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、",
         "condition": {
           "type": "compound",
           "operator": "and",
@@ -5853,7 +5853,7 @@
         "type": "reveal"
       },
       "effect": {
-        "text": "公開したカードのコストの合計が、10、20、30、40、50のいずれかの場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+        "text": "公開したカードのコストの合計が、10、20、30、40、50のいずれかの場合、ライブ終了時まで、",
         "condition": {
           "text": "公開したカードのコストの合計が、10、20、30、40、50のいずれかの場合",
           "location": "revealed_cards",
@@ -10454,7 +10454,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "{{center.png|センター}}自分のライブカード置き場にあるライブカードのスコアの合計が8以上の場合、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+        "text": "{{center.png|センター}}自分のライブカード置き場にあるライブカードのスコアの合計が8以上の場合、",
         "condition": {
           "text": "自分のライブカード置き場にあるライブカードのスコアの合計が8以上の場合",
           "target": "self",
@@ -11153,7 +11153,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分の成功ライブカード置き場にカードが1枚以上あり、かつスコアの合計が1以下の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+        "text": "自分の成功ライブカード置き場にカードが1枚以上あり、かつスコアの合計が1以下の場合、ライブ終了時まで、",
         "condition": {
           "type": "compound",
           "operator": "and",
@@ -13326,7 +13326,7 @@
         "action": "sequential",
         "actions": [
           {
-            "text": "自分の成功ライブカード置き場にある『μ's』のカードの中に、{{icon_score.png|スコア}}を持つカードがある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+            "text": "自分の成功ライブカード置き場にある『μ's』のカードの中に、{{icon_score.png|スコア}}を持つカードがある場合、ライブ終了時まで、",
             "condition": {
               "type": "location_condition",
               "location": "success_live_card_zone",
@@ -13537,7 +13537,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードがある場合、ライブ終了時まで、「{{jyouji.png|常時}}自分のステージにいる『μ's』のメンバーは、{{icon_blade.png|ブレード}}を得る。」を得る",
+        "text": "自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードがある場合、ライブ終了時まで、",
         "condition": {
           "type": "location_condition",
           "location": "success_live_card_zone",
@@ -20716,7 +20716,7 @@
         ]
       },
       "effect": {
-        "text": "自分の成功ライブカード置き場にカードがなく、かつ相手の成功ライブカード置き場にカードが2枚以上ある場合、ライブ終了時まで、自分のステージにいる『Aqours』のメンバー2人までは「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+        "text": "自分の成功ライブカード置き場にカードがなく、かつ相手の成功ライブカード置き場にカードが2枚以上ある場合、ライブ終了時まで、自分のステージにいる『Aqours』のメンバー2人までは",
         "condition": {
           "type": "compound",
           "operator": "and",
@@ -27098,7 +27098,7 @@
             "baton_touch_trigger": true
           },
           {
-            "text": "そのメンバー2人のコストの合計が15の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る。\"",
+            "text": "そのメンバー2人のコストの合計が15の場合、ライブ終了時まで、",
             "condition": {
               "text": "そのメンバー2人のコストの合計が15の場合",
               "card_type": "member_card",
@@ -27176,7 +27176,7 @@
             "baton_touch_trigger": true
           },
           {
-            "text": "そのメンバー2人のコストの合計が15の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+            "text": "そのメンバー2人のコストの合計が15の場合、ライブ終了時まで、",
             "condition": {
               "text": "そのメンバー2人のコストの合計が15の場合",
               "card_type": "member_card",
@@ -28473,7 +28473,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分の控え室に『μ's』のカードが25枚以上ある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+        "text": "自分の控え室に『μ's』のカードが25枚以上ある場合、ライブ終了時まで、",
         "condition": {
           "type": "card_count_condition",
           "count": 25,
@@ -36731,7 +36731,7 @@
         "action": "choice",
         "options": [
           {
-            "text": "このカードは「{{live_success.png|ライブ成功時}}カードを1枚引く。」を得る。",
+            "text": "このカードは",
             "count": 1,
             "action": "gain_ability",
             "ability_gain_trigger": "ライブ成功時",
