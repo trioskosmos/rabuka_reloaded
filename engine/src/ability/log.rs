@@ -157,3 +157,67 @@ impl AbilityResolver {
         gs.push_rule_log_fmt(format_args!("{} {}: {}", pp, cn, label));
     }
 }
+
+/// Push a condition verdict to the structured log buffer.
+///
+/// The `debug_enabled()` gate lives HERE, not in the callers, because this
+/// function builds 3-5 `String`s (`describe_condition_expectation` is
+/// `format!`-heavy) that `push_verdict` discards when debug is off. Gating here
+/// makes it impossible for a call site to forget — which is how this cost
+/// survived in four places after the equivalent gate was added to
+/// `describe_condition_actual`.
+#[cfg(not(feature = "no_std"))]
+pub fn push_cond_verdict(
+    condition: &crate::card::Condition,
+    extra_actual: &str,
+    passed: bool,
+    children: Vec<AbilityLogItem>,
+) {
+    if !debug_enabled() {
+        return;
+    }
+    let condition_type = match condition {
+        crate::card::Condition::Appearance { .. } => "appearance_condition",
+        crate::card::Condition::Comparison { .. } => "comparison_condition",
+        crate::card::Condition::Location { .. } => "card_count_condition",
+        crate::card::Condition::Movement { .. } => "movement_condition",
+        crate::card::Condition::Group { .. } => "group_condition",
+        crate::card::Condition::PositionCond { .. } => "position_condition",
+        crate::card::Condition::Resource { .. } => "resource_condition",
+        crate::card::Condition::ScoreThreshold { .. } => "score_threshold_condition",
+        crate::card::Condition::State { .. } => "state_condition",
+        crate::card::Condition::Temporal { .. } => "temporal_condition",
+        crate::card::Condition::AbilityFilter { .. } => "ability_filter_condition",
+        crate::card::Condition::Choice { .. } => "choice_condition",
+        crate::card::Condition::Complex { .. } => "complex_condition",
+        crate::card::Condition::OpponentChoice { .. } => "opponent_choice_condition",
+        crate::card::Condition::OpponentLiveSuccess { .. } => "opponent_live_success",
+        crate::card::Condition::NoExcessHeart { .. } => "no_excess_heart",
+        crate::card::Condition::Compound { .. } => "compound",
+        crate::card::Condition::AnyOf { .. } => "any_of_condition",
+        crate::card::Condition::AlwaysTrue { .. } => "otherwise_condition",
+        crate::card::Condition::AllRevealedMatchHeartColor { .. } => {
+            "all_revealed_match_heart_color"
+        }
+        crate::card::Condition::Unsupported { .. } => "custom",
+    };
+
+    // Rendered ONCE. It used to be rendered three times per verdict (once for
+    // `expectation`, once for `actual` when no override was supplied, and once
+    // for `text`); `text` and `expectation` are the same string here.
+    let expectation = crate::ability::describe::condition::describe_condition_expectation(condition);
+    let actual = if !extra_actual.is_empty() {
+        extra_actual.to_string()
+    } else {
+        expectation.clone()
+    };
+
+    push_verdict(AbilityLogItem::Condition {
+        text: expectation.clone(),
+        condition_type: condition_type.to_string(),
+        expectation,
+        actual,
+        passed,
+        children,
+    });
+}

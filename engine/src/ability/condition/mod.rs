@@ -5,6 +5,7 @@ use crate::ability::debug::ABILITY_DEBUG;
 #[cfg(feature = "serde_support")]
 use crate::ability::enums::ConditionType;
 use crate::ability::enums::Zone;
+use crate::ability::log::push_cond_verdict;
 use crate::ability::queue::ConditionalChoice;
 use crate::core::constants::CountCast;
 #[cfg(feature = "serde_support")]
@@ -146,226 +147,6 @@ impl<'a> ConditionContext<'a> {
             .condition
             .as_ref()
             .is_none_or(|c| self.evaluate_condition(c))
-    }
-}
-
-/// Produce a user-friendly human-readable expectation string for a condition.
-#[cfg(not(feature = "no_std"))]
-fn describe_condition_expectation(condition: &Condition) -> String {
-    let op = condition.get_operator().unwrap_or(">=");
-    let threshold = condition
-        .get_count()
-        .map(|c| c.to_string())
-        .unwrap_or_default();
-    let location = condition.get_location().unwrap_or("");
-    let ct_field = condition
-        .get_card_type()
-        .map(|ct| ct.as_str())
-        .unwrap_or("");
-
-    match condition {
-        Condition::Appearance { .. } => {
-            if let Some(chars) = condition.get_characters() {
-                if !chars.is_empty() {
-                    let has_cost_ref = matches!(
-                        condition,
-                        Condition::Appearance {
-                            cost_reference_character: Some(_),
-                            ..
-                        }
-                    );
-                    if has_cost_ref {
-                        if let Condition::Appearance {
-                            cost_reference_operator,
-                            cost_reference_character,
-                            ..
-                        } = condition
-                        {
-                            format!(
-                                "{} {} {}",
-                                chars[0],
-                                cost_reference_operator.as_deref().unwrap_or(">"),
-                                cost_reference_character.as_deref().unwrap_or("")
-                            )
-                        } else {
-                            format!("{} = true", chars[0])
-                        }
-                    } else {
-                        format!("{} = true", chars[0])
-                    }
-                } else {
-                    "登場=true".into()
-                }
-            } else {
-                "登場=true".into()
-            }
-        }
-        Condition::Comparison { .. } => {
-            let loc = if !location.is_empty() {
-                format!(" ({})", describe_zone_label(location))
-            } else {
-                String::new()
-            };
-            format!("{} {}{}", op, threshold, loc)
-        }
-        Condition::Location { .. } => {
-            let zone_desc = if !location.is_empty() {
-                describe_zone_label(location)
-            } else {
-                "anywhere".into()
-            };
-            let type_desc = if !ct_field.is_empty() {
-                describe_card_type_label(ct_field)
-            } else {
-                "cards".into()
-            };
-            format!("{} {} {} in {}", op, threshold, type_desc, zone_desc)
-        }
-        Condition::Group { .. } => {
-            if let Some(gns) = condition.get_group_names() {
-                format!("所属={}", gns.join(","))
-            } else {
-                "所属条件".into()
-            }
-        }
-        Condition::PositionCond { .. } => {
-            if let Some(pos) = condition.get_position() {
-                format!("位置={}", pos.get_position().unwrap_or("?"))
-            } else {
-                "位置条件".into()
-            }
-        }
-        Condition::Resource { .. } => {
-            format!("ブレード {} {}", op, threshold)
-        }
-        Condition::ScoreThreshold { .. } => {
-            format!("スコア {} {}", op, threshold)
-        }
-        Condition::State { .. } => {
-            let st = condition.get_state().map(|s| s.as_str()).unwrap_or("状態");
-            let loc = describe_zone_label(location);
-            format!("{}状態のメンバー in {}", st, loc)
-        }
-        Condition::Movement { .. } => {
-            format!("移動={}", condition.get_movement().unwrap_or("?"))
-        }
-        Condition::Temporal { .. } => condition.get_temporal().unwrap_or("タイミング").to_string(),
-        Condition::AbilityFilter { .. } => "フィルター".into(),
-        Condition::NoExcessHeart { .. } => "余剰ハートなし".into(),
-        Condition::Choice { .. }
-        | Condition::Complex { .. }
-        | Condition::OpponentChoice { .. }
-        | Condition::OpponentLiveSuccess { .. }
-        | Condition::Compound { .. }
-        | Condition::AnyOf { .. }
-        | Condition::AlwaysTrue { .. }
-        | Condition::AllRevealedMatchHeartColor { .. }
-        | Condition::Unsupported { .. } => String::new(),
-    }
-}
-
-#[cfg(not(feature = "no_std"))]
-fn describe_zone_label(zone: &str) -> String {
-    match zone {
-        "hand" => "[[zone_hand]]".into(),
-        "discard" | "waitroom" => "[[zone_discard]]".into(),
-        "deck" => "[[zone_deck]]".into(),
-        "deck_top" => "[[zone_deck_top]]".into(),
-        "deck_bottom" => "[[zone_deck_bottom]]".into(),
-        "stage" => "[[zone_stage]]".into(),
-        "energy" | "energy_zone" => "[[zone_energy]]".into(),
-        "live_card_zone" => "[[zone_live_card]]".into(),
-        "success_zone" | "success_live_zone" => "[[zone_success_live]]".into(),
-        "revealed_cards" => "[[zone_revealed]]".into(),
-        "those_cards" => "[[zone_those_cards]]".into(),
-        "all_selected" => "[[zone_selected]]".into(),
-        "under_member" => "[[zone_under_member]]".into(),
-        _ => zone.to_string(),
-    }
-}
-
-#[cfg(not(feature = "no_std"))]
-fn describe_card_type_label(ct: &str) -> String {
-    match ct {
-        "member_card" => "[[card_type_member]]".into(),
-        "live_card" => "[[card_type_live]]".into(),
-        "energy_card" => "[[card_type_energy]]".into(),
-        "card" => "[[card_type_card]]".into(),
-        _ => ct.to_string(),
-    }
-}
-
-/// Push a condition verdict to the structured log buffer.
-/// `actual_label` overrides the auto-generated actual string; use "" to auto-generate.
-///
-/// The `debug_enabled()` gate lives HERE, not in the callers, because this
-/// function builds 3-5 `String`s (`describe_condition_expectation` is
-/// `format!`-heavy) that `push_verdict` discards when debug is off. Gating here
-/// makes it impossible for a call site to forget — which is how this cost
-/// survived in four places after the equivalent gate was added to
-/// `describe_condition_actual`.
-#[cfg(not(feature = "no_std"))]
-pub fn push_cond_verdict(
-    condition: &Condition,
-    extra_actual: &str,
-    passed: bool,
-    children: Vec<crate::ability::log::AbilityLogItem>,
-) {
-    if !crate::ability::log::debug_enabled() {
-        return;
-    }
-    use crate::ability::log::{push_verdict, AbilityLogItem};
-    let condition_type = match condition {
-        Condition::Appearance { .. } => "appearance_condition",
-        Condition::Comparison { .. } => "comparison_condition",
-        Condition::Location { .. } => "card_count_condition",
-        Condition::Movement { .. } => "movement_condition",
-        Condition::Group { .. } => "group_condition",
-        Condition::PositionCond { .. } => "position_condition",
-        Condition::Resource { .. } => "resource_condition",
-        Condition::ScoreThreshold { .. } => "score_threshold_condition",
-        Condition::State { .. } => "state_condition",
-        Condition::Temporal { .. } => "temporal_condition",
-        Condition::AbilityFilter { .. } => "ability_filter_condition",
-        Condition::Choice { .. } => "choice_condition",
-        Condition::Complex { .. } => "complex_condition",
-        Condition::OpponentChoice { .. } => "opponent_choice_condition",
-        Condition::OpponentLiveSuccess { .. } => "opponent_live_success",
-        Condition::NoExcessHeart { .. } => "no_excess_heart",
-        Condition::Compound { .. } => "compound",
-        Condition::AnyOf { .. } => "any_of_condition",
-        Condition::AlwaysTrue { .. } => "otherwise_condition",
-        Condition::AllRevealedMatchHeartColor { .. } => "all_revealed_match_heart_color",
-        Condition::Unsupported { .. } => "custom",
-    };
-
-    // Rendered ONCE. It used to be rendered three times per verdict (once for
-    // `expectation`, once for `actual` when no override was supplied, and once
-    // for `text`); `text` and `expectation` are the same string here.
-    let expectation = describe_condition_expectation(condition);
-    let actual = if !extra_actual.is_empty() {
-        extra_actual.to_string()
-    } else {
-        expectation.clone()
-    };
-
-    push_verdict(AbilityLogItem::Condition {
-        text: expectation.clone(),
-        condition_type: condition_type.to_string(),
-        expectation,
-        actual,
-        passed,
-        children,
-    });
-}
-
-/// Append a position clause to a description, or leave the description alone
-/// when the condition said nothing about position.
-fn with_position(base: String, position_str: &str) -> String {
-    if position_str.is_empty() {
-        base
-    } else {
-        format!("{} {}", base, position_str)
     }
 }
 
@@ -1069,7 +850,12 @@ impl<'a> ConditionContext<'a> {
                             }
                             (None, None) => format!("{}も{}も不在", subject, ref_char),
                         };
-                        return with_position(cost_part, &position_str);
+                        let cost_part = if position_str.is_empty() {
+                            cost_part
+                        } else {
+                            format!("{} {}", cost_part, position_str)
+                        };
+                        return cost_part;
                     }
                 }
                 // No cost reference, or no characters named: the roster itself is
@@ -1083,7 +869,11 @@ impl<'a> ConditionContext<'a> {
                             .map(|c| c.name.to_string())
                     })
                     .collect();
-                with_position(format!("在籍=[{}]", names.join(", ")), &position_str)
+                if position_str.is_empty() {
+                    format!("在籍=[{}]", names.join(", "))
+                } else {
+                    format!("在籍=[{}] {}", names.join(", "), position_str)
+                }
             }
             Some(Zone::Hand) => format!("手札={}枚", player.hand.cards.len()),
             Some(Zone::Discard) => format!("控え室={}枚", player.waitroom.cards.len()),
@@ -1093,5 +883,7 @@ impl<'a> ConditionContext<'a> {
 }
 
 mod card;
+mod comparison;
 mod compound;
+mod predicates;
 mod state;
