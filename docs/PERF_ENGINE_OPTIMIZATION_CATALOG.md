@@ -227,7 +227,14 @@ not drop them because the counter did not move.**
 - [ ] §6.1 A3 `state_snapshot_before_change` → `Vec` (≤3 entries, written once)
 - [ ] §6.2 `zone_card_ids` → iterators
 - [ ] §6.3 `SmallVec` → `Vec` spills (S1 done; S2/S3/S4 open)
-- [ ] §6.8 `Card.box` inline
+- [~] §6.8 `Card.box` inline — **checked 2026-10-07, already in the
+      target state**: the `box: Option<Box<BaseCard>>` wrapper this
+      item describes does not exist in the committed code — no
+      `BaseCard` type and no `.box` field anywhere in `engine/src`
+      (or any `.rs`/`.c` file) at any commit; `Card` carries the
+      fields directly (`core/card.rs:312-366`) and
+      `is_member`/`is_live`/`is_energy`/`get_score` read them
+      inline (`card.rs:4572-4582`, `:4817-4819`). Nothing to apply.
 - [!] §6.9 `ConditionContext` snapshot — **highest risk in the document**; needs a
       1,000-game AI self-play state-trace diff
 - [ ] §6.11 `filter_subset` / `CardFilter::from_effect` single-bind
@@ -1792,6 +1799,14 @@ player_id)` triple).
 
 ### 4.13 `Zone::from_str` re-parsed on the same string, repeatedly
 
+**PARTIALLY LANDED 2026-10-07** — the two sites this section
+names landed: `handle_select_card` hoists a single
+`let zone_enum = Zone::from_str(zone);` (`ability/choice.rs:1023`,
+replacing the five per-function parses) and `count_in_zone` hoists
+`zone_enum` (`ability/util.rs:2272`, replacing the double parse of
+the same string). The remaining ~140 sites are
+single-parse-per-function and stay open, as the checklist records.
+
 `Zone::from_str` (`ability/enums.rs:26-122`, macro-generated) is a **30-arm
 string match** that rustc compiles to a length-switch plus a `memcmp` chain.
 **146 call sites.** Same string, same function, multiple times in one invocation:
@@ -2552,6 +2567,22 @@ compares by content.
 
 ### 6.8 `Card::box` is an unconditional `Box` for a ~100-byte scalar struct
 
+**CHECKED 2026-10-07 — already in the target state; do not
+apply the fix below.** The `box: Option<Box<BaseCard>>` field
+and the `self.box.as_ref().unwrap()` hop this section describes
+do not exist in the committed code: there is no `BaseCard` type
+and no `.box` field anywhere in `engine/src` — or any `.rs`/`.c`
+file in the repo — and `git log -S` finds `BaseCard` only in
+this document's own text, so no commit ever carried the wrapper.
+`Card` carries the scalar fields directly (`core/card.rs:312-366`),
+`is_member`/`is_live`/`is_energy` match on `self.card_type`
+(`card.rs:4572-4582`), and `get_score` reads `self.score`
+(`card.rs:4817-4819`) — no heap allocation at load, no pointer
+hop. The 2,280 load-time allocations and the accessor hop this
+item chased are already gone. (The section's line reference,
+`core/card.rs:426-430`, now points at `CardDatabase` fields —
+the line numbers drifted.)
+
 `core/card.rs:426-430`:
 
 ```rust
@@ -2672,6 +2703,15 @@ an allocation profile, and removing it makes the next round of profiling readabl
 load reassociation.
 
 ### 6.12 `CardFilter::matches` runs up to ten independent hash probes for one card
+
+**LANDED 2026-10-07** — the single-probe threading landed
+earlier (`let card = db.get_card(id);` at the top of `matches`,
+`ability/util.rs:1721`, threaded into the `card_matches_type_for` /
+`card_matches_cost_limit_op_for` twins); 2026-10-07 fixed the three
+leftover duplicate probes the first pass missed — the
+`original_blade_limit`, `original_heart_total` and `cost_total`
+branches re-ran `db.get_card(id)` despite `card` being in scope
+(`util.rs:1779-1808`; each now reads the already-bound `card`).
 
 `ability/util.rs:1585-1690`. The body chains `check_exclude_names`,
 `card_matches_type`, `check_group` (which itself calls `card_matches_group_str`

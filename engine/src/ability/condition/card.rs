@@ -4236,10 +4236,6 @@ pub(crate) fn count_cards_with_filters(
                 let player = self.resolve_condition_player(target);
                 let card_db = &self.game_state.card_database;
                 let location = condition.get_location().unwrap_or("stage");
-                let cards = util::zone_card_ids_occupied(player, location);
-                if cards.is_empty() {
-                    return 0;
-                }
                 let exclude_id = if condition.get_exclude_self().unwrap_or(false) {
                     self.activating_card_id
                 } else {
@@ -4250,7 +4246,7 @@ pub(crate) fn count_cards_with_filters(
                 let groups_vec = condition.get_group_names().map(|v| v.to_vec());
                 filter.groups = groups_vec.as_deref();
                 let mut max_cost: u8 = 0;
-                for &id in cards.iter() {
+                for id in util::zone_cards_occupied(player, location) {
                     if !filter.matches(card_db, id, false) {
                         continue;
                     }
@@ -4274,10 +4270,8 @@ pub(crate) fn count_cards_with_filters(
                 if !loc.is_empty() {
                     let player = self.resolve_condition_player(target);
                     let card_db = &self.game_state.card_database;
-                    let cards = util::zone_card_ids_occupied(player, loc);
-                    let total: u8 = cards
-                        .iter()
-                        .filter(|&&id| {
+                    let total: u8 = util::zone_cards_occupied(player, loc)
+                        .filter(|&id| {
                             if let Some(groups) = condition.get_group_names() {
                                 if !groups.is_empty()
                                     && !groups
@@ -4294,7 +4288,7 @@ pub(crate) fn count_cards_with_filters(
                             }
                             true
                         })
-                        .map(|&id| {
+                        .map(|id| {
                             let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0);
                             crate::constants::effective_stat(
                                 base,

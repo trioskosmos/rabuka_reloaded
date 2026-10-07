@@ -439,14 +439,14 @@ impl super::TurnEngine {
                     list.iter()
                         .enumerate()
                         .find(|(_, a)| a.has_trigger(crate::triggers::TriggerKind::Activation))
-                        .map(|(i, a)| (i, a.clone()))
+                        .map(|(i, a)| (i, crate::Arc::clone(a)))
                 })?;
         if !player.stage.stage.contains(&card_id) {
             return None;
         }
         Some(AbilityActivation {
             idx: crate::ability::types::GAINED_ABILITY_INDEX_BASE + gained_idx,
-            ability: crate::Arc::new(gained),
+            ability: gained,
             loc: Zone::Stage,
         })
     }

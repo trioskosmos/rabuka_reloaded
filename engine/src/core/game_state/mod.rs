@@ -181,7 +181,10 @@ pub struct GameState {
     pub constant_gained_abilities: HashMap<i16, Vec<String>>,
     /// Full Ability structs dynamically added to cards via gain_ability.
     /// These are scanned by the trigger pipeline alongside original card abilities.
-    pub gained_card_abilities: HashMap<i16, Vec<crate::card::Ability>>,
+    /// `Arc`-wrapped: readers borrow or bump the refcount — the old
+    /// `Vec<Ability>` made every activation of a gained ability deep-clone
+    /// the struct out of the map (§4.4b).
+    pub gained_card_abilities: HashMap<i16, Vec<crate::Arc<crate::card::Ability>>>,
     /// Granting card id for each entry in gained_card_abilities (index-aligned
     /// per target card). Lets display/UI attribute a gained ability to the card
     /// that granted it.

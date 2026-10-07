@@ -521,7 +521,7 @@ pub(crate) fn execute_gain_ability(
             gs.gained_card_abilities
                 .entry(card_id)
                 .or_default()
-                .push(gained_ability);
+                .push(crate::Arc::new(gained_ability));
             gs.gained_ability_sources
                 .entry(card_id)
                 .or_default()
@@ -744,7 +744,7 @@ pub(crate) fn execute_gain_ability(
                         gs.gained_card_abilities
                             .entry(activating_card)
                             .or_default()
-                            .push(gained);
+                            .push(crate::Arc::new(gained));
                         gs.gained_ability_sources
                             .entry(activating_card)
                             .or_default()

@@ -430,7 +430,7 @@ impl GameState {
                 .gained_card_abilities
                 .get(&card_id)?
                 .get(gidx)
-                .map(|a| crate::Arc::new(a.clone()));
+                .map(crate::Arc::clone);
         }
         let ar = self.card_database.get_card(card_id)?.abilities.get(ability_idx)?;
         Some(ar.resolve())
@@ -1441,7 +1441,7 @@ pub fn trigger_auto_ability(
             let ability = list.get(gidx)?;
             (Self::ability_matches_trigger(ability, trigger_type)
                 && !self.is_ability_invalidated(cid, trigger_type))
-            .then(|| crate::Arc::new(ability.clone()))
+                .then(|| crate::Arc::clone(ability))
         });
         let Some(ability) = matched else {
             return;
