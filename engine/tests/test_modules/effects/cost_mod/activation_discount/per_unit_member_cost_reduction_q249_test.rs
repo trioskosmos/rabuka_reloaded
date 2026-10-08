@@ -112,11 +112,13 @@ fn three_unit_members_reduce_cost_before_baton_touch_q249() {
     assert_eq!(cost_mod, -6, "3 Mirakura members on stage → cost -6");
 
     // Also verify via calculate_play_cost_reduction directly
+    let db_himeno = game.db.get_card(himeno).unwrap();
     let reduction = rabuka_engine::ability::util::calculate_play_cost_reduction(
         &game.state.player1.stage,
         &game.state.player1.success_live_card_zone.cards,
         game.state.player1.hand.cards.len(),
         himeno,
+        db_himeno,
         &game.db,
         &[],
     );

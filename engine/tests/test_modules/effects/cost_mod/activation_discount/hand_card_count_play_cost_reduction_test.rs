@@ -115,6 +115,7 @@ fn on_stage_card_does_not_reduce_other_cards_cost() {
         &game.state.player1.success_live_card_zone.cards,
         game.state.player1.hand.cards.len(),
         other,
+        db_other,
         &game.db,
         &[],
     );
@@ -142,6 +143,7 @@ fn on_stage_card_ignores_hand_for_other_card_cost() {
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);
     fill_decks(&mut game, filler);
+    let db_other = game.db.get_card(other).unwrap();
 
     // 4 cards in hand: other + 3 fillers. Stage card should NOT give reduction.
     let reduction = rabuka_engine::ability::util::calculate_play_cost_reduction(
@@ -149,6 +151,7 @@ fn on_stage_card_ignores_hand_for_other_card_cost() {
         &game.state.player1.success_live_card_zone.cards,
         game.state.player1.hand.cards.len(),
         other,
+        db_other,
         &game.db,
         &[],
     );

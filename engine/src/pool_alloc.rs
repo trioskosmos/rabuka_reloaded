@@ -100,7 +100,6 @@ unsafe fn system_layout(ptr: *mut u8) -> Layout {
 
 /// Per-thread free lists. `Copy` so it can live in a `Cell` and be read with
 /// `get`, which needs no borrow flag and so cannot re-enter the allocator.
-#[derive(Clone, Copy)]
 struct FreeLists {
     heads: [*mut u8; CLASSES],
     counts: [u16; CLASSES],
@@ -116,10 +115,43 @@ impl FreeLists {
 }
 
 thread_local! {
-    /// Const-initialized and `Copy`, so first access allocates nothing and
-    /// registers no destructor. Both matter: a lazy initializer here would
-    /// recurse into this very allocator.
-    static FREE: Cell<FreeLists> = const { Cell::new(FreeLists::new()) };
+    /// The free lists, boxed once and never moved. The cell holds an
+    /// 8-byte raw pointer to the box, so each alloc/dealloc reads and
+    /// writes 8 bytes — not the 310 bytes the previous `Copy`+`Cell`
+    /// version moved, which was ~1.5 KB per alloc+dealloc pair and
+    /// dominated the pool's own savings.
+    ///
+    /// Mutations go through the raw pointer, which is sound here: the
+    /// box is thread-local and uniquely owned by this thread, and
+    /// nothing else can alias it. A `Ref`/`RefMut` borrow would be
+    /// cheaper than copying the struct but would also re-enter this
+    /// allocator if the borrow guard itself allocated — a `Box::new`
+    /// inside `FREE.with` would recurse. The pointer cell cannot
+    /// allocate, so it cannot re-enter.
+    static FREE: Cell<*const FreeLists> = const { Cell::new(std::ptr::null()) };
+}
+
+fn free_lists() -> *mut FreeLists {
+    let ptr = FREE.with(Cell::get);
+    if !ptr.is_null() {
+        return ptr as *mut FreeLists;
+    }
+    // Allocate the free-list struct through the SYSTEM allocator
+    // directly, bypassing this pool: `Box::new` would re-enter
+    // `free_lists()` and recurse to a stack overflow on the very
+    // first allocation of the thread. `System.alloc` cannot call
+    // back into here, so the init is re-entrancy-free.
+    unsafe {
+        let layout = Layout::new::<FreeLists>();
+        let raw = System.alloc(layout);
+        if raw.is_null() {
+            return std::ptr::null_mut();
+        }
+        (raw as *mut FreeLists).write(FreeLists::new());
+        let p: *const FreeLists = raw as *const FreeLists;
+        FREE.with(|c| c.set(p));
+        p as *mut FreeLists
+    }
 }
 
 pub struct PoolAllocator;
@@ -130,7 +162,7 @@ unsafe impl GlobalAlloc for PoolAllocator {
             return System.alloc(layout);
         }
         let class = class_of(layout.size());
-        let block = FREE.with(|lists| lists.get().heads[class]);
+        let block = unsafe { (*free_lists()).heads[class] };
         if block.is_null() {
             let width = bin_width(layout.size());
             let block = System.alloc(
@@ -144,13 +176,12 @@ unsafe impl GlobalAlloc for PoolAllocator {
         }
         // Recycled: the header was overwritten by the link when the block went
         // on the free list, so it is rewritten here.
-        let next = *(block as *const *mut u8);
-        FREE.with(|lists| {
-            let mut l = lists.get();
-            l.heads[class] = next;
-            l.counts[class] -= 1;
-            lists.set(l);
-        });
+        let next = unsafe { *(block as *const *mut u8) };
+        unsafe {
+            let lists = free_lists();
+            (*lists).heads[class] = next;
+            (*lists).counts[class] -= 1;
+        }
         *(block as *mut usize) = MIN_CLASS + class * GRANULE;
         block.add(HEADER)
     }
@@ -162,18 +193,17 @@ unsafe impl GlobalAlloc for PoolAllocator {
         }
         let block = ptr.sub(HEADER);
         let class = class_of(layout.size());
-        let kept = FREE.with(|lists| {
-            let mut l = lists.get();
-            if l.counts[class] as usize >= PER_CLASS {
+        let kept = {
+            let lists = free_lists();
+            if (*lists).counts[class] as usize >= PER_CLASS {
                 false
             } else {
-                *(block as *mut *mut u8) = l.heads[class];
-                l.heads[class] = block;
-                l.counts[class] += 1;
-                lists.set(l);
+                *(block as *mut *mut u8) = (*lists).heads[class];
+                (*lists).heads[class] = block;
+                (*lists).counts[class] += 1;
                 true
             }
-        });
+        };
         if !kept {
             // Hand the block back with the width it was actually allocated
             // with, not the caller's smaller request size.

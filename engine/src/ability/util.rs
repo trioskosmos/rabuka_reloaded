@@ -261,13 +261,10 @@ pub fn calculate_play_cost_reduction(
     success_live_cards: &[i16],
     hand_count: usize,
     card_id: i16,
+    card: &crate::card::Card,
     card_db: &CardDatabase,
     waited_stage_cards: &[i16],
 ) -> u8 {
-    let card = match card_db.get_card(card_id) {
-        Some(c) => c,
-        None => return 0,
-    };
 
     // ── 1. Scan the played card's own abilities for a self-reduction ──────────
     let mut cost_reduction: u8 = 0;
@@ -372,6 +369,7 @@ pub fn compute_play_cost(
         &player.success_live_card_zone.cards,
         hand_count,
         card_id,
+        card,
         card_db,
         waited_stage_cards,
     );

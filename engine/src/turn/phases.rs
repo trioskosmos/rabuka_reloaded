@@ -1033,14 +1033,17 @@ impl super::TurnEngine {
                     && game_state.mods.get_orientation_modifier(*card_id) == Some("wait")
             })
             .collect();
-        let cost_reduction = crate::ability::util::calculate_play_cost_reduction(
-            stage,
-            success_zone,
-            hand_count,
-            card_id,
-            card_db,
-            &waited_stage_cards,
-        );
+        let cost_reduction = card_entry.map_or(0, |card| {
+            crate::ability::util::calculate_play_cost_reduction(
+                stage,
+                success_zone,
+                hand_count,
+                card_id,
+                card,
+                card_db,
+                &waited_stage_cards,
+            )
+        });
         let final_cost = card_cost
             .saturating_sub(cost_reduction)
             .saturating_sub(combined_reduction);
@@ -1260,6 +1263,10 @@ impl super::TurnEngine {
             })
         };
 
+        // `card_no` is the printed card number, consumed by the debut-trigger
+        // path below on every member play (122,621 plays per benchmark),
+        // so it is resolved here — not deferred to the rare double-baton
+        // branch, which would break the common path.
         let card_no = card_db
             .get_card(card_id)
             .map(|c| c.card_no.to_string())

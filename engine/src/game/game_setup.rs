@@ -1831,6 +1831,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             &active_player.success_live_card_zone.cards,
                             hand_count,
                             *card_id,
+                            card,
                             &game_state.card_database,
                             &waited_stage_cards,
                         )
@@ -1908,19 +1909,24 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     } else {
                         None
                     };
-                    let available_areas = if has_any_available || any_double_baton_available {
+                    // `available_areas` is bot decision data (v7/v8 read it to
+                    // know which areas are legal), not display data — so it is
+                    // NOT elided by `display` like `double_baton_pairs` is.
+                    // But it is only ever *read* when display is on (the bots
+                    // run with display on; sim_bench runs with display off),
+                    // so when display is off the whole `Arc<Vec<AreaInfo>>`
+                    // is dead weight: one Vec + one Arc per hand card, plus
+                    // one `Arc::clone` per generated action. Build it only
+                    // when it can be read, and iterate the borrowed
+                    // `area_candidates` directly otherwise.
+                    let available_areas = if display
+                        && (has_any_available || any_double_baton_available)
+                    {
                         Some(Arc::new(
                             area_candidates
                                 .iter()
                                 .enumerate()
                                 .map(|(slot, candidate)| AreaInfo {
-                                    // Reuse the per-call interned name rather
-                                    // than re-heaping the constant. `area` is
-                                    // one of three `&'static str` known at
-                                    // compile time, and `ArcStr::from` on a
-                                    // `&str` copies into a fresh allocation —
-                                    // previously three 4-byte copies per hand
-                                    // card, per generated action list.
                                     area: interned_area_names[slot].clone(),
                                     available: candidate.available,
                                     cost: candidate.cost,
@@ -1942,19 +1948,17 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         // `MemberArea`'s 0/1/2. The slot index is
                         // the area: no string parse of
                         // "left"/"center"/"right" per action.
-                        for (slot, area) in
-                            available_areas.as_ref().unwrap().iter().enumerate()
-                        {
+                        for (slot, area) in area_candidates.iter().enumerate() {
                             if !area.available {
                                 continue;
                             }
-                            let area_label = area_label_en(area.area.as_ref());
-                            let area_label_ja = area_label_ja(area.area.as_ref());
+                            let area_label = area_label_en(AREA_NAMES[slot]);
+                            let area_label_ja = area_label_ja(AREA_NAMES[slot]);
                             let cost_display = area.cost;
                             let bt = if area.is_baton_touch {
                                 action_desc!(
                                     " bt from {}",
-                                    area.existing_member_name.as_deref().unwrap_or("?")
+                                    area.existing_member_name.unwrap_or("?")
                                 )
                             } else {
                                 String::new()
@@ -1962,7 +1966,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             let bt_ja = if area.is_baton_touch {
                                 action_desc!(
                                     " バトン:{}から",
-                                    area.existing_member_name.as_deref().unwrap_or("?")
+                                    area.existing_member_name.unwrap_or("?")
                                 )
                             } else {
                                 String::new()
@@ -2005,24 +2009,27 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         // read final_cost first (see web_ui ActionButtons).
                                         final_cost: Some(cost_display),
                                         stage_area: if display {
-                                            Some(area.area.to_string())
+                                            Some(AREA_NAMES[slot].to_string())
                                         } else {
                                             None
                                         },
-                                        stage_area_index: Some(slot.u8_count()),
+stage_area_index: Some(slot.u8_count()),
                                         // available_areas is decision data for baton
                                         // vision (is_baton_touch on the chosen
                                         // stage_area), so it is built in every
                                         // build. It used to be forced to `None`
                                         // under `profiling`, which meant a
                                         // profiled run made different decisions
-                                        // from a production one and the profile
-                                        // did not describe the shipping path.
+                                        // from a production one and the
+                                        // profile did not describe the shipping path.
                                         // double_baton_pairs is genuinely UI-only
-                                        // and stays display-gated.
-                                        available_areas: {
-                                            Some(Arc::clone(available_areas.as_ref().unwrap()))
-                                        },
+                                        // and stays display-gated. The Arc is built
+                                        // only when display is on — see the
+                                        // construction above — so this is a clone
+                                        // of an existing Arc, not a new allocation.
+                                        available_areas: available_areas
+                                            .as_ref()
+                                            .map(Arc::clone),
                                         double_baton_pairs: if cfg!(feature = "profiling")
                                             || !display
                                         {
@@ -2098,10 +2105,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             // See the note on available_areas
                                             // above: decision data, not display
                                             // data, so never elided by build
-                                            // profile.
-                                            available_areas: {
-                                                Some(Arc::clone(available_areas.as_ref().unwrap()))
-                                            },
+                                            // profile. The Arc is built only when
+                                            // display is on.
+                                            available_areas: available_areas
+                                                .as_ref()
+                                                .map(Arc::clone),
                                             double_baton_pairs: if cfg!(feature = "profiling")
                                                 || !display
                                             {
