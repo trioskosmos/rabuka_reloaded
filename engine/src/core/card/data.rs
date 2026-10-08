@@ -551,7 +551,7 @@ impl TriggerAbilityIndex {
     }
 }
 
-/// The three ability indexes for one card, built in a single pass
+/// The ability indexes for one card, built in a single pass
 /// over its abilities. Shared by the JSON loader
 /// (`CardDatabase::load_or_create`) and the compact blob loader
 /// (`card_binary::load_cards_from_blob`) so both load paths
@@ -568,6 +568,10 @@ pub(crate) struct AbilityIndexes {
     /// action. Matched by `effect.action`, the predicate
     /// `is_trigger_suppressed` uses.
     pub(crate) suppress: bool,
+    /// Ability indices that activate from the discard pile,
+    /// matched by `activates_from_discard` — the predicate the
+    /// waitroom scan in `generate_main_phase_actions` gates on.
+    pub(crate) discard: Vec<u16>,
 }
 
 /// Build [`AbilityIndexes`] for `card` in one pass.
@@ -584,6 +588,7 @@ pub(crate) fn build_ability_indexes(card: &Card) -> AbilityIndexes {
         constant: false,
         board: TriggerAbilityIndex::default(),
         suppress: false,
+        discard: Vec::new(),
     };
     for (ability_index, ar) in card.abilities.iter().enumerate() {
         let ability = ar.resolve();
@@ -619,6 +624,13 @@ pub(crate) fn build_ability_indexes(card: &Card) -> AbilityIndexes {
         {
             indexes.suppress = true;
         }
+        // Discard activation matches by `activates_from_discard`
+        // — the same predicate the waitroom scan gates on — so
+        // the index is exactly the set that scan would resolve
+        // its way to.
+        if crate::ability::util::activates_from_discard(&ability) {
+            indexes.discard.push(ability_index.u16_count());
+        }
     }
     indexes
 }
@@ -649,6 +661,13 @@ pub struct CardDatabase {
     /// empty and `is_trigger_suppressed`'s empty-set fast path
     /// returns before walking the board.
     pub suppress_cards: HashSet<i16>,
+    /// Per-card ability indices that activate from the discard
+    /// pile. The waitroom scan in `generate_main_phase_actions`
+    /// iterates this instead of every ability of every waitroom
+    /// card: most cards carry no discard-activating ability, so
+    /// one HashMap probe skips the card without resolving any
+    /// ability. See [`CardDatabase::discard_ability_indices`].
+    pub discard_abilities: HashMap<i16, Vec<u16>>,
     /// `is_live` and `is_energy` per card id, as a dense array indexed by the id.
     ///
     /// Card ids are assigned densely from 0, so a direct array index answers "is this a
@@ -711,6 +730,7 @@ impl CardDatabase {
             constant_cards: HashSet::default(),
             trigger_indices: HashMap::default(),
             suppress_cards: HashSet::default(),
+            discard_abilities: HashMap::default(),
             live_ids: Vec::new(),
             energy_ids: Vec::new(),
             next_id: 0,
@@ -782,9 +802,22 @@ impl CardDatabase {
             .unwrap_or(&[])
     }
 
+    /// The ability indices on `card_id` that activate from the
+    /// discard pile, in ability order. The waitroom scan in
+    /// `generate_main_phase_actions` iterates this instead of
+    /// every ability of every waitroom card on every
+    /// action-generation call.
+    #[inline]
+    pub fn discard_ability_indices(&self, card_id: i16) -> &[u16] {
+        self.discard_abilities
+            .get(&card_id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
     /// Index a card's abilities into `auto_abilities`,
-    /// `constant_cards`, `trigger_indices` and
-    /// `suppress_cards` in a single pass (see
+    /// `constant_cards`, `trigger_indices`, `suppress_cards`
+    /// and `discard_abilities` in a single pass (see
     /// [`build_ability_indexes`]).
     ///
     /// `resolve()` here, not `peek()`: at load time no decode
@@ -807,6 +840,9 @@ impl CardDatabase {
         if indexes.suppress {
             self.suppress_cards.insert(card_id);
         }
+        if !indexes.discard.is_empty() {
+            self.discard_abilities.insert(card_id, indexes.discard);
+        }
     }
 
     /// Create a copy of an existing card with a new unique ID.
@@ -824,6 +860,9 @@ impl CardDatabase {
         }
         if let Some(board) = self.trigger_indices.get(&template_id).cloned() {
             self.trigger_indices.insert(copy_id, board);
+        }
+        if let Some(discard) = self.discard_abilities.get(&template_id).cloned() {
+            self.discard_abilities.insert(copy_id, discard);
         }
         if self.has_suppress_ability(template_id) {
             self.suppress_cards.insert(copy_id);

@@ -1,11 +1,17 @@
 # Engine optimization catalogue — the long list
 
-> **Companion to `docs/PERF_ENGINE_COMBINED.md`, not a replacement.** That document
-> is the record of what was measured, landed, and *closed*. This one is the
-> catalogue of everything still on the table, organised by mechanism so that
-> related fixes land together. Read §0 and §1 of the combined doc first: the
-> measurement contract and the closed list are load-bearing here and are
-> summarised (not restated) in §1 below.
+> **SUPERSEDED 2026-10-08 — `docs/PERF_ENGINE_COMBINED.md` is now the
+> single engine-performance document.** It merged this catalogue's open
+> list into its §4 and records everything landed in its §3. This file
+> remains only because ~10 in-tree source comments cite its section
+> numbers (§3.x–§15.x); rewrite those comments to be self-contained and
+> this file can be deleted (its content is in git history). Do not add
+> items here — add them to the combined doc's §4.
+>
+> Original companion note, for the section references that still point
+> here: that document is the record of what was measured, landed, and
+> *closed*; this one was the catalogue of everything still on the table,
+> organised by mechanism so that related fixes land together.
 >
 > Engine *correctness* work is not here. See `docs/ABILITY_PIPELINE.md`,
 > `docs/TEST_AUDIT_PLAN.md`, and `engine/tests/TEST_QUALITY.md`.

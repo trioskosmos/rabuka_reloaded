@@ -53,8 +53,8 @@ Usage: cargo run --release --bin sim_bench -- [options]
   --policy P      random (default) | v1..v8 | conductor
    --repeat R      repeat the full deck sweep R times (default 1)
     --jobs N        worker threads per deck sweep (default 1 = baseline)
-    --secs N        run each deck for N seconds instead of --games
-                    (forces --jobs 1; reported games= is the count played)
+   --secs N        run each deck for N seconds instead of --games
+                     (reported games= is the count actually played)
     --per-game      print per-game outcome, end reason, and action count
    --trace PATH    write replay-compatible JSONL for one deck and one repeat
    --alloc         print allocator delta after the timed loop
@@ -75,9 +75,9 @@ struct Options {
     trace: Option<PathBuf>,
     ab: Option<String>,
     /// Wall-clock budget per deck. When set, each deck runs games
-    /// until this many seconds elapse (jobs forced to 1), instead
-    /// of a fixed `--games` count. The reported `games=` is the
-    /// number actually played.
+    /// until this many seconds elapse, instead of a fixed
+    /// `--games` count. The reported `games=` is the number
+    /// actually played.
     secs: Option<f64>,
 }
 
@@ -645,12 +645,15 @@ fn run_sweep(
         // noise only (not seed→game-length variance, which can exceed 70%).
         let seed_offset = (runs.len() as u32).wrapping_mul(100_000);
         let base_seed = opts.seed.wrapping_add(seed_offset);
-        // A --secs budget forces the single-threaded path: time-bounding
-        // parallel chunks would need a shared deadline, and the baseline
-        // comparison is jobs=1 anyway.
+        // A --secs budget bounds the run by wall-clock. The parallel
+        // path shares one deadline across workers, so the budget
+        // parallelizes like the games mode; the single-threaded
+        // path below is what the baseline comparison uses.
         let time_budget = opts.secs;
         let jobs = if time_budget.is_some() {
-            1
+            // Time-bounded: the played count is unknown up front,
+            // so the --games default must not clamp the worker count.
+            opts.jobs
         } else {
             opts.jobs.min(games.max(1))
         };
@@ -702,7 +705,7 @@ fn run_sweep(
                 g += 1;
             }
             played = g;
-        } else {
+        } else if time_budget.is_none() {
             // Parallel: one game index → one seed pair, independent of worker.
             // Engine RNG is thread-local; each run_game seeds that worker.
             let chunks: Vec<(u32, u32)> = {
@@ -771,6 +774,90 @@ fn run_sweep(
                     .collect::<Vec<_>>()
             });
             for (actions, local_outcomes, local_ends) in parts {
+                total_actions += actions;
+                for (k, v) in local_outcomes {
+                    *outcomes.entry(k).or_insert(0) += v;
+                }
+                for (k, v) in local_ends {
+                    *ends.entry(k).or_insert(0) += v;
+                }
+            }
+        } else {
+            // Parallel time-bounded: workers share one deadline and
+            // stride through the game-index space (worker j takes
+            // indices j, j+jobs, j+2*jobs, ...), so every index —
+            // and therefore every seed pair — is unique across
+            // workers. The played count depends on machine speed,
+            // which is inherent to a wall-clock budget.
+            let limit = time_budget.unwrap();
+            let parts = std::thread::scope(|scope| {
+                let handles: Vec<_> = (0..jobs)
+                    .map(|j| {
+                        let db = &*db;
+                        let t1 = &t1;
+                        let t2 = &t2;
+                        let v2_policy = &v2_policy;
+                        let deadline = t0;
+                        scope.spawn(move || {
+                            let mut actions = 0u64;
+                            let mut count = 0u32;
+                            let mut local_outcomes: BTreeMap<&'static str, u32> =
+                                BTreeMap::new();
+                            let mut local_ends: BTreeMap<&'static str, u32> =
+                                BTreeMap::new();
+                            let mut k = 0u32;
+                            loop {
+                                if k > 0
+                                    && deadline.elapsed().as_secs_f64() >= limit
+                                {
+                                    break;
+                                }
+                                let g = j.wrapping_add(k.wrapping_mul(jobs));
+                                let (engine_seed, arena_seed) =
+                                    game_seeds(base_seed, g.wrapping_add(1));
+                                let stats = run_game(
+                                    GameSetup {
+                                        db,
+                                        player1_deck: t1,
+                                        player2_deck: t2,
+                                        engine_seed,
+                                        arena_seed,
+                                        policy: opts.policy,
+                                        v2_policy,
+                                    },
+                                    g as usize,
+                                    false,
+                                )
+                                .expect("sim_bench worker failed");
+                                actions += stats.actions;
+                                if opts.per_game {
+                                    println!(
+                                        "GAME deck={name} index={g} outcome={} end={} actions={}",
+                                        outcome_label(stats.outcome),
+                                        stats.end_reason,
+                                        stats.actions
+                                    );
+                                }
+                                *local_outcomes
+                                    .entry(outcome_label(stats.outcome))
+                                    .or_insert(0) += 1;
+                                *local_ends.entry(stats.end_reason).or_insert(0) += 1;
+                                let _ = stats.game_result;
+                                count += 1;
+                                k += 1;
+                            }
+                            (count, actions, local_outcomes, local_ends)
+                        })
+                    })
+                    .collect();
+                handles
+                    .into_iter()
+                    .map(|h| h.join().expect("sim_bench worker panicked"))
+                    .collect::<Vec<_>>()
+            });
+            played = 0;
+            for (count, actions, local_outcomes, local_ends) in parts {
+                played += count;
                 total_actions += actions;
                 for (k, v) in local_outcomes {
                     *outcomes.entry(k).or_insert(0) += v;

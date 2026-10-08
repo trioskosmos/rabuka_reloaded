@@ -1935,16 +1935,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         None
                     };
 
-                        if has_any_available || any_double_baton_available {
-                            // `available_areas` is slot-indexed (built
-                            // from `area_candidates.iter().enumerate()`),
-                            // so the loop index IS the stage slot —
-                            // `MemberArea`'s 0/1/2. The slot index is
-                            // the area: no string parse of
-                            // "left"/"center"/"right" per action.
-                            for (slot, area) in
-                                available_areas.as_ref().unwrap().iter().enumerate()
-                            {
+                    if has_any_available || any_double_baton_available {
+                        // `available_areas` is slot-indexed (built
+                        // from `area_candidates.iter().enumerate()`),
+                        // so the loop index IS the stage slot —
+                        // `MemberArea`'s 0/1/2. The slot index is
+                        // the area: no string parse of
+                        // "left"/"center"/"right" per action.
+                        for (slot, area) in
+                            available_areas.as_ref().unwrap().iter().enumerate()
+                        {
                             if !area.available {
                                 continue;
                             }
@@ -2318,26 +2318,38 @@ let owned;
     }
 
     // Also check discard pile for cards that activate from discard
-    // (activation_condition_parsed with location = discard)
-for &card_id in &active_player.waitroom.cards {
-            if let Some(card) = game_state.card_database.get_card(card_id) {
-                for (ability_index, ar) in card.abilities.iter().enumerate() {
-                    // `peek()` first: this loop runs once per waitroom ability on
-                    // every action-generation call, and `resolve()` costs an
-                    // `Arc::clone` (an atomic RMW on the decode slot shared by
-                    // every worker thread) purely to read a few fields. The
-                    // `resolve()` arm covers a not-yet-decoded slot.
-let owned;
-                    let ability = match ar.peek() {
-                        Some(a) => a,
-                        None => {
-                            owned = ar.resolve();
-                            &owned
-                        }
-                    };
-                    if !crate::ability::util::activates_from_discard(&ability) {
+    // (activation_condition_parsed with location = discard). The
+    // `discard_abilities` index is built from the same
+    // `activates_from_discard` predicate at load, so the probe
+    // answers the per-ability test for the whole card: most
+    // waitroom cards carry no discard-activating ability and are
+    // skipped on one HashMap lookup, without resolving any
+    // ability (see `CardDatabase::discard_ability_indices`).
+    for &card_id in &active_player.waitroom.cards {
+        let discard_indices =
+            game_state.card_database.discard_ability_indices(card_id);
+        if discard_indices.is_empty() {
+            continue;
+        }
+        if let Some(card) = game_state.card_database.get_card(card_id) {
+            for &ability_index_u16 in discard_indices {
+                let ability_index = usize::from(ability_index_u16);
+                let Some(ar) = card.abilities.get(ability_index) else {
                     continue;
-                }
+                };
+                // `peek()` first: this loop runs once per waitroom ability on
+                // every action-generation call, and `resolve()` costs an
+                // `Arc::clone` (an atomic RMW on the decode slot shared by
+                // every worker thread) purely to read a few fields. The
+                // `resolve()` arm covers a not-yet-decoded slot.
+                let owned;
+                let ability = match ar.peek() {
+                    Some(a) => a,
+                    None => {
+                        owned = ar.resolve();
+                        &owned
+                    }
+                };
                 if !crate::ability::util::ability_trigger_can_activate(&ability) {
                     continue;
                 }

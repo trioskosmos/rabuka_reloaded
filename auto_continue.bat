@@ -9,7 +9,7 @@ exit /b
 param(
     [int]$IntervalMinutes = 8,
     [string]$WindowTitle = "",
-    [string]$Message = "keep researching the internet and this specific game's rules and strategy guides and so on. keep improving the bots. you are not done until you create a bot with a winrate of 100 over the last one. and even then you would just make the next version. I shouldn't need to say this, but actually do the work and experiments to see don't just think about it with no action. work."
+    [string]$Message = "go crank up the speed then. keep auditing the engine find the worst offenders and do the work."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

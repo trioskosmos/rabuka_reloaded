@@ -379,16 +379,18 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
         }
     }
 
-    // One pass over each card's abilities builds all four
-    // indexes (自動, 常時, board trigger kinds, suppress) —
-    // see `card::build_ability_indexes`. The old code made
-    // two passes, each calling `resolve()` per ability; on
-    // `no_std` that is two decodes per ability at load.
+    // One pass over each card's abilities builds all five
+    // indexes (自動, 常時, board trigger kinds, suppress,
+    // discard activation) — see `card::build_ability_indexes`.
+    // The old code made two passes, each calling `resolve()`
+    // per ability; on `no_std` that is two decodes per ability
+    // at load.
     let mut auto_abilities: HashMap<i16, Vec<u16>> = HashMap::default();
     let mut constant_cards: crate::HashSet<i16> = crate::HashSet::default();
     let mut trigger_indices: HashMap<i16, super::card::TriggerAbilityIndex> =
         HashMap::default();
     let mut suppress_cards: crate::HashSet<i16> = crate::HashSet::default();
+    let mut discard_abilities: HashMap<i16, Vec<u16>> = HashMap::default();
     for (&id, card) in cards.iter() {
         let indexes = super::card::build_ability_indexes(card);
         if !indexes.auto.is_empty() {
@@ -402,6 +404,9 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
         }
         if indexes.suppress {
             suppress_cards.insert(id);
+        }
+        if !indexes.discard.is_empty() {
+            discard_abilities.insert(id, indexes.discard);
         }
     }
 
@@ -431,6 +436,7 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
         constant_cards,
         trigger_indices,
         suppress_cards,
+        discard_abilities,
         next_id,
         live_ids,
         energy_ids,
