@@ -926,25 +926,22 @@ impl AbilityResolver {
                     }
                 }
             }
-            #[cfg(feature = "serde_support")]
-            {
-                let mut json = choice.to_frontend_json();
-                if let Some(ref mut j) = json {
-                    if let Some(entry) = gs.ability_queue.current_entry() {
-                        if let Some(ref effect) = entry.ability.effect {
-                            if let Some(ref maker) = effect.choice_maker_any() {
-                                if let Some(obj) = j.as_object_mut() {
-                                    obj.insert(
-                                        "choice_maker".to_string(),
-                                        serde_json::Value::String(maker.to_string()),
-                                    );
-                                }
-                            }
-                        }
-                    }
-                    gs.inject_choice_ability_context(j);
-                }
-            }
+            // NOTE: the `choice.to_frontend_json()` +
+            // `inject_choice_ability_context` block that used to sit
+            // here was dead work and is GONE. It built the complete
+            // frontend JSON for the pending choice — including the
+            // per-card `selection_cards` array, which alone is one
+            // `serde_json::Value` per card in the target zone — and
+            // then dropped it: the local `json` was never stored,
+            // returned, or logged. The only consumers of that JSON are
+            // the UI layers, which rebuild it on demand through
+            // `GameState::get_pending_choice_json` (display.rs), so
+            // nothing could observe this copy. Measured on the bench:
+            // ~140 of the ~231 allocations of a choice-creating action
+            // were this block, and it re-ran on every re-store of the
+            // same pending choice (each recursion level of ability
+            // resolution re-stores). `inject_choice_ability_context`
+            // itself is still used by `get_pending_choice_json`.
         }
     }
 

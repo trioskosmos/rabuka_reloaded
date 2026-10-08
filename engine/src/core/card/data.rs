@@ -493,6 +493,136 @@ impl From<CardId> for usize {
     }
 }
 
+/// The board trigger kinds the trigger scans look for: 登場,
+/// ライブ開始時 and ライブ成功時. One const so the index
+/// builder and the scans agree on the set.
+const BOARD_TRIGGER_KINDS: [crate::triggers::TriggerKind; 3] = [
+    crate::triggers::TriggerKind::Debut,
+    crate::triggers::TriggerKind::LiveStart,
+    crate::triggers::TriggerKind::LiveSuccess,
+];
+
+/// Ability indices on a card, grouped by board trigger kind.
+///
+/// The Debut/LiveStart/LiveSuccess scans in `turn::trigger_scan`
+/// run on every live start and every live success and used to walk
+/// every ability of every board card, paying an `Arc::clone` per
+/// ability to test one trigger bit. This index is built once at
+/// load from [`Ability::has_trigger`] — the same predicate those
+/// scans use — so a scan iterates only the abilities that can
+/// fire. Runtime-gained abilities (「…を得る」) are not indexed:
+/// they live in `GameState::gained_card_abilities`, not the card
+/// database, and the scans walk them separately.
+#[derive(Debug, Default, Clone)]
+pub struct TriggerAbilityIndex {
+    /// 登場 — [`crate::triggers::TriggerKind::Debut`]
+    debut: Vec<u16>,
+    /// ライブ開始時 — [`crate::triggers::TriggerKind::LiveStart`]
+    live_start: Vec<u16>,
+    /// ライブ成功時 — [`crate::triggers::TriggerKind::LiveSuccess`]
+    live_success: Vec<u16>,
+}
+
+impl TriggerAbilityIndex {
+    /// The ability indices carrying `kind` on this card, in
+    /// ability order. Empty for kinds this card does not carry.
+    pub fn indices_for(&self, kind: crate::triggers::TriggerKind) -> &[u16] {
+        match kind {
+            crate::triggers::TriggerKind::Debut => &self.debut,
+            crate::triggers::TriggerKind::LiveStart => &self.live_start,
+            crate::triggers::TriggerKind::LiveSuccess => &self.live_success,
+            _ => &[],
+        }
+    }
+
+    /// Record `ability_index` under `kind`.
+    fn push(&mut self, kind: crate::triggers::TriggerKind, ability_index: u16) {
+        match kind {
+            crate::triggers::TriggerKind::Debut => self.debut.push(ability_index),
+            crate::triggers::TriggerKind::LiveStart => self.live_start.push(ability_index),
+            crate::triggers::TriggerKind::LiveSuccess => self.live_success.push(ability_index),
+            _ => {}
+        }
+    }
+
+    /// True when no kind carries any ability.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.debut.is_empty() && self.live_start.is_empty() && self.live_success.is_empty()
+    }
+}
+
+/// The three ability indexes for one card, built in a single pass
+/// over its abilities. Shared by the JSON loader
+/// (`CardDatabase::load_or_create`) and the compact blob loader
+/// (`card_binary::load_cards_from_blob`) so both load paths
+/// produce byte-identical indexes.
+pub(crate) struct AbilityIndexes {
+    /// **自動** ability indices, matched by exact `triggers` text
+    /// (the predicate the TAS stage loop gates on).
+    pub(crate) auto: Vec<u16>,
+    /// Whether the card carries a **常時** ability (exact-text match).
+    pub(crate) constant: bool,
+    /// Board trigger kinds, matched by `has_trigger`.
+    pub(crate) board: TriggerAbilityIndex,
+    /// Whether the card carries a `SuppressAbilityTrigger`
+    /// action. Matched by `effect.action`, the predicate
+    /// `is_trigger_suppressed` uses.
+    pub(crate) suppress: bool,
+}
+
+/// Build [`AbilityIndexes`] for `card` in one pass.
+///
+/// One `resolve()` per ability feeds all four indexes. These used
+/// to be three separate passes (`index_auto_ability`,
+/// `index_constant_ability`, and an unindexed board scan), each
+/// calling `resolve()`. On `no_std` `resolve()` decodes on every
+/// call (no cache), so that was three decodes per ability at load;
+/// one pass pays it once.
+pub(crate) fn build_ability_indexes(card: &Card) -> AbilityIndexes {
+    let mut indexes = AbilityIndexes {
+        auto: Vec::new(),
+        constant: false,
+        board: TriggerAbilityIndex::default(),
+        suppress: false,
+    };
+    for (ability_index, ar) in card.abilities.iter().enumerate() {
+        let ability = ar.resolve();
+        // 自動 and 常時 match the exact `triggers` text, exactly as
+        // the TAS stage loop and `recalculate_constants` gate on them
+        // — keep the string comparison so the indexed set is
+        // byte-for-byte the set the old passes produced.
+        let triggers = ability.triggers.as_deref();
+        if triggers == Some(crate::triggers::AUTO) {
+            indexes.auto.push(ability_index.u16_count());
+        }
+        if triggers == Some(crate::triggers::CONSTANT) {
+            indexes.constant = true;
+        }
+        // Board trigger kinds match by `has_trigger` — the same
+        // predicate the Debut/LiveStart/LiveSuccess scans use — so
+        // the index is exactly the set each scan would otherwise
+        // resolve its way to.
+        for kind in BOARD_TRIGGER_KINDS {
+            if ability.has_trigger(kind) {
+                indexes.board.push(kind, ability_index.u16_count());
+            }
+        }
+        // SuppressAbilityTrigger matches by `effect.action`, the
+        // same predicate `is_trigger_suppressed` uses. The pool
+        // currently carries zero such abilities, so this stays
+        // false for every card and `is_trigger_suppressed`'s
+        // empty-set fast path returns before the board walk.
+        if ability
+            .effect
+            .as_ref()
+            .is_some_and(|e| e.action == crate::ability::enums::ActionType::SuppressAbilityTrigger)
+        {
+            indexes.suppress = true;
+        }
+    }
+    indexes
+}
+
 #[derive(Debug, Clone)]
 
 pub struct CardDatabase {
@@ -509,6 +639,16 @@ pub struct CardDatabase {
     /// Card ids carrying at least one **常時** ability. See
     /// [CardDatabase::has_constant_ability].
     pub constant_cards: HashSet<i16>,
+    /// Per-card ability indices for the board trigger kinds
+    /// (登場 / ライブ開始時 / ライブ成功時). See
+    /// [`TriggerAbilityIndex`].
+    pub trigger_indices: HashMap<i16, TriggerAbilityIndex>,
+    /// Card ids carrying at least one `SuppressAbilityTrigger`
+    /// action. See [CardDatabase::has_suppress_ability]. The
+    /// pool currently carries zero such abilities, so this is
+    /// empty and `is_trigger_suppressed`'s empty-set fast path
+    /// returns before walking the board.
+    pub suppress_cards: HashSet<i16>,
     /// `is_live` and `is_energy` per card id, as a dense array indexed by the id.
     ///
     /// Card ids are assigned densely from 0, so a direct array index answers "is this a
@@ -569,6 +709,8 @@ impl CardDatabase {
             normalized_no_to_id: HashMap::default(),
             auto_abilities: HashMap::default(),
             constant_cards: HashSet::default(),
+            trigger_indices: HashMap::default(),
+            suppress_cards: HashSet::default(),
             live_ids: Vec::new(),
             energy_ids: Vec::new(),
             next_id: 0,
@@ -614,30 +756,56 @@ impl CardDatabase {
         self.constant_cards.contains(&card_id)
     }
 
-    fn index_constant_ability(&mut self, card_id: i16, card: &Card) {
-        if card
-            .abilities
-            .iter()
-            .any(|ar| ar.resolve().triggers.as_deref() == Some(crate::triggers::CONSTANT))
-        {
-            self.constant_cards.insert(card_id);
-        }
+    /// Does this card carry ANY `SuppressAbilityTrigger`
+    /// action? O(1) form of the `suppress_cards` set, for
+    /// `is_trigger_suppressed`, which walks the board and
+    /// used to resolve every ability of every board card to
+    /// answer it.
+    #[inline]
+    pub fn has_suppress_ability(&self, card_id: i16) -> bool {
+        self.suppress_cards.contains(&card_id)
     }
 
-    /// `resolve()` here, not `peek()`: at load time no decode slot has been populated, so
-    /// `peek()` is `None` for every ability and the index would come out EMPTY — which
-    /// reads as a clean index and silently disables every 自動. The `Arc` cost is
-    /// irrelevant: this runs once per card at startup, not on a hot path.
-    fn index_auto_ability(&mut self, card_id: i16, card: &Card) {
-        let indices: Vec<u16> = card
-            .abilities
-            .iter()
-            .enumerate()
-            .filter(|(_, ar)| ar.resolve().triggers.as_deref() == Some(crate::triggers::AUTO))
-            .map(|(i, _)| i as u16)
-            .collect();
-        if !indices.is_empty() {
-            self.auto_abilities.insert(card_id, indices);
+    /// The ability indices on `card_id` carrying `kind`, in
+    /// ability order. The Debut/LiveStart/LiveSuccess scans in
+    /// `turn::trigger_scan` iterate this instead of every
+    /// ability of every board card.
+    #[inline]
+    pub fn trigger_ability_indices(
+        &self,
+        card_id: i16,
+        kind: crate::triggers::TriggerKind,
+    ) -> &[u16] {
+        self.trigger_indices
+            .get(&card_id)
+            .map(|idx| idx.indices_for(kind))
+            .unwrap_or(&[])
+    }
+
+    /// Index a card's abilities into `auto_abilities`,
+    /// `constant_cards`, `trigger_indices` and
+    /// `suppress_cards` in a single pass (see
+    /// [`build_ability_indexes`]).
+    ///
+    /// `resolve()` here, not `peek()`: at load time no decode
+    /// slot has been populated, so `peek()` is `None` for
+    /// every ability and the index would come out EMPTY —
+    /// which reads as a clean index and silently disables
+    /// every 自動. The `Arc` cost is irrelevant: this runs
+    /// once per card at startup, not on a hot path.
+    fn index_abilities(&mut self, card_id: i16, card: &Card) {
+        let indexes = build_ability_indexes(card);
+        if !indexes.auto.is_empty() {
+            self.auto_abilities.insert(card_id, indexes.auto);
+        }
+        if indexes.constant {
+            self.constant_cards.insert(card_id);
+        }
+        if !indexes.board.is_empty() {
+            self.trigger_indices.insert(card_id, indexes.board);
+        }
+        if indexes.suppress {
+            self.suppress_cards.insert(card_id);
         }
     }
 
@@ -653,6 +821,12 @@ impl CardDatabase {
         self.next_id += 1;
         if let Some(indices) = self.auto_abilities.get(&template_id).cloned() {
             self.auto_abilities.insert(copy_id, indices);
+        }
+        if let Some(board) = self.trigger_indices.get(&template_id).cloned() {
+            self.trigger_indices.insert(copy_id, board);
+        }
+        if self.has_suppress_ability(template_id) {
+            self.suppress_cards.insert(copy_id);
         }
         if self.has_constant_ability(template_id) {
             self.constant_cards.insert(copy_id);
@@ -686,8 +860,7 @@ impl CardDatabase {
                 db.next_id += 1;
             }
             let card_id = db.card_no_to_id[card.card_no.as_ref()];
-            db.index_auto_ability(card_id, &card);
-            db.index_constant_ability(card_id, &card);
+            db.index_abilities(card_id, &card);
             db.index_card_types(card_id, &card);
             db.cards.insert(card_id, card);
         }

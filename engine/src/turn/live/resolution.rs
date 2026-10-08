@@ -1,14 +1,14 @@
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::Zone;
-use crate::card::{BaseHeart, BladeColor, CardDatabase, HeartColor};
+use crate::card::{CardDatabase, HeartColor};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::game_state::GameState;
 use crate::turn::TurnEngine;
 use crate::types::{
-    AdjustmentType, AllocPhase, Allocation, ArcStr, BladeSource, HeartSource, LivePerformanceData,
-    MemberContribution, SourceName, SourceType, YellCardResult,
+    AdjustmentType, LivePerformanceData,
+    MemberContribution,
 };
-use crate::{HashMap, HashSet};
+use crate::HashMap;
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -18,7 +18,6 @@ use core::sync::atomic::Ordering;
 
 use super::scoring::EMPTY_H8;
 use super::cheer::record_pretrigger_live_results;
-use super::cheer::process_yell_revealed_card_icons;
 use super::fmt_player_id;
 impl TurnEngine {
     fn drain_pending_live_success_choices(

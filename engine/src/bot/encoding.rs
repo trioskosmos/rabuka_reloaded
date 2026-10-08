@@ -471,7 +471,6 @@ pub fn locm_card_features(card_db: &crate::card::CardDatabase, cid: i16) -> [f32
         CardType::Live => 0,
         CardType::Member => 1,
         CardType::Energy => 2,
-        _ => 3,
     };
     v[type_slot] = 1.0;
 
@@ -536,7 +535,6 @@ pub fn locm_card_features(card_db: &crate::card::CardDatabase, cid: i16) -> [f32
         CardType::Energy => {
             v[15] = 1.0;
         }
-        _ => {}
     }
 
     // [16) area of effect: LOCM 1.5's single enum float. This game has no

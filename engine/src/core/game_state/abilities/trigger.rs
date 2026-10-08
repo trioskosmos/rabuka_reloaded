@@ -668,8 +668,22 @@ impl GameState {
                 if card_id == -1 {
                     continue;
                 }
+                let auto_indices = self.card_database.auto_ability_indices(card_id);
+                if auto_indices.is_empty() {
+                    continue;
+                }
                 if let Some(card) = self.card_database.get_card(card_id) {
-                    for (ability_idx, ar) in card.abilities.iter().enumerate() {
+                    for &ability_idx_u16 in auto_indices {
+                        let ability_idx = usize::from(ability_idx_u16);
+                        let Some(ar) = card.abilities.get(ability_idx) else {
+                            log::debug!(
+                                "[AUTO_INDEX] stage card={} idx={} out of range (len={})",
+                                card_id,
+                                ability_idx,
+                                card.abilities.len()
+                            );
+                            continue;
+                        };
                         let ability = ar.resolve();
                         if !crate::zones::check_effect_position(
                             ability
@@ -690,136 +704,138 @@ impl GameState {
                         {
                             continue;
                         }
-                        if ability
-                            .triggers
-                            .as_ref()
-                            .is_some_and(|t| &**t == crate::triggers::AUTO)
-                        {
-                            let mut trigger_multiplicity: u8 = 1;
-                            // Guard: skip discard-location abilities when the card
-                            // is on stage (prevents premature triggering).
-                            if let Some(ref effect) = ability.effect {
-                                if crate::ability::debug::ABILITY_DEBUG
-                                    .load(core::sync::atomic::Ordering::Relaxed)
-                                {
-                                    log::trace!(
-                                        "[AUTO_SCAN] trigger={:?} has_condition={}",
-                                        ability.triggers,
-                                        effect.condition.is_some(),
-                                    );
-                                }
-                                if let Some(ref condition) = effect.condition {
-                                    // A 「自分の控え室にある」 condition can never be
-                                    // satisfied by a card that is on stage, so such an
-                                    // auto ability is skipped rather than queued and
-                                    // rejected later.
-                                    let in_discard = self.player1.waitroom.cards.contains(&card_id)
-                                        || self.player2.waitroom.cards.contains(&card_id);
-                                    if Self::is_stale_discard_condition(condition, in_discard) {
-                                        continue;
-                                    }
-                                    // Pre-filter: evaluate conditions during scanning
-                                    // to prevent queuing auto abilities whose trigger
-                                    // event hasn't occurred.  Only pre-filter event-
-                                    // based condition types:
-                                    //   - movement ("moved" / "moves")
-                                    //   - appearance
-                                    //   - card_count (all variants)
-                                    // Other types (state, position, group, comparison,
-                                    // state_change) depend on game state or events
-                                    // that may change between TAS and ability
-                                    // resolution, so they are deferred.
-                                    if Self::condition_is_event_based(condition) {
-                                        let saved_activating = self.activating_card;
-                                        self.activating_card = Some(card_id);
-                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved_cards);
-                                        let passes = ctx.evaluate_condition(condition);
-                                        self.activating_card = saved_activating;
-                                        if crate::ability::debug::ABILITY_DEBUG
-                                            .load(core::sync::atomic::Ordering::Relaxed)
-                                        {
-                                            log::debug!(
-                                                "[AUTO_CONDITION] source={} ({}, id={}) ability={} condition={:?} passes={}",
-                                                card.name,
-                                                card.card_no,
-                                                card_id,
-                                                ability_idx,
-                                                condition.get_text(),
-                                                passes
-                                            );
-                                        }
-                                        if !passes {
-                                            continue;
-                                        }
-                                    }
-                                }
-                                // §9.7.2.1: Compute trigger multiplicity before
-                                // the effect block closes -- condition and effect
-                                // are only in scope here.
-                                trigger_multiplicity = self.trigger_instance_count(
-                                    moved_cards,
-                                    effect,
-                                    &self.card_database,
+                        // The index is built from `triggers == "自動"`,
+                        // so every ability it yields is an 自動 — the
+                        // `triggers == AUTO` gate this loop used to run
+                        // per ability is already answered. The position
+                        // and watcher checks above still run: they filter
+                        // the 自動 abilities the index selected, and were
+                        // a no-op discard for the non-自動 abilities the
+                        // index now skips.
+                        let mut trigger_multiplicity: u8 = 1;
+                        // Guard: skip discard-location abilities when the card
+                        // is on stage (prevents premature triggering).
+                        if let Some(ref effect) = ability.effect {
+                            if crate::ability::debug::ABILITY_DEBUG
+                                .load(core::sync::atomic::Ordering::Relaxed)
+                            {
+                                log::trace!(
+                                    "[AUTO_SCAN] trigger={:?} has_condition={}",
+                                    ability.triggers,
+                                    effect.condition.is_some(),
                                 );
                             }
-                            // During in-execution scans (e.g. state.rs state-change),
-                            // skip the exact same ability on the same card to prevent
-                            // self-re-triggering. Different abilities on the same card
-                            // (e.g. Maki debut ab#0 vs auto ab#1) can fire normally.
-                            if self.activating_card == Some(card_id)
-                                && self.activating_ability_index == Some(ability_idx)
-                            {
-                                continue;
+                            if let Some(ref condition) = effect.condition {
+                                // A 「自分の控え室にある」 condition can never be
+                                // satisfied by a card that is on stage, so such an
+                                // auto ability is skipped rather than queued and
+                                // rejected later.
+                                let in_discard = self.player1.waitroom.cards.contains(&card_id)
+                                    || self.player2.waitroom.cards.contains(&card_id);
+                                if Self::is_stale_discard_condition(condition, in_discard) {
+                                    continue;
+                                }
+                                // Pre-filter: evaluate conditions during scanning
+                                // to prevent queuing auto abilities whose trigger
+                                // event hasn't occurred.  Only pre-filter event-
+                                // based condition types:
+                                //   - movement ("moved" / "moves")
+                                //   - appearance
+                                //   - card_count (all variants)
+                                // Other types (state, position, group, comparison,
+                                //     state_change) depend on game state or events
+                                //     that may change between TAS and ability
+                                //     resolution, so they are deferred.
+                                if Self::condition_is_event_based(condition) {
+                                    let saved_activating = self.activating_card;
+                                    self.activating_card = Some(card_id);
+                                    let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved_cards);
+                                    let passes = ctx.evaluate_condition(condition);
+                                    self.activating_card = saved_activating;
+                                    if crate::ability::debug::ABILITY_DEBUG
+                                        .load(core::sync::atomic::Ordering::Relaxed)
+                                    {
+                                        log::debug!(
+                                            "[AUTO_CONDITION] source={} ({}, id={}) ability={} condition={:?} passes={}",
+                                            card.name,
+                                            card.card_no,
+                                            card_id,
+                                            ability_idx,
+                                            condition.get_text(),
+                                            passes
+                                        );
+                                    }
+                                    if !passes {
+                                        continue;
+                                    }
+                                }
                             }
-                            // Movement gate for "was placed" (置かれた) triggers:
-                            // self_target + single-location + movement:"moved"
-                            // requires the card to be in this event's moves.
-                            if ability.effect.as_ref().is_some_and(|eff| {
-                                eff.condition
-                                    .as_ref()
-                                    .is_some_and(|c| Self::requires_this_move(c, card_id, moved_cards))
-                            }) {
-                                continue;
-                            }
-                            // Re-scan guard: skip re-enqueueing the exact auto
-                            // ability that just completed (numeric key).
-                            let num_key = (card_id.u32_count() << 16) | ability_idx.u32_count();
-                            // Marker-carrying watchers (「対戦相手のカードの
-                            // 効果でも発動する。」) watching AREA MOVES are
-                            // armed by the push_movement_event hook when their
-                            // LAST move was caused by a foreign player.
-                            // Attribute via the watcher's own turn-scoped move
-                            // record — stable across rescan passes, unlike
-                            // batch sets. (Energy-placement watchers have no
-                            // such record; the generic path handles both
-                            // causes for them.)
-                            if self.hooked_by_foreign_cause(
-                                &ability,
-                                card_id,
-                                player_id,
-                                card.name.as_ref(),
-                            ) {
-                                continue;
-                            }
-                            // Re-scan guard: skip the just-completed ability only
-                            // on the SAME movement batch it resolved on (stale
-                            // re-scan). A fresh batch may re-fire it (turn2+).
-                            if !Self::claim_batch_slot(
-                                &mut self.this_batch_triggered_ability_ids,
-                                num_key,
-                                skip_this_card_auto_key,
-                                just_completed_batch_matches,
-                            ) {
-                                continue;
-                            }
-                            // §9.7.2.1: Multi-trigger -- N trigger instances -- N
-                            // standby entries.  All entries share the same
-                            // trigger_moved_cards (full batch) because each
-                            // instance independently re-evaluates the condition
-                            // at resolution time via can_activate_effect.
-                            for _ in 0..trigger_multiplicity {
-                                abilities_to_trigger.push((card_id, ability_idx, card_id));
-                            }
+                            // §9.7.2.1: Compute trigger multiplicity before
+                            // the effect block closes -- condition and effect
+                            // are only in scope here.
+                            trigger_multiplicity = self.trigger_instance_count(
+                                moved_cards,
+                                effect,
+                                &self.card_database,
+                            );
+                        }
+                        // During in-execution scans (e.g. state.rs state-change),
+                        // skip the exact same ability on the same card to prevent
+                        // self-re-triggering. Different abilities on the same card
+                        // (e.g. Maki debut ab#0 vs auto ab#1) can fire normally.
+                        if self.activating_card == Some(card_id)
+                            && self.activating_ability_index == Some(ability_idx)
+                        {
+                            continue;
+                        }
+                        // Movement gate for "was placed" (置かれた) triggers:
+                        // self_target + single-location + movement:"moved"
+                        // requires the card to be in this event's moves.
+                        if ability.effect.as_ref().is_some_and(|eff| {
+                            eff.condition
+                                .as_ref()
+                                .is_some_and(|c| Self::requires_this_move(c, card_id, moved_cards))
+                        }) {
+                            continue;
+                        }
+                        // Re-scan guard: skip re-enqueueing the exact auto
+                        // ability that just completed (numeric key).
+                        let num_key = (card_id.u32_count() << 16) | ability_idx.u32_count();
+                        // Marker-carrying watchers (「対戦相手のカードの
+                        // 効果でも発動する。」) watching AREA MOVES are
+                        // armed by the push_movement_event hook when their
+                        // LAST move was caused by a foreign player.
+                        // Attribute via the watcher's own turn-scoped move
+                        // record — stable across rescan passes, unlike
+                        // batch sets. (Energy-placement watchers have no
+                        // such record; the generic path handles both
+                        // causes for them.)
+                        if self.hooked_by_foreign_cause(
+                            &ability,
+                            card_id,
+                            player_id,
+                            card.name.as_ref(),
+                        ) {
+                            continue;
+                        }
+                        // Re-scan guard: skip the just-completed ability only
+                        // on the SAME movement batch it resolved on (stale
+                        // re-scan). A fresh batch may re-fire it (turn2+).
+                        if !Self::claim_batch_slot(
+                            &mut self.this_batch_triggered_ability_ids,
+                            num_key,
+                            skip_this_card_auto_key,
+                            just_completed_batch_matches,
+                        ) {
+                            continue;
+                        }
+                        // §9.7.2.1: Multi-trigger -- N trigger instances -- N
+                        // standby entries.  All entries share the same
+                        // trigger_moved_cards (full batch) because each
+                        // instance independently re-evaluates the condition
+                        // at resolution time via can_activate_effect.
+                        for _ in 0..trigger_multiplicity {
+                            abilities_to_trigger.push((card_id, ability_idx, card_id));
                         }
                     }
                 }

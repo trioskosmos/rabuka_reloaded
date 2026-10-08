@@ -10,8 +10,6 @@
 //! counters and particles where English needs articles), so both bodies survive
 //! per arm; what is unified is the dispatch, the preamble, and the arm set.
 
-use crate::ability::enums::{ActionType, Zone};
-use crate::card::AbilityEffect;
 #[cfg(feature = "no_std")]
 use alloc::{
     boxed::Box,

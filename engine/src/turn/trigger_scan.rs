@@ -75,18 +75,25 @@ impl super::TurnEngine {
                     card_no,
                     card_id_opt.is_some()
                 );
-                for (ability_index, ability_ref) in card.abilities.iter().enumerate() {
-                    let ability = ability_ref.resolve();
-                    let trigger_match = ability.has_trigger(crate::triggers::TriggerKind::Debut);
-                    log::log!(
-                        if trigger_match { log::Level::Debug } else { log::Level::Trace },
-                        "[TRIGGER_MATCH] player={} source={} ({}, id={}) ability={} trigger=Debut match={} triggers={:?}",
-                        player_id, card.name, card.card_no, card_id,
-                        ability_index, trigger_match, ability.triggers
-                    );
-                    if !trigger_match {
+                // The index is built from `has_trigger(Debut)`,
+                // so every ability it yields carries the 登場
+                // trigger — the per-ability `has_trigger` test
+                // this loop used to run is already answered.
+                let debut_indices = game_state
+                    .card_database
+                    .trigger_ability_indices(card_id, crate::triggers::TriggerKind::Debut);
+                for &ability_index_u16 in debut_indices {
+                    let ability_index = usize::from(ability_index_u16);
+                    let Some(ability_ref) = card.abilities.get(ability_index) else {
                         continue;
-                    }
+                    };
+                    let ability = ability_ref.resolve();
+                    log::log!(
+                        log::Level::Debug,
+                        "[TRIGGER_MATCH] player={} source={} ({}, id={}) ability={} trigger=Debut match=true triggers={:?}",
+                        player_id, card.name, card.card_no, card_id,
+                        ability_index, ability.triggers
+                    );
                     if !crate::zones::check_effect_position(
                         ability
                             .effect
@@ -160,6 +167,17 @@ impl super::TurnEngine {
     }
 
     pub fn is_trigger_suppressed(game_state: &GameState, player_id: &str, trigger_name: &str) -> bool {
+        let card_database = &game_state.card_database;
+        // Fast path: no card in the pool carries a
+        // SuppressAbilityTrigger ability, so no board card
+        // can either. The pool currently has zero such
+        // cards, so this returns before the board walk —
+        // the old code resolved every ability of every
+        // stage and live card on every live start to
+        // answer the same question.
+        if card_database.suppress_cards.is_empty() {
+            return false;
+        }
         let player = if player_id == game_state.player1.id {
             &game_state.player1
         } else {
@@ -172,7 +190,8 @@ impl super::TurnEngine {
             .chain(player.live_card_zone.cards.iter())
             .copied()
             .filter(|&card_id| card_id != -1)
-            .filter_map(|card_id| game_state.card_database.get_card(card_id))
+            .filter(|&card_id| card_database.has_suppress_ability(card_id))
+            .filter_map(|card_id| card_database.get_card(card_id))
             .any(|card| {
                 card.abilities.iter().any(|ability_ref| {
                     ability_ref.resolve().effect.as_ref().is_some_and(|effect| {
@@ -255,7 +274,18 @@ impl super::TurnEngine {
                 } else {
                     ("live_card_zone", "ライブ置場")
                 };
-                for (ability_index, ability_ref) in card.abilities.iter().enumerate() {
+                // The index is built from `has_trigger(LiveStart)`,
+                // so every ability it yields carries the trigger —
+                // the per-ability `has_trigger` test this loop used
+                // to run is already answered.
+                let live_start_indices = game_state
+                    .card_database
+                    .trigger_ability_indices(card_id, crate::triggers::TriggerKind::LiveStart);
+                for &ability_index_u16 in live_start_indices {
+                    let ability_index = usize::from(ability_index_u16);
+                    let Some(ability_ref) = card.abilities.get(ability_index) else {
+                        continue;
+                    };
                     let ability = ability_ref.resolve();
                     if position.is_some_and(|area| {
                         !crate::zones::check_effect_position(
@@ -278,9 +308,7 @@ impl super::TurnEngine {
                             ability.triggers
                         );
                     }
-                    if !ability.has_trigger(crate::triggers::TriggerKind::LiveStart)
-                        || !seen.insert((card_id, ability_index))
-                    {
+                    if !seen.insert((card_id, ability_index)) {
                         continue;
                     }
                     if crate::ability::debug::ABILITY_DEBUG
@@ -406,7 +434,18 @@ impl super::TurnEngine {
                 } else {
                     ("live_card_zone", "ライブ置場")
                 };
-                for (ability_index, ability_ref) in card.abilities.iter().enumerate() {
+                // The index is built from `has_trigger(LiveSuccess)`,
+                // so every ability it yields carries the trigger —
+                // the per-ability `has_trigger` test this loop used
+                // to run is already answered.
+                let live_success_indices = game_state
+                    .card_database
+                    .trigger_ability_indices(card_id, crate::triggers::TriggerKind::LiveSuccess);
+                for &ability_index_u16 in live_success_indices {
+                    let ability_index = usize::from(ability_index_u16);
+                    let Some(ability_ref) = card.abilities.get(ability_index) else {
+                        continue;
+                    };
                     let ability = ability_ref.resolve();
                     if position.is_some_and(|area| {
                         !crate::zones::check_effect_position(
@@ -419,9 +458,7 @@ impl super::TurnEngine {
                     }) {
                         continue;
                     }
-                    if !ability.has_trigger(crate::triggers::TriggerKind::LiveSuccess)
-                        || !seen.insert((card_id, ability_index))
-                    {
+                    if !seen.insert((card_id, ability_index)) {
                         continue;
                     }
                     if crate::ability::debug::ABILITY_DEBUG

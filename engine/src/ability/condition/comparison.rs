@@ -3,7 +3,7 @@ use crate::ability::enums::Zone;
 use crate::ability::util::{self, compare_counts};
 use crate::ability::queue::ConditionalChoice;
 use crate::card::{
-    AbilityFilter, BladeColor, CardProperty, ComparisonTarget, Condition, HeartColor,
+    ComparisonTarget, Condition, HeartColor,
 };
 use crate::core::constants::CountCast;
 #[cfg(feature = "no_std")]

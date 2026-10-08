@@ -379,33 +379,31 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
         }
     }
 
-    let auto_abilities = cards
-        .iter()
-        .filter_map(|(id, c)| {
-            let indices: Vec<u16> = c
-                .abilities
-                .iter()
-                .enumerate()
-                .filter(|(_, ar)| ar.resolve().triggers.as_deref() == Some(crate::triggers::AUTO))
-                .map(|(i, _)| i as u16)
-                .collect();
-            if indices.is_empty() {
-                None
-            } else {
-                Some((*id, indices))
-            }
-        })
-        .collect();
-
-    let constant_cards = cards
-        .iter()
-        .filter(|(_, c)| {
-            c.abilities
-                .iter()
-                .any(|ar| ar.resolve().triggers.as_deref() == Some(crate::triggers::CONSTANT))
-        })
-        .map(|(id, _)| *id)
-        .collect();
+    // One pass over each card's abilities builds all four
+    // indexes (自動, 常時, board trigger kinds, suppress) —
+    // see `card::build_ability_indexes`. The old code made
+    // two passes, each calling `resolve()` per ability; on
+    // `no_std` that is two decodes per ability at load.
+    let mut auto_abilities: HashMap<i16, Vec<u16>> = HashMap::default();
+    let mut constant_cards: crate::HashSet<i16> = crate::HashSet::default();
+    let mut trigger_indices: HashMap<i16, super::card::TriggerAbilityIndex> =
+        HashMap::default();
+    let mut suppress_cards: crate::HashSet<i16> = crate::HashSet::default();
+    for (&id, card) in cards.iter() {
+        let indexes = super::card::build_ability_indexes(card);
+        if !indexes.auto.is_empty() {
+            auto_abilities.insert(id, indexes.auto);
+        }
+        if indexes.constant {
+            constant_cards.insert(id);
+        }
+        if !indexes.board.is_empty() {
+            trigger_indices.insert(id, indexes.board);
+        }
+        if indexes.suppress {
+            suppress_cards.insert(id);
+        }
+    }
 
     // Same type bits as the JSON loader — see `CardDatabase::index_card_types`. Built
     // BEFORE the struct literal because it reads `card_no_to_id`, which is moved in
@@ -431,6 +429,8 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
         card_no_to_id,
         auto_abilities,
         constant_cards,
+        trigger_indices,
+        suppress_cards,
         next_id,
         live_ids,
         energy_ids,
