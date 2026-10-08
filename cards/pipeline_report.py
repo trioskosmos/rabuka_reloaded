@@ -23,7 +23,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ABILITIES = os.path.join(HERE, "abilities.json")
-CARD_RS = os.path.join(HERE, "..", "engine", "src", "core", "card.rs")
+CARD_DIR = os.path.join(HERE, "..", "engine", "src", "core", "card")
 TESTS_DIR = os.path.join(HERE, "..", "engine", "tests")
 BASELINE = os.path.join(HERE, "validation_baseline.json")
 
@@ -112,7 +112,11 @@ def s3_suspicious(data):
 
 
 def known_card_rs_keys():
-    src = open(CARD_RS, encoding="utf-8").read()
+    src = "\n".join(
+        open(os.path.join(CARD_DIR, name), encoding="utf-8").read()
+        for name in sorted(os.listdir(CARD_DIR))
+        if name.endswith(".rs")
+    )
     known = {"type", "action", "text"}
     for m in re.finditer(r"^\s*pub (\w+)\s*:", src, re.M):
         known.add(m.group(1))

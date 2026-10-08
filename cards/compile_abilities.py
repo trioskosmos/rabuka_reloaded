@@ -64,7 +64,7 @@ from build_lib import (
 
 CARDS_DIR = Path(__file__).resolve().parent
 ENGINE_DIR = CARDS_DIR.parent / "engine"
-CARD_RS = ENGINE_DIR / "src" / "core" / "card.rs"
+CARD_RS = ENGINE_DIR / "src" / "core" / "card" / "condition.rs"
 ENUMS_RS = ENGINE_DIR / "src" / "ability" / "enums.rs"
 
 

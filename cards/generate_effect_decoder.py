@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from generator_types import is_copy_type
 
 CARD_RS = os.path.join(
-    os.path.dirname(__file__), "..", "engine", "src", "core", "card.rs"
+    os.path.dirname(__file__), "..", "engine", "src", "core", "card", "effect.rs"
 )
 OUT_RS = os.path.join(
     os.path.dirname(__file__), "..", "engine", "src", "ability", "effect_decoder_gen.rs"
@@ -291,15 +291,36 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
     )
     lines.append("fn decode_effect_field(bc: &mut BcReader, key: &str,")
 
+    # text needs a special reader (non-Option type)
+    ae_special = {
+        "text": "*text = bc.read_string_value().map(ArcStr::from).unwrap_or_default();",
+    }
+
+    # A field belongs in the signature only if it also gets a match arm.
+    # `action` and `text` have hand-written arms; everything else needs a
+    # READER_MAP entry. A field with neither — `compound` is the one today,
+    # since AbilityEffect's CompoundBranch is assembled from its flat members
+    # by vm.rs rather than decoded from a `compound` key — must not be
+    # declared: nobody writes to it, vm.rs cannot supply it (a compile error),
+    # and it would be an unused variable even if it could.
+    def decodable(fname, ftype):
+        return (
+            fname in ae_special
+            or fname == "action"
+            or rust_type_to_reader(ftype) is not None
+        )
+
     # Generate function parameters from AbilityEffect fields
     lines.append("    // AbilityEffect fields")
     for fname, ftype, _ in ability_effect_fields:
-        lines.append(f"    {fname}: &mut {ftype},")
+        if decodable(fname, ftype):
+            lines.append(f"    {fname}: &mut {ftype},")
 
     # Generate function parameters from CompoundBranch fields
     lines.append("    // CompoundBranch fields")
     for fname, ftype, _ in compound_fields:
-        lines.append(f"    {fname}: &mut {ftype},")
+        if decodable(fname, ftype):
+            lines.append(f"    {fname}: &mut {ftype},")
 
     lines.append("    // EffectKind shared fields (all variants)")
     lines.append("    ek: &mut EffectKindLocals,")
@@ -307,11 +328,6 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
     lines.append("    match key {")
 
     # --- AbilityEffect match arms ---
-    # text needs a special reader (non-Option type)
-    ae_special = {
-        "text": "*text = bc.read_string_value().map(ArcStr::from).unwrap_or_default();",
-    }
-
     # action must fail loudly on unknown strings instead of silently
     # decoding into ActionType::Custom (which executes as a no-op).
     # The empty string is a legacy encoding meaning "no action" — real card

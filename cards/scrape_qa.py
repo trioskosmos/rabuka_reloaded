@@ -1,93 +1,79 @@
 """Scrape the official Q&A list and append any new entries to qa_data.json.
 
-Follows /question/search_ex pagination, parses qa-Item blocks matching the
-existing qa_data.json schema (id, date, question, answer, related_cards).
+Follows the site's JSON list endpoint (`/manage/rule-qa/list`), which replaced
+the old server-rendered `/question/searchresults/` HTML blocks, and maps each
+item onto the existing qa_data.json schema (id, date, question, answer,
+related_cards).
 """
 
 import json
 import re
 import time
-import urllib.parse
 import urllib.request
 from pathlib import Path
 
 BASE = "https://llofficial-cardgame.com"
 QA_JSON = Path(__file__).parent / "qa_data.json"
 
-SEARCH_URL = (
-    f"{BASE}/question/searchresults/"
-    "?keyword=&keyword_type%5B%5D=all&search_type=and&title=&card_kind=&work_title="
-)
+LIST_URL = f"{BASE}/manage/rule-qa/list"
+PER_PAGE = 100
 
 
 def fetch(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return resp.read().decode("utf-8", errors="replace")
-
-
-def get_max_page(html):
-    m = re.search(r"max_page\s*=\s*(\d+)", html)
-    return int(m.group(1)) if m else 1
-
-
-def unescape(s):
-    return (
-        s.replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&#039;", "'")
-        .replace("&quot;", '"')
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
     )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode("utf-8", errors="replace"))
 
 
-def parse_items(html):
+def normalise_text(value):
+    return (value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+
+
+def parse_related(card_names):
+    """`[CARD_NO ： NAME] [CARD_NO ： NAME]` → the existing related_cards shape."""
+    related = []
+    for m in re.finditer(r"\[([^：:]+?) ：\s*([^\]]+)\]", card_names or ""):
+        related.append(
+            {
+                "card_no": m.group(1).strip(),
+                "name": m.group(2).strip(),
+            }
+        )
+    return related
+
+
+def to_entry(item):
+    stamp = item.get("update_time") or item.get("regist_time") or ""
+    return {
+        "id": f"Q{item['id']}",
+        "date": stamp.replace("/", "."),
+        "question": normalise_text(item.get("question")),
+        "answer": normalise_text(item.get("answer")),
+        "related_cards": parse_related(item.get("card_names")),
+    }
+
+
+def scrape_all():
     items = []
-    # Each qa-Item block
-    blocks = re.split(r'<div class="qa-Item qa-Wrapper">', html)[1:]
-    for block in blocks:
-        entry = {}
-        m = re.search(r'faq-Heading">(Q\d+)\s*\((\d{4}\.\d{2}\.\d{2})\)', block)
-        if not m:
-            # some pages may omit date
-            m = re.search(r'faq-Heading">(Q\d+)', block)
-            entry["id"] = m.group(1) if m else ""
-            entry["date"] = ""
-        else:
-            entry["id"] = m.group(1)
-            entry["date"] = m.group(2)
-
-        m = re.search(r'<p class="question-Detail">(.*?)</p>', block, re.DOTALL)
-        entry["question"] = (
-            re.sub(
-                r"<br\s*/?>", "\n", unescape(re.sub(r"<[^>]+>", "", m.group(1)))
-            ).strip()
-            if m
-            else ""
+    page = 1
+    total = None
+    while True:
+        url = (
+            f"{LIST_URL}?page={page}&per_page={PER_PAGE}&status=published"
+            f"&t={int(time.time() * 1000)}"
         )
-
-        m = re.search(r'<p class="answer-Detail">(.*?)</p>', block, re.DOTALL)
-        entry["answer"] = (
-            re.sub(
-                r"<br\s*/?>", "\n", unescape(re.sub(r"<[^>]+>", "", m.group(1)))
-            ).strip()
-            if m
-            else ""
-        )
-
-        # related cards: [CARD_NO ： NAME]
-        related = []
-        for m in re.finditer(r"\[([^：:]+?) ：\s*([^\]]+)\]", block):
-            related.append(
-                {
-                    "card_no": m.group(1).strip(),
-                    "name": m.group(2).strip(),
-                }
-            )
-        entry["related_cards"] = related
-
-        if entry["id"]:
-            items.append(entry)
+        payload = fetch(url)
+        if total is None:
+            total = int(payload.get("total") or 0)
+            print(f"total: {total}")
+        batch = payload.get("items") or []
+        items.extend(batch)
+        if not batch or len(items) >= total:
+            break
+        page += 1
+        time.sleep(0.2)
     return items
 
 
@@ -96,40 +82,18 @@ def main():
     existing_ids = {e["id"] for e in existing}
     print(f"Existing QA count: {len(existing)}")
 
-    all_items = []
-    html = fetch(SEARCH_URL)
-    max_page = get_max_page(html)
-    print(f"max_page: {max_page}")
+    raw = scrape_all()
+    print(f"Scraped {len(raw)} total QA entries")
 
-    all_items.extend(parse_items(html))
-    for pg in range(2, max_page + 1):
-        url = (
-            f"{BASE}/question/search_ex"
-            f"?keyword=&keyword_type%5B0%5D=all&search_type=and"
-            f"&title=&card_kind=&work_title=&page={pg}"
-            f"&t={int(time.time() * 1000)}"
-        )
-        try:
-            data = fetch(url)
-        except Exception as e:
-            print(f"  page {pg} failed: {e}")
-            continue
-        all_items.extend(parse_items(data))
-        time.sleep(0.2)
-
-    print(f"Scraped {len(all_items)} total QA entries")
-    print(f"Unique ids: {len({i['id'] for i in all_items})}")
-
-    # Find new ones not already present
     seen = set()
     new_entries = []
-    for item in all_items:
-        if item["id"] in existing_ids or item["id"] in seen:
+    for item in raw:
+        entry = to_entry(item)
+        if entry["id"] in existing_ids or entry["id"] in seen:
             continue
-        seen.add(item["id"])
-        new_entries.append(item)
+        seen.add(entry["id"])
+        new_entries.append(entry)
 
-    # Sort new by numeric desc, then append to keep desc ordering by newest first
     new_entries.sort(key=lambda i: int(i["id"][1:]), reverse=True)
     merged = existing + new_entries
     merged.sort(key=lambda i: int(i["id"][1:]), reverse=True)
@@ -146,8 +110,6 @@ def main():
     else:
         print("\nNo new QAs found - nothing written")
 
-    # quick dump for verification of new ones
-    out = [e for e in new_entries if True]
     (Path(__file__).parent / "_new_qa.json").write_text(
         json.dumps(new_entries, ensure_ascii=False, indent=2), encoding="utf-8"
     )

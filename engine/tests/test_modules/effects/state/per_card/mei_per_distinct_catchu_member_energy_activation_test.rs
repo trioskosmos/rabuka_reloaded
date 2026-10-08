@@ -21,232 +21,164 @@ fn advance_to_live_start(game: &mut TestGame) {
     game.pass();
 }
 
+/// Stage `members` left→right for P1, hand P1 `6` energy with `active` of them
+/// active, then walk to live start. Returns the game so the caller can assert
+/// the resulting active count.
+///
+/// `6` energy leaves at least 3 genuinely waited cards, so every ruling count
+/// (0, 1, 2) below is reachable without the waited pool clamping the result.
+fn run_with_stage(members: &[&str], active: u8) -> TestGame {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    fill_decks(&mut game);
+    for (slot, member) in members.iter().enumerate() {
+        game.state.player1.stage.stage[slot] = game.id(member);
+    }
+    game.give_energy(6);
+    game.state.player1.energy_zone.set_active_count(active);
+    assert_eq!(game.state.player1.energy_zone.active_count(), active);
+
+    advance_to_live_card_set_p1(&mut game);
+    advance_to_live_start(&mut game);
+    // Two 米女メイ copies raise their ライブ開始時 in the same window, and the
+    // engine asks which resolves first (「複数の自動能力が同時に発動しました」).
+    // Answer in queue order; anything other than that prompt is a hard failure.
+    game.drain_choices_strict(&["SelectAutoAbility"], &[]);
+    game
+}
+
+fn assert_active(game: &mut TestGame, expected: u8, why: &str) {
+    // Anything still queued here is an engine bug — the ability must have
+    // fully resolved. An empty allow-list makes every prompt a hard failure
+    // that prints the whole choice, and the call no-ops on a clean queue, so
+    // it needs no `if has_pending_choice()` guard: such a guard can only skip
+    // the assertion below, which is exactly what the soft-guard ratchet bans.
+    game.drain_choices_strict(&[], &[]);
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        expected,
+        "{}",
+        why
+    );
+}
+
 // ====================================================================
-// Fix verification: per-unit + distinct + change_state (energy activate)
-// Card text (PL!SP-pb2-018-R 米女メイ):
-//   自分のステージにいるこのメンバーと名前の異なる『CatChu!』のメンバー1人につき、
-//   エネルギーを1枚アクティブにする。
-// Effect JSON uses per_unit=true, distinct="card_name", group_names=["CatChu!"],
-// card_type="energy_card", state_change="active", count=1
+// PL!SP-pb2-018-R / PL!SP-pb2-018-P＋ 米女メイ
+//   {{ライブ開始時}}自分のステージにいるこのメンバーと名前の異なる
+//   『CatChu!』のメンバー1人につき、エネルギーを1枚アクティブにする。
 //
-// IMPORTANT: 米女メイ is a MEMBER card played to STAGE, NOT a live card.
-// Her ability fires from the stage during live start phase.
+// Official rulings Q281 / Q282 pin the counting rule down to exactly one
+// reading:
+//   * the candidate set is every CatChu! member on the stage whose printed
+//     name differs from THIS card's name — the source card never counts;
+//   * copies are NOT deduplicated: two prints of 澁谷かのん are two members
+//     (Q281②③), so the `distinct: card_name` that 「名前の異なる」 normally
+//     produces is wrong for this clause;
+//   * each copy of this ability fires on its own, so two 米女メイ on stage
+//     each activate their own count (Q282③).
 // ====================================================================
 
-/// 2 different-named CatChu! members on stage (Mei + 1 other) → activates 2 energy
+const MEI: &str = "PL!SP-pb2-018-R";
+const MEI_PPLUS: &str = "PL!SP-pb2-018-P＋";
+const MEI_OTHER_PRINT: &str = "PL!SP-pb2-007-R";
+const KANON: &str = "PL!SP-pb2-001-R";
+const KANON_OTHER_PRINT: &str = "PL!SP-pb2-012-R";
+const SUMIRE: &str = "PL!SP-pb2-004-R";
+const KANON_SD: &str = "PL!SP-sd1-001-SD";
+const SUMIRE_SD: &str = "PL!SP-sd1-004-SD";
+const FILLER: &str = "PL!-sd1-010-SD";
+
+/// Q281①: 米女メイ + 澁谷かのん + 平安名すみれ → 2 energy.
+/// The pre-ruling engine counted 3 (it never dropped 米女メイ herself).
 #[test]
-fn catchu_basic_two_distinct_activate_2() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
+fn q281_two_named_catchu_members_activate_two() {
+    let mut game = run_with_stage(&[MEI, KANON, SUMIRE], 3);
+    assert_active(&mut game, 5, "Q281①: 2 CatChu members ≠ 米女メイ → 3+2");
+}
 
-    let mei = game.id("PL!SP-pb2-018-R");
-    let catchu = game.id("PL!SP-sd1-001-SD");
-    let filler = game.id("PL!-sd1-010-SD");
+/// Q281②: two copies of the SAME 澁谷かのん print → 2 energy, not 1.
+#[test]
+fn q281_two_copies_of_one_print_activate_two() {
+    let mut game = run_with_stage(&[MEI, KANON, KANON], 3);
+    assert_active(&mut game, 5, "Q281②: copies are not deduplicated → 3+2");
+}
 
-    let card = game
-        .state
-        .card_database
-        .get_card(mei)
-        .expect("mei card not found");
-    assert!(
-        !card.abilities.is_empty(),
-        "mei should have abilities loaded"
-    );
-    assert!(card.resolved_abilities().any(|ability| ability
-        .triggers
-        .as_ref()
-        .is_some_and(|t| t.contains("ライブ開始時"))));
+/// Q281③: 澁谷かのん (001-R) + 澁谷かのん (012-R) — same name, different
+/// prints — → 2 energy, not 1.
+#[test]
+fn q281_same_name_different_prints_activate_two() {
+    let mut game = run_with_stage(&[MEI, KANON, KANON_OTHER_PRINT], 3);
+    assert_active(&mut game, 5, "Q281③: same name, different prints → 3+2");
+}
 
-    fill_decks(&mut game);
+/// Q282①: 米女メイ + 澁谷かのん only → 1 energy (米女メイ never counts).
+#[test]
+fn q282_one_other_catchu_member_activates_one() {
+    let mut game = run_with_stage(&[MEI, KANON, FILLER], 3);
+    assert_active(&mut game, 4, "Q282①: only 澁谷かのん counts → 3+1");
+}
 
-    // Mei + 1 other CatChu on stage = 2 distinct CatChu names
-    game.state.player1.stage.stage[0] = mei;
-    game.state.player1.stage.stage[1] = catchu;
-    game.state.player1.stage.stage[2] = filler;
+/// Q282②: 米女メイ (018-R) + 澁谷かのん + 米女メイ (007-R) → 1 energy.
+/// The second 米女メイ shares the source's name, so she is not counted.
+#[test]
+fn q282_other_mei_print_is_excluded_by_name() {
+    let mut game = run_with_stage(&[MEI, KANON, MEI_OTHER_PRINT], 3);
+    assert_active(&mut game, 4, "Q282②: 米女メイ (007-R) shares the name → 3+1");
+}
 
-    game.give_energy(5);
-    // Two genuinely-waited energies: the +2 below must come from real
-    // waited cards (all-active zones have nothing to activate).
-    game.state.player1.energy_zone.set_active_count(3);
-    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
-
-    advance_to_live_card_set_p1(&mut game);
-    advance_to_live_start(&mut game);
-
-    assert!(!game.has_pending_choice(), "No pending choices expected");
-    assert_eq!(
-        game.state.player1.energy_zone.active_count(),
+/// Q282③: 米女メイ (018-R) + 澁谷かのん + 米女メイ (018-R copy) → 2 energy.
+/// Both copies of this ability fire, each activating its own 1.
+#[test]
+fn q282_each_mei_copy_triggers_separately() {
+    let mut game = run_with_stage(&[MEI, KANON, MEI], 3);
+    assert_active(
+        &mut game,
         5,
-        "2 distinct CatChu names on stage → activate 2: 3→5"
+        "Q282③: both 米女メイ copies trigger, 1 each → 3+2",
     );
 }
 
-/// 0 CatChu! members on stage → 0 energy activated (no change from 3)
+/// The source card alone (two empty stage slots) → 0 energy: a member cannot
+/// satisfy 「このメンバーと名前の異なる」 against herself.
 #[test]
-fn catchu_zero_members_nothing_activates() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let _mei = game.id("PL!SP-pb2-018-R");
-    let filler = game.id("PL!-sd1-010-SD");
-
-    fill_decks(&mut game);
-    game.state.player1.stage.stage[0] = filler;
-    game.state.player1.stage.stage[1] = filler;
-    game.state.player1.stage.stage[2] = filler;
-
-    // Mei NOT on stage → ability doesn't fire
-    game.give_energy(3);
-
-    advance_to_live_card_set_p1(&mut game);
-    advance_to_live_start(&mut game);
-
-    assert!(!game.has_pending_choice(), "No pending choices expected");
-    assert_eq!(
-        game.state.player1.energy_zone.active_count(),
-        3,
-        "No CatChu members → no activation"
-    );
+fn mei_alone_activates_nothing() {
+    let mut game = run_with_stage(&[MEI], 3);
+    assert_active(&mut game, 3, "米女メイ alone → no CatChu member qualifies → 3");
 }
 
-/// 3 different-named CatChu! members → activates 3 energy
+/// 米女メイ + only non-CatChu! members → 0 energy.
 #[test]
-fn catchu_three_distinct_activate_3() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let mei = game.id("PL!SP-pb2-018-R");
-    let catchu_a = game.id("PL!SP-sd1-001-SD");
-    let catchu_b = game.id("PL!SP-sd1-004-SD");
-    let _filler = game.id("PL!-sd1-010-SD");
-
-    fill_decks(&mut game);
-    game.state.player1.stage.stage[0] = mei;
-    game.state.player1.stage.stage[1] = catchu_a;
-    game.state.player1.stage.stage[2] = catchu_b;
-
-    game.give_energy(3);
-    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
-
-    advance_to_live_card_set_p1(&mut game);
-    advance_to_live_start(&mut game);
-
-    assert!(!game.has_pending_choice(), "No pending choices expected");
+fn mei_with_only_non_catchu_members_activates_nothing() {
+    let mut game = run_with_stage(&[MEI, FILLER, FILLER], 3);
+    assert_active(&mut game, 3, "only Printemps filler → nothing counts → 3");
 }
 
-/// Duplicate names: 2 copies of the SAME CatChu + Mei → 2 distinct names
+/// Three 米女メイ copies, no other CatChu! member → 0 energy from each of the
+/// three triggers: every candidate shares the source's name.
 #[test]
-fn catchu_duplicate_names_dedup_to_1() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let mei = game.id("PL!SP-pb2-018-R");
-    let catchu_a = game.id("PL!SP-sd1-001-SD");
-    let catchu_dup = game.new_id("PL!SP-sd1-001-SD");
-    let _filler = game.id("PL!-sd1-010-SD");
-
-    fill_decks(&mut game);
-    // 2 same-name CatChu (かのん x2) + Mei (米女メイ) = 2 distinct names
-    game.state.player1.stage.stage[0] = mei;
-    game.state.player1.stage.stage[1] = catchu_a;
-    game.state.player1.stage.stage[2] = catchu_dup;
-
-    game.give_energy(5);
-    // Two genuinely-waited energies (see basic test).
-    game.state.player1.energy_zone.set_active_count(3);
-    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
-
-    advance_to_live_card_set_p1(&mut game);
-    advance_to_live_start(&mut game);
-
-    assert!(!game.has_pending_choice(), "No pending choices expected");
-    assert_eq!(
-        game.state.player1.energy_zone.active_count(),
-        5,
-        "2 distinct names (mei + kanon) → activate 2: 3→5"
-    );
+fn only_mei_copies_activate_nothing() {
+    let mut game = run_with_stage(&[MEI, MEI, MEI], 3);
+    assert_active(&mut game, 3, "all candidates are 米女メイ → 3");
 }
 
-/// 1 CatChu member on stage (Mei alone) → activates 1 energy
+/// The P＋ print carries the identical clause and must count identically.
 #[test]
-fn catchu_single_member_activate_1() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let mei = game.id("PL!SP-pb2-018-R");
-    let filler = game.id("PL!-sd1-010-SD");
-
-    fill_decks(&mut game);
-    game.state.player1.stage.stage[0] = mei;
-    game.state.player1.stage.stage[1] = filler;
-
-    game.give_energy(4);
-    // One genuinely-waited energy for the +1 below.
-    game.state.player1.energy_zone.set_active_count(3);
-    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
-
-    advance_to_live_card_set_p1(&mut game);
-    advance_to_live_start(&mut game);
-
-    assert!(!game.has_pending_choice(), "No pending choices expected");
-    assert_eq!(
-        game.state.player1.energy_zone.active_count(),
-        4,
-        "1 CatChu member → activate 1 energy: 3→4"
-    );
+fn pplus_print_counts_like_the_r_print() {
+    let mut game = run_with_stage(&[MEI_PPLUS, KANON, FILLER], 3);
+    assert_active(&mut game, 4, "PL!SP-pb2-018-P＋ → 3+1");
 }
 
-/// Only non-CatChu members on stage (no Mei) → activates 0
+/// 澁谷かのん/平安名すみれ SD prints are CatChu! too and count the same as
+/// their pb2 prints.
 #[test]
-fn catchu_only_non_catchu_on_stage() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let filler = game.id("PL!-sd1-010-SD");
-
-    fill_decks(&mut game);
-    game.state.player1.stage.stage[0] = filler;
-    game.state.player1.stage.stage[1] = filler;
-    game.state.player1.stage.stage[2] = filler;
-
-    game.give_energy(3);
-
-    advance_to_live_card_set_p1(&mut game);
-    advance_to_live_start(&mut game);
-
-    assert!(!game.has_pending_choice(), "No pending choices expected");
-
-    // No CatChu members on stage at all → no abilities fire → energy unchanged
-    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
+fn sd1_catchu_prints_count_like_pb2_prints() {
+    let mut game = run_with_stage(&[MEI, KANON_SD, SUMIRE_SD], 3);
+    assert_active(&mut game, 5, "SD prints are CatChu! members → 3+2");
 }
 
-/// Self as member on stage + 1 other CatChu → activates 2
+/// 米女メイ not on stage → no live-start trigger at all.
 #[test]
-fn catchu_self_as_member_on_stage_plus_one_other() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let mei = game.id("PL!SP-pb2-018-R");
-    let catchu = game.id("PL!SP-sd1-001-SD");
-    let filler = game.id("PL!-sd1-010-SD");
-
-    fill_decks(&mut game);
-    game.state.player1.stage.stage[0] = mei;
-    game.state.player1.stage.stage[1] = catchu;
-    game.state.player1.stage.stage[2] = filler;
-
-    game.give_energy(5);
-    // Two genuinely-waited energies (see basic test).
-    game.state.player1.energy_zone.set_active_count(3);
-    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
-
-    advance_to_live_card_set_p1(&mut game);
-    advance_to_live_start(&mut game);
-
-    assert!(!game.has_pending_choice(), "No pending choices expected");
-    assert_eq!(
-        game.state.player1.energy_zone.active_count(),
-        5,
-        "2 unique CatChu names on stage → activate 2: 3→5"
-    );
+fn no_mei_on_stage_nothing_activates() {
+    let mut game = run_with_stage(&[FILLER, FILLER, FILLER], 3);
+    assert_active(&mut game, 3, "no source card → no trigger → 3");
 }

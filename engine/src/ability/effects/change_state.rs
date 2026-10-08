@@ -54,11 +54,40 @@ impl AbilityResolver {
         let mut per_unit_filter = util::CardFilter::from_effect(effect);
         per_unit_filter.card_type = None;
         per_unit_filter.cost_limit = cost_limit;
+        // 「このメンバーと名前の異なる『X』のメンバー1人につき」 — Q281/Q282
+        // (米女メイ PL!SP-pb2-018-R / -P＋). The phrase names the comparison
+        // target as THIS card, so every stage card sharing its name drops out
+        // of the count (the source member included, Q282①②) while copies of
+        // another name stay in (Q281②③) — which is why the parser emits the
+        // source-name exclusion instead of the `distinct` a bare 「名前の異なる」
+        // would give. `exclude_names` compares by name, so the source's own
+        // print is excluded without touching the other copies of it.
+        let source_names: Vec<String> = match effect.exclude_by_name_source_any() {
+            Some("activating_card") => gs
+                .activating_card
+                .and_then(|aid| gs.card_database.get_card(aid))
+                .map(|c| c.name.to_string())
+                .into_iter()
+                .collect(),
+            _ => Vec::new(),
+        };
+        if !source_names.is_empty() {
+            per_unit_filter.exclude_names = Some(&source_names);
+        }
         let matching: Vec<i16> = cards
             .iter()
             .filter(|&&cid| per_unit_filter.matches(&gs.card_database, cid, false))
             .copied()
             .collect();
+        log::debug!(
+            "[PER_UNIT_STATE] location={} zone_len={} matched={} distinct={:?} excluded_name={:?} activating={:?}",
+            location,
+            cards.len(),
+            matching.len(),
+            effect.distinct_any(),
+            source_names,
+            gs.activating_card
+        );
         let matched_count = if matches!(
             effect.distinct_any(),
             Some(crate::card::DistinctType::CardName)

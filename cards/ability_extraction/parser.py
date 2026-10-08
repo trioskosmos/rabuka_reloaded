@@ -1313,6 +1313,7 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     # child-location strip must also run here: earlier, the child clauses had not yet
     # been given their location, so it silently did nothing.
     _post_fix_cost_and_select(ability)
+    _fix_reference_name_distinction(ability)
     _fix_member_selection_target(ability)
     _drop_unsupported_child_location(ability)
     _propagate_compound_branch_context(ability)
@@ -12775,6 +12776,41 @@ def _fix_member_selection_target(ability):
         eff.pop("target", None)
 
 
+# 「このメンバーと名前の異なる『X』のメンバー」 is NOT the ordinary
+# 「名前の異なる」 (which `distinct: card_name` answers by deduplicating the
+# counted set by name): the phrase names the comparison target — THIS card.
+# Q281/Q282 (米女メイ PL!SP-pb2-018-R / -P＋) pin the reading down:
+#   Q281② 澁谷かのん ×2 and Q281③ 澁谷かのん 001-R + 012-R are TWO members
+#   (copies are counted, so `distinct` would be wrong), and
+#   Q282② a second 米女メイ print is not a member at all (same name).
+# `exclude_by_name_source: "activating_card"` states exactly that.
+_REFERENCE_NAME_MARKERS = ("このメンバーと名前の異なる", "このメンバーと名前が異なる")
+
+
+def _fix_reference_name_distinction(ability):
+    """Rewrite 「このメンバーと名前の異なる」 from `distinct` to a source-name
+    exclusion.
+
+    Runs after `_normalize_parsed_effect`, whose text-context walk would
+    otherwise put `distinct` straight back (it matches the bare 「名前の異なる」).
+    Scoped to effect steps: a condition node has no `action` and its decoder
+    does not read this field.
+    """
+    for root in (ability.get("effect"), ability.get("cost")):
+        if not isinstance(root, dict):
+            continue
+        for node in iter_dict_nodes(root):
+            text = node.get("text")
+            if not isinstance(text, str) or not text:
+                continue
+            if not any(marker in text for marker in _REFERENCE_NAME_MARKERS):
+                continue
+            if "action" not in node:
+                continue
+            node.pop("distinct", None)
+            node["exclude_by_name_source"] = "activating_card"
+
+
 def _post_fix_cost_and_select(ability):
     """Fixes that must reach every node — effect steps, costs and select_actions alike.
 
@@ -14970,7 +15006,14 @@ def _validate_semantic(abilities):
             # follows. Reading only the effect reported a missing mechanic that was in fact
             # expressed (and unenforced) on the cost.
             lambda e, eff: _json_has_field(eff, "distinct", "card_name")
-            or _json_has_field(e.get("cost") or {}, "distinct", "card_name"),
+            or _json_has_field(e.get("cost") or {}, "distinct", "card_name")
+            # 「このメンバーと名前の異なる」 is satisfied by naming the source
+            # instead of the set (Q281/Q282 米女メイ): copies count, same-name
+            # cards do not. See _REFERENCE_NAME_MARKERS.
+            or _json_has_field(eff, "exclude_by_name_source", "activating_card")
+            or _json_has_field(
+                e.get("cost") or {}, "exclude_by_name_source", "activating_card"
+            ),
             "Distinct card names required but no distinct field on the effect or cost",
         ),
         SemanticRule(

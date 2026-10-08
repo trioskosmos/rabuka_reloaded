@@ -15,7 +15,7 @@ import os
 import sys
 
 CARD_RS = os.path.join(
-    os.path.dirname(__file__), "..", "engine", "src", "core", "card.rs"
+    os.path.dirname(__file__), "..", "engine", "src", "core", "card", "condition.rs"
 )
 OUT_RS = os.path.join(
     os.path.dirname(__file__),

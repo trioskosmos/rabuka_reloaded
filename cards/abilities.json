@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-07T17:41:57.282883",
+  "generated_at": "2026-10-08T20:42:18.227580",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "dc84c55e",
+  "engine_commit": "df257d64",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -24782,9 +24782,9 @@
         "group_names": [
           "CatChu!"
         ],
-        "distinct": "card_name",
         "location": "stage",
-        "target": "self"
+        "target": "self",
+        "exclude_by_name_source": "activating_card"
       }
     },
     {

@@ -12,7 +12,7 @@ _test never asserts (smoke at best — cannot pin behavior)_
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/unit_tests/core_card_binary_tests.rs` | `test_decode_member_card` | 42 |  |
+| `engine/tests/unit_tests/core_card_binary_tests.rs` | `test_decode_member_card` | 24 |  |
 
 ## no_drive (1)
 
@@ -20,7 +20,7 @@ _trigger-context test that mutates state and asserts but never drives the engine
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/state/wait_activation/pb2_double_baton_debut_recover_and_score_pl_pb2_000_duo_test.rs` | `the_debut_recovers_a_mus_live_card_from_the_waitroom` | 97 |  |
+| `engine/tests/test_modules/effects/state/wait_activation/pb2_double_baton_debut_recover_and_score_pl_pb2_000_duo_test.rs` | `the_debut_recovers_a_mus_live_card_from_the_waitroom` | 96 |  |
 
 ## synthetic_only (0)
 
@@ -34,7 +34,7 @@ _has_pending_choice asserted without choice identity (pending_choice_type/summar
 
 | file | test | line | detail |
 | --- | --- | --- | --- |
-| `engine/tests/test_modules/effects/position/area_gated/love_wing_bell_all_mus_stage_offers_position_change_test.rs` | `love_wing_bell_offers_the_change_with_an_empty_area` | 128 |  |
+| `engine/tests/test_modules/effects/position/area_gated/love_wing_bell_all_mus_stage_offers_position_change_test.rs` | `love_wing_bell_offers_the_change_with_an_empty_area` | 127 |  |
 
 ## assert_only_negative (0)
 
@@ -49,7 +49,7 @@ _every assertion is about a count/size (len/count/>=1) — '3 options were offer
 | file | test | line | detail |
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/characterization/seed_reproduces_game_test.rs` | `each_replayed_game_reaches_a_terminal_result` | 394 |  |
-| `engine/tests/test_modules/effects/recover/to_hand/pb2_kidou_self_to_waitroom_recover_mus_live_then_energy_per_mus_pl_pb2_007_pp_test.rs` | `a_mus_live_is_recovered_from_the_waitroom` | 87 |  |
+| `engine/tests/test_modules/effects/recover/to_hand/pb2_kidou_self_to_waitroom_recover_mus_live_then_energy_per_mus_pl_pb2_007_pp_test.rs` | `a_mus_live_is_recovered_from_the_waitroom` | 86 |  |
 
 ## live_success_no_premise (1)
 
@@ -205,10 +205,10 @@ _every assertion is an INEQUALITY on a count and there is no assert_eq anywhere 
 | file | test | line | detail |
 | --- | --- | --- | --- |
 | `engine/tests/test_modules/characterization/seed_reproduces_game_test.rs` | `each_replayed_game_reaches_a_terminal_result` | 394 | 2 inequality assertion(s) on a count, vs baseline+threshold |
-| `engine/tests/unit_tests/ability_vm_tests.rs` | `every_offset_slice_is_within_the_blob` | 67 | 1 inequality assertion(s) on a count, vs baseline |
-| `engine/tests/unit_tests/bot_encoding_locm_encoding_tests.rs` | `locm_encoding_separates_the_evaluated_deck` | 82 | 1 inequality assertion(s) on a count, vs threshold |
-| `engine/tests/unit_tests/bot_strategy_v7_mulligan_tests.rs` | `v7_mulligan_dumps_lives_beyond_the_three_slots` | 90 | 1 inequality assertion(s) on a count, vs threshold |
-| `engine/tests/unit_tests/bot_v8_model_tests.rs` | `the_forecast_rises_with_the_opponents_public_board` | 622 | 1 inequality assertion(s) on a count, vs threshold |
+| `engine/tests/unit_tests/ability_vm_tests.rs` | `every_offset_slice_is_within_the_blob` | 49 | 1 inequality assertion(s) on a count, vs baseline |
+| `engine/tests/unit_tests/bot_encoding_locm_encoding_tests.rs` | `locm_encoding_separates_the_evaluated_deck` | 62 | 1 inequality assertion(s) on a count, vs threshold |
+| `engine/tests/unit_tests/bot_strategy_v7_mulligan_tests.rs` | `v7_mulligan_dumps_lives_beyond_the_three_slots` | 74 | 1 inequality assertion(s) on a count, vs threshold |
+| `engine/tests/unit_tests/bot_v8_model_tests.rs` | `the_forecast_rises_with_the_opponents_public_board` | 606 | 1 inequality assertion(s) on a count, vs threshold |
 
 ## unresolvable_card_id (1)
 

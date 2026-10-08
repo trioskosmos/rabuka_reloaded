@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-07T01:59:33.664969+00:00",
+  "generated_at": "2026-10-08T09:55:38.866114+00:00",
   "stats": {
     "total_cards": 2674,
     "cards_with_abilities": 1664,
     "total_abilities": 2132,
     "unique_abilities": 996
   },
-  "n_files": 1048,
-  "n_tests": 4351,
+  "n_files": 1049,
+  "n_tests": 4358,
   "total_cards": 818,
   "covered_cards": 818,
   "abilities_on_covered": 996,
@@ -327,8 +327,8 @@
     "L1": 1
   },
   "qa_rulings": {
-    "covered": 280,
-    "total": 280,
+    "covered": 282,
+    "total": 282,
     "uncovered_ids": []
   },
   "jidou_conjunction": {
@@ -411,7 +411,7 @@
         {
           "file": "engine/tests/unit_tests/core_card_binary_tests.rs",
           "test": "test_decode_member_card",
-          "line": 42,
+          "line": 24,
           "detail": ""
         }
       ]
@@ -422,7 +422,7 @@
         {
           "file": "engine/tests/test_modules/effects/state/wait_activation/pb2_double_baton_debut_recover_and_score_pl_pb2_000_duo_test.rs",
           "test": "the_debut_recovers_a_mus_live_card_from_the_waitroom",
-          "line": 97,
+          "line": 96,
           "detail": ""
         }
       ]
@@ -437,7 +437,7 @@
         {
           "file": "engine/tests/test_modules/effects/position/area_gated/love_wing_bell_all_mus_stage_offers_position_change_test.rs",
           "test": "love_wing_bell_offers_the_change_with_an_empty_area",
-          "line": 128,
+          "line": 127,
           "detail": ""
         }
       ]
@@ -458,7 +458,7 @@
         {
           "file": "engine/tests/test_modules/effects/recover/to_hand/pb2_kidou_self_to_waitroom_recover_mus_live_then_energy_per_mus_pl_pb2_007_pp_test.rs",
           "test": "a_mus_live_is_recovered_from_the_waitroom",
-          "line": 87,
+          "line": 86,
           "detail": ""
         }
       ]
@@ -1044,25 +1044,25 @@
         {
           "file": "engine/tests/unit_tests/ability_vm_tests.rs",
           "test": "every_offset_slice_is_within_the_blob",
-          "line": 67,
+          "line": 49,
           "detail": "1 inequality assertion(s) on a count, vs baseline"
         },
         {
           "file": "engine/tests/unit_tests/bot_encoding_locm_encoding_tests.rs",
           "test": "locm_encoding_separates_the_evaluated_deck",
-          "line": 82,
+          "line": 62,
           "detail": "1 inequality assertion(s) on a count, vs threshold"
         },
         {
           "file": "engine/tests/unit_tests/bot_strategy_v7_mulligan_tests.rs",
           "test": "v7_mulligan_dumps_lives_beyond_the_three_slots",
-          "line": 90,
+          "line": 74,
           "detail": "1 inequality assertion(s) on a count, vs threshold"
         },
         {
           "file": "engine/tests/unit_tests/bot_v8_model_tests.rs",
           "test": "the_forecast_rises_with_the_opponents_public_board",
-          "line": 622,
+          "line": 606,
           "detail": "1 inequality assertion(s) on a count, vs threshold"
         }
       ]
@@ -1079,7 +1079,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4351,
+  "n_test_fns_parsed": 4358,
   "abilities": [
     {
       "idx": 0,
@@ -1180,6 +1180,7 @@
         "engine/tests/test_modules/effects/score/card_score/waited_members_pl_n_sd2_027_p_test.rs",
         "engine/tests/test_modules/effects/state/per_card/kanata_nijigasaki_appeared_activate_two_energy_test.rs",
         "engine/tests/test_modules/effects/state/per_card/konata_nijigasaki_debuted_this_turn_activates_energy_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/mei_per_distinct_catchu_member_energy_activation_test.rs",
         "engine/tests/test_modules/integration/full_round/real_card_phase_walkthrough_and_ability_suite_test.rs",
         "engine/tests/test_modules/integration/per_card/hard_tier_cards_cost_copy_discount_mill_and_dual_retrieve_test.rs",
         "engine/tests/test_modules/jidou/ability_watch/copied_ability_registration_lifecycle_test.rs",
@@ -1222,7 +1223,7 @@
         "both_empty_stages_skip_draw_and_topdeck_pl_n_bp4_009_r",
         "both_sides_cost13_still_only_two_blades"
       ],
-      "covering_test_count": 432,
+      "covering_test_count": 444,
       "direct_tests": [
         "all_members_excluded_no_reduction",
         "center_mus_zero_heart03_no_reduction",
@@ -1255,7 +1256,7 @@
         "ginako_discard_self_gains_two_blades",
         "ginako_skip_cost_gains_zero_blades"
       ],
-      "direct_test_count": 145,
+      "direct_test_count": 146,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -37833,7 +37834,8 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/compound/cost_and_effect/baton_touch_self_to_waitroom_recovers_liella_member_pl_sp_pb2_006_test.rs",
-        "engine/tests/test_modules/effects/look_select/reveal/debut_look_liella_cost4_hand_or_debut_test.rs"
+        "engine/tests/test_modules/effects/look_select/reveal/debut_look_liella_cost4_hand_or_debut_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/mei_per_distinct_catchu_member_energy_activation_test.rs"
       ],
       "covering_tests": [
         "a_preexisting_liella_member_is_not_offered_as_a_recovery_candidate",
@@ -37849,14 +37851,33 @@
         "kinako_baton_touch_does_not_recover_a_non_liella_member",
         "kinako_baton_touch_recovers_the_displaced_liella_member",
         "kinako_normal_debut_does_not_recover_a_hand_card",
+        "mei_alone_activates_nothing",
+        "mei_with_only_non_catchu_members_activates_nothing",
+        "no_mei_on_stage_nothing_activates",
+        "only_mei_copies_activate_nothing",
+        "pplus_print_counts_like_the_r_print",
+        "q281_same_name_different_prints_activate_two",
+        "q281_two_copies_of_one_print_activate_two",
+        "q281_two_named_catchu_members_activate_two",
+        "q282_each_mei_copy_triggers_separately",
+        "q282_one_other_catchu_member_activates_one",
+        "q282_other_mei_print_is_excluded_by_name",
+        "sd1_catchu_prints_count_like_pb2_prints",
         "the_parse_is_a_look_select_with_an_optional_stage_followup"
       ],
-      "covering_test_count": 14,
+      "covering_test_count": 26,
       "direct_tests": [
         "kanon_cost_above_4_rejected",
+        "pplus_print_counts_like_the_r_print",
+        "q281_same_name_different_prints_activate_two",
+        "q281_two_copies_of_one_print_activate_two",
+        "q281_two_named_catchu_members_activate_two",
+        "q282_each_mei_copy_triggers_separately",
+        "q282_one_other_catchu_member_activates_one",
+        "q282_other_mei_print_is_excluded_by_name",
         "the_parse_is_a_look_select_with_an_optional_stage_followup"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 9,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -37981,19 +38002,33 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/draw/conditional/score_or_revealed_live_pl_sp_pb2_004_r_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/mei_per_distinct_catchu_member_energy_activation_test.rs",
         "engine/tests/test_modules/jidou/debut_watch/bare_draw_and_zone_disjunction_test.rs"
       ],
       "covering_tests": [
+        "mei_alone_activates_nothing",
+        "mei_with_only_non_catchu_members_activates_nothing",
+        "no_mei_on_stage_nothing_activates",
+        "only_mei_copies_activate_nothing",
         "pl_sp_pb2_004_r_live_success_draw_score_or_revealed_live_and_neither",
+        "pplus_print_counts_like_the_r_print",
+        "q281_same_name_different_prints_activate_two",
+        "q281_two_copies_of_one_print_activate_two",
+        "q281_two_named_catchu_members_activate_two",
+        "q282_each_mei_copy_triggers_separately",
+        "q282_one_other_catchu_member_activates_one",
+        "q282_other_mei_print_is_excluded_by_name",
         "rurino_draws_one_card_and_draws_nothing_from_an_empty_deck",
+        "sd1_catchu_prints_count_like_pb2_prints",
         "sumire_draws_when_either_zone_condition_alone_holds"
       ],
-      "covering_test_count": 3,
+      "covering_test_count": 15,
       "direct_tests": [
         "pl_sp_pb2_004_r_live_success_draw_score_or_revealed_live_and_neither",
+        "q281_two_named_catchu_members_activate_two",
         "sumire_draws_when_either_zone_condition_alone_holds"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 3,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -38333,18 +38368,32 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/recover/to_hand/optional_energy_live_recovery_pl_sp_pb2_007_r_test.rs"
+        "engine/tests/test_modules/effects/recover/to_hand/optional_energy_live_recovery_pl_sp_pb2_007_r_test.rs",
+        "engine/tests/test_modules/effects/state/per_card/mei_per_distinct_catchu_member_energy_activation_test.rs"
       ],
       "covering_tests": [
+        "mei_alone_activates_nothing",
+        "mei_with_only_non_catchu_members_activates_nothing",
+        "no_mei_on_stage_nothing_activates",
+        "only_mei_copies_activate_nothing",
         "pl_sp_pb2_007_r_paid_three_energy_recovers_liella_live",
-        "pl_sp_pb2_007_r_unpayable_energy_keeps_live_in_waitroom"
+        "pl_sp_pb2_007_r_unpayable_energy_keeps_live_in_waitroom",
+        "pplus_print_counts_like_the_r_print",
+        "q281_same_name_different_prints_activate_two",
+        "q281_two_copies_of_one_print_activate_two",
+        "q281_two_named_catchu_members_activate_two",
+        "q282_each_mei_copy_triggers_separately",
+        "q282_one_other_catchu_member_activates_one",
+        "q282_other_mei_print_is_excluded_by_name",
+        "sd1_catchu_prints_count_like_pb2_prints"
       ],
-      "covering_test_count": 2,
+      "covering_test_count": 14,
       "direct_tests": [
         "pl_sp_pb2_007_r_paid_three_energy_recovers_liella_live",
-        "pl_sp_pb2_007_r_unpayable_energy_keeps_live_in_waitroom"
+        "pl_sp_pb2_007_r_unpayable_energy_keeps_live_in_waitroom",
+        "q282_other_mei_print_is_excluded_by_name"
       ],
-      "direct_test_count": 2,
+      "direct_test_count": 3,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -38836,24 +38885,34 @@
         "engine/tests/test_modules/effects/state/per_card/mei_per_distinct_catchu_member_energy_activation_test.rs"
       ],
       "covering_tests": [
-        "catchu_basic_two_distinct_activate_2",
-        "catchu_duplicate_names_dedup_to_1",
-        "catchu_only_non_catchu_on_stage",
-        "catchu_self_as_member_on_stage_plus_one_other",
-        "catchu_single_member_activate_1",
-        "catchu_three_distinct_activate_3",
-        "catchu_zero_members_nothing_activates"
+        "mei_alone_activates_nothing",
+        "mei_with_only_non_catchu_members_activates_nothing",
+        "no_mei_on_stage_nothing_activates",
+        "only_mei_copies_activate_nothing",
+        "pplus_print_counts_like_the_r_print",
+        "q281_same_name_different_prints_activate_two",
+        "q281_two_copies_of_one_print_activate_two",
+        "q281_two_named_catchu_members_activate_two",
+        "q282_each_mei_copy_triggers_separately",
+        "q282_one_other_catchu_member_activates_one",
+        "q282_other_mei_print_is_excluded_by_name",
+        "sd1_catchu_prints_count_like_pb2_prints"
       ],
-      "covering_test_count": 7,
+      "covering_test_count": 12,
       "direct_tests": [
-        "catchu_basic_two_distinct_activate_2",
-        "catchu_duplicate_names_dedup_to_1",
-        "catchu_self_as_member_on_stage_plus_one_other",
-        "catchu_single_member_activate_1",
-        "catchu_three_distinct_activate_3",
-        "catchu_zero_members_nothing_activates"
+        "mei_alone_activates_nothing",
+        "mei_with_only_non_catchu_members_activates_nothing",
+        "only_mei_copies_activate_nothing",
+        "pplus_print_counts_like_the_r_print",
+        "q281_same_name_different_prints_activate_two",
+        "q281_two_copies_of_one_print_activate_two",
+        "q281_two_named_catchu_members_activate_two",
+        "q282_each_mei_copy_triggers_separately",
+        "q282_one_other_catchu_member_activates_one",
+        "q282_other_mei_print_is_excluded_by_name",
+        "sd1_catchu_prints_count_like_pb2_prints"
       ],
-      "direct_test_count": 6,
+      "direct_test_count": 11,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -61202,7 +61261,7 @@
         "bella_q174_no_member_on_stage_ability_does_not_fire",
         "blades_count_the_cards_this_step_placed_not_the_hand"
       ],
-      "covering_test_count": 326,
+      "covering_test_count": 331,
       "direct_tests": [
         "ab0_only_energy_under_counts",
         "aspire_liella_and_non_liella_moved_only_liella_gains_blade",
@@ -61210,10 +61269,6 @@
         "aspire_no_movement_no_blade",
         "aspire_two_moved_liella_both_gain_blade",
         "blades_count_the_cards_this_step_placed_not_the_hand",
-        "catchu_basic_two_distinct_activate_2",
-        "catchu_duplicate_names_dedup_to_1",
-        "catchu_self_as_member_on_stage_plus_one_other",
-        "catchu_three_distinct_activate_3",
         "center_non_mus_no_reduction",
         "chika_constant_blade_counts_only_under",
         "chika_constant_blade_per_member_under",
@@ -61233,9 +61288,13 @@
         "hazuki_ren_bp5_005_mill_liella_blade_all_3_liella_grants_3_blade",
         "hazuki_ren_bp5_005_mill_liella_blade_blade_duration_live_end",
         "hazuki_ren_bp5_005_optional_pay_recovery_only_trigger_cards_not_full_discard",
-        "hazuki_ren_bp5_005_optional_pay_recovery_triggers_after_mill_pay_cost_recover_card"
+        "hazuki_ren_bp5_005_optional_pay_recovery_triggers_after_mill_pay_cost_recover_card",
+        "hazuki_ren_bp5_005_optional_pay_recovery_two_copies_both_trigger",
+        "hazuki_ren_bp5_005_preexisting_liella_in_discard_does_not_count_toward_the_blades",
+        "hazuki_ren_bp5_005_the_opponents_discard_is_never_a_recovery_pool",
+        "issue1_kanon_no_liella_on_stage_no_recovery"
       ],
-      "direct_test_count": 86,
+      "direct_test_count": 83,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -61398,26 +61457,25 @@
         "bella_q174_no_heart04_surplus_ability_does_not_fire",
         "bella_q174_no_member_on_stage_ability_does_not_fire",
         "blades_count_the_cards_this_step_placed_not_the_hand",
-        "catchu_basic_two_distinct_activate_2",
-        "catchu_duplicate_names_dedup_to_1",
-        "catchu_only_non_catchu_on_stage",
-        "catchu_self_as_member_on_stage_plus_one_other",
-        "catchu_single_member_activate_1",
-        "catchu_three_distinct_activate_3",
-        "catchu_zero_members_nothing_activates",
         "chika_constant_blade_counts_only_under",
         "chika_constant_blade_per_member_under",
         "chika_constant_blade_zero_under",
         "choice_condition_shows_proper_labels_in_actions",
-        "dia_sd1_optional_draw_pay_then_deck_top"
+        "dia_sd1_optional_draw_pay_then_deck_top",
+        "dia_sd1_optional_draw_skip_skips_movement",
+        "distortion_basic_energy_refresh_with_catchu",
+        "distortion_exact_max_boundary_6_wait_all_refreshed",
+        "distortion_max_cap_8_wait_refresh_6_only",
+        "distortion_no_refresh_when_no_wait_energy",
+        "distortion_q103_two_triggers_only_one_plus_1",
+        "distortion_q96_score_permanent_after_energy_used"
       ],
-      "covering_test_count": 120,
+      "covering_test_count": 125,
       "direct_tests": [
         "baton_displaced_self_baton_touch_places_under_arriver",
         "baton_displaced_self_placed_under_liella_arriver_grants_host_blade",
         "baton_displaced_self_placed_under_specific_arriver_slot",
         "blades_count_the_cards_this_step_placed_not_the_hand",
-        "catchu_three_distinct_activate_3",
         "chika_constant_blade_counts_only_under",
         "chika_constant_blade_per_member_under",
         "distortion_basic_energy_refresh_with_catchu",
@@ -61431,6 +61489,7 @@
         "live_start_mills_bottom_one_preserving_hand",
         "live_start_optional_bottom_mill_removes_bottom_card_from_deck",
         "nothing_placeable_earns_nothing_despite_a_full_hand",
+        "sd1_catchu_prints_count_like_pb2_prints",
         "shizuku_live_start_blade_counts_only_under",
         "shizuku_live_start_blade_dedups_same_name",
         "shizuku_live_start_blade_per_distinct_under",

@@ -483,6 +483,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut out = String::from(
             "turn,seat,lives,junk,lives_in_hand,my_success,opp_success,opp_set_size,p_pass,p_place,opp_place,opp_pass,value,margin,board_hearts,need_hearts,passed,placed,score,opp_passed,opp_placed,opp_score,our_supply,our_yell,our_required,life_cards,pool_colours,req_colours,opp_supply,opp_yell,opp_required,our_board,our_blades,opp_board,opp_blades,first_attacker,opp_set_actual\n",
         );
+        let header_cols = out.trim_end().matches(',').count() + 1;
         for r in &rows {
             // Built as a list rather than one 32-placeholder format string: a
             // long positional format is unreadable and, when a column is added,
@@ -526,6 +527,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (r.first_attacker as u8).to_string(),
                 r.opp_set_actual.to_string(),
             ];
+            // The guard §0.5 said this file deserves: a row that does not have
+            // exactly the header's column count (or hides a delimiter inside a
+            // cell) corrupts every downstream measurement while still writing
+            // plausible-looking data.
+            assert_eq!(
+                cells.len(),
+                header_cols,
+                "row/header column drift: {} cells vs {} header columns",
+                cells.len(),
+                header_cols
+            );
+            for c in &cells {
+                assert!(
+                    !c.contains(',') && !c.contains('"') && !c.contains('\n'),
+                    "unescaped delimiter inside CSV cell: {c:?}"
+                );
+            }
             out.push_str(&cells.join(","));
             out.push('\n');
         }
@@ -566,10 +584,16 @@ fn resolve(pending: &mut Vec<Pending>, gs: &GameState, rows: &mut Vec<Row>) {
                 .map(|l| l.card_no.to_string())
                 .collect::<Vec<_>>()
                 .join(";");
+            // Dot-separated, not comma-separated: a raw comma inside an
+            // unquoted CSV cell splits it into six columns and silently shifts
+            // every column from pool_colours onward (the 2026-10-08 drift —
+            // req_colours used "." and stayed aligned while pool_colours did
+            // not). Escaping and a column-count assertion in the writer guard
+            // against both directions.
             item.row.pool_colours = (1..=6)
                 .map(|c| i32::from(snap.total_hearts[c]).to_string())
                 .collect::<Vec<_>>()
-                .join(",");
+                .join(".");
             item.row.req_colours = snap
                 .lives
                 .iter()
