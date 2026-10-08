@@ -51,9 +51,11 @@ Usage: cargo run --release --bin sim_bench -- [options]
   --deck NAME     single deck name (file stem under ../web_ui/decks)
   --seed S        base engine seed (default 1)
   --policy P      random (default) | v1..v8 | conductor
-  --repeat R      repeat the full deck sweep R times (default 1)
-   --jobs N        worker threads per deck sweep (default 1 = baseline)
-   --per-game      print per-game outcome, end reason, and action count
+   --repeat R      repeat the full deck sweep R times (default 1)
+    --jobs N        worker threads per deck sweep (default 1 = baseline)
+    --secs N        run each deck for N seconds instead of --games
+                    (forces --jobs 1; reported games= is the count played)
+    --per-game      print per-game outcome, end reason, and action count
    --trace PATH    write replay-compatible JSONL for one deck and one repeat
    --alloc         print allocator delta after the timed loop
                    (requires --features alloc_tracker + RABUKA_ALLOC_TRACK)
@@ -72,6 +74,11 @@ struct Options {
     per_game: bool,
     trace: Option<PathBuf>,
     ab: Option<String>,
+    /// Wall-clock budget per deck. When set, each deck runs games
+    /// until this many seconds elapse (jobs forced to 1), instead
+    /// of a fixed `--games` count. The reported `games=` is the
+    /// number actually played.
+    secs: Option<f64>,
 }
 
 fn parse_args() -> Result<Options, String> {
@@ -87,6 +94,7 @@ fn parse_args() -> Result<Options, String> {
         per_game: false,
         trace: None,
         ab: None,
+        secs: None,
     };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -96,6 +104,21 @@ fn parse_args() -> Result<Options, String> {
                 std::process::exit(0);
             }
             "--alloc" => opts.alloc = true,
+            "--secs" => {
+                let value = args
+                    .next()
+                    .filter(|v| !v.starts_with("--"))
+                    .ok_or_else(|| "missing value for --secs".to_string())?;
+                let secs: f64 = value
+                    .parse()
+                    .map_err(|e| format!("--secs: {e}"))?;
+                if !secs.is_finite() || secs <= 0.0 {
+                    return Err(format!(
+                        "--secs must be a positive number, got {value}"
+                    ));
+                }
+                opts.secs = Some(secs);
+            }
             "--ab" => {
                 opts.ab = args.next().filter(|v| !v.starts_with("--"));
             }
@@ -622,10 +645,27 @@ fn run_sweep(
         // noise only (not seed→game-length variance, which can exceed 70%).
         let seed_offset = (runs.len() as u32).wrapping_mul(100_000);
         let base_seed = opts.seed.wrapping_add(seed_offset);
-        let jobs = opts.jobs.min(games.max(1));
+        // A --secs budget forces the single-threaded path: time-bounding
+        // parallel chunks would need a shared deadline, and the baseline
+        // comparison is jobs=1 anyway.
+        let time_budget = opts.secs;
+        let jobs = if time_budget.is_some() {
+            1
+        } else {
+            opts.jobs.min(games.max(1))
+        };
+        let mut played = games;
         let t0 = Instant::now();
         if jobs <= 1 {
-            for g in 0..games {
+            let mut g = 0u32;
+            loop {
+                if let Some(limit) = time_budget {
+                    if g > 0 && t0.elapsed().as_secs_f64() >= limit {
+                        break;
+                    }
+                } else if g >= games {
+                    break;
+                }
                 let (engine_seed, arena_seed) = game_seeds(base_seed, g.wrapping_add(1));
                 let stats = run_game(
                     GameSetup {
@@ -659,7 +699,9 @@ fn run_sweep(
                 *outcomes.entry(outcome_label(stats.outcome)).or_insert(0) += 1;
                 *ends.entry(stats.end_reason).or_insert(0) += 1;
                 let _ = stats.game_result;
+                g += 1;
             }
+            played = g;
         } else {
             // Parallel: one game index → one seed pair, independent of worker.
             // Engine RNG is thread-local; each run_game seeds that worker.
@@ -741,17 +783,17 @@ fn run_sweep(
         let secs = t0.elapsed().as_secs_f64();
         runs.push(DeckRun {
             deck: name.clone(),
-            games,
+            games: played,
             actions: total_actions,
             secs,
             outcomes,
             ends,
         });
-        let gps = games as f64 / secs.max(f64::EPSILON);
+        let gps = played as f64 / secs.max(f64::EPSILON);
         let aps = total_actions as f64 / secs.max(f64::EPSILON);
         println!(
             "DECK\t{}\trepeat={}\tgames={}\tactions={}\tsecs={:.3}\tgps={:.2}\taps={:.1}",
-            name, repeat_tag, games, total_actions, secs, gps, aps
+            name, repeat_tag, played, total_actions, secs, gps, aps
         );
     }
     Ok(runs)
@@ -976,7 +1018,12 @@ fn real_main() -> Result<(), String> {
     }
 
     if let Some(writer) = trace_writer.take() {
-        writer.finish(opts.games as usize)?;
+        // In --secs mode the played count is only known here; the
+        // Completion record must carry the actual games, not the
+        // (meaningless) --games default.
+        let traced_games: usize =
+            all_runs.iter().map(|r| r.games as usize).sum();
+        writer.finish(traced_games)?;
     }
 
     // Drop the alloc guard BEFORE printing the aggregate so its report
@@ -1066,11 +1113,20 @@ fn real_main() -> Result<(), String> {
         rabuka_engine::timer::print_results();
     }
 
+    // In --secs mode the configured --games is not the played count;
+    // report what was actually played so the summary line (the
+    // canonical extracted record) stays truthful. Games mode keeps
+    // the per-deck target so recorded baselines stay comparable.
+    let summary_games = if opts.secs.is_some() {
+        total_games
+    } else {
+        u64::from(opts.games)
+    };
     println!(
         "\nSIM_BENCH_SUMMARY policy={} seed={} games={} decks={} repeat={} jobs={} total_secs={:.3} mean_gps={:.3} mean_aps={:.1} total_actions={}",
         opts.policy_raw,
         opts.seed,
-        opts.games,
+        summary_games,
         deck_names.len(),
         opts.repeat,
         opts.jobs,
