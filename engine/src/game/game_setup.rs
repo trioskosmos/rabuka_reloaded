@@ -1666,6 +1666,14 @@ fn has_double_baton(card: &Card) -> bool {
 
 const AREA_NAMES: [&str; 3] = ["left", "center", "right"];
 
+/// Per-process `Arc<str>` handles for the three stage-area names.
+/// See the note at the use site in `generate_main_phase_actions`.
+#[cfg(not(feature = "no_std"))]
+static INTERNED_AREA_NAMES: std::sync::LazyLock<[ArcStr; 3]> =
+    std::sync::LazyLock::new(|| {
+        core::array::from_fn(|slot| ArcStr(Arc::from(AREA_NAMES[slot])))
+    });
+
 /// For each stage area, what placing `card` there would cost and whether it is
 /// legal. Returns the three candidates plus whether any area is available at
 /// all (an empty area costs the card's full reduced cost; an occupied one is a
@@ -1740,7 +1748,15 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
     // bump — by the per-hand-card `available_areas` construction below. Only
     // borrowed on the clone path, so this costs three small allocations per
     // call instead of three per hand card.
-    let interned_area_names: [ArcStr; 3] =
+    //
+    // They are constants, so the handles themselves are built once per
+    // process: a `LazyLock` static turns the three per-call allocations
+    // (~590k over a 10 s bench run) into three refcount bumps. no_std
+    // builds have no `LazyLock`, so they keep the per-call construction.
+    #[cfg(not(feature = "no_std"))]
+    let interned_area_names = &*INTERNED_AREA_NAMES;
+    #[cfg(feature = "no_std")]
+    let interned_area_names =
         core::array::from_fn(|slot| ArcStr(Arc::from(AREA_NAMES[slot])));
 
     if !game_state.is_action_prohibited("play_member") {
@@ -1919,8 +1935,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         None
                     };
 
-                    if has_any_available || any_double_baton_available {
-                        for area in available_areas.as_ref().unwrap().iter() {
+                        if has_any_available || any_double_baton_available {
+                            // `available_areas` is slot-indexed (built
+                            // from `area_candidates.iter().enumerate()`),
+                            // so the loop index IS the stage slot —
+                            // `MemberArea`'s 0/1/2. The slot index is
+                            // the area: no string parse of
+                            // "left"/"center"/"right" per action.
+                            for (slot, area) in
+                                available_areas.as_ref().unwrap().iter().enumerate()
+                            {
                             if !area.available {
                                 continue;
                             }
@@ -1985,13 +2009,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                         } else {
                                             None
                                         },
-                                        stage_area_index: Some(
-                                            area.area
-                                                .as_ref()
-                                                .parse::<MemberArea>()
-                                                .map(|area| area.to_index().u8_count())
-                                                .unwrap_or(0),
-                                        ),
+                                        stage_area_index: Some(slot.u8_count()),
                                         // available_areas is decision data for baton
                                         // vision (is_baton_touch on the chosen
                                         // stage_area), so it is built in every

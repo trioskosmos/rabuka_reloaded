@@ -782,45 +782,72 @@ pub fn card_matches_group_str(
     group_name: Option<&str>,
 ) -> bool {
     let result = match group_name {
-        Some(g) => {
-            let gn = norm_group_name(g);
-            card_db
-                .get_card(card_id)
-                .map(|c| {
-                    let unit = c.unit.as_deref().unwrap_or("");
-                    let unit_match = unit == gn.as_ref()
-                        // Spacing-insensitive: the corpus spells some units both ways
-                        // (`lily white` / `lilywhite`), and a raw == made a
-                        // `『lily white』` filter skip every unspaced card.
-                        || eq_ignoring_whitespace(unit, gn.as_ref())
-                        || ((unit.contains('\u{FF01}') || unit.contains('\u{00B5}')) && norm_group_name(unit).as_ref() == gn.as_ref());
-                    unit_match
-                || c.group.as_ref() == g
-                || !c.group.is_empty() && eq_ignoring_whitespace(&c.group, g)
-                || card_name_matches_group(card_db, c, card_id, gn.as_ref())
-                // Multi-name cards (e.g. 渡辺曜&鬼塚夏美&大沢瑠璃乃) should match
-                // group names through any of their constituent series (Q105).
-                // Example: LL-bp2-001-R+ matches "Aqours" via ラブライブ！サンシャイン!!
-                || card_series_matches_group(&c.series, gn.as_ref())
-                // Constant `set_card_identity` ("treated as") abilities give the
-                // card additional group memberships in all zones. Examples:
-                //   AURORA FLOWER (PL!HS-bp5-018-L) is "スリーズブーケ" /
-                //   "DOLLCHESTRA" / "みらくらぱーく！" everywhere.
-                || c.abilities.iter().any(|ar| {
-                    ar.resolve().effect.as_ref().is_some_and(|eff| {
-                        eff.action == ActionType::SetCardIdentity
-                            && eff.identities_any().as_ref().is_some_and(|ids| {
-                                ids.iter().any(|id| id == gn.as_ref() || ((id.contains('\u{FF01}') || id.contains('\u{00B5}')) && norm_group_name(id).as_ref() == gn.as_ref()))
-                            })
-                    })
-                })
-                })
-                .unwrap_or(false)
-        }
+        Some(g) => card_db
+            .get_card(card_id)
+            .is_some_and(|c| card_matches_group_str_card(card_db, c, card_id, g)),
         None => true,
     };
     debug_group_match(card_db, card_id, group_name, result);
     result
+}
+
+/// Card-resolved form of [`card_matches_group_str`]: identical
+/// matching, but the caller has already looked the card up.
+///
+/// `GameState::distinct_stage_groups` tests each of the three stage
+/// members against all five canonical groups, so resolving the card
+/// once per member (3 hash probes) instead of once per (member,
+/// group) pair (15 probes) is the difference between 3 and 15
+/// lookups per call — and that predicate sits on the action-generation
+/// hot path (~52 calls per game).
+#[inline]
+pub fn card_matches_group_str_card(
+    card_db: &CardDatabase,
+    card: &crate::core::card::Card,
+    card_id: i16,
+    group_name: &str,
+) -> bool {
+    let gn = norm_group_name(group_name);
+    let unit = card.unit.as_deref().unwrap_or("");
+    let unit_match = unit == gn.as_ref()
+        // Spacing-insensitive: the corpus spells some units both ways
+        // (`lily white` / `lilywhite`), and a raw == made a
+        // `『lily white』` filter skip every unspaced card.
+        || eq_ignoring_whitespace(unit, gn.as_ref())
+        || ((unit.contains('\u{FF01}') || unit.contains('\u{00B5}')) && norm_group_name(unit).as_ref() == gn.as_ref());
+    unit_match
+        || card.group.as_ref() == group_name
+        || !card.group.is_empty() && eq_ignoring_whitespace(&card.group, group_name)
+        || card_name_matches_group(card_db, card, card_id, gn.as_ref())
+        // Multi-name cards (e.g. 渡辺曜&鬼塚夏美&大沢瑠璃乃) should match
+        // group names through any of their constituent series (Q105).
+        // Example: LL-bp2-001-R+ matches "Aqours" via ラブライブ！サンシャイン!!
+        || card_series_matches_group(&card.series, gn.as_ref())
+        // Constant `set_card_identity` ("treated as") abilities give the
+        // card additional group memberships in all zones. Examples:
+        //   AURORA FLOWER (PL!HS-bp5-018-L) is "スリーズブーケ" /
+        //   "DOLLCHESTRA" / "みらくらぱーく！" everywhere.
+        || card.abilities.iter().any(|ar| {
+            // `peek()` first: this walk runs for every (card, group)
+            // pair on the action-generation path, and `resolve()` costs
+            // an `Arc::clone` (an atomic RMW on the decode slot shared
+            // by every worker thread) purely to read a few fields. The
+            // `resolve()` arm covers a not-yet-decoded slot.
+            let owned;
+            let ability = match ar.peek() {
+                Some(a) => a,
+                None => {
+                    owned = ar.resolve();
+                    &owned
+                }
+            };
+            ability.effect.as_ref().is_some_and(|eff| {
+                eff.action == ActionType::SetCardIdentity
+                    && eff.identities_any().as_ref().is_some_and(|ids| {
+                        ids.iter().any(|id| id == gn.as_ref() || ((id.contains('\u{FF01}') || id.contains('\u{00B5}')) && norm_group_name(id).as_ref() == gn.as_ref()))
+                    })
+            })
+        })
 }
 
 /// Returns true if `card_id` matches ANY group in `groups`, or if `groups` is

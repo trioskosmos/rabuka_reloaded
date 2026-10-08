@@ -700,30 +700,48 @@ impl GameState {
     /// Single source of truth for "グループ名1種類につぁE cost reductions --     /// used by the resolver's runtime cost adjustment AND by action
     /// generation's effective-cost display/gating.
     ///
-    /// Membership is resolved through [`crate::ability::util::card_matches_group_str`]
+    /// Membership is resolved through [`crate::ability::util::card_matches_group_str_card`]
     /// so multi-name joint cards (Q228: LL-bp1-001-R＋ carries 虹ヶ咲 +
     /// Liella! + 蓮ノ空 through its three names) contribute every group they
     /// belong to, not just a single `card.group` field.
+    ///
+    /// One pass over the three slots — one card resolution each — instead
+    /// of a full stage scan per group: the same (member, group) tests,
+    /// but 3 hash probes instead of 15, and a group that has already
+    /// matched is never tested again. This predicate runs on the
+    /// action-generation hot path (~52 calls per game, each feeding the
+    /// effective-cost gate of every offered activation).
     pub fn distinct_stage_groups(&self, player_id: &str) -> u8 {
         const CANONICAL_GROUPS: [&str; 5] = ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"];
         let player = self
             .try_player_by_id(player_id)
             .unwrap_or(&self.player1);
-        let mut count = 0u8;
-        for group in CANONICAL_GROUPS {
-            let matched = player.stage.stage.iter().any(|&cid| {
-                cid != -1
-                    && crate::ability::util::card_matches_group_str(
-                        &self.card_database,
-                        cid,
-                        Some(group),
-                    )
-            });
-            if matched {
-                count += 1;
+        // Bitset over `CANONICAL_GROUPS`: bit i is set once any stage
+        // member matches group i.
+        let mut matched = 0u8;
+        for &cid in player.stage.stage.iter() {
+            if cid == -1 {
+                continue;
+            }
+            let Some(card) = self.card_database.get_card(cid) else {
+                continue;
+            };
+            for (i, group) in CANONICAL_GROUPS.iter().enumerate() {
+                let bit = 1u8 << i;
+                if matched & bit != 0 {
+                    continue;
+                }
+                if crate::ability::util::card_matches_group_str_card(
+                    &self.card_database,
+                    card,
+                    cid,
+                    group,
+                ) {
+                    matched |= bit;
+                }
             }
         }
-        count
+        matched.count_ones() as u8
     }
 
     /// Effective ACTIVE-energy cost of `cost` for `player_id` given the
