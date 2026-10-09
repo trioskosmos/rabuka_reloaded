@@ -19,8 +19,16 @@ edition = "2021"
 [profile.release]
 incremental = true
 codegen-units = 16
-# No LTO: the arena runs thousands of games per second and link-time
-# optimisation would dominate every rebuild for no measurable play-strength gain.
+# LTO thin + codegen-units = 1 was measured 2026-10-09 with the pool
+# active and gave +5.6% (909,674 / 898,071 / 868,727 aps at jobs=256
+# vs 844,883 pool-only, total_actions=328173 byte-identical), but it
+# doubles build time (~30s -> ~59s) and the full test suite could not
+# be run to completion under LTO (the crate compiles ~27 bins plus the
+# harness test target, all with LTO, and the run kept aborting), so it
+# is NOT set here. Re-measure before committing: the gate is 4354/4354
+# tests with LTO active. lto = "fat" was measured earlier and is not
+# worth it (+2-4% single-threaded, inside noise, appeared to cost
+# throughput at high --jobs).
 lto = false
 # `panic = "abort"` removes the unwinding tables and landing pads from every
 # function. This engine never catches a panic to recover - the arena treats a
