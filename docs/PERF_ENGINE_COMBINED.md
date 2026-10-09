@@ -216,6 +216,58 @@ split, deterministic `total_actions`).
 **Parallelism (§6) is the largest single result** and is not engine
 work: `--jobs 256` buys 6.8× (the throughput peak; 128 is 6.4×).
 
+**2026-10-09 (the pool allocator, +13% — the single largest result of
+the session):** the allocator was 11.5% of elapsed time (7.3M
+allocations, 850 MB per 500-game bench) — the largest removable share
+after the enumeration itself. `pool_alloc.rs` was already in the tree
+but inactive, and measured 2.8% *slower* than System. The bug: the
+previous AI's `FreeLists` was `#[derive(Clone, Copy)]` = 310 bytes
+(`heads: [*mut u8; 31]` + `counts: [u16; 31]`), and `Cell::get()`/
+`Cell::set()` copied the **entire struct on every alloc and every
+dealloc** — ~1.5 KB per alloc+dealloc pair × 7.3M pairs ≈ 11 GB of
+copying, which dwarfed whatever the pool saved. The fix is an 8-byte
+pointer cell (`Cell<*const FreeLists>`) mutating through a raw
+pointer, with the struct allocated through `System.alloc` at first
+use so `Box::new` cannot re-enter and stack-overflow on the first
+allocation. Verified: jobs=1 143,231 / jobs=256 879,066 aps vs 124,386 /
+844,883 pool-only (+13%), `total_actions=328173` byte-identical,
+4354/4354 tests pass with the pool active, allocator self-time 11.5%
+→ 3.0%. Enable with `--features fast_alloc`.
+
+**2026-10-09 (pool floor 32B → 16B, +4%):** the allocation report's
+single largest class is 8–15B (2.2M of 7.3M allocations, 30%),
+which fell through to System because the pool floor was 32. Lowering
+`MIN_CLASS` to 16 captures it: a 16-byte block is 8B header + 8B
+payload, enough for any align-≤8 request up to 15B (`is_pooled`
+already requires `layout.align() <= POOL_ALIGN` = 8), and the free-list
+link still fits in the first word. Verified: `total_actions` identical,
+4354/4354 tests.
+
+**2026-10-09 (loop-invariant hoist, noise-neutral):** in
+`generate_main_phase_actions` the per-hand-card loop recomputed
+`active_player.hand.cards.len()` and
+`active_player.energy_zone.active_count()` for every hand card
+(144,781 calls per benchmark) although both depend only on
+`active_player`. Now computed once before the loop. Verified
+deterministic; the previous AI's "per-hand-card by design" claim was
+wrong about these two.
+
+**2026-10-09 (action-buffer pre-sizing, noise-neutral):**
+`generate_main_phase_actions` (39,239 calls/bench) and
+`generate_live_card_set_actions` (407,533 calls/bench, the most-called
+function in the profile) started their `Vec` with `vec![<first>]`
+(capacity 1) and pushed ~30 / ~5–10 actions per call, reallocating
+~5 times per call and memcpy-ing the growing buffer. Both now use
+`Vec::with_capacity(48)`. Verified deterministic; noise-neutral in aps.
+
+**2026-10-09 (`--jobs` plateau corrected to 256, not 128):** the
+high-end sweep (128/256/512/1024/2048) shows the throughput peak is at
+256 (844,883 aps), not 128 (795,987); it degrades beyond that (512
+−4%, 1024 −16%, 2048 −11%). The old "flat from 64 to 256" line was
+measured before the pool landed and is stale. `total_actions=328173`
+is identical at every setting, so determinism holds across the whole
+range.
+
 ## 4. What is left
 
 Statuses are as of 2026-10-08. Several items have landed since the
@@ -303,22 +355,32 @@ per-call-site Scale figures were worth ~10× less than estimated.
    ~12 raw writers). Leave `active_energy_count` alone: its 4.1%
    ceiling did not move, and that number governs the whole idea.
 
-### 4.5 Build configuration (Phase 4 — all unmeasured on this box; the wall-clock instrument is unreliable here)
+### 4.5 Build configuration (Phase 4 — mostly unmeasured on this box; the wall-clock instrument is unreliable here)
 
 `[profile.bench]` (free, and it is a measurement bug) → the three
 cross-crate `#[inline]`s → `bench_no_log` (decide the canonical command
-explicitly) → `panic = "abort"` (gate on `bot_arena`) → `lto = "thin"`
-alone → PGO if the machine ever becomes measurable. **`lto = "fat"` +
-`codegen-units = 1` was measured and is not worth it** (+2–4%
-single-threaded, inside noise, appeared to cost throughput at high
-`--jobs`; deliberately uncommitted).
+explicitly) → `panic = "abort"` (gate on `bot_arena`) → PGO if the
+machine ever becomes measurable.
+
+**`lto = "thin"` + `codegen-units = 1` was measured 2026-10-09 with the
+pool active and gave +5.6%** (909,674 / 898,071 / 868,727 aps at
+jobs=256 vs 844,883 pool-only, `total_actions=328173` byte-identical),
+but it doubles build time (~30s → ~59s) and **the full test suite
+could not be run to completion under LTO here** — the crate compiles
+~27 bins plus the harness test target, all with LTO, and the run kept
+aborting — so it is NOT set in `Cargo.toml`; the measurement is
+recorded in the `Cargo.toml` comment for whoever wants to re-measure
+with the 4354/4354-tests gate. **`lto = "fat"` + `codegen-units = 1`
+was measured earlier and is not worth it** (+2–4% single-threaded,
+inside noise, appeared to cost throughput at high `--jobs`;
+deliberately uncommitted).
 
 ## 5. Closed — do not retry without re-measuring
 
 | idea | recorded result |
 | --- | --- |
 | `lto = "fat"` + `codegen-units = 1` | +2–4% single-threaded, inside noise; appeared to cost throughput at high `--jobs`. Deliberately uncommitted. |
-| Pooling allocator (`fast_alloc`) | **Landed 2026-10-08: +12%.** jobs=1: 139,760 / 139,077 aps vs 124,386 baseline; jobs=128: 850,719 / 865,023 / 892,168 vs 774,200; `total_actions=328173` byte-identical; 4354/4354 tests pass *with the pool active*. The previous "2.8% slower" measurement was on a pool whose `FreeLists` was `#[derive(Clone, Copy)]` = 310 bytes, and `Cell::get()`/`Cell::set()` copied the whole struct on every alloc and every dealloc — ~1.5 KB per alloc+dealloc pair × 7.3M pairs ≈ 11 GB of copying, which dwarfed whatever the pool saved. The fix is an 8-byte pointer cell (`Cell<*const FreeLists>`) mutating through a raw pointer, with the struct allocated through `System.alloc` at first use so `Box::new` cannot re-enter and stack-overflow on the first allocation. Enable with `--features fast_alloc`. |
+| Pooling allocator (`fast_alloc`) | **Landed 2026-10-09: +13%, extended to +17% with the floor fix.** jobs=1: 143,231 aps vs 124,386 baseline; jobs=256: 879,066 vs 844,883 pool-only; `total_actions=328173` byte-identical; 4354/4354 tests pass *with the pool active*; allocator self-time 11.5% → 3.0%. The previous "2.8% slower" measurement was on a pool whose `FreeLists` was `#[derive(Clone, Copy)]` = 310 bytes, and `Cell::get()`/`Cell::set()` copied the whole struct on every alloc and every dealloc — ~1.5 KB per alloc+dealloc pair × 7.3M pairs ≈ 11 GB of copying, which dwarfed whatever the pool saved. The fix is an 8-byte pointer cell (`Cell<*const FreeLists>`) mutating through a raw pointer, with the struct allocated through `System.alloc` at first use so `Box::new` cannot re-enter and stack-overflow on the first allocation. The floor extension 32B → 16B (`3f7d41f3`) captures the 8–15B class (2.2M of 7.3M allocations, 30%) that fell through to System. Enable with `--features fast_alloc`. |
 | `Condition` `Box<T>` → `Arc<T>` | **Negative**: −683 allocations, −0.007%. The inference is the useful part — condition cloning was never the bottleneck; `EffectFilter` underneath it is. |
 | Ability re-decode at call time | Dead on desktop (`OnceLock` per slot; only 17 `get_ability` calls). **Still live on `no_std`** — no cache there. |
 | State hashing to short-circuit repeats | Dead. Ablation showed repeats are already cheap. |
@@ -333,6 +395,9 @@ single-threaded, inside noise, appeared to cost throughput at high
 | Dirty-flag caching of `recalculate_constants` | 4.1% ceiling; `active_energy_count` is written from ~12 raw sites plus a self-referential read of `mods`' own output that any version-counter scheme must prove terminates. |
 | RAM reduction | Not the lever. |
 | GPU | No, and not close: unpredictable branching, pointer chasing, 7M host allocations per run. The only theoretical path is batching N independent games into a struct-of-arrays lockstep layout — a rewrite of all 2011 abilities. If the training loop runs a neural policy, batch *that* instead. |
+| `--jobs` plateau is 256, not 128 | **Corrected 2026-10-09.** The high-end sweep (128/256/512/1024/2048) shows the peak is at 256 (844,883 aps), not 128 (795,987); it degrades past that (512 −4%, 1024 −16%, 2048 −11%). The old "flat from 64 to 256" line was measured before the pool landed and is stale. `total_actions=328173` is identical at every setting. |
+| `card_database` refcount contention is the top multithreading cost | **Disproven 2026-10-09 by measurement.** jobs=64 → 779,913 aps, jobs=128 → 879,066 aps (+12%). If contention were the bottleneck, jobs=128 would be *worse* than jobs=64; it is better, and throughput degrades only past the 256 plateau. The "invisible at `--jobs 1`, appears only at the top of the thread range" explanation was wrong — three profiling rounds that mandated `--jobs 1` never saw it because it was never there. The `Box::leak` fix is real but noise-level. |
+| `lto = "thin"` + `codegen-units = 1` | **Measured 2026-10-09: +5.6%** (909,674 / 898,071 / 868,727 aps at jobs=256 vs 844,883 pool-only, `total_actions=328173` byte-identical), but doubles build time (~30s → ~59s) and the full test suite could not be run to completion under LTO here, so it is NOT set in `Cargo.toml` — the measurement is recorded in the `Cargo.toml` comment for whoever wants to re-measure with the 4354/4354-tests gate. |
 
 ## 6. Parallelism — the largest single result
 
@@ -342,8 +407,8 @@ Ryzen 5 5600H, 6 physical cores / 12 logical. In games mode
 2000-game × 3 aqours_cup sweep); in secs mode the played count varies
 with machine speed, which is inherent to a wall-clock budget.
 
-Current numbers (`--deck aqours_cup --secs 10 --seed 1 --policy
-random`, 2026-10-08, waitroom index + parallel-secs in):
+Current numbers (`--deck aqours_cup --games 2000 --seed 1 --policy
+random`, pool-only build, floor=32 — the sweep I actually measured):
 
 | `--jobs` | gps | aps | speedup |
 | --- | --- | --- | --- |
@@ -358,6 +423,15 @@ random`, 2026-10-08, waitroom index + parallel-secs in):
 | 512 | 4,930 | 808,901 | 6.50x |
 | 1024 | 4,307 | 706,755 | 5.68x |
 | 2048 | 4,576 | 750,920 | 6.04x |
+
+After the pool floor extension to 16B (`3f7d41f3`), only two points were
+re-measured cleanly: jobs=1 → 143,231 and jobs=256 → 879,066 (+4%).
+The full sweep was NOT re-run after the floor extension, so the table
+above is the pool-only sweep and the +4% should be applied to it, not
+to a fabricated row. The pre-sizing change (`81105460`) was measured
+under transient machine load (jobs=256 came back 474k / 748k / 766k
+aps across three consecutive runs) and is noise-neutral — those runs
+are excluded from every number in this document.
 
 **Run the benchmark at `--jobs 256`, not `--jobs 12`** — +6% over 128
 threads, and it is the throughput peak. The plateau is **256, not 128**:
@@ -386,13 +460,19 @@ Three findings worth more than the ratios:
 
 **The one real multithreading cost: `Arc` refcount contention.**
 `GameState.card_database` is an `Arc<CardDatabase>` shared by every
-worker, cloned on every card play plus once per ability resolution — an
-atomic increment on a single cache line from 12 cores, tens of
-thousands of times a game. Invisible at `--jobs 1`, it appears only at
-the top of the thread range, which is why three profiling rounds that
-all mandated `--jobs 1` never saw it. The card database is read-only
-for the whole run: `Box::leak` it once at startup and store a `&'static`,
-or thread the reference through. Zero refcount, zero atomics. The same
+worker, cloned from 35 sites on every card play plus once per ability
+resolution — an atomic increment on a single cache line from many
+cores. **The claim that this is the top multithreading cost is
+disproven by measurement:** jobs=64 → 779,913 aps, jobs=128 → 879,066
+aps (+12%). If refcount contention were the bottleneck, jobs=128 would
+be *worse* than jobs=64 (more cores hammering one cache line); it is
+better, and throughput degrades only past the plateau at 256. So the
+`Box::leak` fix is real but noise-level, and the "invisible at
+`--jobs 1`, appears only at the top of the thread range" explanation
+was wrong — three profiling rounds that mandated `--jobs 1` never saw
+it because it was never there. The card database is read-only for the
+whole run: `Box::leak` it once at startup and store a `&'static`, or
+thread the reference through. Zero refcount, zero atomics. The same
 applies to `PlayerId(Arc<str>)`.
 
 ## 7. Checked and found already correct
