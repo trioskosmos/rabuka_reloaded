@@ -57,6 +57,22 @@ pub struct Ability {
     #[cfg(not(feature = "no_std"))]
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub(crate) trigger_position_mask: std::sync::OnceLock<crate::zones::TriggerPositionMask>,
+    /// Precomputed position-overlay merge of the activation
+    /// condition with the effect's position — the memoized
+    /// form of the deep clone `ability_activation_gate_holds`
+    /// used to rebuild on every action-generation pass (a
+    /// `Condition` is a recursive tree with a
+    /// `Box<ConditionCommon>` per node, so that clone was
+    /// 10-30 allocations per activatable ability per pass).
+    /// The merge is a pure function of the ability's own
+    /// data — the printed activation condition and the
+    /// effect's position — so it is cached here and
+    /// serde-skipped, exactly like `trigger_mask`. `None`
+    /// means no overlay is needed: the printed condition
+    /// evaluates as-is (the common case).
+    #[cfg(not(feature = "no_std"))]
+    #[cfg_attr(feature = "serde_support", serde(skip))]
+    pub(crate) activation_overlay: std::sync::OnceLock<Option<Arc<Condition>>>,
 }
 
 // PartialEq/Eq are manual: the two mask fields are caches of pure
@@ -102,6 +118,45 @@ impl Ability {
         *self.trigger_position_mask.get_or_init(|| {
             crate::zones::TriggerPositionMask::parse(self.triggers.as_deref().unwrap_or(""))
         })
+    }
+
+    /// The cached position-overlay merge of this ability's
+    /// activation condition with the effect's position —
+    /// the memoized form of the deep clone
+    /// `ability_activation_gate_holds` used to rebuild on
+    /// every action-generation pass. The merge is a pure
+    /// function of the ability's own data, so it is
+    /// computed at most once per ability and then shared
+    /// read-only. `None` means no overlay is needed and the
+    /// printed activation condition evaluates as-is.
+    #[cfg(not(feature = "no_std"))]
+    pub(crate) fn activation_overlay_condition(&self) -> Option<&Arc<Condition>> {
+        self.activation_overlay
+            .get_or_init(|| {
+                let Some(effect) = self.effect.as_deref() else {
+                    return None;
+                };
+                let Some(cond) = effect.activation_condition_parsed_any() else {
+                    return None;
+                };
+                if !crate::ability::resolver::AbilityResolver::condition_needs_position_overlay(
+                    cond,
+                    effect,
+                ) {
+                    return None;
+                }
+                let mut merged: Arc<Condition> = Arc::new(cond.clone());
+                {
+                    let m = Arc::make_mut(&mut merged);
+                    if let Some(pos) = effect.position_any() {
+                        m.set_position(pos.clone());
+                    } else if let Some(act_pos) = effect.activation_position_any() {
+                        m.set_activation_position(act_pos.to_string());
+                    }
+                }
+                Some(merged)
+            })
+            .as_ref()
     }
 
     /// Does this ability carry the given trigger kind? The single

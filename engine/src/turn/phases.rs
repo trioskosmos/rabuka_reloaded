@@ -121,7 +121,11 @@ impl super::TurnEngine {
                         .iter()
                         .filter_map(|x| x.parse::<i16>().ok())
                         .collect();
-                    let to_activate: Vec<i16> = turn_player
+                    // The stage is exactly 3 slots, so the wait-activate
+                    // set never exceeds 3 ids: a `SmallVec` keeps it on
+                    // the stack and the Active phase (run twice per turn)
+                    // allocates nothing here.
+                    let to_activate: SmallVec<[i16; 3]> = turn_player
                         .stage
                         .stage
                         .iter()

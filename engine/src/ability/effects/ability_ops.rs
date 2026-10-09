@@ -512,7 +512,7 @@ pub(crate) fn execute_gain_ability(
                 #[cfg(not(feature = "no_std"))]
                 trigger_mask: Default::default(),
                 #[cfg(not(feature = "no_std"))]
-                trigger_position_mask: Default::default(),
+                trigger_position_mask: Default::default(), #[cfg(not(feature = "no_std"))] activation_overlay: Default::default(),
             };
             gained_constant = GameState::ability_matches_trigger(
                 &gained_ability,
@@ -739,7 +739,7 @@ pub(crate) fn execute_gain_ability(
                             #[cfg(not(feature = "no_std"))]
                             trigger_mask: Default::default(),
                             #[cfg(not(feature = "no_std"))]
-                            trigger_position_mask: Default::default(),
+                            trigger_position_mask: Default::default(), #[cfg(not(feature = "no_std"))] activation_overlay: Default::default(),
                         };
                         gs.gained_card_abilities
                             .entry(activating_card)

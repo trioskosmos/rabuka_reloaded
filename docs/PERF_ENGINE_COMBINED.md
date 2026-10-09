@@ -276,6 +276,39 @@ work: `--jobs 256` buys 6.8× (the throughput peak; 128 is 6.4×).
    committed at `engine/pgo/merged.profdata` and the build
    command is in §1. A single-deck profile measured +43.1% —
    the corpus profile is both faster and more general.
+6. **Activation-overlay condition cache + typed hasher
+   writers (+7.4% jobs=1, +129% jobs=256, interleaved
+   A/B; −81% alloc calls per 200-game bench).** Two
+   outcome-neutral changes landed together and gated
+   together (total_actions byte-identical in all 20 A/B
+   runs, 4364/4364 tests, allocator self-time 17.1% →
+   5.1%):
+   - `ability_activation_gate_holds` deep-cloned the
+     activation condition into a fresh `Arc` on every
+     action-generation pass whenever the effect carried a
+     position the printed condition did not — a `Condition`
+     is a recursive tree with a `Box<ConditionCommon>` per
+     node, so that clone was 10-30 allocations per
+     activatable ability per pass, and the pass runs ~52×
+     per game. The merge is a pure function of the
+     ability's own data, so it is now cached on `Ability`
+     in a `OnceLock<Option<Arc<Condition>>>`
+     (`activation_overlay`, serde-skipped, the same
+     pattern as `trigger_mask`). This is the
+     alloc-removal lever: with the pool's single Mutex as
+     the jobs=256 bottleneck, cutting alloc calls from
+     12.42M to 2.33M per 200 games is what compounds into
+     the +129% at high job counts (the jobs=1 gain is the
+     CPU-bound +7.4%).
+   - `generate_state_hash`'s `SimpleHasher` hashed every
+     `i16`/`usize`/`bool` element through the default
+     `write(&bytes)` call plus a per-byte loop; the typed
+     `Hasher` writers are now overridden so each element is
+     a single multiply-add. `record_action_boundary` self
+     time dropped 0.41 → 0.29 µs/call (−29%). Only hash
+     equality is ever consumed (`game_state_history`
+     containment and the repetition count), so the changed
+     values are behaviour-preserving.
 
 Also measured and **rejected** this session: `target-cpu=native`
 (+0.8% over pool+LTO — noise; the workload is branch-heavy
@@ -332,6 +365,55 @@ high-end sweep (128/256/512/1024/2048) shows the throughput peak is at
 measured before the pool landed and is stale. `total_actions=328173`
 is identical at every setting, so determinism holds across the whole
 range.
+
+**2026-10-10 (display-only source attribution gated + two
+`SmallVec` conversions; `total_actions` byte-identical,
+outcomes exact):** four outcome-neutral allocation
+reductions, each gated on the exact outcome match
+(P1 189 / P2 252 / draw 1059 over 500×3, seed 1;
+`total_actions=219948`):
+- The success-zone and constant-cost `*_sources`
+  `Vec<BonusSource>` pushes
+  (`evaluate_success_zone_constant_modifiers`,
+  `recalculate_constant_cost_modifiers_with_ids`) ran
+  unconditionally — growing a `Vec` and, on the heart
+  arm, allocating a `color_str.to_string()` per color —
+  on every `recalculate_constants` pass, even though
+  those fields are read **only** by `game/display.rs`
+  (the same contract the stage-constant path's
+  `DisplaySources` already encodes). They are now gated
+  on `action_display_enabled()`.
+- `advance_phase::active`'s `to_activate` was a
+  `Vec<i16>` allocated every Active phase (~75,599 per
+  bench); the stage is exactly 3 slots, so it is now a
+  `SmallVec<[i16;3]>` that never spills.
+- The success-zone constant pass collected
+  `Vec<(i16, usize, AbilityEffect)>`, deep-cloning every
+  `AbilityEffect` (whose `compound`/`effect_steps`
+  `Box`/`Vec` fields allocate when present) and
+  allocating a `Vec` buffer every pass. It now stores the
+  resolved `Arc<Ability>` in a
+  `SmallVec<[(i16, usize, Arc<Ability>);4]>` — a
+  refcount bump replaces the clone, and the common ≤4-entry
+  board stays on the stack. The effect is borrowed from the
+  `Arc` in the application loop, which is disjoint from the
+  `&mut self` that applies the bonus, so the borrow that
+  forced the collect-up-front still holds.
+
+The jobs=1 gain (+1.2%, 1598 vs 1579 mean over 3 runs)
+is below this box's ±12% gps noise floor and is not a
+reliable speed claim on its own; the gate is the exact
+allocation reduction and the byte-identical `total_actions`.
+The PGO profile was retrained on the full 13-deck corpus
+after the edit. Two Windows PGO gotchas hit during
+retraining and are now encoded in the recipe: with
+`--jobs>1` every worker writes the *same* default
+`.profraw` and clobbers the others, so set
+`LLVM_PROFILE_FILE=<dir>\pgo-%p.profraw` (per-PID) when
+training; and `cargo clean` before the `-Cprofile-use`
+build, or cargo reuses dependency objects cached under the
+identical RUSTFLAGS string and the thin-LTO link fails on
+conflicting `ProfileSummary` module flags.
 
 ## 4. What is left
 

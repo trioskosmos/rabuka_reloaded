@@ -96,12 +96,64 @@ impl GameState {
 
     pub fn generate_state_hash(&self) -> u64 {
         use core::hash::{Hash, Hasher};
+        // The typed `write_*` methods are overridden so that hashing an
+        // `i16`/`usize`/`bool` element is a single multiply-add instead
+        // of the default `write(&bytes)` call plus a per-byte loop. This
+        // hash runs over ~40 zones (both players' hand, decks, energy,
+        // waitroom, live, success, stage, under-cards) on every
+        // `record_action_boundary` — the most-called hashing site in the
+        // engine — so the per-element call overhead dominated. The hash
+        // VALUES differ from the byte-wise form, but only equality is
+        // ever consumed (`game_state_history` containment and the
+        // repetition count), so the change is behaviour-preserving; the
+        // `total_actions` gate verifies it end to end.
         struct SimpleHasher(u64);
         impl Hasher for SimpleHasher {
+            #[inline]
             fn write(&mut self, bytes: &[u8]) {
                 for &b in bytes {
                     self.0 = self.0.wrapping_mul(31).wrapping_add(b as u64);
                 }
+            }
+            #[inline]
+            fn write_u8(&mut self, i: u8) {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(i as u64);
+            }
+            #[inline]
+            fn write_u16(&mut self, i: u16) {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(i as u64);
+            }
+            #[inline]
+            fn write_u32(&mut self, i: u32) {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(i as u64);
+            }
+            #[inline]
+            fn write_u64(&mut self, i: u64) {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(i);
+            }
+            #[inline]
+            fn write_usize(&mut self, i: usize) {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(i as u64);
+            }
+            #[inline]
+            fn write_i8(&mut self, i: i8) {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(i as u8 as u64);
+            }
+            #[inline]
+            fn write_i16(&mut self, i: i16) {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(i as u16 as u64);
+            }
+            #[inline]
+            fn write_i32(&mut self, i: i32) {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(i as u32 as u64);
+            }
+            #[inline]
+            fn write_i64(&mut self, i: i64) {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(i as u64);
+            }
+            #[inline]
+            fn write_isize(&mut self, i: isize) {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(i as usize as u64);
             }
             fn finish(&self) -> u64 {
                 self.0

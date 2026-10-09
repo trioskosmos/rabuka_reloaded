@@ -446,7 +446,7 @@ entry_index: u8::try_from(idx).unwrap(),
                         #[cfg(not(feature = "no_std"))]
                         trigger_mask: Default::default(),
                         #[cfg(not(feature = "no_std"))]
-                        trigger_position_mask: Default::default(),
+                        trigger_position_mask: Default::default(), #[cfg(not(feature = "no_std"))] activation_overlay: Default::default(),
                     }),
                     ability_index: 0,
                     card_id: None,
@@ -551,7 +551,7 @@ entry_index: u8::try_from(idx).unwrap(),
                 #[cfg(not(feature = "no_std"))]
                 trigger_mask: Default::default(),
                 #[cfg(not(feature = "no_std"))]
-                trigger_position_mask: Default::default(),
+                trigger_position_mask: Default::default(), #[cfg(not(feature = "no_std"))] activation_overlay: Default::default(),
             }),
             ability_index: 0,
             card_id: None,

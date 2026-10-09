@@ -48,8 +48,11 @@ codegen-units = 1
 #   rustup component add llvm-tools-preview          # once, for llvm-profdata
 #   RUSTFLAGS="-Cprofile-generate=$env:TEMP\pgo" cargo build --release --bin sim_bench
 #   $env:SIM_BENCH_WARMUP_SECS="0"                 # warmup seeds hit a
-#   & .\target\release\sim_bench.exe --games 1000 --repeat 2 --seed 1 --policy random --jobs 4   # pathological (deck,seed) pair
-#   llvm-profdata merge -o $env:TEMP\pgo\merged.profdata $env:TEMP\pgo\*.profraw
+#   $env:LLVM_PROFILE_FILE="$env:TEMP\pgo\pgo-%p.profraw"   # REQUIRED: with
+#   & .\target\release\sim_bench.exe --games 1000 --repeat 2 --seed 1 --policy random --jobs 4   # --jobs>1 every worker writes the SAME default .profraw and clobbers the others; %p (PID) gives each its own file
+#   llvm-profdata merge -o $env:TEMP\pgo\merged.profdata $env:TEMP\pgo\pgo-*.profraw
+#   Remove-Item Env:LLVM_PROFILE_FILE               # don't instrument the optimized build
+#   cargo clean                                    # REQUIRED: else cargo reuses dependency objects cached under the identical -Cprofile-use=<path> RUSTFLAGS and thin-LTO fails on conflicting ProfileSummary module flags
 #   RUSTFLAGS="-Cprofile-use=$env:TEMP\pgo\merged.profdata" cargo build --release --bin sim_bench
 lto = "thin"
 # `panic = "abort"` removes the unwinding tables and landing pads from every

@@ -91,6 +91,18 @@ pub fn ability_activation_gate_holds(
         return true;
     };
     let ctx = crate::ability::condition::ConditionContext::new(game_state);
+    // The position overlay is a pure function of the ability's
+    // own data (activation condition + effect position), so the
+    // merged tree is cached on the `Ability` (see
+    // `activation_overlay`) instead of being deep-cloned here on
+    // every action-generation pass — a `Condition` is a recursive
+    // tree with a `Box<ConditionCommon>` per node, so the clone
+    // was 10-30 allocations per activatable ability per pass.
+    #[cfg(not(feature = "no_std"))]
+    if let Some(merged) = ability.activation_overlay_condition() {
+        return ctx.evaluate_condition(merged.as_ref());
+    }
+    #[cfg(feature = "no_std")]
     if crate::ability::resolver::AbilityResolver::condition_needs_position_overlay(
         activation_condition,
         effect,
@@ -102,7 +114,7 @@ pub fn ability_activation_gate_holds(
         } else if let Some(act_pos) = effect.activation_position_any() {
             merged_cond.set_activation_position(act_pos.to_string());
         }
-        return ctx.evaluate_condition(&merged_cond);
+        return ctx.evaluate_condition(merged_cond);
     }
     ctx.evaluate_condition(activation_condition)
 }

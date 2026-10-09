@@ -858,6 +858,8 @@ fn commit_constant_results(
     pub fn recalculate_constants(&mut self) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("recalculate_constants");
+        #[cfg(feature = "alloc_tracker")]
+        let _alloc_trace = crate::alloc_counter::maybe_arm("recalculate_constants");
         tdbg!("RC:0 ENTERED");
         // Measures the PROLOGUE — scratch takes, the `entry_positions` map, and the
         // `mods.constant_*` clears — which the `recalc::collect` timer starts after and so
@@ -1820,37 +1822,45 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
                     match op {
                         "add" => {
                             *expected.entry(cid).or_insert(0) += value;
-                            cost_sources.push(crate::core::game_modifiers::BonusSource {
-                                source_card_id: cid,
-                                ability_text: ui_text(&effect.text),
-                                target_card_id: cid,
-                                amount: value,
-                                color: None,
-                                kind: ui_kind("cost"),
-                            });
+                            // Display-only attribution (constant_cost_sources
+                            // is read solely by game/display.rs).
+                            if crate::core::runtime_flags::action_display_enabled() {
+                                cost_sources.push(crate::core::game_modifiers::BonusSource {
+                                    source_card_id: cid,
+                                    ability_text: ui_text(&effect.text),
+                                    target_card_id: cid,
+                                    amount: value,
+                                    color: None,
+                                    kind: ui_kind("cost"),
+                                });
+                            }
                         }
                         "subtract" => {
                             *expected.entry(cid).or_insert(0) -=
                                 crate::constants::saturate_i16(i32::from(value));
-                            cost_sources.push(crate::core::game_modifiers::BonusSource {
-                                source_card_id: cid,
-                                ability_text: ui_text(&effect.text),
-                                target_card_id: cid,
-                                amount: value.saturating_neg(),
-                                color: None,
-                                kind: ui_kind("cost"),
-                            });
+                            if crate::core::runtime_flags::action_display_enabled() {
+                                cost_sources.push(crate::core::game_modifiers::BonusSource {
+                                    source_card_id: cid,
+                                    ability_text: ui_text(&effect.text),
+                                    target_card_id: cid,
+                                    amount: value.saturating_neg(),
+                                    color: None,
+                                    kind: ui_kind("cost"),
+                                });
+                            }
                         }
                         "set" => {
                             expected_set.insert(cid, value);
-                            cost_sources.push(crate::core::game_modifiers::BonusSource {
-                                source_card_id: cid,
-                                ability_text: ui_text(&effect.text),
-                                target_card_id: cid,
-                                amount: value,
-                                color: None,
-                                kind: ui_kind("cost_set"),
-                            });
+                            if crate::core::runtime_flags::action_display_enabled() {
+                                cost_sources.push(crate::core::game_modifiers::BonusSource {
+                                    source_card_id: cid,
+                                    ability_text: ui_text(&effect.text),
+                                    target_card_id: cid,
+                                    amount: value,
+                                    color: None,
+                                    kind: ui_kind("cost_set"),
+                                });
+                            }
                         }
                         _ => {}
                     }
@@ -2513,7 +2523,18 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
         // being PERFORMED contributed nothing while the same card in the success zone
         // did. `live_card_zone` holds the card currently performing, so the same
         // effect must be evaluated there too.
-        let mut entries: Vec<(i16, usize, crate::card::AbilityEffect)> = Vec::new();
+        //
+        // The resolved `Arc<Ability>` is stored instead of a cloned
+        // `AbilityEffect`: the effect is then borrowed from the Arc in
+        // the application loop below, which is disjoint from the `&mut
+        // self` that applies the bonus, so the borrow that forced the
+        // collect-up-front still holds — but a refcount bump replaces a
+        // deep `AbilityEffect` clone (whose `compound`/`effect_steps`
+        // Box/Vec fields allocate when present), and a `SmallVec` keeps
+        // the common ≤4-entry board on the stack instead of allocating
+        // a `Vec` buffer every pass.
+        let mut entries: SmallVec<[(i16, usize, crate::Arc<crate::card::Ability>); 4]> =
+            SmallVec::new();
         for (player_idx, zone_cards) in [
             (0usize, &self.player1.live_card_zone.cards),
             (0usize, &self.player1.success_live_card_zone.cards),
@@ -2534,14 +2555,17 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
                     if !is_constant {
                         continue;
                     }
-                    if let Some(effect) = ability.effect.as_ref() {
-                        entries.push((*cid, player_idx, (**effect).clone()));
+                    if ability.effect.is_some() {
+                        entries.push((*cid, player_idx, ability));
                     }
                 }
             }
         }
 
-        for (cid, player_idx, effect) in &entries {
+        for (cid, player_idx, ability) in &entries {
+            let Some(effect) = ability.effect.as_ref() else {
+                continue;
+            };
             let prev_activating = self.activating_card;
             self.activating_card = Some(*cid);
             let self_player = match player_idx {
@@ -2723,16 +2747,24 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
                                 .success_zone_blade_bonuses
                                 .entry(target_id)
                                     .or_insert(0) += amount;
-                            self.mods.success_zone_blade_sources.push(
-                                crate::core::game_modifiers::BonusSource {
-                                    source_card_id: cid,
-                                    ability_text: ui_text(&effect.text),
-                                    target_card_id: target_id,
-                                    amount,
-                                    color: None,
-                                    kind: ui_kind("blade"),
-                                },
-                            );
+                            // Display-only attribution (read solely by
+                            // game/display.rs). The bonus HashMaps above are
+                            // the engine-readable data; the source Vec is not,
+                            // so skip the push — and its Vec growth — when the
+                            // UI is off, exactly as the stage-constant path's
+                            // DisplaySources already does.
+                            if crate::core::runtime_flags::action_display_enabled() {
+                                self.mods.success_zone_blade_sources.push(
+                                    crate::core::game_modifiers::BonusSource {
+                                        source_card_id: cid,
+                                        ability_text: ui_text(&effect.text),
+                                        target_card_id: target_id,
+                                        amount,
+                                        color: None,
+                                        kind: ui_kind("blade"),
+                                    },
+                                );
+                            }
                         }
                     }
                     "heart" => {
@@ -2753,16 +2785,21 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
                                     .or_default()
                                     .entry(color_str.to_string())
                                     .or_insert(0) += per_color;
-                                self.mods.success_zone_heart_sources.push(
-                                    crate::core::game_modifiers::BonusSource {
-                                        source_card_id: cid,
-                                        ability_text: ui_text(&effect.text),
-                                        target_card_id: target_id,
-                                        amount: per_color,
-                                        color: Some(color_str.to_string()),
-                                        kind: ui_kind("heart"),
-                                    },
-                                );
+                                // Display-only; see the blade arm above.
+                                // Gating also skips the per-color
+                                // `color_str.to_string()` allocation.
+                                if crate::core::runtime_flags::action_display_enabled() {
+                                    self.mods.success_zone_heart_sources.push(
+                                        crate::core::game_modifiers::BonusSource {
+                                            source_card_id: cid,
+                                            ability_text: ui_text(&effect.text),
+                                            target_card_id: target_id,
+                                            amount: per_color,
+                                            color: Some(color_str.to_string()),
+                                            kind: ui_kind("heart"),
+                                        },
+                                    );
+                                }
                             }
                         }
                     }
@@ -2823,16 +2860,19 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
                             self.mods
                                 .success_zone_score_bonuses
                                 .insert(target_id, value);
-                            self.mods.success_zone_score_sources.push(
-                                crate::core::game_modifiers::BonusSource {
-                                    source_card_id: cid,
-                                    ability_text: ui_text(&effect.text),
-                                    target_card_id: target_id,
-                                    amount: value,
-                                    color: None,
-                                    kind: ui_kind("score_set"),
-                                },
-                            );
+                            // Display-only attribution; see the blade arm.
+                            if crate::core::runtime_flags::action_display_enabled() {
+                                self.mods.success_zone_score_sources.push(
+                                    crate::core::game_modifiers::BonusSource {
+                                        source_card_id: cid,
+                                        ability_text: ui_text(&effect.text),
+                                        target_card_id: target_id,
+                                        amount: value,
+                                        color: None,
+                                        kind: ui_kind("score_set"),
+                                    },
+                                );
+                            }
                         }
                         _ => {
                             self.mods.add_score_modifier(target_id, value);
@@ -2841,16 +2881,19 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
                                 .success_zone_score_bonuses
                                 .entry(target_id)
                                 .or_insert(0) += value;
-                            self.mods.success_zone_score_sources.push(
-                                crate::core::game_modifiers::BonusSource {
-                                    source_card_id: cid,
-                                    ability_text: ui_text(&effect.text),
-                                    target_card_id: target_id,
-                                    amount: value,
-                                    color: None,
-                                    kind: ui_kind("score"),
-                                },
-                            );
+                            // Display-only attribution; see the blade arm.
+                            if crate::core::runtime_flags::action_display_enabled() {
+                                self.mods.success_zone_score_sources.push(
+                                    crate::core::game_modifiers::BonusSource {
+                                        source_card_id: cid,
+                                        ability_text: ui_text(&effect.text),
+                                        target_card_id: target_id,
+                                        amount: value,
+                                        color: None,
+                                        kind: ui_kind("score"),
+                                    },
+                                );
+                            }
                         }
                     }
                 }

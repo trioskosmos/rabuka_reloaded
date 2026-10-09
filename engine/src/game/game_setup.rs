@@ -1837,6 +1837,9 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     let reduction = {
                         #[cfg(not(feature = "no_std"))]
                         let _t = crate::timer::Timer::start("gen::cost_reduction");
+                        #[cfg(feature = "alloc_tracker")]
+                        let _alloc_trace =
+                            crate::alloc_counter::maybe_arm("gen_cost_reduction");
                         crate::ability::util::calculate_play_cost_reduction(
                             &active_player.stage,
                             &active_player.success_live_card_zone.cards,
@@ -1867,6 +1870,9 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     let (area_candidates, has_any_available) = {
                         #[cfg(not(feature = "no_std"))]
                         let _t = crate::timer::Timer::start("gen::area_candidates");
+                        #[cfg(feature = "alloc_tracker")]
+                        let _alloc_trace =
+                            crate::alloc_counter::maybe_arm("gen_area_candidates");
                         area_candidates_for(
                             game_state,
                             active_player,
