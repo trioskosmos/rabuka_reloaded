@@ -1818,11 +1818,15 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 )
             });
 
+        // Loop-invariant: both depend only on `active_player`, not on the
+        // hand card, so they are computed once instead of per hand card.
+        let hand_count = active_player.hand.cards.len();
+        let active_energy_count = active_player.energy_zone.active_count();
+
         for (hand_index, card_id) in active_player.hand.cards.iter().enumerate() {
             if let Some(card) = game_state.card_database.get_card(*card_id) {
                 if card.is_member() && !card.is_live() {
                     let card_cost = card.cost.unwrap_or(0);
-                    let hand_count = active_player.hand.cards.len();
                     let reduction = {
                         #[cfg(not(feature = "no_std"))]
                         let _t = crate::timer::Timer::start("gen::cost_reduction");
@@ -1837,7 +1841,6 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         )
                     };
                     let effective_cost = card_cost.saturating_sub(reduction);
-                    let active_energy_count = active_player.energy_zone.active_count();
 
                     // Per-area baton-touch protection. The restriction walk is
                     // pre-resolved above; this is only the group test, which is
