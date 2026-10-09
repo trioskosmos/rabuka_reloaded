@@ -638,7 +638,10 @@ let actual = if condition.get_member_has_resource_under() == Some(true) {
             } else {
                 stage_cards
             };
-            let mut name_counts: HashMap<String, u8> = HashMap::default();
+            // `get_card_names` borrows from `card_db`, so the tally
+            // keys are `&str` into the database — no per-name clone
+            // on this per-stage-card scan.
+            let mut name_counts: HashMap<&str, u8> = HashMap::default();
             for &cid in &stage_cards {
                 if cid == -1 {
                     continue;
@@ -916,7 +919,7 @@ pub(crate) fn count_cards_with_filters(
             "cost" => self.count_distinct_cost(&matching, None).u8_count(),
             "group_name" => util::max_distinct_group_names(card_db, &matching, group_names).u8_count(),
             _ => {
-                let name_sets: Vec<Vec<String>> = matching
+                let name_sets: Vec<Vec<&str>> = matching
                     .iter()
                     .map(|&cid| card_db.get_card_names(cid))
                     .collect();

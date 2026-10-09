@@ -20,6 +20,21 @@ engine slowdowns wearing a disguise. Random play has no such coupling.
     cargo build --release --bin sim_bench
     .\target\release\sim_bench.exe --deck "5CP3Z idou" --games 500 --repeat 3 --seed 1 --policy random --jobs 1
 
+**The canonical build is the PGO build** (landed 2026-10-09,
++47.7% jobs=1 / +47.0% jobs=256 — the largest single lever
+measured; the profile is committed at `engine/pgo/merged.profdata`):
+
+    RUSTFLAGS="-Cprofile-use=pgo/merged.profdata" cargo build --release --bin sim_bench
+
+LLVM matches profiles by function hash, so an engine edit
+degrades gracefully (edited functions lose their profile, the
+rest keep it), but re-run the pipeline after significant
+engine changes — the retraining recipe is in `engine/Cargo.toml`
+under `[profile.release]`. Training corpus: all 13 decks,
+26,000 random-policy games, 4.29M actions, with
+`SIM_BENCH_WARMUP_SECS=0` (the multi-deck warmup seeds hit a
+pathological (deck, seed) pair — see §4.6).
+
 **Gate on allocation counts, not games per second.** The machine runs
 other work in the background; the noise floor is **±12% and
 time-varying** (same binary, same seed, same `total_actions`: 78,003 ·
@@ -216,6 +231,56 @@ split, deterministic `total_actions`).
 **Parallelism (§6) is the largest single result** and is not engine
 work: `--jobs 256` buys 6.8× (the throughput peak; 128 is 6.4×).
 
+**2026-10-09 (this session — five landed levers, cumulative
++80% jobs=1 / +74% jobs=256, every one gated on
+`total_actions` byte-identical and 4364/4364 tests):**
+
+1. **`fast_alloc` promoted to a default feature (+11.5%
+   jobs=1, +10.6% jobs=256).** Re-measured on the current
+   tree before believing the old +13%: interleaved in-process
+   A/B, pool 147,780 vs base 132,556 mean aps (jobs=1),
+   817,449 vs 739,156 (jobs=256). The full suite passes with
+   the pool active (4364/4364, 4.29s run), which was the
+   gate for default-on. `no_std` ports are unaffected — they
+   declare their own allocators and never enable the feature.
+2. **`lto = "thin"` + `codegen-units = 1` landed (+5.6%
+   jobs=1, +4.2% jobs=256).** The catalogue's blocker was
+   that the full suite "could not be run to completion under
+   LTO" — it did not reproduce: 4364/4364 in 4.30s under the
+   LTO build (the 8m37s is the ~27 bins plus the harness
+   target compiling with LTO, not a failure). No high-`--jobs`
+   regression (unlike `lto = "fat"`, which was measured and
+   rejected).
+3. **`get_card_names` → `Vec<&str>` (−71,301 allocs per
+   200-game bench, −2.9%; +1.7% jobs=1).** The 12 call sites
+   in the condition layer were cloning every name part of every
+   candidate card. `max_distinct_names`/`_greedy` became
+   generic over `AsRef<str>`; the one site that must own the
+   strings (`resolve_name_fragments`, feeding `CardFilter`,
+   whose field type is shared with the effect's printed
+   `card_names`) maps `String::from` at its boundary — a cold
+   path.
+4. **Mechanical batch (+1.1% jobs=1, −14,940 allocs):**
+   `ResumeSnapshot::capture`'s nine `current_entry()` probes
+   collapsed to one (every field it reads is `Copy` except
+   `player_id`); `entry_player_or_p1` returns `&str` borrowed
+   from the snapshot instead of cloning the `String` (all four
+   consumers take `&str`); `take_cards_from_standard_zone`
+   borrows the zone slice via `zone_cards` instead of cloning
+   it through `zone_card_ids` (NLL releases the borrow before
+   the first `&mut player` use); `execute_modify_required_hearts_standard`'s
+   two per-call `Vec`s became `SmallVec`s.
+5. **PGO, corpus-trained (+47.7% jobs=1, +47.0% jobs=256).**
+   Trained on the full 13-deck corpus (26,000 games, 4.29M
+   actions) with `SIM_BENCH_WARMUP_SECS=0`; the profile is
+   committed at `engine/pgo/merged.profdata` and the build
+   command is in §1. A single-deck profile measured +43.1% —
+   the corpus profile is both faster and more general.
+
+Also measured and **rejected** this session: `target-cpu=native`
+(+0.8% over pool+LTO — noise; the workload is branch-heavy
+pointer-chasing, not vectorizable).
+
 **2026-10-09 (the pool allocator, +13% — the single largest result of
 the session):** the allocator was 11.5% of elapsed time (7.3M
 allocations, 850 MB per 500-game bench) — the largest removable share
@@ -294,23 +359,23 @@ per-call-site Scale figures were worth ~10× less than estimated.
 | item | est. | status |
 | --- | --- | --- |
 | `waited_stage_cards` → `SmallVec<[i16;3]>` | ~3 | ✓ landed |
-| `find_printed_ability` double-resolve | ~1 | open (1 line) |
+| `find_printed_ability` double-resolve | ~1 | ✓ landed (returns the `Arc` already in hand) |
 | `ChoiceRoute` stringification ×2 | ~2 | open (trivial) |
-| `requeue_remaining_after_choice` → `into_iter()` | ~32 × steps | open |
+| `requeue_remaining_after_choice` → `into_iter()` | ~32 × steps | ✓ landed (slices `queued[appended_from..]`, no `tail` Vec) |
 | lazy `apply_modify_cost_to_ability_cost` clone | ~32/no-cost ability | open |
-| `execute_modify_required_hearts_standard` → slice | 1+N/heart mod | open |
-| `post_cost_position_gate` → no `Vec` | 1/resolution | open |
-| `ResumeSnapshot::capture` — 10 lookups → 1 | 2/choice answer | open |
+| `execute_modify_required_hearts_standard` → slice | 1+N/heart mod | ✓ landed (both Vecs → `SmallVec`, 2026-10-09) |
+| `post_cost_position_gate` → no `Vec` | 1/resolution | ✓ landed (`SmallVec<[Keyword;3]>`) |
+| `ResumeSnapshot::capture` — 10 lookups → 1 | 2/choice answer | ✓ landed (one probe; `entry_player_or_p1` borrows, 2026-10-09) |
 | `ResolveSnapshot` / `Zone::from_str` hoists | 0 (branches) | open |
-| `process_player_abilities_depth`'s `HashMap` → `SmallVec` | 1–2/drain | open |
-| `set_indices_waited/active` buffers | 3/multi-energy payment | open |
-| `performer_owned_ids` → three-zone scan | 1/performer | open |
-| `check_invalid_live_cards` → `SmallVec` | 2/`check_timing` | open |
-| `zone_card_ids`/`_occupied` → iterators | 2/zone query | open |
-| `get_zone_cards` and friends → borrow | 1/zone eval | open |
+| `process_player_abilities_depth`'s `HashMap` → `SmallVec` | 1–2/drain | ✓ landed (`SmallVec<[((i16,usize),u8);8]>`) |
+| `set_indices_waited/active` buffers | 3/multi-energy payment | open (callers' Vecs are empty-on-common-path) |
+| `performer_owned_ids` → three-zone scan | 1/performer | ✓ landed (`performer_owns` closure over three zones) |
+| `check_invalid_live_cards` → `SmallVec` | 2/`check_timing` | ✗ closed — measured no-alloc: `collect()` on a `filter_map` (lower bound 0) does not pre-allocate, so the all-live/empty common path allocates nothing |
+| `zone_card_ids`/`_occupied` → iterators | 2/zone query | ✓ landed (the one caller borrows via `zone_cards`; `zone_card_ids` remains for API users) |
+| `get_zone_cards` and friends → borrow | 1/zone eval | ✓ landed (`zone_cards` returns `&[i16]`) |
 | `counted_by_any().to_vec()` → borrow | 1+N/card/count | open |
-| `Active` phase: parse once, `SmallVec` not `HashSet` | 1/Active phase | open |
-| `execute_performance_phase`'s `nhm_flat` + partition | 3/performer | open |
+| `Active` phase: parse once, `SmallVec` not `HashSet` | 1/Active phase | ✓ landed (`constant_blocked` parsed once into `SmallVec<[i16;8]>`; `all_card_ids` already a `SmallVec`) |
+| `execute_performance_phase`'s `nhm_flat` + partition | 3/performer | ✗ closed — `collect()` on an empty `need_heart_modifiers` map (the common case) allocates nothing |
 | `ArcStr::from(&str)` single-alloc | 1/decode | ✓ landed at the hot site (the area names, via `LazyLock`); other sites unaudited |
 | `player_prefix()` → `player_prefix_id()` at 12 sites | 1/log line | open |
 | `can_activate_effect` → `Option<&Ability>` pointer token | ~50% of condition evals | open (also Phase 2.7) |
@@ -327,8 +392,8 @@ per-call-site Scale figures were worth ~10× less than estimated.
 
 | item | est. impact | effort | gate |
 | --- | --- | --- | --- |
-| **`ability_master_id()` → `Option<&str>`** — 199 call sites × 1 alloc + up to 12 zone scans on the fallback; the largest single allocation count in the catalogue | high | low | `total_actions` + a debug-assert old-vs-new player-resolution diff over one full run |
-| **`get_card_names` allocation-free + `normalize_name` borrowing** — 4 allocs × 67 call sites × per-candidate | high | medium | exhaustive corpus equivalence test |
+| **`ability_master_id()` → `Option<&str>`** — 199 call sites × 1 alloc + up to 12 zone scans on the fallback; the largest single allocation count in the catalogue | high | low | `total_actions` + a debug-assert old-vs-new player-resolution diff over one full run | ✓ landed (borrowed, 2026-10-09 or earlier — verify against source) |
+| **`get_card_names` allocation-free + `normalize_name` borrowing** — 4 allocs × 67 call sites × per-candidate | high | medium | exhaustive corpus equivalence test | ✓ landed 2026-10-09 (`Vec<&str>`, −71,301 allocs/200 games, 4364/4364) |
 | `store_pending_choice` gating | ~20/choice offer | low | `total_actions` + grep log assertions |
 | `filter_subset` / `CardFilter::from_effect` single-bind | 200–300 dependent loads; 10 probes → 1 | medium | `total_actions` + full suite |
 | `execute_move_cards` borrow its 8 `String`s | ~9/MoveCards | low | `total_actions` |
@@ -355,25 +420,45 @@ per-call-site Scale figures were worth ~10× less than estimated.
    ~12 raw writers). Leave `active_energy_count` alone: its 4.1%
    ceiling did not move, and that number governs the whole idea.
 
-### 4.5 Build configuration (Phase 4 — mostly unmeasured on this box; the wall-clock instrument is unreliable here)
+### 4.5 Build configuration
 
-`[profile.bench]` (free, and it is a measurement bug) → the three
-cross-crate `#[inline]`s → `bench_no_log` (decide the canonical command
-explicitly) → `panic = "abort"` (gate on `bot_arena`) → PGO if the
-machine ever becomes measurable.
+**Landed 2026-10-09:** `lto = "thin"` + `codegen-units = 1`
+(+5.6% jobs=1, +4.2% jobs=256 — the suite-completion blocker
+did not reproduce; 4364/4364 under the LTO build) and **PGO**
+(+47.7% jobs=1, +47.0% jobs=256, profile committed at
+`engine/pgo/merged.profdata`, build command in §1). Both are
+in `Cargo.toml` / the canonical command respectively.
+`target-cpu=native` was measured and rejected (+0.8% — noise;
+the workload is branch-heavy pointer-chasing, not
+vectorizable). Still open: `[profile.bench]` (free, and it is
+a measurement bug) → the three cross-crate `#[inline]`s →
+`bench_no_log` (decide the canonical command explicitly) →
+`panic = "abort"` (gate on `bot_arena`).
 
-**`lto = "thin"` + `codegen-units = 1` was measured 2026-10-09 with the
-pool active and gave +5.6%** (909,674 / 898,071 / 868,727 aps at
-jobs=256 vs 844,883 pool-only, `total_actions=328173` byte-identical),
-but it doubles build time (~30s → ~59s) and **the full test suite
-could not be run to completion under LTO here** — the crate compiles
-~27 bins plus the harness test target, all with LTO, and the run kept
-aborting — so it is NOT set in `Cargo.toml`; the measurement is
-recorded in the `Cargo.toml` comment for whoever wants to re-measure
-with the 4354/4354-tests gate. **`lto = "fat"` + `codegen-units = 1`
-was measured earlier and is not worth it** (+2–4% single-threaded,
-inside noise, appeared to cost throughput at high `--jobs`;
-deliberately uncommitted).
+### 4.6 Multi-deck warmup pathology (pre-existing, open — engine bug, not perf)
+
+`sim_bench`'s warmup loop (the 10s pre-sweep that runs 4
+games per deck per pass, seeds
+`game_seeds(seed ^ 0xA5A5A5A5, pass*10000 + deck_idx*10 + w + 1)`)
+**hangs on the full 13-deck corpus**: a run with the default
+warmup never completes (killed at 15 min, 105 s+ CPU and
+counting), while the same binary with
+`SIM_BENCH_WARMUP_SECS=0` finishes the whole corpus in
+0.57 s. Reproduces on the **unmodified pre-session binary**
+(`sim_bench_base`, no pool, no LTO, no code changes), so it
+is not a regression. Passes 1–16 × all decks × all 4 warmup
+seeds probed clean (per-game `--seed` replication of the
+warmup seed math, 3 s watchdog each); the pathological
+(pass, deck, w) is in passes 17–63 and was not isolated.
+The game loop's 600-iteration cap bounds *iterations*, not
+*per-iteration cost*, so this is either a game whose
+iterations are pathologically expensive or an unbounded
+internal loop (e.g. in `auto_advance_one` /
+`execute_and_settle`'s settle loop) that the cap does not
+bound. Worth a dedicated investigation: a random-policy game
+that never terminates can hang a real match, not just the
+bench. Workaround for corpus-wide runs:
+`SIM_BENCH_WARMUP_SECS=0`.
 
 ## 5. Closed — do not retry without re-measuring
 

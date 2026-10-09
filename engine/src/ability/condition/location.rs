@@ -566,7 +566,7 @@ impl<'a> ConditionContext<'a> {
             _ => {
                 // Collect each card's possible names (multi-name cards contribute
                 // all constituent names from get_card_names).
-                let name_sets: Vec<Vec<String>> = cards
+                let name_sets: Vec<Vec<&str>> = cards
                     .iter()
                     .map(|&cid| card_db.get_card_names(cid))
                     .filter(|ns| !ns.is_empty())
@@ -1099,7 +1099,7 @@ impl<'a> ConditionContext<'a> {
                     compare_counts(operator, count, count_threshold)
                 }
                 _ => {
-                    let mut name_sets: Vec<Vec<String>> = Vec::new();
+                    let mut name_sets: Vec<Vec<&str>> = Vec::new();
                     for &cid in &combined {
                         if !eligible(cid) {
                             continue;

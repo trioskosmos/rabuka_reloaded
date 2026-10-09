@@ -58,36 +58,36 @@ impl ResumeSnapshot {
     /// computation previously smeared across the three branches, with the
     /// single CHOICE_RESUME_BRANCH debug line.
     fn capture(game_state: &mut GameState, had_pending_sequential: bool) -> (Self, ResumeOutcome) {
-        let cost_was_paid = game_state.ability_queue.current_cost_paid();
-        let effect_started = game_state
-            .ability_queue
-            .current_entry()
-            .is_some_and(|e| e.effect_started);
+        // One probe of the current entry. Every field the snapshot
+        // reads is `Copy` except `player_id`, and nothing between
+        // the old nine `current_entry()` calls mutated the queue,
+        // so a single match yields all of them with identical
+        // semantics. (`current_entry()` itself is allocation-free —
+        // a state match plus a `Vec::get` — but it was paying that
+        // nine times per choice answer, 115k times a bench.)
+        let entry = game_state.ability_queue.current_entry();
+        let cost_was_paid = entry.is_some_and(|e| e.cost_paid);
+        let effect_started = entry.is_some_and(|e| e.effect_started);
         // Capture key and player_id BEFORE complete_current() removes the entry.
         // Numeric key: (card_id as u8) << 16 | ability_index as u8
-        let just_completed_key: Option<u32> =
-            game_state.ability_queue.current_entry().and_then(|e| {
-                let cid = e.card_id?;
-                let idx = e.ability_index;
-                Some((u32::try_from(cid).ok()? << 16) | u32::try_from(idx).ok()?)
-            });
-        let entry_player_id = game_state
-            .ability_queue
-            .current_entry()
-            .map(|e| e.player_id.clone());
+        let just_completed_key = entry.and_then(|e| {
+            let cid = e.card_id?;
+            let idx = e.ability_index;
+            Some((u32::try_from(cid).ok()? << 16) | u32::try_from(idx).ok()?)
+        });
+        let entry_player_id = entry.map(|e| e.player_id.clone());
         // Capture each_time trigger info before entry is lost
-        let cost_entry_trigger = game_state
-            .ability_queue
-            .current_entry()
-            .map(|e| e.trigger_type.clone());
-        let cost_entry_card_id = game_state
-            .ability_queue
-            .current_entry()
-            .and_then(|e| e.card_id);
-        let cost_entry_opt_result = game_state
-            .ability_queue
-            .current_entry()
-            .and_then(|e| e.optional_cost_result);
+        // (`AbilityTrigger` is a fieldless enum: the clone is a
+        // register copy, but the type does not derive `Copy`).
+        let cost_entry_trigger = entry.map(|e| e.trigger_type.clone());
+        let cost_entry_card_id = entry.and_then(|e| e.card_id);
+        let cost_entry_opt_result = entry.and_then(|e| e.optional_cost_result);
+        let optional_skipped = entry.is_some_and(|e| {
+            e.cost_paid
+                && e.optional_cost_result == Some(false)
+                && e.choice_card_no == Some(crate::ability::types::ChoiceRoute::OptionalCost)
+        });
+        let chose_to_pay = entry.is_some_and(|e| e.optional_cost_result == Some(true));
         // Save activating_card before clearing — it must be restored when
         // the ability continues processing (needs_reprocess), otherwise
         // gain_resource etc. in nested sequentials lose their target.
@@ -96,11 +96,6 @@ impl ResumeSnapshot {
         game_state.activating_card = None;
         game_state.activating_ability_index = None;
 
-        let optional_skipped = game_state.ability_queue.current_entry().is_some_and(|e| {
-            e.cost_paid
-                && e.optional_cost_result == Some(false)
-                && e.choice_card_no == Some(crate::ability::types::ChoiceRoute::OptionalCost)
-        });
         // Re-check pending commands — they may have been cleared by the choice
         // handler (e.g. optional draw skip), leaving the sequential stranded.
         // Only fire when effect hasn't started yet (the skip is between optional
@@ -113,10 +108,6 @@ impl ResumeSnapshot {
         let effect_ready = cost_was_paid && !had_pending_sequential && !effect_started;
         // When an optional choice inside a sequential is resolved with "pay",
         // re-process so remaining pending actions can execute.
-        let chose_to_pay = game_state
-            .ability_queue
-            .current_entry()
-            .is_some_and(|e| e.optional_cost_result == Some(true));
         let needs_reprocess = effect_ready
             || (cost_was_paid && !effect_started && had_pending_sequential && chose_to_pay);
         log::debug!("[CHOICE_RESUME_BRANCH] cost_paid={} effect_started={} had_pending={} optional_skipped={} pending_cleared={} effect_ready={} chose_to_pay={} needs_reprocess={}",
@@ -1238,8 +1229,14 @@ impl super::TurnEngine {
 
     /// `entry_player_id.clone().unwrap_or_else(|| "p1")` appears at every
     /// completion site below. ONE fallback for "no entry, assume p1".
-    fn entry_player_or_p1(entry_player_id: &Option<String>) -> String {
-        entry_player_id.clone().unwrap_or_else(|| "p1".to_string())
+    /// The completing entry's player, or player 1 when the snapshot
+    /// carries none. Borrows the snapshot's `String` instead of
+    /// cloning it — every consumer takes `&str`, and this ran once
+    /// per choice answer (a `String` clone per call, on top of the
+    /// capture clone, for a value that is always "p1"/"p2"/"player1"/
+    /// "player2").
+    fn entry_player_or_p1(entry_player_id: &Option<String>) -> &str {
+        entry_player_id.as_deref().unwrap_or("p1")
     }
 
     /// AutoAbility-choice fast path of `resume_queue_with_choice`: promote
@@ -1463,7 +1460,7 @@ impl super::TurnEngine {
         game_state.clear_effect_tracking();
         let player_id = Self::entry_player_or_p1(&snap.entry_player_id);
         game_state.set_just_completed(snap.just_completed_key);
-        game_state.process_pending_auto_abilities(&player_id);
+        game_state.process_pending_auto_abilities(player_id);
         game_state.just_completed_ability_key = None;
         Self::clear_tracking_preserving_queued_triggers(game_state);
     }
@@ -1503,7 +1500,7 @@ impl super::TurnEngine {
             // Effect completed without sub-choice — process any newly
             // enqueued watcher abilities (e.g. each_time triggers).
             let player_id = Self::entry_player_or_p1(&snap.entry_player_id);
-            game_state.process_with_completed_key(snap.just_completed_key, &player_id);
+            game_state.process_with_completed_key(snap.just_completed_key, player_id);
         }
     }
 
@@ -1525,10 +1522,10 @@ impl super::TurnEngine {
             // Inline for batches of <= 4 cards, so no allocation in the common case.
             let moved = game_state.recently_moved_cards.clone().unwrap_or_default();
             game_state.set_just_completed(snap.just_completed_key);
-            game_state.trigger_auto_abilities_for_player_with_event(&player_id, &moved);
+            game_state.trigger_auto_abilities_for_player_with_event(player_id, &moved);
             game_state.just_completed_ability_key = None;
         }
-        game_state.process_with_completed_key(snap.just_completed_key, &player_id);
+        game_state.process_with_completed_key(snap.just_completed_key, player_id);
         Self::clear_tracking_preserving_queued_triggers(game_state);
     }
 
@@ -1553,14 +1550,14 @@ impl super::TurnEngine {
             let pid = Self::entry_player_or_p1(&snap.entry_player_id);
             if let Some(crate::game_state::AbilityTrigger::LiveStart) = snap.cost_entry_trigger {
                 if let Some(cid) = snap.cost_entry_card_id {
-                    game_state.trigger_each_time_for_member(&pid, crate::triggers::LIVE_START, cid);
+                    game_state.trigger_each_time_for_member(pid, crate::triggers::LIVE_START, cid);
                 }
             } else if let Some(crate::game_state::AbilityTrigger::LiveSuccess) =
                 snap.cost_entry_trigger
             {
                 if let Some(cid) = snap.cost_entry_card_id {
                     game_state.trigger_each_time_for_member(
-                        &pid,
+                        pid,
                         crate::triggers::LIVE_SUCCESS,
                         cid,
                     );

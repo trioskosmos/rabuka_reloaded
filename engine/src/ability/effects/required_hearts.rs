@@ -231,16 +231,22 @@ impl AbilityResolver {
         target: &str,
         effect_text: &str,
     ) -> Result<(), String> {
-        let colors = if heart_colors.is_empty() {
-            vec!["heart00".to_string()]
-        } else {
-            heart_colors.to_vec()
-        };
-        let card_ids: Vec<i16> = {
+        // Both collections were `Vec`s built per call: the colors
+        // a `to_vec` of the effect's printed slice (plus one
+        // `String` per color), the target's live cards a full
+        // clone of the zone. Effects print a handful of colors and
+        // a live zone holds a couple of cards, so SmallVecs hold
+        // both inline — no heap on this path at all.
+        let mut color_buf: smallvec::SmallVec<[&str; 4]> =
+            heart_colors.iter().map(String::as_str).collect();
+        if color_buf.is_empty() {
+            color_buf.push("heart00");
+        }
+        let card_ids: smallvec::SmallVec<[i16; 2]> = {
             let player = gs.resolve_target_player_mut(target);
-            player.live_card_zone.cards.to_vec()
+            player.live_card_zone.cards.iter().copied().collect()
         };
-        for hc in &colors {
+        for hc in &color_buf {
             let color = crate::card::parse_heart_color(hc);
             for card_id in &card_ids {
                 let modifier_value = match operation {

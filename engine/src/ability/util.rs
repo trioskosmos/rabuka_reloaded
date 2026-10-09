@@ -1225,7 +1225,7 @@ pub struct DistinctNamesResult {
 /// HashSet per node) and the >12-card greedy fallback that provably
 /// undercounted. Greedy survives only as a safety net for pathological
 /// universes (> 128 unique names, where the bitmask no longer fits).
-pub fn max_distinct_names(name_sets: &[Vec<String>]) -> DistinctNamesResult {
+pub fn max_distinct_names<S: AsRef<str>>(name_sets: &[Vec<S>]) -> DistinctNamesResult {
     if name_sets.is_empty() {
         return DistinctNamesResult {
             distinct: 0,
@@ -1249,7 +1249,7 @@ pub fn max_distinct_names(name_sets: &[Vec<String>]) -> DistinctNamesResult {
         let mut mask = 0u128;
         for name in names {
             let next = universe_len;
-            let id = *ids.entry(name.as_str()).or_insert_with(|| {
+            let id = *ids.entry(name.as_ref()).or_insert_with(|| {
                 universe_len += 1;
                 next
             });
@@ -1323,13 +1323,13 @@ fn prune_dominated(masks: &mut Vec<u128>) {
 
 /// First-fit greedy fallback. Correct only when a collision-free assignment
 /// exists trivially; otherwise the distinct count can be an undercount.
-fn max_distinct_names_greedy(name_sets: &[Vec<String>]) -> DistinctNamesResult {
-    let mut seen: HashSet<String> = HashSet::default();
+fn max_distinct_names_greedy<S: AsRef<str>>(name_sets: &[Vec<S>]) -> DistinctNamesResult {
+    let mut seen: HashSet<&str> = HashSet::default();
     let mut had_collision = false;
     for names in name_sets {
         let mut picked = false;
         for name in names {
-            if seen.insert(name.clone()) {
+            if seen.insert(name.as_ref()) {
                 picked = true;
                 break;
             }
@@ -1337,7 +1337,7 @@ fn max_distinct_names_greedy(name_sets: &[Vec<String>]) -> DistinctNamesResult {
         if !picked {
             // All names already in set — take the first (already seen).
             if let Some(first) = names.first() {
-                seen.insert(first.clone());
+                seen.insert(first.as_ref());
             }
             had_collision = true;
         }
@@ -2932,9 +2932,13 @@ pub fn apply_distinct_filter(
 ///   Q278 (歩 + joint{歩,かのん,花帆}) = 2; Q279 (歩+かのん+花帆 + same joint) = 3,
 ///   because the joint's constituent names are already present as standalones.
 pub fn count_distinct_member_name_units(cards: &[i16], card_db: &CardDatabase) -> usize {
-    let mut single_names: HashSet<String> = HashSet::default();
+    // `get_card_names` borrows from `card_db`, so the dedup sets hold
+    // `&str` keys into the database instead of cloning every name into
+    // an owned `String` — one allocation per card on the per-member
+    // scan of 「名前の異なるメンバーカード1枚につき」 effects.
+    let mut single_names: HashSet<&str> = HashSet::default();
     let mut joint_names: HashSet<ArcStr> = HashSet::default();
-    let mut joints: Vec<Vec<String>> = Vec::new();
+    let mut joints: Vec<Vec<&str>> = Vec::new();
     for &id in cards {
         let Some(card) = card_db.get_card(id) else { continue };
         let names = card_db.get_card_names(id);
@@ -2944,14 +2948,14 @@ pub fn count_distinct_member_name_units(cards: &[i16], card_db: &CardDatabase) -
                 joints.push(names);
             }
         } else if let Some(name) = names.first() {
-            single_names.insert(name.clone());
+            single_names.insert(*name);
         }
     }
     let mut count = single_names.len();
     for names in &joints {
         if names
             .iter()
-            .any(|part| !single_names.contains(part))
+            .any(|part| !single_names.contains(*part))
         {
             count += 1;
         }

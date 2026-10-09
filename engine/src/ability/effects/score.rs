@@ -112,7 +112,10 @@ impl PerUnitFilter<'_> {
             // reads the same canonical string the branch below joins.
             card.name_key.to_string()
         } else {
-            names.to_vec().join("|")
+            // `names` is borrowed `&str` parts, so the join builds the
+            // key directly — the old `to_vec()` copied every part into
+            // an owned Vec first for nothing.
+            names.join("|")
         };
         seen_names.insert(key)
     }

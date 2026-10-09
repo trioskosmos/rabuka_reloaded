@@ -57,15 +57,9 @@ fn q65_one_multiname_card_is_one_distinct_name() {
     // Its get_card_names should return 3 individual names
     let names = game.db.get_card_names(multi);
     assert_eq!(names.len(), 3, "Q62: multi-name card has 3 names");
-    assert!(names.contains(&"上原歩夢".to_string()), "contains 上原歩夢");
-    assert!(
-        names.contains(&"澁谷かのん".to_string()),
-        "contains 澁谷かのん"
-    );
-    assert!(
-        names.contains(&"日野下花帆".to_string()),
-        "contains 日野下花帆"
-    );
+    assert!(names.contains(&"上原歩夢"), "contains 上原歩夢");
+    assert!(names.contains(&"澁谷かのん"), "contains 澁谷かのん");
+    assert!(names.contains(&"日野下花帆"), "contains 日野下花帆");
 
     // Q65: Despite having 3 names, it counts as ONE distinct name
     // in distinct-name conditions (one card = one name slot).

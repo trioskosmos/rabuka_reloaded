@@ -71,11 +71,11 @@ fn dp_matches_brute_force() {
 #[test]
 fn degenerate_inputs() {
     // Empty input: no cards, trivially fine.
-    let r = max_distinct_names(&[]);
+    let r = max_distinct_names::<String>(&[]);
     assert_eq!((r.distinct, r.collision), (0, false));
     // A card with zero names: no complete assignment exists — matches the
     // degenerate behavior of the old DFS (zero leaves reached).
-    let r = max_distinct_names(&[vec!["a".into()], vec![]]);
+    let r = max_distinct_names::<String>(&[vec!["a".to_string()], vec![]]);
     assert_eq!((r.distinct, r.collision), (0, true));
 }
 
@@ -92,7 +92,8 @@ fn cyclic_overlap_is_solved_exactly() {
     assert!(!r.collision);
 
     // Pigeonhole: three cards sharing one name ⇒ every assignment collides.
-    let sets = vec![vec!["a".into()], vec!["a".into()], vec!["a".into()]];
+    let sets: Vec<Vec<String>> =
+        vec![vec!["a".to_string()], vec!["a".to_string()], vec!["a".to_string()]];
     let r = max_distinct_names(&sets);
     assert_eq!(r.distinct, 1);
     assert!(r.collision);

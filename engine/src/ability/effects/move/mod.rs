@@ -198,11 +198,19 @@ impl AbilityResolver {
         // never a substring of "DreamBelievers（104期Ver.）" and Q236 recovery
         // silently matched nothing. `get_card_names` is exactly `name_key` split
         // on '&', i.e. the canonical needle the matcher already expects.
+        //
+        // `get_card_names` now borrows its parts; this is the one call site
+        // that must own them, because the fragments flow into `CardFilter`,
+        // whose `name_fragments` field is `Option<&'a Vec<String>>` — a type
+        // shared with the effect's printed `card_names`. This path is cold
+        // (only `name_constraint == contains_all` from a revealed card), so
+        // the per-fragment `String::from` here is not a hot-path allocation.
         let fragments: Vec<String> = gs
             .revealed_cost_cards
             .iter()
             .chain(gs.revealed_cards.iter())
             .flat_map(|&id| gs.card_database.get_card_names(id))
+            .map(String::from)
             .collect();
         if fragments.is_empty() {
             None

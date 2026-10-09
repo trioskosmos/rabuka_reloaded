@@ -1111,7 +1111,16 @@ impl CardDatabase {
 
     /// Get all names from a multi-name card (e.g., "A&B&C" -> ["A", "B", "C"])
     /// Used for multi-name card handling (Q65, Q69, Q81)
-    pub fn get_card_names(&self, card_id: i16) -> Vec<String> {
+    ///
+    /// Borrows the parts instead of cloning them into owned `String`s.
+    /// `name_key` lives in the `CardDatabase`, which outlives every
+    /// caller, so the split is a pure borrow: the old owned return was
+    /// one `Vec` plus one `String` per name part at every one of the
+    /// ~12 call sites, several of which run per candidate card during
+    /// condition evaluation. Callers that must own the strings (the
+    /// `CardFilter` boundary, whose field type is shared with the
+    /// effect's printed `card_names`) map `String::from` at their site.
+    pub fn get_card_names(&self, card_id: i16) -> Vec<&str> {
         if let Some(card) = self.cards.get(&card_id) {
             // `name_key` is already whitespace-free and has '＆' folded to '&'
             // (cards/scrape_expansion.py), so this is a plain split. It used to be
@@ -1119,7 +1128,7 @@ impl CardDatabase {
             // allocations, the last two unconditional no-ops for 2610 of the
             // 2639 cards, measured at 2.99us/call on multi-name cards in a debug
             // build and reached during ability-condition evaluation.
-            card.name_key.split('&').map(|s| s.to_string()).collect()
+            card.name_key.split('&').collect()
         } else {
             Vec::new()
         }
