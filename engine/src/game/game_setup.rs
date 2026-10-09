@@ -1738,9 +1738,16 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
     #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("generate_main_phase_actions");
     let active_player = game_state.active_player();
-    let mut actions =
-        vec![make_action(ActionType::Pass, "Pass - End Main Phase")
-            .with_ja("パス - メインフェーズ終了")];
+    // Pre-size the buffer: `vec![Pass]` starts at capacity 1 and this
+    // function pushes ~30 actions per call, so it was reallocating ~5
+    // times per call (39,239 calls per benchmark) and memcpy-ing the
+    // growing buffer each time. A hand card × 3 areas × 2 baton pairs
+    // plus stage/waitroom activations plus Pass tops out well under 48.
+    let mut actions = Vec::with_capacity(48);
+    actions.push(
+        make_action(ActionType::Pass, "Pass - End Main Phase")
+            .with_ja("パス - メインフェーズ終了"),
+    );
     let stage_groups = game_state.distinct_stage_groups(&active_player.id);
 
     // The three stage-area names are compile-time constants, so their
@@ -2466,7 +2473,14 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
         "Player 2"
     };
 
-    let mut actions = vec![{
+    // Pre-size the buffer: this function runs once per live card set
+    // window (407,533 calls per benchmark, the most-called function in
+    // the profile) and `vec![ConfirmLiveCard]` starts at capacity 1
+    // while pushing one action per hand card (~5-10), so it was
+    // reallocating and memcpy-ing on every call. Hand cards are capped
+    // by the deck, so 48 is a safe upper bound.
+    let mut actions = Vec::with_capacity(48);
+    actions.push({
         let mut a = make_action_params(
             ActionType::ConfirmLiveCardSet,
             action_desc!("Confirm {}'s live card set", player_name),
@@ -2476,7 +2490,7 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
             a.description_ja = Some(action_desc!("{}のライブカードセットを確定", player_name));
         }
         a
-    }];
+    });
 
     let max_live_cards = 3i32 - i32::from(active_player.live_card_set_limit_reduction);
     let already_selected = game_state.live_card_selected_indices.len();
