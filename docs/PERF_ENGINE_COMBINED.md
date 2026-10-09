@@ -214,7 +214,7 @@ pair stays unique across workers. Games mode is untouched (fixed-chunk
 split, deterministic `total_actions`).
 
 **Parallelism (§6) is the largest single result** and is not engine
-work: `--jobs 128` buys 6.4×.
+work: `--jobs 256` buys 6.8× (the throughput peak; 128 is 6.4×).
 
 ## 4. What is left
 
@@ -280,7 +280,7 @@ per-call-site Scale figures were worth ~10× less than estimated.
 | `store_pending_choice` gating | ~20/choice offer | low | `total_actions` + grep log assertions |
 | `filter_subset` / `CardFilter::from_effect` single-bind | 200–300 dependent loads; 10 probes → 1 | medium | `total_actions` + full suite |
 | `execute_move_cards` borrow its 8 `String`s | ~9/MoveCards | low | `total_actions` |
-| `Option<&Ability>` in `AbilityRef` (the remaining ~50 tight-loop `resolve()` sites) | ~200–300 atomics/action | small | measure at `--jobs 1` **and** `--jobs 128` |
+| `Option<&Ability>` in `AbilityRef` (the remaining ~50 tight-loop `resolve()` sites) | ~200–300 atomics/action | small | measure at `--jobs 1` **and** `--jobs 256` |
 | `EffectOwner` **writes** are deep clones (§5.4) — the accessors were fixed, the writes were not | ~1.7 KB per write | high | needs a new corpus harness; the `resolver.rs:102-119` comment records that this area has produced bugs before |
 
 ### 4.4 The deliberate projects (Phase 3 — each needs its own gate and sign-off; do not batch)
@@ -353,14 +353,21 @@ random`, 2026-10-08, waitroom index + parallel-secs in):
 | 6 | 3,351 | 550,006 | 4.42x |
 | 12 | 4,407 | 723,730 | 5.82x |
 | 64 | 4,754 | 779,913 | 6.27x |
-| **128** | 4,841 | **794,200** | **6.39x** |
-| 256 | 4,825 | 793,119 | 6.38x |
+| 128 | 4,851 | 795,987 | 6.40x |
+| **256** | 5,149 | **844,883** | **6.80x** |
+| 512 | 4,930 | 808,901 | 6.50x |
+| 1024 | 4,307 | 706,755 | 5.68x |
+| 2048 | 4,576 | 750,920 | 6.04x |
 
-**Run the benchmark at `--jobs 128`, not `--jobs 12`** — +10% over 12
-threads, and it cuts run-to-run spread. Oversubscribing a 12-thread box
-by 10× costs nothing here because each game is ~1.3 ms and the whole
-live state is L1-resident; throughput stays flat from 64 to 256
-threads.
+**Run the benchmark at `--jobs 256`, not `--jobs 12`** — +6% over 128
+threads, and it is the throughput peak. The plateau is **256, not 128**:
+the old "flat from 64 to 256" line was measured before the pool landed and
+is stale. Beyond 256, oversubscription degrades (512 −4%, 1024 −16%,
+2048 −11%) — thread-spawn overhead and cache pressure outweigh the
+parallelism. `total_actions=328173` is identical at every setting, so
+determinism holds across the whole range. Each game is ~0.4 ms and the
+live state is L1-resident, so 10× oversubscription of a 12-thread box
+is free until ~512 threads.
 
 Three findings worth more than the ratios:
 
