@@ -300,15 +300,80 @@ work: `--jobs 256` buys 6.8× (the throughput peak; 128 is 6.4×).
      12.42M to 2.33M per 200 games is what compounds into
      the +129% at high job counts (the jobs=1 gain is the
      CPU-bound +7.4%).
-   - `generate_state_hash`'s `SimpleHasher` hashed every
-     `i16`/`usize`/`bool` element through the default
-     `write(&bytes)` call plus a per-byte loop; the typed
-     `Hasher` writers are now overridden so each element is
-     a single multiply-add. `record_action_boundary` self
-     time dropped 0.41 → 0.29 µs/call (−29%). Only hash
-     equality is ever consumed (`game_state_history`
-     containment and the repetition count), so the changed
-     values are behaviour-preserving.
+    - `generate_state_hash`'s `SimpleHasher` hashed every
+      `i16`/`usize`/`bool` element through the default
+      `write(&bytes)` call plus a per-byte loop; the typed
+      `Hasher` writers are now overridden so each element is
+      a single multiply-add. `record_action_boundary` self
+      time dropped 0.41 → 0.29 µs/call (−29%). Only hash
+      equality is ever consumed (`game_state_history`
+      containment and the repetition count), so the changed
+      values are behaviour-preserving.
+    - Correction: the pool (`pool_alloc.rs`) is
+      **thread-local** (`thread_local! { static FREE:
+      Cell<*const FreeLists> }`) and has **no Mutex** —
+      the "pool's single Mutex" phrasing was wrong. The
+      contended resource at high job counts is the
+      *system* allocator's heap lock, reached on a
+      free-list miss or a `PER_CLASS` overflow; that is
+      what an alloc-call reduction relieves.
+
+7. **Choice-offer signature gating + value-keyed
+   condition cache (−25% alloc calls on the bench deck,
+   +8.9% jobs=1 aps).** Two outcome-neutral changes,
+   gated on `total_actions` byte-identical (30231 on
+   `5CP3Z idou`, seed 1, 200 games) and 4364/4364
+   tests:
+   - `store_pending_choice` materialized the full
+     `choice_offered_labels` Vec — a `String` per
+     candidate plus a resolved card name per index
+     (`resolve_index_any_player`) — on EVERY choice
+     store, to build a dedup signature whose only
+     consumer (`push_choice_offered`) is itself gated
+     on `logging_enabled()`, and whose only other
+     reader (the debug-choice log) is gated on
+     `log_enabled!(Debug)`. sim_bench runs headless
+     (both flags false), so the whole materialization
+     was waste: ~30 of the ~84 allocations of a
+     choice-storing ability. The signature block now
+     runs only when `logging_enabled() ||
+     log_enabled!(Debug)`. Measured on the bench deck:
+     1,053,120 → 788,151 alloc calls per 200 games
+     (−25.2%), 150,107 → 163,556 mean aps at jobs=1
+     (+8.9%), `total_actions=30231` byte-identical.
+   - The per-queue-entry condition cache was keyed by
+     `format!("{:?}", condition)` — two full
+     condition-tree Debug formats per cached-condition
+     evaluation, each a ~650 B allocation that bypasses
+     the small-allocation pool entirely (the pool only
+     serves ≤255 B). `Condition` derives `PartialEq`
+     and its derived `Debug` prints every field, so
+     string-key equality and value equality are the
+     same relation; the cache is now keyed on the
+     `Condition` value itself
+     (`SmallVec<[(Condition, bool); 2]>`), which
+     removes both formats (lookup is a `PartialEq`
+     compare, store is one deep clone into the inline
+     SmallVec).
+   - Audit method note: the single-frame allocation
+     tracer misattributes under LTO/inlining — it
+     reported `Phase::fmt` and `clear_movement_tracking`
+     as top sites, but arming `check_timing` directly
+     measured **0 allocations**, and `clear_movement_tracking`
+     only clears collections. Those rows are merged-symbol
+     artifacts. The tracer now keeps the innermost three
+     engine frames (`alloc_counter.rs`), and
+     `check_timing` gained a trace site. The remaining
+     allocations in the hottest function
+     (`process_current_ability`, ~20/call after this
+     change) are genuine: the `EffectOwner` deep clones
+     (`executing = Some(effect.clone())`, 8 write sites,
+     plus `capture_choice_owner`'s snapshot — an
+     `Arc<AbilityEffect>` EffectOwner would remove only
+     the snapshot clone, not the write-site clones), the
+     `Choice` builder's display strings (game state, not
+     display-only), and `normalized_steps`' owned
+     compound-step lists.
 
 Also measured and **rejected** this session: `target-cpu=native`
 (+0.8% over pool+LTO — noise; the workload is branch-heavy
@@ -455,7 +520,7 @@ per-call-site Scale figures were worth ~10× less than estimated.
 | `check_invalid_live_cards` → `SmallVec` | 2/`check_timing` | ✗ closed — measured no-alloc: `collect()` on a `filter_map` (lower bound 0) does not pre-allocate, so the all-live/empty common path allocates nothing |
 | `zone_card_ids`/`_occupied` → iterators | 2/zone query | ✓ landed (the one caller borrows via `zone_cards`; `zone_card_ids` remains for API users) |
 | `get_zone_cards` and friends → borrow | 1/zone eval | ✓ landed (`zone_cards` returns `&[i16]`) |
-| `counted_by_any().to_vec()` → borrow | 1+N/card/count | open |
+| `counted_by_any().to_vec()` → borrow | 1+N/card/count | ✓ landed (`recalculate_constant_cost_modifiers_with_ids` borrows the iterator, 2026-10-10) |
 | `Active` phase: parse once, `SmallVec` not `HashSet` | 1/Active phase | ✓ landed (`constant_blocked` parsed once into `SmallVec<[i16;8]>`; `all_card_ids` already a `SmallVec`) |
 | `execute_performance_phase`'s `nhm_flat` + partition | 3/performer | ✗ closed — `collect()` on an empty `need_heart_modifiers` map (the common case) allocates nothing |
 | `ArcStr::from(&str)` single-alloc | 1/decode | ✓ landed at the hot site (the area names, via `LazyLock`); other sites unaudited |
@@ -476,10 +541,10 @@ per-call-site Scale figures were worth ~10× less than estimated.
 | --- | --- | --- | --- |
 | **`ability_master_id()` → `Option<&str>`** — 199 call sites × 1 alloc + up to 12 zone scans on the fallback; the largest single allocation count in the catalogue | high | low | `total_actions` + a debug-assert old-vs-new player-resolution diff over one full run | ✓ landed (borrowed, 2026-10-09 or earlier — verify against source) |
 | **`get_card_names` allocation-free + `normalize_name` borrowing** — 4 allocs × 67 call sites × per-candidate | high | medium | exhaustive corpus equivalence test | ✓ landed 2026-10-09 (`Vec<&str>`, −71,301 allocs/200 games, 4364/4364) |
-| `store_pending_choice` gating | ~20/choice offer | low | `total_actions` + grep log assertions |
+| `store_pending_choice` gating | ~20/choice offer | low | `total_actions` + grep log assertions | ✓ landed 2026-10-10 — the dedup-signature block is gated on `logging_enabled() \|\| log_enabled!(Debug)`; −25% alloc calls on the bench deck (§7) |
 | `filter_subset` / `CardFilter::from_effect` single-bind | 200–300 dependent loads; 10 probes → 1 | medium | `total_actions` + full suite |
 | `execute_move_cards` borrow its 8 `String`s | ~9/MoveCards | low | `total_actions` |
-| `Option<&Ability>` in `AbilityRef` (the remaining ~50 tight-loop `resolve()` sites) | ~200–300 atomics/action | small | measure at `--jobs 1` **and** `--jobs 256` |
+| `Option<&Ability>` in `AbilityRef` (the remaining ~50 tight-loop `resolve()` sites) | ~200–300 atomics/action | small | measure at `--jobs 1` **and** `--jobs 256` | partial — `AbilityRef::peek()` (`Option<&'static Ability>` off the `OnceLock` cache) exists; the ~50 `resolve()` call sites are not yet converted to it |
 | `EffectOwner` **writes** are deep clones (§5.4) — the accessors were fixed, the writes were not | ~1.7 KB per write | high | needs a new corpus harness; the `resolver.rs:102-119` comment records that this area has produced bugs before |
 
 ### 4.4 The deliberate projects (Phase 3 — each needs its own gate and sign-off; do not batch)

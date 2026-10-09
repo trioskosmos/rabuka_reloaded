@@ -7,7 +7,7 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 2,
+    [int]$IntervalMinutes = 5,
     [string]$WindowTitle = "",
     [string]$Message = "go crank up the speed then. keep auditing the engine find the worst offenders and do the work."
 )
@@ -46,7 +46,7 @@ if ($WindowTitle) { Write-Host "  target window : $WindowTitle" } else { Write-H
 Write-Host "  interval      : every $IntervalMinutes minute(s)"
 Write-Host ""
 
-Show-Countdown 10
+Show-Countdown 5
 Send-Message
 
 while ($true) {

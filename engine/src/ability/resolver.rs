@@ -477,11 +477,10 @@ impl AbilityResolver {
             return None;
         }
         let entry = gs.ability_queue.current_entry()?;
-        let key = format!("{:?}", condition);
         entry
             .condition_cache
             .iter()
-            .find(|(k, _)| k == &key)
+            .find(|(c, _)| c == condition)
             .map(|(_, v)| *v)
     }
 
@@ -492,9 +491,8 @@ impl AbilityResolver {
             return;
         }
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
-            let key = format!("{:?}", condition);
-            entry.condition_cache.retain(|(k, _)| k != &key);
-            entry.condition_cache.push((key, passed));
+            entry.condition_cache.retain(|(c, _)| c != condition);
+            entry.condition_cache.push((condition.clone(), passed));
         }
     }
 
@@ -831,13 +829,27 @@ impl AbilityResolver {
             // Dedup: re-storing the SAME pending choice (re-prompt, or an
             // auto-ability processed in between) must not emit a second, identical
             // offer block. Only a genuinely different presentation is a new offer.
-            let offered = gs.choice_offered_labels(choice);
-            let sig = choice_offer_sig(&offered, choice.allow_skip());
-            let is_new_offer = self.carried.last_offered_sig.as_deref() != Some(sig.as_str());
-            if is_new_offer {
-                gs.push_choice_offered(choice);
-                self.carried.last_offered_sig = Some(sig);
-            }
+            // The offer signature exists ONLY to feed `push_choice_offered`
+            // (gated on `logging_enabled()`) and the debug-choice log below
+            // (gated on `log_enabled!(Debug)`). When neither is on, the label
+            // materialization — a `Vec<String>` plus a resolved card name per
+            // candidate — is pure waste, and this is the largest allocation
+            // site in ability resolution: ~30 of the ~84 allocations of a
+            // choice-storing ability on the bench deck.
+            let is_new_offer = if crate::core::runtime_flags::logging_enabled()
+                || log::log_enabled!(log::Level::Debug)
+            {
+                let offered = gs.choice_offered_labels(choice);
+                let sig = choice_offer_sig(&offered, choice.allow_skip());
+                let is_new_offer = self.carried.last_offered_sig.as_deref() != Some(sig.as_str());
+                if is_new_offer {
+                    gs.push_choice_offered(choice);
+                    self.carried.last_offered_sig = Some(sig);
+                }
+                is_new_offer
+            } else {
+                false
+            };
             let debug_choice_changed = if log::log_enabled!(log::Level::Debug) {
                 let sig = format!("{:?}|{:?}|{:?}|{:?}|{:?}|{:?}", choice,
                     self.session.activating_card_id, self.session.current_ability_index,

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::Choice;
-use crate::card::{Ability, AbilityEffect};
+use crate::card::{Ability, AbilityEffect, Condition};
 use crate::game_state::AbilityTrigger;
 #[cfg(feature = "no_std")]
 use alloc::{
@@ -154,10 +154,16 @@ pub struct AbilityQueueEntry {
     /// choice has been taken and no re-prompt follows.
     pub choice_repeats_remaining: u8,
     /// Cache for condition results that should be evaluated once and reused.
-    /// Keyed by condition text. Populated by the first evaluation; subsequent
-    /// evaluations return the cached value. The parser sets `"cache": true` on
-    /// conditions that depend on mutable state (e.g. revealed_cards).
-    pub condition_cache: SmallVec<[(String, bool); 2]>,
+    /// Keyed by the condition VALUE (the enum derives `PartialEq`, and its
+    /// derived `Debug` — the previous key, `format!("{:?}", condition)` —
+    /// prints every field, so string-key equality and value equality are the
+    /// same relation). Keying on the value directly removes two full
+    /// condition-tree Debug formats per cached evaluation, each a ~650 B
+    /// allocation that bypasses the small-allocation pool entirely.
+    /// Populated by the first evaluation; subsequent evaluations return the
+    /// cached value. The parser sets `"cache": true` on conditions that
+    /// depend on mutable state (e.g. revealed_cards).
+    pub condition_cache: SmallVec<[(Condition, bool); 2]>,
 }
 
 impl AbilityQueueEntry {

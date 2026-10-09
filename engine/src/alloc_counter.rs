@@ -95,22 +95,26 @@ thread_local! {
 fn trace_frame() -> Option<String> {
     let bt = std::backtrace::Backtrace::force_capture();
     let text = format!("{bt}");
-    text.lines()
-        .map(str::trim)
-        // Keep the first engine frame: everything above it is the tracer, the
-        // allocator shim, or core/std.
-        .find(|l| {
-            l.contains("rabuka_reloaded\\engine\\src")
-                || l.contains("rabuka_reloaded/engine/src")
-                || (l.contains("rabuka_engine::") && !l.contains("alloc_counter"))
-        })
-        .map(|l| {
-            l.split("::h")
-                .next()
-                .unwrap_or(l)
-                .trim()
-                .to_string()
-        })
+    // Keep the innermost three engine frames: one is often an inlined
+    // leaf (a `fmt::Debug` impl, say) whose caller names the real site.
+    let mut frames = Vec::new();
+    for l in text.lines().map(str::trim) {
+        if l.contains("rabuka_reloaded\\engine\\src")
+            || l.contains("rabuka_reloaded/engine/src")
+            || (l.contains("rabuka_engine::") && !l.contains("alloc_counter"))
+        {
+            let clean = l.split("::h").next().unwrap_or(l).trim().to_string();
+            frames.push(clean);
+            if frames.len() >= 3 {
+                break;
+            }
+        }
+    }
+    if frames.is_empty() {
+        None
+    } else {
+        Some(frames.join(" <- "))
+    }
 }
 
 fn record_trace(size: usize) {

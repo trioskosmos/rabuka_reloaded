@@ -1641,6 +1641,8 @@ impl super::TurnEngine {
     pub fn check_timing(game_state: &mut GameState) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("check_timing");
+        #[cfg(feature = "alloc_tracker")]
+        let _alloc_trace = crate::alloc_counter::maybe_arm("check_timing");
         // These five repair steps are NOT a rarely-taken safety net, which is worth
         // recording because it killed a family of plausible optimisations.
         //
