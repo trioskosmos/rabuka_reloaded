@@ -175,84 +175,103 @@ fn you_does_not_draw_when_own_reveal_count_is_higher() {
     );
 }
 
-/// THE FINDING: 渡辺曜's ライブ成功時 ability cannot fire at all.
+/// The differential, whole: 渡辺曜 draws exactly when 「より少ない」 is true.
 ///
-/// Four reveal configurations, each with the window open and each asserted, and the
-/// engine records `result_failure` for every one:
-///
-/// ```text
-///   (p1, p2) = (0, 0)  ->  result_failure
-///   (p1, p2) = (1, 3)  ->  result_failure     <- 「より少ない」 is TRUE here
-///   (p1, p2) = (2, 2)  ->  result_failure
-///   (p1, p2) = (3, 1)  ->  result_failure
-/// ```
-///
-/// (1, 3) is the case the printed text is about — p1 revealed fewer than p2 — and it
-/// fails. So the condition is not merely conservative, it is unsatisfiable.
-///
-/// ## Scope: one card, and a lead-generator that needs the same discipline
-///
-/// Every condition in `abilities.json` whose text states a comparison was checked.
-/// Four cards matched, and three of them are FINE because the comparison IS
-/// structured there:
-///
-///   * `PL!N-bp5-005-R＋`, `PL!HS-sd1-001-SD`, `PL!S-PR-029-PR` all carry
-///     `cost_limit` together with `cost_limit_operator`, so 「コスト10以上」 and
-///     「コスト13以上」 compile to a real operand and an operator.
-///   * `PL!S-bp3-005-R` (渡辺曜) carries NEITHER, and the only field on her condition
-///     is the zone.
-///
-/// So the parser has a working representation for a ONE-SIDED comparison, and
-/// 渡辺曜 is the single card in this pool whose comparison is TWO-SIDED — a count
-/// against another count, which `cost_limit` + `cost_limit_operator` has no shape
-/// for. A precise gap with a count of one, and the distinction matters: a fix
-/// belongs in the parser's comparison representation and should not disturb the
-/// three cards that work.
-///
-/// ## The wider scan, and why its other hits are not claims
-///
-/// Extending the same signature to every condition TYPE finds more candidates, and
-/// most are an artefact of the scan rather than a defect:
-///
-///   * `quantifier_all` on `compound` — 3 cards, e.g. 「自分のステージのエリアすべてに
-///     『蓮ノ空』のメンバーが登場しており」. A compound's `text` carries its CHILD's
-///     vocabulary, so the parent's own fields are checked against text that is not
-///     the parent's. And this one is KNOWN GOOD: 乙宗梢 `PL!S-bp2-008-R＋` is the
-///     all-areas card and `constant_conditions_exact_counts_and_names_test.rs` passes
-///     on it — emptying an area withdraws the grant. A scan reporting it would have
-///     sent someone to a working card.
-///   * `count_of_zone` on `compound` — 11 cards, the same nesting: the 「3枚以上」
-///     belongs to a `card_count_condition` child that does carry a count.
-///   * `quantifier_all` on `card_count_condition` — 9 cards, e.g. 「それらがすべて
-///     heart04 を持つメンバーカードの場合」. A real lead, and NOT verified either way:
-///     「all of them」 is a distinct quantifier and nothing in the suite has driven
-///     it. Flagged as a lead, deliberately not as a defect.
-///
-/// So the discipline that produced this finding is the one the scan itself needs:
-/// attribute vocabulary to the condition that OWNS it, and confirm a suspected gap
-/// behaviourally before reporting it. The wider scan is a lead-generator; only
-/// 渡辺曜 has been confirmed.
-///
-/// ## Not written, and why
-///
-/// A structural test asserting the condition has no comparison operand is not
-/// expressible: `Condition` exposes no public `text` or `location`. The evidence is
-/// behavioural instead, which is stronger — four configurations, including the one the
-/// card is written about.
+/// This test used to assert the OPPOSITE for all four configurations — it pinned
+/// a defect. The condition was a bare `location_condition` on `revealed_cards`
+/// carrying `negation: true` (the parser read 「より少ない」 as a negation,
+/// because 少ない CONTAINS ない) and no operand at all, so no configuration could
+/// ever satisfy it. It is now the two-sided comparison the card prints: the LEFT
+/// is this player's reveal count, `comparison_target: "opponent"` supplies the
+/// RIGHT, and the operator decides.
 #[test]
-fn no_reveal_configuration_satisfies_the_condition() {
-    for (p1, p2) in [(0usize, 0usize), (1, 3), (2, 2), (3, 1)] {
+fn verdict_follows_the_printed_comparison() {
+    for (p1, p2, should_draw) in [
+        (0usize, 0usize, false),
+        (1, 3, true),
+        (2, 2, false),
+        (3, 1, false),
+    ] {
         let mut game = TestGame::new(load_real_database());
         let result = run(&mut game, p1, p2);
+
+        assert_eq!(
+            result.resolved_success, should_draw,
+            "({p1}, {p2}): 「より少ない」 is {} — the engine must record {}",
+            if should_draw { "true" } else { "false" },
+            if should_draw { "success" } else { "failure" }
+        );
+        assert!(
+            !(result.resolved_success && result.resolved_failure),
+            "({p1}, {p2}): both verdicts means the condition was evaluated twice"
+        );
+        assert_eq!(
+            result.hers(),
+            if should_draw { 1 } else { 0 },
+            "({p1}, {p2}): 「カードを1枚引く」 — she contributes exactly one card, and \
+             only when the comparison holds"
+        );
+    }
+}
+
+/// The positive on its own, so a fixture change that breaks the window fails with
+/// the message about DRAWING rather than about a verdict.
+#[test]
+fn you_draws_one_exactly_when_own_reveal_count_is_lower() {
+    let mut game = TestGame::new(load_real_database());
+    let result = run(&mut game, 1, 3);
+
+    assert!(
+        result.resolved_success,
+        "(1, 3) is the case the printed text is about — p1 revealed fewer than p2 — \
+         so the engine must record a SUCCESS"
+    );
+    assert_eq!(result.hers(), 1, "and she contributes exactly one card");
+    assert_eq!(
+        result.hand_gained, 1,
+        "which lands in hand, on top of the live card's own draw"
+    );
+}
+
+/// The other side of the differential: revealing NOTHING is fewer than revealing
+/// something, so the draw happens. Symmetric to the never-live'd case below —
+/// there the ZERO is on the opponent's side and the comparison cannot be met.
+#[test]
+fn own_zero_reveals_is_fewer_than_the_opponents_and_draws() {
+    for opp in [1usize, 3, 7] {
+        let mut game = TestGame::new(load_real_database());
+        let result = run(&mut game, 0, opp);
+
+        assert!(
+            result.resolved_success,
+            "(0, {opp}): own revealed nothing, the opponent revealed {opp} — 「より少ない」 \
+             is TRUE and the engine must record a SUCCESS"
+        );
+        assert_eq!(
+            result.hers(),
+            1,
+            "(0, {opp}): and she contributes exactly one card"
+        );
+    }
+}
+
+/// Ruling Q153: an opponent who never live'd counts as having revealed 0 cards.
+///
+/// So 「自分の枚数が相手の枚数より少ない」 becomes own < 0, which no reveal count
+/// satisfies — the ability does NOT draw just because the opponent sat out.
+#[test]
+fn opponent_who_never_lived_counts_as_zero_and_blocks_the_draw() {
+    for own in [0usize, 1, 5] {
+        let mut game = TestGame::new(load_real_database());
+        let result = run(&mut game, own, 0);
+
         assert!(
             result.resolved_failure,
-            "({p1}, {p2}): recorded a SUCCESS, so the condition IS satisfiable and the \
-             `location_condition` reading is wrong"
+            "own={own} vs opponent=0: 「より少ない」 needs own < 0, which nothing \
+             satisfies. Q153 treats the non-live'd opponent as 0 revealed, not as an \
+             automatic win for the comparison"
         );
-        assert!(
-            !result.resolved_success,
-            "({p1}, {p2}): recorded both verdicts, so the condition was evaluated twice"
-        );
+        assert_eq!(result.hers(), 0, "own={own}: she contributes nothing");
     }
 }
 #[test]

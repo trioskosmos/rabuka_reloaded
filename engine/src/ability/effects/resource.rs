@@ -1630,17 +1630,11 @@ pub(crate) fn execute_gain_surplus_heart(
         };
         let mut filter = effect.filter_subset();
         filter.exclude_self = exclude_self_id;
-        let exclude_names: Vec<String> = effect
-            .exclude_by_name_source_any()
-            .filter(|&s| s == "preceding_moved")
-            .and(preceding_moved.as_ref())
-            .map(|moved| {
-                moved
-                    .iter()
-                    .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
+        // Resolved by the shared helper so `exclude_by_name_source` values this
+        // path does not special-case ("activating_card", from
+        // 「このメンバーと名前の異なる」) are still honoured rather than dropped.
+        let exclude_names: Vec<String> =
+            util::resolve_excluded_names(gs, effect, preceding_moved.as_deref().unwrap_or(&[]));
         if !exclude_names.is_empty() {
             filter.exclude_names = Some(&exclude_names);
         }

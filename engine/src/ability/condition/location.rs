@@ -2,7 +2,7 @@ use super::ConditionContext;
 use super::predicates;
 use crate::ability::enums::Zone;
 use crate::ability::util::{self, compare_counts};
-use crate::card::{AbilityFilter, BladeColor, CardProperty, Condition};
+use crate::card::{AbilityFilter, BladeColor, CardProperty, ComparisonTarget, Condition};
 use crate::core::constants::CountCast;
 use crate::HashSet;
 #[cfg(feature = "no_std")]
@@ -722,6 +722,39 @@ impl<'a> ConditionContext<'a> {
         if !self.check_no_excess_heart(condition, player, target) {
             log::debug!("[LOC_COND] failed at check_no_excess_heart");
             return false;
+        }
+
+        // Two-sided count differential: 「エールにより公開された自分のカードの枚数が、
+        // 相手がエールによって公開したカードの枚数より少ない場合」
+        // (渡辺曜 PL!S-bp3-005-R, ruling Q153).
+        //
+        // The LEFT operand is this player's count in `location`; `comparison_target`
+        // supplies the RIGHT, which is another count rather than a literal — a shape
+        // the one-sided `cost_limit`/`operator` pair cannot express, and the reason
+        // this card used to arrive as a bare zone count that no configuration could
+        // satisfy (its ライブ成功時 never drew). Q153: an opponent who never live'd
+        // has revealed 0, so own < 0 is never true and the ability does not draw.
+        //
+        // Guarded on `count.is_none()` so a condition that already carries its own
+        // threshold keeps its existing path; no Location condition in the corpus sets
+        // `comparison_target` today, so this cannot reinterpret one.
+        if condition.get_comparison_target() == Some(ComparisonTarget::Opponent)
+            && condition.get_count().is_none()
+        {
+            let self_count = self.game_state.cheer_revealed_count_for_player(
+                self.resolve_condition_player("self"),
+            );
+            let opp_count = self.game_state.cheer_revealed_count_for_player(
+                self.resolve_condition_player("opponent"),
+            );
+            log::debug!(
+                "[LOC_COND] two-sided differential self={} opponent={} op={:?} loc={}",
+                self_count,
+                opp_count,
+                condition.get_operator(),
+                location
+            );
+            return compare_counts(condition.get_operator(), self_count, opp_count);
         }
 
         // G11: "ほかのすべてのメンバーより多くのブレードを持つ" — the selected

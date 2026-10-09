@@ -3921,23 +3921,61 @@ _try_state = ConditionPattern(
 )
 
 
+# Comparatives that happen to CONTAIN 「ない」. Only 「少ない」 does today, but the
+# set is named so the next one is a one-line addition rather than a rerun of the
+# bug where 「より少ない」 set `negation: true` and made a card's ability
+# permanently unsatisfiable.
+_COMPARATIVE = re.compile(r"少ない|多い|長い|短い")
+
+# Own-count vs opponent-count phrases, longest first so a shorter operator that
+# appears inside a longer one cannot shadow it.
+_REVEAL_COMPARATORS = (
+    ("より少ない", "<"),
+    ("より多い", ">"),
+    ("と等しい", "="),
+    ("と同じ", "="),
+    ("以上", ">="),
+    ("以下", "<="),
+    ("未満", "<"),
+)
+
+
 def _try_revealed(text):
     if "エールにより公開された" not in text and "エールした" not in text:
         return None
-    has_negation = "ない" in text
+    # 「ない」 marks a negation, but a COMPARATIVE contains it as a substring:
+    # 「より少ない」 (PL!S-bp3-005-R) is "fewer", not "there is none". Without
+    # stripping those, the card's two-sided count comparison arrived at the
+    # engine as `negation: true` on a bare zone count — unsatisfiable in every
+    # configuration, so its ライブ成功時 could never draw.
+    has_negation = "ない" in _COMPARATIVE.sub("", text)
     result = {
         "type": "location_condition",
         "location": "revealed_cards",
         "target": "self",
         "text": text,
     }
-    # "エールしたとき" (when you yell) vs "エールにより公開された" (when cards revealed by yell).
-    # "エールしたとき" requires that a yell actually occurred (total_blade > 0 after modifiers).
+    # 「エールしたとき」 (when you yell) vs 「エールにより公開された」 (when cards revealed by yell).
+    # 「エールしたとき」 requires that a yell actually occurred (total_blade > 0 after modifiers).
     # If no yell was performed (e.g. all members wait), the ability should not trigger (Q264).
     if "エールしたとき" in text and "エールにより公開された" not in text:
         result["yell_trigger"] = True
     if has_negation:
         result["negation"] = True
+    # TWO-SIDED count differential: 「自分の…枚数が、相手が…公開したカードの枚数より
+    # 少ない場合」. The LEFT operand is this player's count in `location`; the RIGHT is
+    # the OPPONENT'S count, another count rather than a literal — a shape the
+    # one-sided `cost_limit`/`operator` pair cannot express. `comparison_target`
+    # supplies that second side (Q153: an opponent who never live'd counts as 0
+    # revealed). Exactly one card in the pool prints it.
+    if "相手" in text and "公開" in text:
+        for phrase, op in _REVEAL_COMPARATORS:
+            if phrase in text:
+                result["operator"] = op
+                result["comparison_target"] = "opponent"
+                # A comparison is never a negation, whatever the 少ない tail did.
+                result.pop("negation", None)
+                break
     if "ブレードハートを持つ" in text or "ブレードハートを持たない" in text:
         result["card_property"] = "has_blade_heart"
     if HAS_SCORE_ICON in text:
@@ -12696,6 +12734,14 @@ def _type_replacement_appearance(effect):
     4つ以下のメンバーは、ウェイト状態で登場する」. The heart bound is already on the
     node (`heart_total_limit`, from the shared rule), so only the action name is
     missing. Guarded on `custom` so a real rule's claim is never overridden.
+
+    NOTE: this rule used to also write `node["replacement"] = "appear_wait"`.
+    Nothing reads that key — the engine keys the appearance rule off the ACTION
+    name (`ReplacementAppearWait`, dispatch.rs) and the success-zone registry
+    keys off `effect_type == "replacement"` (`effects/replacement.rs`), so the
+    extra field reached the bytecode as an unknown effect field, was warned
+    about on every decode of the card, and made `pipeline_report.py` exit 1 on
+    an undeclared emitted key. It is deliberately not restored.
     """
     for node in iter_dict_nodes(effect):
         if node.get("action") != "custom":
@@ -12706,7 +12752,6 @@ def _type_replacement_appearance(effect):
         if not node.get("heart_total_limit") and not node.get("blade_limit"):
             continue
         node["action"] = "replacement_appear_wait"
-        node["replacement"] = "appear_wait"
         if "正面のエリア" in text and node.get("position") in (None, "front"):
             # 正面 is the area in front of this member. The engine reads it as the
             # CENTRE slot; see docs/PBLL02_ABILITY_REVIEW.md for why that reading is

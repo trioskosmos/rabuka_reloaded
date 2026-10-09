@@ -1962,6 +1962,54 @@ impl<'a> CardFilter<'a> {
     }
 }
 
+/// Card names that `CardFilter::exclude_names` should drop for `effect`,
+/// resolved from `exclude_by_name_source` on the effect.
+///
+/// This is the single resolution point for that field. Every site that builds
+/// a stage filter from an effect must route through it, so a source kind the
+/// site does not itself care about is still honoured rather than dropped —
+/// the three call sites previously each matched on the string inline and two
+/// of them only knew `"preceding_moved"`, which silently overcounted
+/// 「このメンバーと名前の異なる」 clauses carried by a gain or target effect.
+///
+/// * `"preceding_moved"` — cards moved by an earlier step of this ability
+///   (「このカードで移動した…」): their printed names are the exclusion.
+/// * `"activating_card"` — the card executing the effect. Used by
+///   「このメンバーと名前の異なる」 (米女メイ PL!SP-pb2-018-R / -P＋, rulings
+///   Q281/Q282): the printed comparison target is THIS member, so every stage
+///   card sharing the source's name drops out while other copies stay in.
+///
+/// Callers apply the result through `CardFilter::exclude_names`, which
+/// compares names ignoring whitespace. An empty vec means "set nothing".
+pub fn resolve_excluded_names(
+    gs: &crate::game_state::GameState,
+    effect: &AbilityEffect,
+    preceding_moved: &[i16],
+) -> Vec<String> {
+    match effect.exclude_by_name_source_any() {
+        Some("preceding_moved") => preceding_moved
+            .iter()
+            .filter_map(|&cid| gs.card_database.get_card(cid).map(|c| c.name.to_string()))
+            .collect(),
+        Some("activating_card") => gs
+            .activating_card
+            .and_then(|aid| gs.card_database.get_card(aid))
+            .map(|c| c.name.to_string())
+            .into_iter()
+            .collect(),
+        other => {
+            if other.is_some() {
+                log::warn!(
+                    "[EXCLUDE_NAMES] unknown exclude_by_name_source {:?} on {} — no names excluded",
+                    other,
+                    effect.effect_type().unwrap_or("<none>")
+                );
+            }
+            Vec::new()
+        }
+    }
+}
+
 /// Filter member candidates by their CURRENT blade total (base or set +
 /// additive modifiers), matching "ブレードをNつ以上持つ" (no 元々) semantics.
 /// `matches()` cannot evaluate this (no modifier access), so the gain/change

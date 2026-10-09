@@ -19,6 +19,7 @@ mod tracking;
 
 use crate::ability::queue::AbilityQueue;
 use crate::card::{CardDatabase, CardId};
+use crate::core::constants::CountCast;
 use crate::core::game_modifiers::{CardOrientation, GameModifiers};
 use crate::player::{Player, PlayerId};
 use crate::zones::{MemberArea, ResolutionZone};
@@ -1050,6 +1051,24 @@ impl GameState {
             Some("player2") | Some("p2") => &self.player2_cheer_revealed_cards,
             _ => &self.player1_cheer_revealed_cards,
         }
+    }
+
+    /// Cards `player` revealed by yell, counted for THAT seat alone.
+    ///
+    /// `cheer_revealed_cards()` picks one seat from whoever is resolving the
+    /// ability, which is wrong for a two-sided differential: 渡辺曜
+    /// 「エールにより公開された自分のカードの枚数が、相手がエールによって公開した
+    /// カードの枚数より少ない場合」 (PL!S-bp3-005-R, ruling Q153) needs the LEFT
+    /// from the ability's owner and the RIGHT from the other seat, and neither is
+    /// "whoever is resolving". An opponent who never live'd has an empty list, so
+    /// it counts as 0 — which is exactly what Q153 says.
+    pub fn cheer_revealed_count_for_player(&self, player: &crate::player::Player) -> u8 {
+        let list = if player.id == self.player2.id {
+            &self.player2_cheer_revealed_cards
+        } else {
+            &self.player1_cheer_revealed_cards
+        };
+        list.len().u8_count()
     }
 
     /// Internal helper: push a card to a revealed list with metadata.

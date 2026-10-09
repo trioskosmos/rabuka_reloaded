@@ -27,9 +27,6 @@
   "engine/tests/test_modules/effects/score/live_total/kasumi_energy_under_test.rs": [
     "kasumi_constant_score_bonus_applies_when_energy_under"
   ],
-  "engine/tests/test_modules/effects/state/per_card/mei_per_distinct_catchu_member_energy_activation_test.rs": [
-    "catchu_basic_two_distinct_activate_2"
-  ],
   "engine/tests/test_modules/effects/state/per_card/sd2_nijigasaki_abilities_gap_test.rs": [
     "shioriko_auto_activates_waited_ally",
     "ai_pay_activates_a_waited_member"

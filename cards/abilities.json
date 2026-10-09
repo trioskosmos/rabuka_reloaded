@@ -1,9 +1,9 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-10-08T20:42:18.227580",
+  "generated_at": "2026-10-09T17:55:21.652191",
   "generated_by": "cards/ability_extraction/extract_card_abilities.py",
   "source_file": "cards/cards.json",
-  "engine_commit": "df257d64",
+  "engine_commit": "5d258b69",
   "parser_version": "1.0",
   "input_hash": null,
   "statistics": {
@@ -13411,8 +13411,7 @@
         "action": "replacement_appear_wait",
         "original_value": true,
         "heart_total_limit": 4,
-        "heart_total_operator": "<=",
-        "replacement": "appear_wait"
+        "heart_total_operator": "<="
       }
     },
     {
@@ -20221,7 +20220,8 @@
           "location": "revealed_cards",
           "target": "self",
           "text": "エールにより公開された自分のカードの枚数が、相手がエールによって公開したカードの枚数より少ない場合",
-          "negation": true
+          "operator": "<",
+          "comparison_target": "opponent"
         },
         "action": "draw_card",
         "count": 1,

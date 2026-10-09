@@ -20,12 +20,12 @@ are not**: an object whose name is missing from a table is written as
 The numbers carry meaning in exactly one place. `decode_condition_direct`
 (`generate_condition_decoder.py`) dispatches on the variant byte by *position*:
 the generator emits `0 => build_compound, 1 => build_location, ...` in the order
-the `Condition` enum is DECLARED in `engine/src/core/card.rs`. So a condition's
-variant tag is its index in that enum, and the compiler and the generator must
-agree on that ordering or every condition decodes into the wrong variant —
-silently, because an in-range tag is never reported by the decode audit.
+the `Condition` enum is DECLARED in `engine/src/core/card/condition.rs`. So a
+condition's variant tag is its index in that enum, and the compiler and the
+generator must agree on that ordering or every condition decodes into the wrong
+variant — silently, because an in-range tag is never reported by the decode audit.
 
-That is why `COND_TO_VARIANT_TAG` below is DERIVED from `card.rs` rather than
+That is why `COND_TO_VARIANT_TAG` below is DERIVED from `condition.rs` rather than
 written out. It used to be a hand transcription of the serde tags, correct as of
 the last review and unguarded: inserting a variant anywhere but the end of the
 enum would have retagged every later condition with no test failing. The
@@ -39,7 +39,7 @@ encoding self-describing when a blob is read by eye, and the membership is what
 keeps an effect on the `TAG_OBJECT_VARIANT` path.
 
 `tests/test_ability_compiler.py` guards all of this: the derived table against
-`card.rs`, the corpus against the tables, and the encoder against itself.
+`condition.rs`, the corpus against the tables, and the encoder against itself.
 """
 
 import json
@@ -88,10 +88,11 @@ class BC:
 def _condition_variant_tags() -> dict[str, int]:
     """`{"wire_name": variant_index}` for the serde-tagged `Condition` enum.
 
-    Reads `engine/src/core/card.rs` and returns, for every variant, the index the
-    condition decoder generator will emit for it — the variant's POSITION in the
-    declaration. A variant's accepted wire names are its `#[serde(rename = ...)]`
-    (or its Rust name when it has none) plus every `#[serde(alias = ...)]`.
+    Reads `engine/src/core/card/condition.rs` and returns, for every variant, the
+    index the condition decoder generator will emit for it — the variant's
+    POSITION in the declaration. A variant's accepted wire names are its
+    `#[serde(rename = ...)]` (or its Rust name when it has none) plus every
+    `#[serde(alias = ...)]`.
 
     This is the one place the condition wire vocabulary is defined. See the module
     docstring for why it is derived rather than transcribed.

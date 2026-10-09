@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Generate a direct Condition decoder from the `Condition` enum in card.rs.
+"""Generate a direct Condition decoder from the `Condition` enum in
+engine/src/core/card/condition.rs.
 
 Mirrors generate_effect_decoder.py but for the serde internally-tagged
 `Condition` enum. Field name collisions across variants (the "field-type trap":

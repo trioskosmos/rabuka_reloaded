@@ -618,8 +618,9 @@ def main():
             print(f"  {line}")
 
     # Auto-regenerate the Rust decoders so a NEW field added to
-    # engine/src/core/card.rs is picked up without a separate manual step.
-    # These are generated FROM card.rs, so they only change when card.rs does.
+    # engine/src/core/card/{condition,effect}.rs is picked up without a separate
+    # manual step. These are generated FROM the card module, so they only change
+    # when it does.
     decoder_scripts = [
         compile_script.parent / "generate_effect_decoder.py",
         compile_script.parent / "generate_condition_decoder.py",
@@ -682,6 +683,14 @@ def _validate_group_filters(abilities):
         # Normalize variants
         def variants(name):
             v = {name}
+            # Character names are PRINTED with a space (「渡辺 曜」) but stored
+            # normalized without one ("渡辺曜"), so the bracket text never
+            # equals the filter value unless the stripped form is a variant
+            # too. Without this every spaced name was a false positive, which
+            # is worse than no check: it buries real gaps in noise.
+            ws = "".join(name.split())
+            if ws != name:
+                v.add(ws)
             if "!" in name:
                 v.add(name.replace("!", "！"))
             if "！" in name:

@@ -117,14 +117,14 @@ def walk_nodes(obj, in_effect_vec=False, in_condition=False):
 # ─── 1. The ABI: compiler <-> generated decoders ─────────────────────────────
 #
 # `generate_condition_decoder.py` emits `0 => build_compound, 1 => ...` in the
-# order the `Condition` enum is declared in card.rs, and
+# order the `Condition` enum is declared in core/card/condition.rs, and
 # `decode_condition_direct` dispatches on that byte. The compiler writes the same
-# byte. These tests assert the two agree by reading card.rs, so reordering the
-# enum cannot leave the compiler writing yesterday's numbers.
+# byte. These tests assert the two agree by reading condition.rs, so reordering
+# the enum cannot leave the compiler writing yesterday's numbers.
 
 
 def card_rs_condition_variants():
-    """`[(variant_name, [wire names])]` in declaration order, read from card.rs."""
+    """`[(variant_name, [wire names])]` in declaration order, read from condition.rs."""
     text = CARD_RS.read_text(encoding="utf-8")
     m = re.search(r"pub enum Condition\s*\{", text)
     assert m, f"no `pub enum Condition` in {CARD_RS}"
@@ -182,7 +182,7 @@ def test_condition_variant_index_is_the_enum_position():
         name: index for index, (_, names) in enumerate(variants) for name in names
     }
     assert COND_TO_VARIANT_TAG == expected, (
-        "COND_TO_VARIANT_TAG does not match the serde tags in card.rs: "
+        "COND_TO_VARIANT_TAG does not match the serde tags in condition.rs: "
         f"missing={sorted(set(expected) - set(COND_TO_VARIANT_TAG))} "
         f"extra={sorted(set(COND_TO_VARIANT_TAG) - set(expected))} "
         f"wrong={ {k: (COND_TO_VARIANT_TAG[k], expected[k]) for k in expected if k in COND_TO_VARIANT_TAG and COND_TO_VARIANT_TAG[k] != expected[k]} }"
@@ -194,13 +194,13 @@ def test_every_condition_wire_name_has_a_tag():
 
     An unclassified name cannot happen while the table is derived — that is the
     point of deriving it — so this is the assertion that fails first if the
-    derivation silently drops a variant (a parse change in card.rs, a renamed
+    derivation silently drops a variant (a parse change in condition.rs, a renamed
     variant) rather than quietly compiling conditions to a wrong index.
     """
     variants = card_rs_condition_variants()
     total_names = sum(len(names) for _, names in variants)
     assert len(COND_TO_VARIANT_TAG) == total_names, (
-        f"{len(COND_TO_VARIANT_TAG)} classified names vs {total_names} in card.rs — "
+        f"{len(COND_TO_VARIANT_TAG)} classified names vs {total_names} in condition.rs — "
         "a multi-line `#[cfg_attr(...)]` block probably lost its serde attributes"
     )
     for index, (variant, names) in enumerate(variants):

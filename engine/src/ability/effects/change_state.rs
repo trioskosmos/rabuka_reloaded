@@ -60,17 +60,10 @@ impl AbilityResolver {
         // of the count (the source member included, Q282①②) while copies of
         // another name stay in (Q281②③) — which is why the parser emits the
         // source-name exclusion instead of the `distinct` a bare 「名前の異なる」
-        // would give. `exclude_names` compares by name, so the source's own
-        // print is excluded without touching the other copies of it.
-        let source_names: Vec<String> = match effect.exclude_by_name_source_any() {
-            Some("activating_card") => gs
-                .activating_card
-                .and_then(|aid| gs.card_database.get_card(aid))
-                .map(|c| c.name.to_string())
-                .into_iter()
-                .collect(),
-            _ => Vec::new(),
-        };
+        // would give. Resolution lives in util::resolve_excluded_names, shared
+        // with the gain and target-selection paths so the source kind cannot be
+        // dropped there.
+        let source_names = util::resolve_excluded_names(gs, effect, &[]);
         if !source_names.is_empty() {
             per_unit_filter.exclude_names = Some(&source_names);
         }

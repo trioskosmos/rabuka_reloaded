@@ -22,17 +22,17 @@ const IN_BOUND_4: &str = "PL!-bp3-002-P";
 /// the only thing that could wait it is this rule.
 const OVER_BOUND_5: &str = "PL!N-bp4-019-N";
 
-/// Stand ERI in a side slot, play `victim` into `victim_slot`, report orientation.
-/// ERI goes to the RIGHT slot so `victim_slot: 0` is genuinely empty — playing into
-/// an occupied slot is a baton touch, which is a different scenario entirely.
-fn orientation_after_appear(victim: &str, victim_slot: usize) -> Option<String> {
+/// Stand `host` in a side slot, play `victim` into `victim_slot`, report orientation.
+/// The host goes to the RIGHT slot so `victim_slot: 0` is genuinely empty — playing
+/// into an occupied slot is a baton touch, which is a different scenario entirely.
+fn orientation_for(host: &str, victim: &str, victim_slot: usize) -> Option<String> {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let filler = game.new_id("PL!-sd1-010-SD");
     fill_decks(&mut game, filler);
 
-    let eri = game.id(ERI);
-    game.assert_card_identity(eri, ERI);
+    let eri = game.id(host);
+    game.assert_card_identity(eri, host);
     game.state.player1.hand.cards.push(eri);
     game.give_energy(40);
     game.play_to_stage(eri, MemberArea::RightSide);
@@ -51,6 +51,30 @@ fn orientation_after_appear(victim: &str, victim_slot: usize) -> Option<String> 
         .mods
         .get_orientation_modifier(v)
         .map(|s| s.to_string())
+}
+
+fn orientation_after_appear(victim: &str, victim_slot: usize) -> Option<String> {
+    orientation_for(ERI, victim, victim_slot)
+}
+
+/// Both prints of this ability, driven separately. `-PP` and `-R` are DIFFERENT cards
+/// that share a character and number, so a suite that stages only one proves only that
+/// one's wiring — the other is a separate entry in `cards.json` and a separate
+/// `card_no` → ability edge.
+#[test]
+fn both_prints_of_the_ability_wait_the_same_members() {
+    for host in ["PL!-pb2-002-PP", "PL!-pb2-002-R"] {
+        assert_eq!(
+            orientation_for(host, IN_BOUND_4, 1).as_deref(),
+            Some("wait"),
+            "{host}: 4つ以下 is an INCLUSIVE bound, so exactly 4 qualifies"
+        );
+        assert_eq!(
+            orientation_for(host, OVER_BOUND_5, 1),
+            None,
+            "{host}: 5つ — one over the bound, so the member is unaffected"
+        );
+    }
 }
 
 #[test]

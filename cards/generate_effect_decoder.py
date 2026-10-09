@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Parse EffectKind/AbilityEffect/CompoundBranch/EffectFilter from card.rs and
-generate a Rust direct decoder for ability effects.
+"""Parse EffectKind/AbilityEffect/CompoundBranch/EffectFilter from
+engine/src/core/card/effect.rs and generate a Rust direct decoder for ability
+effects.
 
 Run: python cards/generate_effect_decoder.py
 Output: engine/src/ability/effect_decoder_gen.rs
@@ -492,7 +493,7 @@ def generate_decoder(variants, ability_effect_fields, compound_fields, filter_fi
 
     # === build_* functions ===
     # Variant construction now lives in a single shared function
-    # `EffectKind::from_action` (card.rs), so no per-variant build_* functions
+    # `EffectKind::from_action` (effect.rs), so no per-variant build_* functions
     # are emitted here. The decoder builds the flat `EffectFilter` via
     # `build_filter` and dispatches on the action string via `from_action`.
 

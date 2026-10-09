@@ -7,7 +7,7 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 8,
+    [int]$IntervalMinutes = 2,
     [string]$WindowTitle = "",
     [string]$Message = "go crank up the speed then. keep auditing the engine find the worst offenders and do the work."
 )

@@ -6,7 +6,7 @@ Sections
   1. corpus overview
   2. action-type / condition-type histograms (what the corpus actually uses)
   3. suspicious parses (custom actions, empty effects, do_nothing)
-  4. emitted-key audit vs engine/src/core/card.rs (CI gate)
+  4. emitted-key audit vs engine/src/core/card/*.rs (dev gate, not CI)
   5. semantic-validation issues vs baseline
   6. abilities with no engine-test coverage (the gameplay-as-written backlog)
 
@@ -32,7 +32,7 @@ from parser import _validate_semantic  # noqa: E402
 
 SPECIAL_KEYS = {"cards", "costs", "options", "text", "type", "action"}
 
-# Emitted outside card.rs but consumed elsewhere / documentary.
+# Emitted outside core/card but consumed elsewhere / documentary.
 # Dispositions live in cards/ability_extraction/PARSER_NOTES.md.
 DOCUMENTED_KEYS = {
     "zone",              # vm.rs aliases source
@@ -144,7 +144,7 @@ def s4_key_audit(data):
         collect(a.get("cost") or {})
         collect(a.get("effect") or {})
     unknown = sorted(emitted - known)
-    print(f"emitted keys: {len(emitted)}; outside card.rs: {len(unknown)}")
+    print(f"emitted keys: {len(emitted)}; outside core/card: {len(unknown)}")
     for k in unknown:
         print(f"  {k}")
     return unknown
@@ -218,7 +218,7 @@ def main():
         if n == 4:
             unknown = s4_key_audit(data)
             if unknown:
-                print("FAIL: new emitted keys not declared in card.rs (see above)")
+                print("FAIL: new emitted keys not declared in engine/src/core/card (see above)")
                 sys.exit(1)
             continue
         print("=" * 72)
