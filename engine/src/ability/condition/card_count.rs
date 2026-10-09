@@ -540,6 +540,68 @@ let actual = if condition.get_member_has_resource_under() == Some(true) {
             );
             return compare_counts(Some(op), actual, threshold);
         }
+        // 「相手の手札の枚数が自分の手札枚数より2以上多い場合」 (PL!S-pb1-001-R)
+        // targets the OPPONENT but compares against SELF. The block above
+        // only covers the reverse orientation (`target=self,
+        // comparison_target=opponent`); without this arm the clause fell
+        // through to the plain `actual >= count` path and evaluated
+        // `opp_hand >= 2`, ignoring the printed gap against the own hand.
+        // The threshold is self_count + count, so an empty own hand can
+        // never satisfy the comparison.
+        //
+        // Gated on the two seats actually differing: the parser also emits
+        // `target=self, comparison_target=self` for same-seat clauses
+        // (上原歩夢 「エールにより公開された自分のカードが持つブレードハートに
+        // …3種類以上ある場合」), where the gap is the count itself and the
+        // plain threshold below is the printed rule.
+        let seats_differ = match (target, condition.get_comparison_target()) {
+            ("self", Some(ComparisonTarget::Opponent))
+            | ("opponent", Some(ComparisonTarget::Self_)) => true,
+            _ => false,
+        };
+        if seats_differ && condition.get_comparison_target() == Some(ComparisonTarget::Self_) {
+            // The RIGHT-hand side is the seat that OWNS the activating card
+            // (千歌 PL!S-pb1-001-R 「相手の手札の枚数が自分の手札枚数より2以上
+            // 多い場合」), counted in the condition's own zone. On a 登場
+            // trigger the card has already left that hand, so the count is
+            // hand-after-play, not hand-before-play — which is exactly what
+            // the printed rule measures at resolution time.
+            //
+            // Not `resolve_condition_player("self")`: that path can collapse
+            // to the same seat as `target` (opponent) when the activating
+            // card is not on a stage the resolver can see, so both sides of
+            // the comparison would count one hand and a printed gap of 2
+            // would pass at a gap of 0.
+            let own_player = self
+                .activating_card_id
+                .and_then(|cid| self.game_state.owner_of_card(cid));
+            let own_count = match (own_player, Zone::from_str(location)) {
+                (Some(p), Some(Zone::Hand)) => p.hand.cards.len().u8_count(),
+                (Some(p), Some(Zone::Discard)) | (Some(p), Some(Zone::Waitroom)) => {
+                    p.waitroom.cards.len().u8_count()
+                }
+                (Some(p), Some(Zone::Stage)) => p.stage.stage.len().u8_count(),
+                (Some(p), Some(Zone::Energy)) => p.energy_zone.cards.len().u8_count(),
+                (Some(p), Some(Zone::LiveCardZone)) => p.live_card_zone.cards.len().u8_count(),
+                (Some(p), Some(Zone::SuccessLiveZone)) => {
+                    p.success_live_card_zone.cards.len().u8_count()
+                }
+                _ => 0,
+            };
+            let threshold = own_count.saturating_add(count);
+            let op = condition
+                .get_operator()
+                .unwrap_or(if count == 0 { "==" } else { ">=" });
+            log::debug!(
+                "[CARD_COUNT_SELF] self={} own={} count={} threshold={} op={}",
+                actual,
+                own_count,
+                count,
+                threshold,
+                op
+            );
+            return compare_counts(Some(op), actual, threshold);
+        }
         // Operator ownership: when original_value=true WITHOUT a blade_limit,
         // the condition operator belongs to the PER-CARD heart comparison
         // applied inside resolve_zone_card_count's filter chain

@@ -1,14 +1,14 @@
 {
   "generated_by": "cards/test_inventory.py",
-  "generated_at": "2026-10-09T06:37:34.817750+00:00",
+  "generated_at": "2026-10-09T08:05:39.299029+00:00",
   "stats": {
     "total_cards": 2674,
     "cards_with_abilities": 1664,
     "total_abilities": 2132,
     "unique_abilities": 996
   },
-  "n_files": 1049,
-  "n_tests": 4358,
+  "n_files": 1050,
+  "n_tests": 4368,
   "total_cards": 818,
   "covered_cards": 818,
   "abilities_on_covered": 996,
@@ -1079,7 +1079,7 @@
       ]
     }
   },
-  "n_test_fns_parsed": 4358,
+  "n_test_fns_parsed": 4368,
   "abilities": [
     {
       "idx": 0,
@@ -2945,6 +2945,7 @@
         "an_already_waited_member_is_not_offered_and_the_remaining_candidate_resolves",
         "an_empty_opponent_stage_resolves_cleanly",
         "an_expensive_non_mus_baton_touch_activates_nothing",
+        "both_prints_of_the_ability_wait_the_same_members",
         "center_grants_at_least_two_blades_pl_sp_bp4_003",
         "constant_blade_per_waited_opponent_member",
         "declined_energy_preserves_energy_stage_and_requirement_743",
@@ -2957,14 +2958,14 @@
         "eli_bp5_sequential_wait_then_discard_works",
         "eli_bp5_skip_costs_skips_look_entirely",
         "erena_active_no_heart",
-        "erena_default_active_no_heart",
-        "erena_in_wait_gains_heart05"
+        "erena_default_active_no_heart"
       ],
-      "covering_test_count": 85,
+      "covering_test_count": 86,
       "direct_tests": [
         "a_cheap_mus_baton_touch_activates_nothing",
         "a_duplicate_named_member_cannot_be_paid_for_the_cost",
         "a_four_heart_member_entering_the_front_appears_in_wait",
+        "both_prints_of_the_ability_wait_the_same_members",
         "constant_blade_per_waited_opponent_member",
         "eli_bp5_a_mu_member_below_cost_nine_is_rejected_on_cost_alone",
         "eli_bp5_look_select_optional_skip_keeps_hand",
@@ -2990,10 +2991,9 @@
         "pl_hs_bp5_016_n_discard_waits_opponent_and_enables_constant_heart06",
         "pl_hs_bp5_016_n_single_eligible_victim_grants_no_heart06",
         "pl_hs_bp5_016_n_waits_at_most_two_of_three_eligible_members",
-        "the_constraint_is_the_name_not_the_card_number",
-        "the_waited_opponent_member_crosses_another_cards_constant_threshold"
+        "the_constraint_is_the_name_not_the_card_number"
       ],
-      "direct_test_count": 33,
+      "direct_test_count": 34,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -3056,6 +3056,7 @@
         "baad_cage_cost_limit_two_hasunosora_members_grants_score",
         "baad_cage_counts_two_physical_instances_of_same_hasunosora_member",
         "baad_cage_three_members_score_still_one",
+        "both_prints_of_the_ability_wait_the_same_members",
         "declining_skips_the_self_wait_and_the_target_prompt",
         "exactly_one_is_chosen_from_several_eligible",
         "four_printed_hearts_is_never_offered",
@@ -3064,10 +3065,9 @@
         "live_card_own_live_success_no_trigger",
         "live_start_another_member",
         "live_start_chosen_heart_scales_with_success_zone_card_count",
-        "live_start_cost_free_still_triggers",
-        "live_start_grants_all_heart"
+        "live_start_cost_free_still_triggers"
       ],
-      "covering_test_count": 55,
+      "covering_test_count": 56,
       "direct_tests": [
         "a_member_entering_a_side_slot_is_unaffected",
         "a_member_that_appeared_before_the_rule_is_unaffected",
@@ -8018,7 +8018,6 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs",
         "engine/tests/test_modules/jidou/leaves_stage/baton_touch_nijigasaki_partner_cost_gate_energizes_and_draws_test.rs",
         "engine/tests/test_modules/rules/trigger_paths/zone_change_gate_test.rs"
       ],
@@ -8031,17 +8030,13 @@
         "niji_bp5_partner_low_cost_nothing_fires",
         "niji_bp5_partner_not_nijigasaki_nothing_fires",
         "niji_bp5_partner_with_blade_heart_nothing_fires",
-        "no_reveal_configuration_satisfies_the_condition",
         "reina_fires_after_non_blade_member_left_live_zone",
         "reina_silent_when_blade_heart_member_left_live_zone",
         "riko_aqours_live_leaving_live_zone_offers_deck_placement",
         "riko_ignores_non_aqours_live_leaving_live_zone",
-        "riko_responds_only_to_own_side_live_zone",
-        "the_live_cards_own_draw_only_happens_inside_the_open_window",
-        "you_does_not_draw_when_own_reveal_count_is_higher",
-        "you_does_not_draw_when_reveal_counts_are_equal"
+        "riko_responds_only_to_own_side_live_zone"
       ],
-      "covering_test_count": 17,
+      "covering_test_count": 13,
       "direct_tests": [
         "miyamiya_baton_touch_blade_heart_newcomer_nothing",
         "miyamiya_baton_touch_cost13_newcomer_energy_only",
@@ -9410,7 +9405,6 @@
         "engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs",
         "engine/tests/test_modules/effects/cost_mod/activation_discount/success_zone_high_cost_group_deploy_discount_test.rs",
         "engine/tests/test_modules/effects/deploy/s_bp3_006_cost_ref_test.rs",
-        "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs",
         "engine/tests/test_modules/effects/position/area_gated/success_zone_center_area_mus_member_constant_blade_test.rs"
       ],
       "covering_tests": [
@@ -9430,7 +9424,6 @@
         "love_wing_bell_not_in_success_zone_no_blade",
         "love_wing_bell_only_center_gets_blade_not_left_or_right",
         "love_wing_bell_removed_from_success_zone_loses_blade",
-        "no_reveal_configuration_satisfies_the_condition",
         "non_aqours_member_fails_condition",
         "one_live_card_plus_one",
         "owner_without_live_gets_no_bonus_from_opponents_reveals",
@@ -9441,11 +9434,12 @@
         "success_zone_discount_does_not_reduce_wrong_group_member",
         "success_zone_discount_reduces_cost_seventeen_group_member_by_two",
         "successful_owners_use_their_own_zero_one_or_three_live_reveals",
-        "the_live_cards_own_draw_only_happens_inside_the_open_window",
         "three_live_cards_plus_two",
-        "yoshi_center_cost4_to_cost6_succeeds"
+        "yoshi_center_cost4_to_cost6_succeeds",
+        "yoshi_cost4_with_no_cost6_in_discard_no_place",
+        "yoshi_no_other_aqours_no_target"
       ],
-      "covering_test_count": 37,
+      "covering_test_count": 33,
       "direct_tests": [
         "all_areas_aqours_diff_names_gains_ability",
         "condition_loss_removes_delayed_registration_and_restoring_stage_registers_once",
@@ -9498,7 +9492,6 @@
         "engine/tests/test_modules/effects/ability_mod/full_distinct_group_stage_grants_yell_live_score_test.rs",
         "engine/tests/test_modules/effects/cost_mod/activation_discount/success_zone_high_cost_group_deploy_discount_test.rs",
         "engine/tests/test_modules/effects/deploy/s_bp3_006_cost_ref_test.rs",
-        "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs",
         "engine/tests/test_modules/effects/position/area_gated/success_zone_center_area_mus_member_constant_blade_test.rs"
       ],
       "covering_tests": [
@@ -9518,7 +9511,6 @@
         "love_wing_bell_not_in_success_zone_no_blade",
         "love_wing_bell_only_center_gets_blade_not_left_or_right",
         "love_wing_bell_removed_from_success_zone_loses_blade",
-        "no_reveal_configuration_satisfies_the_condition",
         "non_aqours_member_fails_condition",
         "one_live_card_plus_one",
         "owner_without_live_gets_no_bonus_from_opponents_reveals",
@@ -9529,11 +9521,12 @@
         "success_zone_discount_does_not_reduce_wrong_group_member",
         "success_zone_discount_reduces_cost_seventeen_group_member_by_two",
         "successful_owners_use_their_own_zero_one_or_three_live_reveals",
-        "the_live_cards_own_draw_only_happens_inside_the_open_window",
         "three_live_cards_plus_two",
-        "yoshi_center_cost4_to_cost6_succeeds"
+        "yoshi_center_cost4_to_cost6_succeeds",
+        "yoshi_cost4_with_no_cost6_in_discard_no_place",
+        "yoshi_no_other_aqours_no_target"
       ],
-      "covering_test_count": 37,
+      "covering_test_count": 33,
       "direct_tests": [
         "all_areas_aqours_diff_names_gains_ability",
         "condition_loss_removes_delayed_registration_and_restoring_stage_registers_once",
@@ -14487,7 +14480,7 @@
         "audit_set_zero_removes_requirement",
         "audit_sufficient_hearts_passes"
       ],
-      "covering_test_count": 931,
+      "covering_test_count": 934,
       "direct_tests": [
         "a_card_in_the_success_zone_blocks_the_bonus",
         "a_live_in_the_waitroom_is_not_a_candidate",
@@ -16492,7 +16485,6 @@
       "has_choice": false,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs",
         "engine/tests/test_modules/effects/recover/per_card/constant_two_blade_gain_when_either_stage_has_cost13_plus_test.rs"
       ],
       "covering_tests": [
@@ -16501,13 +16493,9 @@
         "cost13_exact_boundary_triggers",
         "cost13_on_opponent_stage_meets_condition",
         "cost13_on_self_triggers",
-        "cost9_alone_does_not_meet_cost13_condition",
-        "no_reveal_configuration_satisfies_the_condition",
-        "the_live_cards_own_draw_only_happens_inside_the_open_window",
-        "you_does_not_draw_when_own_reveal_count_is_higher",
-        "you_does_not_draw_when_reveal_counts_are_equal"
+        "cost9_alone_does_not_meet_cost13_condition"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 6,
       "direct_tests": [
         "both_sides_cost13_still_only_two_blades",
         "cost12_below_threshold_no_trigger",
@@ -19224,6 +19212,7 @@
         "a_member_that_appeared_before_the_rule_is_unaffected",
         "a_zero_heart_member_entering_the_front_appears_in_wait",
         "an_expensive_non_mus_baton_touch_activates_nothing",
+        "both_prints_of_the_ability_wait_the_same_members",
         "center_grants_at_least_two_blades_pl_sp_bp4_003",
         "constant_blade_per_waited_opponent_member",
         "each_further_wait_transition_grants_another_blade",
@@ -19243,14 +19232,14 @@
         "fixture_cost_and_group_are_what_the_gates_assume",
         "four_printed_hearts_is_never_offered",
         "no_eligible_opponent_member_is_harmless",
-        "one_of_several_eligible_is_chosen",
-        "one_wait_transition_grants_one_blade"
+        "one_of_several_eligible_is_chosen"
       ],
-      "covering_test_count": 44,
+      "covering_test_count": 45,
       "direct_tests": [
         "a_cheap_mus_baton_touch_activates_nothing",
         "a_duplicate_named_member_cannot_be_paid_for_the_cost",
         "a_four_heart_member_entering_the_front_appears_in_wait",
+        "both_prints_of_the_ability_wait_the_same_members",
         "constant_blade_per_waited_opponent_member",
         "eli_bp5_a_mu_member_below_cost_nine_is_rejected_on_cost_alone",
         "eli_bp5_look_select_optional_skip_keeps_hand",
@@ -19268,7 +19257,7 @@
         "two_copies_of_one_name_pay_nothing",
         "two_waited_opponents_grant_at_least_two_blades_pl_bp3_002"
       ],
-      "direct_test_count": 19,
+      "direct_test_count": 20,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -23124,11 +23113,11 @@
         "an_opponent_member_with_five_printed_hearts_is_not_waited",
         "an_unspaced_card_matches_the_spaced_group_name",
         "an_untouched_member_is_not_recorded",
+        "both_prints_of_the_ability_wait_the_same_members",
         "dropping_any_one_of_the_three_named_characters_stops_it",
-        "every_branch_carries_the_all_marker",
-        "extra_copies_of_a_named_character_still_satisfy_its_clause"
+        "every_branch_carries_the_all_marker"
       ],
-      "covering_test_count": 60,
+      "covering_test_count": 61,
       "direct_tests": [
         "a_cheap_centre_bibi_does_not_satisfy_the_cost_bound",
         "a_cheap_centre_non_bibi_does_not_satisfy_the_group",
@@ -23141,6 +23130,7 @@
         "all_bibi_takes_one",
         "all_clauses_met_waits_the_foe",
         "an_opponent_member_with_five_printed_hearts_is_not_waited",
+        "both_prints_of_the_ability_wait_the_same_members",
         "dropping_any_one_of_the_three_named_characters_stops_it",
         "extra_copies_of_a_named_character_still_satisfy_its_clause",
         "fixtures_are_what_the_clauses_assume",
@@ -23158,7 +23148,7 @@
         "two_different_mus_units_do_not_qualify",
         "two_prints_are_one_name"
       ],
-      "direct_test_count": 27,
+      "direct_test_count": 28,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -32443,16 +32433,19 @@
       "covering_tests": [
         "hanamaru_bp3_016_success_zone_cost_increase_constant_parsed",
         "maki_sd1_006_success_zone_restriction_parsed",
-        "no_reveal_configuration_satisfies_the_condition",
         "only_the_opponents_revealed_live_card_does_not_count",
+        "opponent_who_never_lived_counts_as_zero_and_blocks_the_draw",
         "own_reveals_contain_a_live_card_and_draw_one_pl_s_pr_046_pr",
         "own_reveals_without_a_live_card_draw_nothing",
+        "own_zero_reveals_is_fewer_than_the_opponents_and_draws",
         "the_live_cards_own_draw_only_happens_inside_the_open_window",
+        "verdict_follows_the_printed_comparison",
         "you_bp3_005_live_success_trigger_is_evaluated_and_records_a_verdict",
         "you_does_not_draw_when_own_reveal_count_is_higher",
-        "you_does_not_draw_when_reveal_counts_are_equal"
+        "you_does_not_draw_when_reveal_counts_are_equal",
+        "you_draws_one_exactly_when_own_reveal_count_is_lower"
       ],
-      "covering_test_count": 10,
+      "covering_test_count": 13,
       "direct_tests": [
         "the_live_cards_own_draw_only_happens_inside_the_open_window",
         "you_bp3_005_live_success_trigger_is_evaluated_and_records_a_verdict"
@@ -33857,9 +33850,16 @@
       "has_choice": true,
       "has_negative": true,
       "covering_files": [
-        "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs"
+        "engine/tests/test_modules/effects/recover/per_card/live_start_aqours_center_cost_nine_blade_gain_or_opponent_wait_test.rs",
+        "engine/tests/test_modules/effects/recover/to_hand/chika_pb1_hand_gap_recovers_live_pl_s_pb1_001_r_test.rs"
       ],
       "covering_tests": [
+        "chika_pb1_empty_own_hand_meets_gap_of_two",
+        "chika_pb1_empty_p2_hand_does_not_recover",
+        "chika_pb1_equal_hands_do_not_recover",
+        "chika_pb1_hand_gap_one_does_not_recover",
+        "chika_pb1_hand_gap_over_two_recovers_live_from_waitroom",
+        "chika_pb1_hand_gap_two_recovers_live_from_waitroom",
         "deep_resonance_aqours_center_cost9_fires",
         "deep_resonance_aqours_center_cost9_ignores_left",
         "deep_resonance_aqours_cost13_at_left_no_fire",
@@ -33869,14 +33869,20 @@
         "deep_resonance_option_1_opponent_wait_exact_state",
         "deep_resonance_wrong_group_at_center_no_fire"
       ],
-      "covering_test_count": 8,
+      "covering_test_count": 14,
       "direct_tests": [
+        "chika_pb1_empty_own_hand_meets_gap_of_two",
+        "chika_pb1_empty_p2_hand_does_not_recover",
+        "chika_pb1_equal_hands_do_not_recover",
+        "chika_pb1_hand_gap_one_does_not_recover",
+        "chika_pb1_hand_gap_over_two_recovers_live_from_waitroom",
+        "chika_pb1_hand_gap_two_recovers_live_from_waitroom",
         "deep_resonance_aqours_center_cost9_ignores_left",
         "deep_resonance_aqours_cost13_at_left_no_fire",
         "deep_resonance_option_0_blade_gain_exact_modifier",
         "deep_resonance_option_1_opponent_wait_exact_state"
       ],
-      "direct_test_count": 4,
+      "direct_test_count": 10,
       "is_null": false,
       "use_limit": null,
       "watches_abilities": false,
@@ -48572,7 +48578,6 @@
       "has_negative": true,
       "covering_files": [
         "engine/tests/test_modules/effects/cost_mod/required_hearts/distinct_stage_waitroom_members_required_hearts_test.rs",
-        "engine/tests/test_modules/effects/draw/flat/live_success_compare_revealed_draw_behaviour_test.rs",
         "engine/tests/test_modules/effects/gain/hearts/live_start/live_start_convert_selected_member_heart_color_test.rs",
         "engine/tests/test_modules/effects/look_select/recruit_stage/cost_tier_remainder_to_deck_top_routing_test.rs",
         "engine/tests/test_modules/effects/look_select/reveal/sequential_cost_look_five_take_group_member_test.rs",
@@ -48618,7 +48623,7 @@
         "hana_009_q245_self_deploy_to_center_triggers_each_time",
         "hanaho_baton_touch_low_cost_no_trigger"
       ],
-      "covering_test_count": 76,
+      "covering_test_count": 72,
       "direct_tests": [
         "awake_q36_low_cheers_no_score",
         "baton_touch_activates_energy",
