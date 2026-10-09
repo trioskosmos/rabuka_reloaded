@@ -41,8 +41,13 @@ use std::cell::Cell;
 /// Bytes reserved at the front of every pooled block to record its true width.
 const HEADER: usize = std::mem::size_of::<usize>();
 /// Smallest pooled block, header included. Must exceed `size_of::<*mut u8>()`
-/// because a free block stores its own link in its first word.
-const MIN_CLASS: usize = 32;
+/// because a free block stores its own link in its first word. Was 32; the
+/// allocation report's single largest class is 8-15B (2.2M of 7.3M
+/// allocations, 30%), which was falling through to System because the pool
+/// floor was 32. A 16-byte block is 8B header + 8B payload, enough for any
+/// align-<=8 request up to 15B — `is_pooled` already requires
+/// `layout.align() <= POOL_ALIGN` (8), so nothing over-aligned slips in.
+const MIN_CLASS: usize = 16;
 /// Largest pooled *payload*, in bytes. Bigger requests go to the system
 /// allocator: large blocks are rare here and are not worth the retention.
 const MAX_POOLED: usize = 512;
