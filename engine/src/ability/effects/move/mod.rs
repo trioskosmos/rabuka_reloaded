@@ -450,7 +450,7 @@ impl AbilityResolver {
             return Ok(());
         }
         let card_type_filter: Option<&str> = card_type_owned.as_deref();
-        let tgt = effect.target.clone();
+        let tgt: Option<&str> = effect.target.as_deref();
         let is_self_cost = effect.self_cost_any().unwrap_or(false);
         let exclude_self = effect.exclude_self_any().unwrap_or(false);
         let is_max = effect.max.unwrap_or(false);
@@ -475,13 +475,16 @@ impl AbilityResolver {
         let name_fragments: Option<Vec<String>> = Self::resolve_name_fragments(gs, effect);
 
         let mut moved_cards: Vec<i16> = Vec::new();
-        let source = effect
-            .source_any()
-            .map(|s| s.to_string())
-            .unwrap_or_default();
-        let destination = effect
+        // `source`/`destination`/`tgt` are borrowed from `effect`, which
+        // every caller passes as a local clone or a non-`gs` param — the
+        // `&mut GameState` + `&AbilityEffect` signature already guarantees
+        // `effect` does not borrow `gs`, so the borrows live across the
+        // `&mut gs` calls below without conflict. `Zone::to_str()` is
+        // `&'static str`, so `destination` does not borrow `effect` at all.
+        let source: &str = effect.source_any().unwrap_or_default();
+        let destination: &'static str = effect
             .destination
-            .map(|z| z.to_str().to_string())
+            .map(|z| z.to_str())
             .unwrap_or_default();
 
         let target = effect.target.as_deref().unwrap_or("self");
@@ -496,7 +499,7 @@ impl AbilityResolver {
             ),
             _ => false,
         };
-        let baton_arrival_area = if Zone::from_str(&destination) == Some(Zone::UnderMember)
+        let baton_arrival_area = if Zone::from_str(destination) == Some(Zone::UnderMember)
             && source == "discard"
             && effect.is_self_target()
             && effect
@@ -577,7 +580,7 @@ impl AbilityResolver {
 
         // For empty_area / stage destinations: skip selection prompt entirely
         // if the target has no empty slots (card text says "メンバーのいないエリアに").
-        if Zone::from_str(&destination) == Some(Zone::EmptyArea) {
+        if Zone::from_str(destination) == Some(Zone::EmptyArea) {
             let player = gs.resolve_target_player(target);
             let has_empty_slot = (0..3).any(|i| player.stage.stage[i] == -1);
             if !has_empty_slot {
@@ -612,8 +615,8 @@ impl AbilityResolver {
                 effect.exclude_characters_any(),
             ),
             MoveRoute {
-                source: &source,
-                destination: &destination,
+                source,
+                destination,
                 use_p2,
             },
             &card_db,
@@ -642,8 +645,8 @@ impl AbilityResolver {
             gs,
             DeckOrderHint::of(effect),
             &taken,
-            &source,
-            &destination,
+            source,
+            destination,
             &mut moved_cards,
         ) {
             return Ok(());
@@ -665,9 +668,9 @@ if util::distinct_should_dedupe(distinct) {
         if self.place_taken_cards(
             gs,
             &taken,
-            &source,
-            &destination,
-            tgt.as_deref(),
+            source,
+            destination,
+            tgt,
             effect,
             use_p2,
             vacated_stage_area,
@@ -688,10 +691,10 @@ if util::distinct_should_dedupe(distinct) {
         self.finalize_card_movement(
             gs,
             &moved_cards,
-            &destination,
-            &source,
+            destination,
+            source,
             &state_change,
-            tgt.as_deref(),
+            tgt,
         );
         Ok(())
     }

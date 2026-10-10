@@ -565,7 +565,32 @@ failures, unchanged). This is instrumentation overhead,
 not engine work — it vanishes in the production
 (no-`profiling`) build — but it was drowning the
 allocation signal the audit measures by, so collapsing
-it makes every remaining engine allocation visible.
+  it makes every remaining engine allocation visible.
+
+**2026-10-10 (allocation audit round 5 — `SmallVec<[usize; 2]>`
+for `card_indices`/`indices`; `total_actions` byte-identical):**
+the last `Vec` on the per-action path. `ActionParameters.
+card_indices` and `ChoiceResult::CardSelected.indices` were
+`Vec<usize>`, and every `SelectLiveCard` action and every
+pending-choice card answer built a one-element `Vec` for them
+(`Some(vec![hand_index])` in `generate_live_card_set_actions`,
+15,040 calls; the `SelectCard`/`SelectTarget` arms of
+`generate_pending_choice_actions`, 4,649 calls). Both are now
+`SmallVec<[usize; 2]>` — the indices are a hand index plus, at
+most, a second index for the double-baton area pair, so two
+elements sit inline on the stack and the common one-element case
+never touches the heap. The boundary structs that serialize the
+indices (`link.rs` `LinkAction`, `web_server.rs` `FrameAction`)
+keep `Vec<usize>` and convert at the boundary, so the wire
+format is unchanged. `−116,196` alloc calls (−16.8%: 693,076 →
+576,880), entirely from the 8–15 B size class (214,462 →
+98,266, −54% — a one-element `Vec` header is exactly that
+class); `total_actions=29875` byte-identical. The production
+build (default features, pool active) is timing-neutral-to-faster:
+aqours_cup 2000 games ~165–170k aps, above the 143,231 record.
+Test call sites updated with `.into()` conversions (28 sites
+across 11 files); the `resume_traced` helper signature is now
+`Option<SmallVec<[usize; 2]>>`.
 
 **What the audit found is left, and why each is not a
 quick win** (so it is not rediscovered as if new):
@@ -587,7 +612,7 @@ quick win** (so it is not rediscovered as if new):
   `card_property` half of the same item *was* landable
   (above) because its `filter` dies at the `retain_valid`
   call before any mutable borrow.
-- The **`card_indices: Some(vec![hand_index])`** on every
+- ~~The **`card_indices: Some(vec![hand_index])`** on every
   `SelectLiveCard` action (~75k allocs, the dominant 8–15 B
   class in `generate_live_card_set_actions`) is
   **load-bearing**: `resolve_hand_answer_index` prefers
@@ -596,7 +621,10 @@ quick win** (so it is not rediscovered as if new):
   hand holding two copies of the same card id is
   disambiguated only by the exact `hand_index`. Removing it
   needs a `SmallVec` type change across every `card_indices`
-  consumer, not a local fix.
+  consumer, not a local fix.~~ **Landed in round 5** (above):
+  `card_indices`/`indices` are `SmallVec<[usize; 2]>`, so the
+  one-element `Vec` is gone while the exact `hand_index`
+  disambiguation is preserved (the `SmallVec` still carries it).
 - The **choice-action label `String`s** (`generate_pending_choice_actions`'
   PAY_SKIP arm uses raw `.to_string()`, not the display-gated
   `action_desc!`) are display-only — `make_action` and

@@ -77,9 +77,6 @@ pub mod pool_alloc;
 #[global_allocator]
 static ALLOC: alloc_counter::CountingAllocator = alloc_counter::CountingAllocator;
 
-#[cfg(all(feature = "fast_alloc", feature = "alloc_tracker"))]
-type SystemAlloc = pool_alloc::PoolAllocator;
-
 #[cfg(all(feature = "fast_alloc", not(feature = "alloc_tracker")))]
 #[global_allocator]
 static ALLOC: pool_alloc::PoolAllocator = pool_alloc::PoolAllocator;

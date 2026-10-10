@@ -48,7 +48,6 @@ use std::sync::Arc;
 use rabuka_engine::alloc_counter;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::game::game_setup;
-use rabuka_engine::game_state::Phase;
 
 use crate::helpers::{load_real_database, TestGame};
 

@@ -1271,13 +1271,16 @@ impl super::TurnEngine {
             })
         };
 
-        // `card_no` is the printed card number, consumed by the debut-trigger
-        // path below on every member play (122,621 plays per benchmark),
-        // so it is resolved here — not deferred to the rare double-baton
-        // branch, which would break the common path.
-        let card_no = card_db
+        // `card_no` is the printed card number. It is only ever read by
+        // `trigger_debut_abilities` in its `card_id == None` fallback
+        // (this caller always passes `Some(card_id)`, so the fallback is
+        // not taken) and by a `log::trace!` that is compiled out in
+        // release — so it is borrowed from the interned `ArcStr` in the
+        // card database rather than cloned into a fresh `String` on every
+        // one of the ~122k member plays per benchmark.
+        let card_no: &str = card_db
             .get_card(card_id)
-            .map(|c| c.card_no.to_string())
+            .map(|c| c.card_no.as_deref())
             .unwrap_or_default();
         let player_id = player.id.clone();
 
@@ -1294,7 +1297,7 @@ impl super::TurnEngine {
         // constant ability (play_baton_touch, count>1) is offered as separate gold buttons.
         if let Some(db_areas) = double_baton_areas {
             return Self::play_double_baton(
-                game_state, card_id, &card_no, &player_id, idx, area, db_areas, &card_db,
+                game_state, card_id, card_no, &player_id, idx, area, db_areas, &card_db,
             );
         }
 
@@ -1383,7 +1386,7 @@ impl super::TurnEngine {
         Self::trigger_debut_abilities(
             game_state,
             &player_id,
-            &card_no,
+            card_no,
             cost_paid,
             baton_touch_used,
             Some(card_id),
