@@ -59,7 +59,7 @@ fn chisato_natsumi_double_baton_both_have_blade_heart() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(card),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::Center),
         Some(true),
     )
@@ -109,7 +109,7 @@ fn chisato_natsumi_double_baton_no_blade_heart() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(card),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::Center),
         Some(true),
     )
@@ -159,7 +159,7 @@ fn chisato_natsumi_q265_double_baton_both_no_blade_heart() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(card),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::Center),
         Some(true),
     )
@@ -217,7 +217,7 @@ fn chisato_natsumi_debut_draw_counts_only_replaced_not_full_waitroom() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(card),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::Center),
         Some(true),
     )
@@ -265,7 +265,7 @@ fn chisato_natsumi_debut_double_baton_both_blade_heart() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(card),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::Center),
         Some(true),
     )
@@ -314,7 +314,7 @@ fn chisato_natsumi_debut_double_baton_no_blade_heart() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(card),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::Center),
         Some(true),
     )
@@ -460,7 +460,7 @@ fn chisato_natsumi_baton_replacing_non_liella_counts_only_liella() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(card),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::Center),
         Some(true),
     )

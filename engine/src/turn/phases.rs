@@ -718,7 +718,7 @@ impl super::TurnEngine {
     fn resolve_hand_answer_index(
         game_state: &GameState,
         card_id: Option<i16>,
-        card_indices: Option<Vec<usize>>,
+        card_indices: Option<smallvec::SmallVec<[usize; 2]>>,
     ) -> usize {
         if let Some(indices) = card_indices {
             indices.first().copied().unwrap_or(0)
@@ -779,7 +779,7 @@ impl super::TurnEngine {
     pub(crate) fn handle_mulligan_selection(
         game_state: &mut GameState,
         card_id: Option<i16>,
-        card_indices: Option<Vec<usize>>,
+        card_indices: Option<smallvec::SmallVec<[usize; 2]>>,
     ) -> Result<(), String> {
         // Resolve against the mulligan OWNER, not `active_player()`. They agree
         // while the phase is still live, but naming the owner explicitly keeps
@@ -807,7 +807,7 @@ impl super::TurnEngine {
 
     pub fn handle_mulligan_confirmation(
         game_state: &mut GameState,
-        card_indices: Option<Vec<usize>>,
+        card_indices: Option<smallvec::SmallVec<[usize; 2]>>,
     ) -> Result<(), String> {
         // Capture the owner BEFORE the phase advances. `advance_mulligan_phase`
         // flips MulliganFirstAttacker -> MulliganSecondAttacker, after which
@@ -822,6 +822,7 @@ impl super::TurnEngine {
         // server-side selection is not silently discarded.
         let mulligan_indices: Vec<usize> = card_indices
             .filter(|v| !v.is_empty())
+            .map(|v| v.to_vec())
             .unwrap_or_else(|| {
                 game_state
                     .mulligan_selected_indices
@@ -907,7 +908,7 @@ impl super::TurnEngine {
     pub(crate) fn handle_live_card_selection(
         game_state: &mut GameState,
         card_id: Option<i16>,
-        card_indices: Option<Vec<usize>>,
+        card_indices: Option<smallvec::SmallVec<[usize; 2]>>,
     ) -> Result<(), String> {
         let idx = Self::resolve_hand_answer_index(game_state, card_id, card_indices);
         if Self::deselect_index(&mut game_state.live_card_selected_indices, idx) {
@@ -928,11 +929,14 @@ impl super::TurnEngine {
 
     pub(crate) fn handle_live_card_confirmation(
         game_state: &mut GameState,
-        card_indices: Option<Vec<usize>>,
+        card_indices: Option<smallvec::SmallVec<[usize; 2]>>,
     ) -> Result<(), String> {
         let is_second = matches!(game_state.current_phase, Phase::LiveCardSetSecondAttacker);
         let live_indices: Vec<usize> =
-            card_indices.filter(|v| !v.is_empty()).unwrap_or_else(|| {
+            card_indices
+                .filter(|v| !v.is_empty())
+                .map(|v| v.to_vec())
+                .unwrap_or_else(|| {
                 game_state
                     .live_card_selected_indices
                     .iter()
@@ -1192,7 +1196,7 @@ impl super::TurnEngine {
     pub fn handle_play_member_to_stage(
         game_state: &mut GameState,
         card_id: Option<i16>,
-        card_indices: Option<Vec<usize>>, // For double baton: [area1_idx, area2_idx]
+        card_indices: Option<smallvec::SmallVec<[usize; 2]>>, // For double baton: [area1_idx, area2_idx]
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {

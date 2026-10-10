@@ -151,7 +151,7 @@ impl super::TurnEngine {
         game_state: &mut GameState,
         action: &crate::game_setup::ActionType,
         card_id: Option<i16>,
-        card_indices: Option<Vec<usize>>,
+        card_indices: Option<smallvec::SmallVec<[usize; 2]>>,
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {
@@ -233,7 +233,7 @@ impl super::TurnEngine {
         game_state: &mut GameState,
         action: &crate::game_setup::ActionType,
         card_id: Option<i16>,
-        card_indices: Option<Vec<usize>>,
+        card_indices: Option<smallvec::SmallVec<[usize; 2]>>,
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
         ability_index: Option<usize>,
@@ -604,7 +604,7 @@ impl super::TurnEngine {
                     .or_else(|| {
                         card_id
                             .and_then(|id| usize::try_from(id).ok())
-                            .map(|id| vec![id])
+                        .map(|id| vec![id])
                     })
                     .unwrap_or_default();
                 if idxs.is_empty() {
@@ -757,7 +757,7 @@ impl super::TurnEngine {
     pub fn resume_with_choice(
         game_state: &mut GameState,
         card_id: Option<i16>,
-        card_indices: Option<Vec<usize>>,
+        card_indices: Option<smallvec::SmallVec<[usize; 2]>>,
     ) -> Result<(), String> {
         if game_state.pending_loop_protocol.is_some() {
             let choice = game_state
@@ -1019,7 +1019,7 @@ impl super::TurnEngine {
     fn lookup_option_target(
         options: Option<&Vec<String>>,
         card_id: Option<i16>,
-        card_indices: &Option<Vec<usize>>,
+        card_indices: &Option<smallvec::SmallVec<[usize; 2]>>,
     ) -> Option<String> {
         let opts = options?;
         if let Some(&idx) = card_indices.as_deref().and_then(|v| v.first()) {
@@ -1051,7 +1051,7 @@ impl super::TurnEngine {
 
     /// Answer index, indices channel first, then card id, else 0. Shared by
     /// the SelectLiveSuccess / SelectAutoAbility arms.
-    fn answer_index(card_id: Option<i16>, card_indices: &Option<Vec<usize>>) -> usize {
+    fn answer_index(card_id: Option<i16>, card_indices: &Option<smallvec::SmallVec<[usize; 2]>>) -> usize {
         card_indices
             .as_ref()
             .and_then(|v| v.first().copied())
@@ -1062,7 +1062,7 @@ impl super::TurnEngine {
     fn build_choice_result(
         choice: &crate::ability::types::Choice,
         card_id: Option<i16>,
-        card_indices: Option<Vec<usize>>,
+        card_indices: Option<smallvec::SmallVec<[usize; 2]>>,
         choice_card_no: Option<&ChoiceRoute>,
     ) -> Result<crate::ability::types::ChoiceResult, String> {
         match choice {
@@ -1070,7 +1070,7 @@ impl super::TurnEngine {
                 let indices = card_indices.unwrap_or_else(|| {
                     card_id
                         .and_then(|id| usize::try_from(id).ok())
-                        .map(|id| vec![id])
+                        .map(|id| smallvec::smallvec![id])
                         .unwrap_or_default()
                 });
                 Ok(crate::ability::types::ChoiceResult::CardSelected { indices })

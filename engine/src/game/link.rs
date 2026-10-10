@@ -116,7 +116,7 @@ impl LinkAction {
             tag: a.action_type.to_tag(),
             card_id: params.and_then(|p| p.card_id),
             card_indices: params
-                .and_then(|p| p.card_indices.clone())
+                .and_then(|p| p.card_indices.as_ref().map(|v| v.to_vec()))
                 .unwrap_or_default(),
             stage_area: action_stage_tag(params),
             use_baton_touch: params.and_then(|p| p.use_baton_touch).unwrap_or(false),
@@ -234,9 +234,9 @@ pub fn find_local_action(acts: &[Action], link: &LinkAction) -> Option<usize> {
             && a.parameters.as_ref().and_then(|p| p.card_id) == link.card_id
             && a.parameters
                 .as_ref()
-                .and_then(|p| p.card_indices.clone())
+                .and_then(|p| p.card_indices.as_deref())
                 .unwrap_or_default()
-                == link.card_indices
+                == link.card_indices.as_slice()
             && want_area(a) == link.stage_area
             && a.parameters.as_ref().and_then(|p| p.use_baton_touch).unwrap_or(false)
                 == link.use_baton_touch

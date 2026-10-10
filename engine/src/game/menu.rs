@@ -851,14 +851,14 @@ if count <= 1 {
                 );
                 match sel {
                     None => {
-                        TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
+                        TurnEngine::resume_with_choice(gs, None, Some(Vec::new().into())).ok();
                     }
                     Some(idx) => {
                         // `shown` maps the grid position back to the zone
                         // index the engine resolves (look zones show the
                         // whole pool, so this is the identity there).
                         let actual_idx = shown.get(idx).copied().unwrap_or(idx);
-                        TurnEngine::resume_with_choice(gs, None, Some(vec![actual_idx])).ok();
+                        TurnEngine::resume_with_choice(gs, None, Some(vec![actual_idx].into())).ok();
                     }
                 }
             } else {
@@ -917,7 +917,7 @@ if count <= 1 {
                 }
                 let actual_indices: Vec<usize> =
                     selected.iter().map(|&i| shown.get(i).copied().unwrap_or(i)).collect();
-                TurnEngine::resume_with_choice(gs, None, Some(actual_indices)).ok();
+                TurnEngine::resume_with_choice(gs, None, Some(actual_indices.into())).ok();
             }
             true
         }
@@ -949,7 +949,7 @@ if count <= 1 {
             match sel {
                 None => match target.as_str() {
                     "choice" | "choice_string" | "conditional_optional" => {
-                        TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
+                        TurnEngine::resume_with_choice(gs, None, Some(Vec::new().into())).ok();
                     }
                     _ => {
                         TurnEngine::resume_with_choice(gs, Some(-1), None).ok();
@@ -1012,7 +1012,7 @@ if count <= 1 {
         } => {
             let items: Vec<String> = options.iter().map(|o| o.card_name.clone()).collect();
             if items.is_empty() {
-                TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
+                TurnEngine::resume_with_choice(gs, None, Some(Vec::new().into())).ok();
                 return true;
             }
             // Card numbers for the focused-row art preview. Options were
@@ -1037,7 +1037,7 @@ if count <= 1 {
                 ui, gs, &items, prompt, false, Some(&card_nos), None,
             )
             .unwrap_or(0);
-            TurnEngine::resume_with_choice(gs, None, Some(vec![sel])).ok();
+            TurnEngine::resume_with_choice(gs, None, Some(vec![sel].into())).ok();
             true
         }
     }

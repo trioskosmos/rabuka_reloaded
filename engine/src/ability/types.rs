@@ -323,7 +323,7 @@ pub struct AutoAbilityOption {
 #[derive(Debug, Clone)]
 
 pub enum ChoiceResult {
-    CardSelected { indices: Vec<usize> },
+    CardSelected { indices: smallvec::SmallVec<[usize; 2]> },
     TargetSelected { target: String },
     PositionSelected { position: String },
     HeartColorSelected { colors: Vec<String> },

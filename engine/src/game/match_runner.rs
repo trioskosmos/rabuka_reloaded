@@ -117,10 +117,10 @@ pub(crate) fn ai_handle_choice(gs: &mut GameState) -> bool {
         }
         Choice::SelectLiveSuccess { options, .. } => {
             if options.is_empty() {
-                return TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).is_ok();
+                return TurnEngine::resume_with_choice(gs, None, Some(Vec::new().into())).is_ok();
             }
             let idx = crate::rng::rand_range(options.len());
-            TurnEngine::resume_with_choice(gs, None, Some(vec![idx])).is_ok()
+            TurnEngine::resume_with_choice(gs, None, Some(vec![idx].into())).is_ok()
         }
         Choice::SelectHeartColor { options, .. }
         | Choice::SelectHeartType { options, .. } => {
@@ -141,7 +141,7 @@ pub(crate) fn ai_handle_choice(gs: &mut GameState) -> bool {
                 "choice" | "choice_string" | "conditional_optional" => TurnEngine::resume_with_choice(
                     gs,
                     None,
-                    Some(vec![idx.usize_count()]),
+                    Some(vec![idx.usize_count()].into()),
                 )
                 .is_ok(),
                 _ => TurnEngine::resume_with_choice(gs, Some(idx), None).is_ok(),
@@ -180,7 +180,7 @@ pub(crate) fn ai_handle_choice(gs: &mut GameState) -> bool {
                 .map(|fi| fi.len())
                 .unwrap_or(card_ids.len());
             if n_options == 0 {
-                return TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).is_ok();
+                return TurnEngine::resume_with_choice(gs, None, Some(Vec::new().into())).is_ok();
             }
             // VsAi: the AI never "skips" a mandatory choice; allow_skip paths
             // are human affordances. Auto-pick instead of skipping.
@@ -188,7 +188,7 @@ pub(crate) fn ai_handle_choice(gs: &mut GameState) -> bool {
             if *count <= 1 {
                 let idx = crate::rng::rand_range(n_options);
                 let actual = filtered_indices.as_ref().map(|fi| fi[idx]).unwrap_or(idx);
-                TurnEngine::resume_with_choice(gs, None, Some(vec![actual])).is_ok()
+                TurnEngine::resume_with_choice(gs, None, Some(vec![actual].into())).is_ok()
             } else {
                 let want = (*count).min(n_options);
                 let mut picked = Vec::with_capacity(want);
@@ -202,7 +202,7 @@ pub(crate) fn ai_handle_choice(gs: &mut GameState) -> bool {
                         break;
                     }
                 }
-                TurnEngine::resume_with_choice(gs, None, Some(picked)).is_ok()
+                TurnEngine::resume_with_choice(gs, None, Some(picked.into())).is_ok()
             }
         }
     }

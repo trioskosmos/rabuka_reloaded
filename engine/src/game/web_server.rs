@@ -833,7 +833,7 @@ fn ai_frame_action(action: &crate::game_setup::Action, ai_pid: u8) -> FrameActio
         action_type: action.action_type.to_string(),
         player_id: ai_pid,
         card_id: p.and_then(|x| x.card_id),
-        card_indices: p.and_then(|x| x.card_indices.clone()),
+        card_indices: p.and_then(|x| x.card_indices.as_ref().map(|v| v.to_vec())),
         stage_area: p.and_then(|x| x.stage_area.clone()),
         use_baton_touch: p.and_then(|x| x.use_baton_touch).unwrap_or(false),
     }
@@ -1325,7 +1325,9 @@ pub async fn execute_action(
             &mut game_state,
             &action_type,
             req.card_id,
-            req.card_indices.as_ref().cloned(),
+            req.card_indices
+                .as_ref()
+                .map(|v| smallvec::SmallVec::from_slice(v)),
             req.stage_area
                 .as_ref()
                 .and_then(|s| s.parse::<crate::zones::MemberArea>().ok()),

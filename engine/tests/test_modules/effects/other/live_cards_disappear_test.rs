@@ -87,7 +87,7 @@ fn live_cards_stuck_in_live_zone_instead_of_discard() {
         if ct == "SelectAutoAbility" {
             game.select_indices(&[]);
         } else if ct == "SelectLiveSuccess" {
-            TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![0]))
+            TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![0].into()))
                 .expect("resume live success failed");
         } else {
             break;
@@ -109,7 +109,7 @@ fn live_cards_stuck_in_live_zone_instead_of_discard() {
             if ct == "SelectAutoAbility" {
                 game.select_indices(&[]);
             } else if ct == "SelectLiveSuccess" {
-                TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![0]))
+                TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![0].into()))
                     .expect("resume live success failed");
             } else {
                 break;

@@ -27,7 +27,7 @@ fn trigger_and_drain(game: &mut TestGame) {
         match choice {
             rabuka_engine::ability::types::Choice::SelectCard { allow_skip, .. } => {
                 if allow_skip {
-                    TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![]))
+                    TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![].into()))
                         .expect("skip select card");
                 } else {
                     break;

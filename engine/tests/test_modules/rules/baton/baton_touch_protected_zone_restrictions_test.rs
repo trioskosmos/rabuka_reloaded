@@ -74,7 +74,7 @@ fn double_baton_to_protected_zone_rejected() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(sumire),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::Center),
         Some(true),
     );
@@ -136,7 +136,7 @@ fn double_baton_to_non_protected_zones_succeeds() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(sumire),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::Center),
         Some(true),
     );

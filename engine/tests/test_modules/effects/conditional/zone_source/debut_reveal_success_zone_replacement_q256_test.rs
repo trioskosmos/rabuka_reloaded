@@ -65,7 +65,7 @@ fn select_maki_reveal(game: &mut TestGame, card_id: i16) {
         .as_ref()
         .and_then(|parameters| parameters.card_index)
         .expect("generated physical hand index");
-    TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![physical_index]))
+    TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![physical_index].into()))
         .expect("revealed live selection");
 }
 

@@ -45,7 +45,7 @@ fn sumire_q193_q194_baton_touch_draw_and_deploy() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(sumire),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::Center),
         Some(true),
     )
@@ -329,7 +329,7 @@ fn sumire_double_baton_to_left_does_not_activate_debut() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(sumire),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::LeftSide),
         Some(true),
     )
@@ -495,7 +495,7 @@ fn execute_action_via_string_parsing(
         &mut game.state,
         &action_type,
         card_id,
-        card_indices,
+        card_indices.map(|v| v.into()),
         stage_area,
         use_baton_touch,
     )
@@ -626,7 +626,7 @@ fn sumire_explicit_double_baton_via_card_indices() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(sumire),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::Center),
         Some(true),
     )
@@ -718,7 +718,7 @@ fn sumire_explicit_double_baton_to_left_no_debut() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(sumire),
-        Some(vec![0, 1]),
+        Some(vec![0, 1].into()),
         Some(MemberArea::LeftSide),
         Some(true),
     )

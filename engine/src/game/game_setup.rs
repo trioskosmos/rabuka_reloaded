@@ -281,7 +281,7 @@ impl Action {
 pub struct ActionParameters {
     pub card_id: Option<i16>,      // Database card ID - reliable identifier
     pub card_index: Option<usize>, // Array position - kept for backward compatibility
-    pub card_indices: Option<Vec<usize>>, // For selecting multiple cards (e.g., live cards)
+    pub card_indices: Option<smallvec::SmallVec<[usize; 2]>>, // For selecting multiple cards (e.g., live cards); the 1-2 element cases (a hand index, a double-baton area pair) stay inline so the hot generation paths never touch the heap
     pub stage_area: Option<String>, // "left", "center", "right"
     #[cfg_attr(feature = "serde_support", serde(skip))]
     pub stage_area_index: Option<u8>,
@@ -1327,7 +1327,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         card_id: Some(*card_id),
                         card_index: Some(*zone_index),
                         card_indices: if is_selectable {
-                            Some(vec![fi_index])
+                            Some(smallvec::smallvec![fi_index])
                         } else {
                             None
                         },
@@ -1344,7 +1344,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     ActionType::ChoiceSelect,
                     action_desc!("Select card(s): {}", description),
                     ActionParameters {
-                        card_indices: Some(Vec::new()),
+                        card_indices: Some(smallvec::SmallVec::new()),
                         card_no: display_str("select"),
                         ..make_params()
                     },
@@ -1555,7 +1555,7 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
             ActionParameters {
                 card_id: Some(*card_id),
                 card_index: Some(hand_index),
-                card_indices: Some(vec![hand_index]),
+                card_indices: Some(smallvec::smallvec![hand_index]),
                 card_name: if display {
                     Some(card_name.to_string())
                 } else {
@@ -2138,7 +2138,7 @@ stage_area_index: Some(slot.u8_count()),
                                                 None
                                             },
                                             stage_area_index: Some(pair.placement.to_index().u8_count()),
-                                            card_indices: Some(area_indices),
+                                            card_indices: Some(area_indices.into()),
                                             // See the note on available_areas
                                             // above: decision data, not display
                                             // data, so never elided by build
@@ -2549,7 +2549,7 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
             ActionParameters {
                 card_id: Some(*card_id),
                 card_index: Some(hand_index),
-                card_indices: Some(vec![hand_index]),
+                card_indices: Some(smallvec::smallvec![hand_index]),
                 card_name: if display {
                     Some(card_name.to_string())
                 } else {

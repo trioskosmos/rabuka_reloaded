@@ -56,7 +56,7 @@ fn setup_kanon(game: &mut TestGame, top_cards: &[i16]) -> i16 {
 
 /// Pay the optional cost by selecting hand index 0.
 fn pay_optional_cost(game: &mut TestGame) {
-    TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![0])).ok();
+    TurnEngine::resume_with_choice(&mut game.state, None, Some(vec![0].into())).ok();
 }
 
 /// Select Liella! cost≤4 from looked_at, skip stage followup → stays in hand.

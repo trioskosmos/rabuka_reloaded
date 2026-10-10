@@ -427,7 +427,7 @@ impl TestGame {
             &mut self.state,
             &ActionType::PlayMemberToStage,
             Some(card_id),
-            Some(indices),
+            Some(indices.into()),
             Some(land_in),
             Some(false),
         )

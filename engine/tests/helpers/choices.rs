@@ -143,7 +143,7 @@ impl TestGame {
 
     fn resume_indices(&mut self, indices: &[usize]) -> Result<(), String> {
         if self.select_via_generated(indices).is_err() {
-            TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec()))
+            TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec().into()))
         } else {
             Ok(())
         }
@@ -215,7 +215,7 @@ impl TestGame {
         &mut self,
         label: String,
         selected: Option<i16>,
-        indices: Option<Vec<usize>>,
+        indices: Option<smallvec::SmallVec<[usize; 2]>>,
         expect_msg: &str,
     ) {
         if self.trace.live() {

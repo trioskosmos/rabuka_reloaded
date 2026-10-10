@@ -36,7 +36,7 @@ use rabuka_engine::bot::observation::*;
             parameters: Some(ActionParameters {
                 card_id: Some(hidden),
                 card_index: Some(0),
-                card_indices: Some(vec![0]),
+                card_indices: Some(vec![0].into()),
                 stage_area: None,
                 stage_area_index: None,
                 use_baton_touch: None,

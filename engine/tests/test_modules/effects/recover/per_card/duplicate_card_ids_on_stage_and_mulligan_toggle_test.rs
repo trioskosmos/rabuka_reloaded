@@ -65,7 +65,7 @@ fn mulligan_toggle_works() {
         &mut game.state,
         &ActionType::SelectMulligan,
         None,
-        Some(vec![0]),
+        Some(vec![0].into()),
         None,
         None,
     )
@@ -78,7 +78,7 @@ fn mulligan_toggle_works() {
         &mut game.state,
         &ActionType::SelectMulligan,
         None,
-        Some(vec![0]),
+        Some(vec![0].into()),
         None,
         None,
     )
@@ -93,7 +93,7 @@ fn mulligan_toggle_works() {
         &mut game.state,
         &ActionType::SelectMulligan,
         None,
-        Some(vec![1]),
+        Some(vec![1].into()),
         None,
         None,
     )
@@ -106,7 +106,7 @@ fn mulligan_toggle_works() {
         &mut game.state,
         &ActionType::SelectMulligan,
         None,
-        Some(vec![1]),
+        Some(vec![1].into()),
         None,
         None,
     )
