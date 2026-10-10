@@ -38,7 +38,7 @@ impl super::TurnEngine {
         // `has_trigger(Debut)`, so it is exactly the ability the
         // string key used to re-find by full text (no card in the
         // corpus carries two abilities with the same full text).
-        let mut abilities_to_trigger: SmallVec<[(usize, String, i16); 4]> = SmallVec::new();
+        let mut abilities_to_trigger: SmallVec<[(usize, crate::core::types::ArcStr, i16); 4]> = SmallVec::new();
 
         let card_id_opt = card_id;
         {
@@ -148,7 +148,7 @@ impl super::TurnEngine {
                     }
                     abilities_to_trigger.push((
                         ability_index,
-                        card.card_no.to_string(),
+                        card.card_no.clone(),
                         card_id,
                     ));
                 }
@@ -165,7 +165,7 @@ impl super::TurnEngine {
             game_state.trigger_auto_ability_by_index(
                 AbilityTrigger::Debut,
                 player_id,
-                Some(card_no.as_str()),
+                Some(&*card_no),
                 Some(stage_card_id),
                 ability_index,
                 moved_snapshot.as_ref(),

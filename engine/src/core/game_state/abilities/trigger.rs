@@ -274,11 +274,11 @@ impl GameState {
 
     fn build_ability_queue_entry(
         &self,
-        card_no: String,
+        card_no: crate::core::types::ArcStr,
         ability_index: usize,
         ability: crate::Arc<crate::card::Ability>,
         card_id: Option<i16>,
-        player_id: String,
+        player_id: crate::core::player::PlayerId,
         trigger: AbilityTriggerContext,
     ) -> crate::ability::queue::AbilityQueueEntry {
         let AbilityTriggerContext {
@@ -289,13 +289,13 @@ impl GameState {
         crate::ability::queue::AbilityQueueEntry {
             card_no,
             // Normalise "player1"/"player2" to "p1"/"p2" exactly as before,
-            // but move the incoming String through untouched in the common
+            // but the incoming PlayerId is moved through untouched in the common
             // case where it is already canonical — the old `match` rebuilt an
             // identical String on every single enqueue.
             player_id: if player_id == "player1" {
-                "p1".to_string()
+                crate::core::player::PlayerId::p1().clone()
             } else if player_id == "player2" {
-                "p2".to_string()
+                crate::core::player::PlayerId::p2().clone()
             } else {
                 player_id
             },
@@ -644,7 +644,14 @@ impl GameState {
         #[cfg(not(feature = "no_std"))]
         let _timer = crate::timer::Timer::start("trig::auto_scan");
         let queued_before = self.ability_queue.len();
-        let mut abilities_to_trigger: Vec<(i16, usize, i16)> = Vec::new();
+        // Matched auto abilities, collected across the stage, live and
+        // moved-card scans and drained by the enqueue loop below. A
+        // scan almost never matches more than a handful, so a `SmallVec`
+        // keeps the common case on the stack; the `Vec` it replaces
+        // reallocated on its 1→2→4 growth for every scan that matched
+        // even one ability.
+        let mut abilities_to_trigger: SmallVec<[(i16, usize, i16); 4]> =
+            SmallVec::new();
         let skip_this_card_auto_key = self.just_completed_ability_key;
         let just_completed_batch_matches =
             self.just_completed_batch_matches(moved_cards);
@@ -997,7 +1004,7 @@ impl GameState {
         // <= 4 cards, which is the overwhelmingly common case.
         let moved = Some(smallvec::SmallVec::<[i16; 4]>::from_slice(moved_cards));
         let mut cached_card_id = None;
-        let mut cached_card_no = String::new();
+        let mut cached_card_no = crate::core::types::ArcStr::default();
         for (card_id, ability_idx, _stage_card_id) in abilities_to_trigger {
             let num_key = (card_id.u32_count() << 16) | ability_idx.u32_count();
             if !self.this_batch_triggered_ability_ids.contains(&num_key) {
@@ -1018,13 +1025,13 @@ impl GameState {
                 cached_card_no = self
                     .card_database
                     .get_card(card_id)
-                    .map(|c| String::from(c.card_no.as_ref()))
+                    .map(|c| c.card_no.clone())
                     .unwrap_or_default();
             }
             self.trigger_auto_ability_by_index_refs(
                 AbilityTrigger::Auto,
-                player_id,
-                Some(cached_card_no.as_str()),
+                crate::core::player::PlayerId::from(player_id),
+                Some(&*cached_card_no),
                 Some(card_id),
                 ability_idx,
                 moved.as_ref(),
@@ -1255,7 +1262,7 @@ impl GameState {
                 );
                 self.trigger_auto_ability_by_index_refs(
                     AbilityTrigger::Auto,
-                    owner_pid.as_str(),
+                    owner_pid.clone(),
                     Some(card_no.as_str()),
                     Some(watcher_id),
                     ability_idx,
@@ -1373,11 +1380,11 @@ pub fn trigger_auto_ability(
         triggering_member_id: Option<i16>,
     ) {
         let entry = self.build_ability_queue_entry(
-            card_no.to_string(),
+            crate::core::types::ArcStr::from(card_no),
             ability_index,
             ability,
             Some(cid),
-            player_id.to_string(),
+            crate::core::player::PlayerId::from(player_id),
             AbilityTriggerContext {
                 trigger_type: trigger_type.clone(),
                 trigger_moved_cards: trigger_moved_cards.clone(),
@@ -1440,11 +1447,11 @@ pub fn trigger_auto_ability(
             return;
         };
         let entry = self.build_ability_queue_entry(
-            card_no.to_string(),
+            crate::core::types::ArcStr::from(card_no),
             crate::ability::types::GAINED_ABILITY_INDEX_BASE + gidx,
             ability,
             Some(cid),
-            player_id.to_string(),
+            crate::core::player::PlayerId::from(player_id),
             AbilityTriggerContext {
                 trigger_type: trigger_type.clone(),
                 trigger_moved_cards: trigger_moved_cards.clone(),
@@ -1483,7 +1490,7 @@ pub fn trigger_auto_ability_by_index(
     ) {
         self.trigger_auto_ability_by_index_refs(
             trigger_type,
-            &player_id.into(),
+            player_id.into(),
             source_card_id,
             explicit_card_id,
             ability_index,
@@ -1496,7 +1503,7 @@ pub fn trigger_auto_ability_by_index(
     fn trigger_auto_ability_by_index_refs(
         &mut self,
         trigger_type: AbilityTrigger,
-        player_id: &str,
+        player_id: crate::core::player::PlayerId,
         source_card_id: Option<&str>,
         explicit_card_id: Option<i16>,
         ability_index: usize,
@@ -1510,11 +1517,11 @@ pub fn trigger_auto_ability_by_index(
             if let Some(card) = self.card_database.get_card(card_id) {
                 if let Some(ar) = card.abilities.get(ability_index) {
                     let entry = self.build_ability_queue_entry(
-                        source_card_id.unwrap_or_default().to_string(),
+                        source_card_id.map(|s| crate::core::types::ArcStr::from(s)).unwrap_or_default(),
                         ability_index,
                         ar.to_arc(),
                         Some(card_id),
-                        player_id.to_string(),
+                        player_id,
                         AbilityTriggerContext {
                             trigger_type: trigger_type.clone(),
                             trigger_moved_cards: trigger_moved_cards.map(|mc| mc.clone()),
@@ -1723,12 +1730,12 @@ pub fn trigger_auto_ability_by_index(
             let card_no = self
                 .card_database
                 .get_card(cid)
-                .map(|c| String::from(c.card_no.as_ref()))
+                .map(|c| c.card_no.clone())
                 .unwrap_or_default();
             self.trigger_auto_ability_by_index_refs(
                 crate::game_state::AbilityTrigger::Auto,
-                player_id,
-                Some(card_no.as_str()),
+                crate::core::player::PlayerId::from(player_id),
+                Some(&*card_no),
                 Some(cid),
                 ability_idx,
                 None,

@@ -499,20 +499,30 @@ impl TurnEngine {
         let mut blade_sources: Vec<BladeSource> = Vec::new();
         let mut total_hearts_arr = EMPTY_H8;
 
-        // Stage hearts source
-        let stage_heart_str: crate::types::ArcStr = "Stage (base)".into();
-        let mut stage_heart_arr = EMPTY_H8;
-        for (color, count) in &owned_hearts.hearts {
-            let idx = color.index();
-            if idx < 8 {
-                stage_heart_arr[idx] += count;
+        // Per-source attribution (`heart_sources`/`blade_sources`) feeds
+        // only `Breakdown.hearts`/`blades`, which no engine logic reads —
+        // `check_live_success` moves them through untouched and only the
+        // display/replay layer consumes them, the same contract
+        // `recalculate_constants`' `*_sources` already encode. Build them
+        // only when action display is on. The aggregate `total_hearts_arr`
+        // is the gameplay output and stays unconditional.
+        let display = crate::core::runtime_flags::action_display_enabled();
+        if display {
+            // Stage hearts source
+            let stage_heart_str: crate::types::ArcStr = "Stage (base)".into();
+            let mut stage_heart_arr = EMPTY_H8;
+            for (color, count) in &owned_hearts.hearts {
+                let idx = color.index();
+                if idx < 8 {
+                    stage_heart_arr[idx] += count;
+                }
             }
+            heart_sources.push(HeartSource {
+                source_type: SourceType::Stage,
+                source: stage_heart_str,
+                value: stage_heart_arr,
+            });
         }
-        heart_sources.push(HeartSource {
-            source_type: SourceType::Stage,
-            source: stage_heart_str,
-            value: stage_heart_arr,
-        });
         for (color, count) in &owned_hearts.hearts {
             let idx = color.index();
             if idx < 8 {
@@ -521,11 +531,13 @@ impl TurnEngine {
         }
 
         // Add stage blade source
-        blade_sources.push(BladeSource {
-            source_type: SourceType::Stage,
-            source: crate::types::ArcStr::from("Stage members"),
-            value: total_blade,
-        });
+        if display {
+            blade_sources.push(BladeSource {
+                source_type: SourceType::Stage,
+                source: crate::types::ArcStr::from("Stage members"),
+                value: total_blade,
+            });
+        }
 
         // Q42: Defer draw effects until after all yell cards have been revealed.
         let (yell_cards, cheer_icon_count, total_draw_icons) = Self::process_yell_zone_cards(
@@ -540,25 +552,28 @@ impl TurnEngine {
         // yell cards are revealed. Q104 refresh applies mid-draw.
         Self::draw_for_yell_icons(player, total_draw_icons);
 
-        // Yell heart source
-        let mut yell_heart_arr = EMPTY_H8;
-        for yc in &yell_cards {
-            for (i, &bh) in yc.blade_hearts.iter().enumerate() {
-                yell_heart_arr[i] += bh;
+        // Yell heart source (display-only attribution, see the stage
+        // source note above)
+        if display {
+            let mut yell_heart_arr = EMPTY_H8;
+            for yc in &yell_cards {
+                for (i, &bh) in yc.blade_hearts.iter().enumerate() {
+                    yell_heart_arr[i] += bh;
+                }
             }
-        }
-        if yell_heart_arr.iter().any(|&v| v > 0) {
-            heart_sources.push(HeartSource {
+            if yell_heart_arr.iter().any(|&v| v > 0) {
+                heart_sources.push(HeartSource {
+                    source_type: SourceType::Yell,
+                    source: crate::types::ArcStr::from("Yell cards"),
+                    value: yell_heart_arr,
+                });
+            }
+            blade_sources.push(BladeSource {
                 source_type: SourceType::Yell,
-                source: crate::types::ArcStr::from("Yell cards"),
-                value: yell_heart_arr,
+                source: format!("{} blades", total_blade).into(),
+                value: total_blade,
             });
         }
-        blade_sources.push(BladeSource {
-            source_type: SourceType::Yell,
-            source: format!("{} blades", total_blade).into(),
-            value: total_blade,
-        });
 
         // NOTE: Special hearts on cards sitting in the live_card_zone do NOT
         // apply here. Both the draw note (rule 8.3.12.1) and the score note

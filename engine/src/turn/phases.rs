@@ -173,7 +173,25 @@ impl super::TurnEngine {
                     // `SmallVec`; the previous `HashSet` collect
                     // allocated and hashed ~15 ids only to feed a
                     // membership test that a slice scan serves.
-                    let owned = turn_player.all_card_ids();
+                    //
+                    // `owned` is read only by
+                    // `tick_delayed_cannot_active_for`, whose
+                    // `delayed_cannot_active` map is empty on the
+                    // common path (the flag is set by a handful of
+                    // abilities). A 60-card main deck + 12 energy +
+                    // hand + stage already exceeds the
+                    // `SmallVec<[i16; 64]>` inline capacity, so
+                    // building the full owned set spills a ~256 B
+                    // buffer to the heap every Active phase for a
+                    // scan that runs zero times. Build it only when
+                    // there is a flag to tick; the empty `SmallVec`
+                    // stays inline and the retain over an empty map
+                    // is a no-op either way.
+                    let owned = if game_state.mods.delayed_cannot_active.is_empty() {
+                        SmallVec::new()
+                    } else {
+                        turn_player.all_card_ids()
+                    };
                     for &cid in &to_activate {
                         game_state.mods.add_orientation_modifier(cid, "active");
                     }
@@ -514,15 +532,20 @@ impl super::TurnEngine {
                 // whose owner already finalized) — put it back untouched.
                 game_state.pending_reyell_rebuild = Some(rebuilt);
             } else {
-                let applied_nos: Vec<String> = rebuilt
-                    .yell_cards
-                    .iter()
-                    .map(|yc| yc.card_no.to_string())
-                    .collect();
+                // The card-number list is read only by the debug
+                // line, so build it inside the macro: `log::debug!`
+                // short-circuits its format arguments when Debug is
+                // disabled, which is every headless run. Materialized
+                // out here it allocated a `Vec<String>` (one
+                // `to_string` per re-yelled card) unconditionally.
                 log::debug!(
                     "[REYELL_APPLY] n={} cards={:?} note_icons={}",
                     rebuilt.yell_cards.len(),
-                    applied_nos,
+                    rebuilt
+                        .yell_cards
+                        .iter()
+                        .map(|yc| yc.card_no.to_string())
+                        .collect::<Vec<_>>(),
                     rebuilt.note_icons
                 );
                 // QA ruling: only the re-yelled cards participate — the first
@@ -1351,6 +1374,7 @@ impl super::TurnEngine {
         // Per Q24, baton touch step 2 (old card → waitroom) happens before step 4
         // (new card → stage). Enqueue movement-based triggers BEFORE appearance
         // triggers so they resolve first when process_pending runs below.
+        let opponent_id = game_state.opponent_id(&player_id);
         if baton_touch_used {
             game_state.record_baton_touch(&player_id, Some(card_id));
             game_state.baton_touch_arriving_card_id = Some(card_id);
@@ -1367,8 +1391,7 @@ impl super::TurnEngine {
             // Enqueue movement-triggered auto abilities (baton_touch, discard, etc.)
             // but do NOT process yet — let them queue before appearance triggers.
             Self::trigger_auto_abilities_for_player(game_state, &player_id);
-            let bt_opponent_id = game_state.opponent_id(&player_id);
-            Self::trigger_auto_abilities_for_player(game_state, &bt_opponent_id);
+            Self::trigger_auto_abilities_for_player(game_state, &opponent_id);
         }
 
         // Phase 2: record appearance and debut triggers
@@ -1387,8 +1410,7 @@ impl super::TurnEngine {
             Some(card_id),
         );
         Self::trigger_auto_abilities_for_player(game_state, &player_id);
-        let sb_opponent_id = game_state.opponent_id(&player_id);
-        Self::trigger_auto_abilities_for_player(game_state, &sb_opponent_id);
+        Self::trigger_auto_abilities_for_player(game_state, &opponent_id);
         // Process ALL queued abilities now: movement-triggered (baton_touch, etc.)
         // are ahead of appearance-triggered in the queue, so they resolve first.
         game_state.process_pending_auto_abilities(&player_id);

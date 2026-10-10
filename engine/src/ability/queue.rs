@@ -78,8 +78,8 @@ pub enum QueueState {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 pub struct AbilityQueueEntry {
-    pub card_no: String,
-    pub player_id: String,
+    pub card_no: crate::core::types::ArcStr,
+    pub player_id: crate::core::player::PlayerId,
     pub ability: Arc<Ability>,
     pub ability_index: usize,
     pub card_id: Option<i16>,
@@ -112,7 +112,7 @@ pub struct AbilityQueueEntry {
     /// `None` = not inside a conditional_on_optional consequence (no gating).
     pub optional_moves_all_moved: Option<bool>,
     /// Player who must make the pending choice (if different from activating player)
-    pub choice_player_id: Option<String>,
+    pub choice_player_id: Option<crate::core::player::PlayerId>,
     /// Card IDs that triggered this each_time auto ability (snapshot of
     /// recently_moved_cards at enqueue time). Used by source:"those_cards"
     /// to resolve to only the trigger cards, not the full discard pile.

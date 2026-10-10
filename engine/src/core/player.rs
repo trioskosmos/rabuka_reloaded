@@ -61,6 +61,21 @@ impl core::fmt::Display for PlayerId {
     }
 }
 
+impl PlayerId {
+    /// Returns the static PlayerId for "p1" — no allocation on normalization.
+    #[inline]
+    pub fn p1() -> &'static Self {
+        static P1: std::sync::OnceLock<PlayerId> = std::sync::OnceLock::new();
+        P1.get_or_init(|| PlayerId(Arc::from("p1")))
+    }
+    /// Returns the static PlayerId for "p2" — no allocation on normalization.
+    #[inline]
+    pub fn p2() -> &'static Self {
+        static P2: std::sync::OnceLock<PlayerId> = std::sync::OnceLock::new();
+        P2.get_or_init(|| PlayerId(Arc::from("p2")))
+    }
+}
+
 impl From<&str> for PlayerId {
     fn from(s: &str) -> Self {
         PlayerId(Arc::from(s))
