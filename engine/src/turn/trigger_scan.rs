@@ -30,7 +30,15 @@ impl super::TurnEngine {
     ) {
         #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("trig::debut");
-        let mut abilities_to_trigger: SmallVec<[(String, String, i16); 4]> = SmallVec::new();
+        // (ability_index, card_no, card_id): the index identifies the
+        // ability on the card, so the enqueue goes through the
+        // by-index entry point instead of formatting a
+        // `{card_no}_{full_text}` key per matched ability. The index
+        // comes from `trigger_ability_indices`, which is built from
+        // `has_trigger(Debut)`, so it is exactly the ability the
+        // string key used to re-find by full text (no card in the
+        // corpus carries two abilities with the same full text).
+        let mut abilities_to_trigger: SmallVec<[(usize, String, i16); 4]> = SmallVec::new();
 
         let card_id_opt = card_id;
         {
@@ -139,7 +147,7 @@ impl super::TurnEngine {
                         );
                     }
                     abilities_to_trigger.push((
-                        format!("{}_{}", card.card_no, ability.full_text),
+                        ability_index,
                         card.card_no.to_string(),
                         card_id,
                     ));
@@ -153,14 +161,14 @@ impl super::TurnEngine {
         }
 
         let moved_snapshot = game_state.recently_moved_cards.clone();
-        for (ability_id, card_no, stage_card_id) in abilities_to_trigger {
-            game_state.trigger_auto_ability(
-                ability_id,
+        for (ability_index, card_no, stage_card_id) in abilities_to_trigger {
+            game_state.trigger_auto_ability_by_index(
                 AbilityTrigger::Debut,
                 player_id,
-                Some(card_no),
+                Some(card_no.as_str()),
                 Some(stage_card_id),
-                moved_snapshot.clone(),
+                ability_index,
+                moved_snapshot.as_ref(),
                 None,
             );
         }
@@ -230,7 +238,10 @@ impl super::TurnEngine {
             return;
         }
 
-        let mut abilities_to_trigger: Vec<(String, String, Option<i16>)> = Vec::new();
+        // (ability_index, card_no, explicit_card_id) — see the
+        // debut scan: the index identifies the ability, so the
+        // enqueue skips the `{card_no}_{full_text}` format.
+        let mut abilities_to_trigger: Vec<(usize, String, Option<i16>)> = Vec::new();
         // Track (card_id, ability_idx) to prevent the same card's ability from
         // firing twice when the card is both a stage member AND a live card.
         let mut seen: HashSet<(i16, usize)> = HashSet::default();
@@ -339,7 +350,7 @@ impl super::TurnEngine {
                         );
                     }
                     abilities_to_trigger.push((
-                        format!("{}_{}", card.card_no, ability.full_text),
+                        ability_index,
                         card.card_no.to_string(),
                         Some(card_id),
                     ));
@@ -357,18 +368,18 @@ impl super::TurnEngine {
             player_id,
             abilities_to_trigger.len()
         ));
-        for (ability_id, card_no, explicit_card_id) in abilities_to_trigger {
+        for (ability_index, card_no, explicit_card_id) in abilities_to_trigger {
             log::trace!(
                 "[LIVE_START_TRIGGER] enqueue ability={} card_no={}",
-                ability_id,
+                ability_index,
                 card_no
             );
-            game_state.trigger_auto_ability(
-                ability_id,
+            game_state.trigger_auto_ability_by_index(
                 AbilityTrigger::LiveStart,
                 player_id,
-                Some(card_no),
+                Some(card_no.as_str()),
                 explicit_card_id,
+                ability_index,
                 None,
                 None,
             );
@@ -391,7 +402,13 @@ impl super::TurnEngine {
         // sources, ensuring should_trigger_live_success uses the correct requirements.
         game_state.restore_performance_need_heart_modifiers();
 
-        let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
+        // Printed abilities are keyed by index (see the debut
+        // scan); gained abilities keep the
+        // `{card_no}_gained_{idx}` string key because
+        // `enqueue_gained_ability` parses the gained index
+        // back out of it.
+        let mut printed_to_trigger: Vec<(usize, String, i16)> = Vec::new();
+        let mut gained_to_trigger: Vec<(String, String, i16)> = Vec::new();
         let mut seen: HashSet<(i16, usize)> = HashSet::default();
 
         // LiveSuccess only triggers when the live card's need_heart is satisfied
@@ -488,8 +505,8 @@ impl super::TurnEngine {
                             },
                         );
                     }
-                    abilities_to_trigger.push((
-                        format!("{}_{}", card_no, ability.full_text),
+                    printed_to_trigger.push((
+                        ability_index,
                         card_no.clone(),
                         card_id,
                     ));
@@ -541,7 +558,7 @@ impl super::TurnEngine {
                             },
                         );
                     }
-                    abilities_to_trigger.push((
+                    gained_to_trigger.push((
                         format!("{}_gained_{}", card_no, gained_index),
                         card_no.clone(),
                         card_id,
@@ -550,7 +567,19 @@ impl super::TurnEngine {
             }
         }
 
-        for (ability_id, card_no, source_card_id) in abilities_to_trigger {
+        for (ability_index, card_no, source_card_id) in printed_to_trigger {
+            game_state.trigger_auto_ability_by_index(
+                AbilityTrigger::LiveSuccess,
+                player_id,
+                Some(card_no.as_str()),
+                Some(source_card_id),
+                ability_index,
+                None,
+                None,
+            );
+        }
+
+        for (ability_id, card_no, source_card_id) in gained_to_trigger {
             game_state.trigger_auto_ability(
                 ability_id,
                 AbilityTrigger::LiveSuccess,

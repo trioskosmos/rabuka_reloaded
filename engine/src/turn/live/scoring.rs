@@ -2,10 +2,10 @@ use crate::card::{BaseHeart, BladeColor, CardDatabase, HeartColor};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::turn::TurnEngine;
 use crate::types::{
-    AllocPhase, Allocation, BladeSource, HeartSource, LivePerformanceData,
-    MemberContribution, SourceName, SourceType, YellCardResult,
+    AllocPhase, Allocation, LivePerformanceData, SourceName, SourceType,
 };
 use crate::HashMap;
+use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
@@ -163,8 +163,8 @@ impl TurnEngine {
         live_card_ids: &[i16],
         card_db: &CardDatabase,
         need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
-    ) -> Vec<CardNeed> {
-        let mut needs = Vec::new();
+    ) -> SmallVec<[CardNeed; 4]> {
+        let mut needs = SmallVec::new();
         for &lc_id in live_card_ids {
             if let Some(card) = card_db.get_card(lc_id) {
                 let mut need = [0u8; 8];
@@ -190,9 +190,10 @@ impl TurnEngine {
     }
 
     /// Compute future demand per card: for cards i+1..N, sum of non-heart00 needs.
-    fn compute_future_demand(card_needs: &[CardNeed]) -> Vec<[u8; 8]> {
+    fn compute_future_demand(card_needs: &[CardNeed]) -> SmallVec<[[u8; 8]; 4]> {
         let n = card_needs.len();
-        let mut demand = vec![[0u8; 8]; n];
+        let mut demand: SmallVec<[[u8; 8]; 4]> =
+            (0..n).map(|_| [0u8; 8]).collect();
         let mut running = [0u8; 8];
         for i in (0..n).rev() {
             if i + 1 < n {
@@ -812,7 +813,7 @@ fn try_all_distribution(
     /// `heart_override`/`heart_modifiers`/`heart_color_multiplier` must come from the
     /// current game state (post-ability-trigger) so ability-granted hearts are counted.
     #[allow(clippy::too_many_arguments)]
-pub fn check_live_success(
+    pub fn check_live_success(
         player: &mut crate::player::Player,
         resolution_zone: &mut crate::zones::ResolutionZone,
         card_db: &CardDatabase,
@@ -821,16 +822,23 @@ pub fn check_live_success(
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
         heart_copy: &HashMap<i16, i16>,
-        live_card_ids: &[i16],
-        _allocations: &[Allocation],
-        yell_cards: &[YellCardResult],
-        total_blade: u8,
-        cheer_icon_count: u8,
-        member_contributions: &[MemberContribution],
-        total_hearts_arr: &[u8; 8],
-        heart_sources: &[HeartSource],
-        blade_sources: &[BladeSource],
+        mut perf: LivePerformanceData,
     ) -> LivePerformanceData {
+        // `perf` arrives owned from `execute_performance_phase`, which
+        // built it in `player_perform_live`. The old shape took the
+        // six collection fields as slices and `.to_vec()`-cloned every
+        // one back into a fresh `LivePerformanceData` here — six Vec
+        // allocations plus an element-wise clone of `member_contributions`
+        // (416 B/element) and `allocations` per performance, for data
+        // the caller already owned and never reads again. Taking ownership
+        // moves those fields straight through; only the four fields this
+        // function actually recomputes (`allocations`, `revealed_ids`,
+        // `moved_live_card_ids`, `draw_effects_occurred`) are written.
+        //
+        // `draw_effects_occurred` is read off `perf.yell_cards` up here
+        // so the immutable borrow ends before the owned fields are
+        // reassigned below.
+        let draw_effects_occurred = perf.yell_cards.iter().any(|yc| yc.draw_icons > 0);
         // Recompute hearts from current state (includes ability-granted hearts
         // from the 8.3.13 check timing) + yell blade heart hearts.
         let mut owned_hearts = player.stage.get_available_hearts(
@@ -840,7 +848,7 @@ pub fn check_live_success(
             heart_color_multiplier,
             heart_copy,
         );
-        for yc in yell_cards {
+        for yc in &perf.yell_cards {
             for i in 0..8 {
                 if yc.blade_hearts[i] > 0 {
                     *owned_hearts
@@ -851,9 +859,10 @@ pub fn check_live_success(
         }
         // Recompute allocations from the updated pool.
         let allocations =
-            Self::compute_allocations(&owned_hearts, live_card_ids, card_db, need_heart_modifiers);
+            Self::compute_allocations(&owned_hearts, &perf.live_card_ids, card_db, need_heart_modifiers);
 
-        let mut per_card_filled: Vec<[u8; 8]> = vec![EMPTY_H8; live_card_ids.len()];
+        let mut per_card_filled: SmallVec<[[u8; 8]; 4]> =
+            (0..perf.live_card_ids.len()).map(|_| EMPTY_H8).collect();
         for alloc in &allocations {
             if (alloc.target_idx as usize) < per_card_filled.len() {
                 per_card_filled[alloc.target_idx as usize][alloc.color as usize] += alloc.amount;
@@ -862,7 +871,7 @@ pub fn check_live_success(
 
         // Q259: Required heart check is only performed at live success judgment timing.
         // Subsequent changes do NOT retroactively fail a live.
-        let any_requirement_failed = live_card_ids.iter().enumerate().any(|(live_idx, &lc_id)| {
+        let any_requirement_failed = perf.live_card_ids.iter().enumerate().any(|(live_idx, &lc_id)| {
             card_db.get_card(lc_id).is_some_and(|card| {
                 // Build effective need_heart by starting from base requirements,
                 // then applying per-color set/additive modifiers.
@@ -944,21 +953,15 @@ pub fn check_live_success(
         for card_id in resolution_zone.cards.drain(..) {
             player.waitroom.add_card(card_id);
         }
-        let draw_effects_occurred = yell_cards.iter().any(|yc| yc.draw_icons > 0);
 
-        LivePerformanceData {
-            yell_count: total_blade,
-            note_icons: cheer_icon_count,
-            revealed_ids,
-            member_contributions: member_contributions.to_vec(),
-            yell_cards: yell_cards.to_vec(),
-            total_hearts: *total_hearts_arr,
-            allocations: allocations.to_vec(),
-            heart_sources: heart_sources.to_vec(),
-            blade_sources: blade_sources.to_vec(),
-            draw_effects_occurred,
-            live_card_ids: live_card_ids.to_vec(),
-            moved_live_card_ids,
-        }
+        // The four fields this function recomputes; the rest of `perf`
+        // (member_contributions, yell_cards, total_hearts, heart_sources,
+        // blade_sources, live_card_ids, yell_count, note_icons) moves
+        // through untouched — no `.to_vec()` clone of caller-owned data.
+        perf.allocations = allocations;
+        perf.revealed_ids = revealed_ids;
+        perf.moved_live_card_ids = moved_live_card_ids;
+        perf.draw_effects_occurred = draw_effects_occurred;
+        perf
     }
 }

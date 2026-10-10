@@ -1,5 +1,6 @@
 use crate::core::game_state::GameState;
 use crate::core::types::{Duration, TurnPhase, ReplacementEffect};
+use smallvec::SmallVec;
 
 impl GameState {
     /// Has `effect` run out of time?
@@ -239,7 +240,13 @@ impl GameState {
         // which refreshes constants right after registering.
         let mut expired_gain_ability = false;
 
-        let expired_indices: Vec<usize> = self
+        // The expiry list is almost always empty or a single
+        // entry, and this runs on every `execute_and_settle` —
+        // a `Vec` allocated (and immediately dropped) per call
+        // for a count that fits inline. `temporary_effects` is
+        // itself a small per-game window, so 8 covers it without
+        // a spill.
+        let expired_indices: SmallVec<[usize; 8]> = self
             .temporary_effects
             .iter()
             .enumerate()

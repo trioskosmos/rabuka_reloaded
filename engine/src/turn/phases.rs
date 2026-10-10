@@ -469,7 +469,10 @@ impl super::TurnEngine {
         // (cannot_live path), set recently_moved_cards so the 8.3.13 check
         // captures auto abilities that trigger on that zone change (e.g. Riko BP6).
         if !yell_data.moved_live_card_ids.is_empty() {
-            game_state.set_recently_moved_batch(yell_data.moved_live_card_ids.into(), None);
+            game_state.set_recently_moved_batch(
+                core::mem::take(&mut yell_data.moved_live_card_ids).into(),
+                None,
+            );
         }
 
         // Rule 8.3.13: Check timing — auto abilities fire here.
@@ -555,15 +558,7 @@ impl super::TurnEngine {
                 &game_state.mods.heart_modifiers,
                 current_hcm,
                 current_hcopy,
-                &yell_data.live_card_ids,
-                &yell_data.allocations,
-                &yell_data.yell_cards,
-                yell_data.yell_count,
-                yell_data.note_icons,
-                &yell_data.member_contributions,
-                &yell_data.total_hearts,
-                &yell_data.heart_sources,
-                &yell_data.blade_sources,
+                yell_data,
             )
         };
         // player borrow ends here — game_state accessible again

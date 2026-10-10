@@ -85,16 +85,21 @@ def merge_codes(src):
 
 
 def pick_meta():
-    best = None
-    for name in ("search_meta.jsonl", "search_meta_partial_p300.jsonl"):
-        p = DOWNLOADS / name
-        if p.exists():
-            best = p
-            break
-    if not best:
-        cands = sorted(DOWNLOADS.glob("search_meta*.jsonl"),
-                       key=lambda p: p.stat().st_mtime, reverse=True)
-        best = cands[0] if cands else None
+    cands = list(DOWNLOADS.glob("search_meta*.jsonl"))
+    if not cands:
+        return 0
+
+    def page_key(p):
+        # The browser script's final artefact is the complete set; among the
+        # cumulative partials the highest page number already contains every
+        # earlier row. Picking by mtime alone once picked a stale p300
+        # checkpoint and silently dropped ~31k rows of owner/date/fav data.
+        if p.name == "search_meta.jsonl":
+            return float("inf")
+        m = re.search(r"p(\d+)", p.stem)
+        return int(m.group(1)) if m else -1
+
+    best = max(cands, key=lambda p: (page_key(p), p.stat().st_mtime))
     if not best:
         return 0
     dest = HERE / "search_meta.jsonl"

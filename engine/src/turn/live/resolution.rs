@@ -162,7 +162,21 @@ impl TurnEngine {
                     continue;
                 };
                 snap.lives[i].card_id = lc_id;
-                snap.lives[i].card_no = crate::types::ArcStr::from(card.card_no.as_ref());
+                // `card_no` is the card's printed number — immutable,
+                // and already stamped onto every live card by
+                // `build_snapshot` when the performance snapshot was
+                // first pushed. This pass runs once per turn but
+                // walks EVERY snapshot accumulated so far, so an
+                // unconditional re-`ArcStr::from` here re-allocated
+                // the same handle for every prior performance on
+                // every turn rollover (O(turns²) allocations). The
+                // value can only ever be the one `build_snapshot`
+                // already wrote, so fill it only when a snapshot
+                // somehow arrived without it.
+                if snap.lives[i].card_no.is_empty() {
+                    snap.lives[i].card_no =
+                        crate::types::ArcStr::from(card.card_no.as_ref());
+                }
                 if card.need_heart.is_none() {
                     snap.lives[i].passed = true;
                     let base_score = card.get_score();

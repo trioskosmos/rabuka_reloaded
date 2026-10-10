@@ -565,20 +565,49 @@ impl super::TurnEngine {
             log::debug!("[HAND_ACTIVATION] card={} defer_self_cost=true", card_id);
         }
 
-        // Gained abilities use the "card_no_gained_{idx}" format so
-        // trigger_auto_ability's gained-ability code path (line ~683)
-        // can find and enqueue them.
-        let ability_id =
-            Self::activation_ability_id(game_state, &card.card_no, card_id, idx, &ability);
-        game_state.trigger_auto_ability(
-            ability_id,
-            crate::game_state::AbilityTrigger::Activation,
-            player_id.as_str(),
-            Some(card.card_no.to_string()),
-            Some(card_id),
-            None,
-            None,
-        );
+        // Queue the activation. A printed ability enqueues by index
+        // directly: `trigger_auto_ability_by_index` addresses
+        // `card.abilities[idx]` without the `format!("{}_{}", card_no,
+        // full_text)` key and without the full-text linear scan
+        // `find_printed_ability` runs to recover that same index. The
+        // two are provably identical here — `full_text` uniquely
+        // identifies the ability index (no card in the corpus carries
+        // duplicate ability texts), and `ability_matches_trigger(..,
+        // Activation)` is exactly the `has_trigger(Activation)` test
+        // this loop already gated on, so the by-index enqueue lands on
+        // the same queue entry. A gained ability keeps the
+        // `{card_no}_gained_{idx}` key: its index sits past
+        // `GAINED_ABILITY_INDEX_BASE`, so `card.abilities[idx]` does
+        // not address it and `trigger_auto_ability`'s gained path must
+        // parse the key to find it.
+        if crate::ability::types::gained_ability_index(idx).is_some() {
+            let ability_id = Self::activation_ability_id(
+                game_state,
+                &card.card_no,
+                card_id,
+                idx,
+                &ability,
+            );
+            game_state.trigger_auto_ability(
+                ability_id,
+                crate::game_state::AbilityTrigger::Activation,
+                player_id.as_str(),
+                Some(card.card_no.to_string()),
+                Some(card_id),
+                None,
+                None,
+            );
+        } else {
+            game_state.trigger_auto_ability_by_index(
+                crate::game_state::AbilityTrigger::Activation,
+                player_id.as_str(),
+                Some(card.card_no.as_deref()),
+                Some(card_id),
+                idx,
+                None,
+                None,
+            );
+        }
         game_state.process_pending_auto_abilities(&player_id);
         game_state.push_rule_log_fmt(format_args!(
             "{} [[log_activation]] {}: {}",

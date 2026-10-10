@@ -41,7 +41,24 @@ impl<'a> ConditionContext<'a> {
                     group_names,
                 ) as usize
             } else {
-                let base = self.count_cards_with_filters(
+                // A card can be worth more than one when something counts it:
+                // 「このカードは2枚として扱う」 (PL!-pb2-041-L). Membership is decided
+                // by the SAME filter the base count uses, so a weighted card can
+                // only ever be a card this count would already have included —
+                // the weight changes the total, never which cards qualify.
+                //
+                // The weight is a property of the card, not of a zone, so it
+                // applies on every path through this closure rather than only
+                // the success live zone. That is safe because the rule's own
+                // condition scopes it: a card outside the success live zone
+                // has no active weight.
+                //
+                // One pass: the membership the base count needs IS the
+                // membership the weight sum needs, so `matching_card_ids`
+                // returns it and both read the result. The old shape re-ran
+                // the entire filter — and rebuilt `filter_subset` — once per
+                // card to re-derive what the base pass already computed.
+                let matching = self.matching_card_ids(
                     zone_source,
                     Some(ct),
                     group_names,
@@ -54,33 +71,10 @@ impl<'a> ConditionContext<'a> {
                     // card (「元々持つハートの数より多い…メンバー」).
                     true,
                     condition,
-                ) as u32;
-                // A card can be worth more than one when something counts it:
-                // 「このカードは2枚として扱う」 (PL!-pb2-041-L). Membership is decided
-                // by the SAME filter above, applied one card at a time, so a weighted
-                // card can only ever be a card this count would already have included
-                // — the weight changes the total, never which cards qualify.
-                //
-                // The weight is a property of the card, not of a zone, so it applies
-                // on every path through this closure rather than only the success live
-                // zone. That is safe because the rule's own condition scopes it: a
-                // card outside the success live zone has no active weight.
-                let extra: u32 = zone_source
+                );
+                let base = matching.len() as u32;
+                let extra: u32 = matching
                     .iter()
-                    .filter(|&&cid| {
-                        cid != -1
-                            && self.count_cards_with_filters(
-                                &[cid],
-                                Some(ct),
-                                group_names,
-                                hc,
-                                condition.get_cost_limit(),
-                                condition.get_cost_limit_operator().map(|o| o.as_str()),
-                                None,
-                                true,
-                                condition,
-                            ) == 1
-                    })
                     .map(|&cid| {
                         self.game_state
                             .count_as_multiple_weight(cid, activating_id)
@@ -254,8 +248,11 @@ impl<'a> ConditionContext<'a> {
                         0
                     }
                 } else {
-                    // Fallback: count under_cards across all positions
-                    let all_under: Vec<i16> = player
+                    // Fallback: count under_cards across all positions.
+                    // Three 3-slot under-card lists (rules 4.5.2), so a
+                    // SmallVec covers the whole fallback without a heap
+                    // allocation.
+                    let all_under: SmallVec<[i16; 12]> = player
                         .stage
                         .under_cards
                         .iter()
@@ -303,13 +300,17 @@ impl<'a> ConditionContext<'a> {
                             self_blade as usize
                         }
                     } else {
-                        let stage_slots: Vec<i16> = if is_both {
+                        // Two 3-slot stages at most (is_both), so a
+                        // SmallVec covers the combined walk without a
+                        // heap allocation.
+                        let stage_slots: SmallVec<[i16; 6]> = if is_both {
                             let opp = self.resolve_condition_player("opponent");
-                            let mut combined = player.stage.stage.to_vec();
+                            let mut combined: SmallVec<[i16; 6]> =
+                                player.stage.stage.iter().copied().collect();
                             combined.extend_from_slice(&opp.stage.stage);
                             combined
                         } else {
-                            player.stage.stage.to_vec()
+                            player.stage.stage.iter().copied().collect()
                         };
                         let mut stage_count = stage_slots
                             .iter()
@@ -782,7 +783,12 @@ pub(crate) fn card_matches_count_filters(
     }
 
     #[allow(clippy::too_many_arguments)]
-pub(crate) fn count_cards_with_filters(
+    /// The cards in `cards` that pass the condition's filters, in one
+    /// pass. Callers that also need WHICH cards matched (the
+    /// `count_as_multiple` weight pass in `resolve_zone_card_count`)
+    /// call this directly instead of re-running the whole filter per
+    /// card to re-derive membership the count already computed.
+    pub(crate) fn matching_card_ids(
         &self,
         cards: &[i16],
         card_type_filter: Option<&str>,
@@ -793,8 +799,8 @@ pub(crate) fn count_cards_with_filters(
         exclude_self: Option<i16>,
         respect_original_value: bool,
         condition: &Condition,
-    ) -> u8 {
-        // Build a single CardFilter and use its .count() — avoids re-parsing
+    ) -> SmallVec<[i16; 4]> {
+        // Build a single CardFilter and use its .matches() — avoids re-parsing
         // the filter fields for every card in the slice. Base it on the
         // condition's own filter (filter_subset → the single CardFilter builder)
         // so characters/heart_colors/etc. are never silently dropped.
@@ -837,7 +843,7 @@ pub(crate) fn count_cards_with_filters(
         } else {
             None
         };
-        let mut count = 0u8;
+        let mut matching = SmallVec::new();
         for &card_id in cards {
             if !filter.matches(card_db, card_id, true) {
                 continue;
@@ -883,9 +889,9 @@ pub(crate) fn count_cards_with_filters(
             if !self.matches_original_value_filters(condition, card_id, respect_original_value) {
                 continue;
             }
-            count += 1;
+            matching.push(card_id);
         }
-        count
+        matching
     }
 
     /// Count distinct names/costs/groups among cards matching the condition's filters.

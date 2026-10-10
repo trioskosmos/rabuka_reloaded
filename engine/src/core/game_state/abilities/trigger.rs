@@ -1027,7 +1027,7 @@ impl GameState {
                 Some(cached_card_no.as_str()),
                 Some(card_id),
                 ability_idx,
-                moved.clone(),
+                moved.as_ref(),
                 None,
             );
         }
@@ -1259,7 +1259,7 @@ impl GameState {
                     Some(card_no.as_str()),
                     Some(watcher_id),
                     ability_idx,
-                    Some(smallvec::smallvec![moved_card_id]),
+                    Some(&smallvec::smallvec![moved_card_id]),
                     None,
                 );
             }
@@ -1458,21 +1458,33 @@ pub fn trigger_auto_ability(
 
     /// Hot-path version of trigger_auto_ability that takes a numeric ability index
     /// instead of a string key. Avoids format!() allocations in the TAS scan loop.
+    ///
+    /// `source_card_id` is borrowed (`&str`) rather than owned: every caller
+    /// already holds the card number as an `ArcStr`/`String` it is about to
+    /// drop, and `build_ability_queue_entry` re-materialises an owned `String`
+    /// for the entry anyway — so an owned `Option<String>` here would be a
+    /// throwaway allocation that is only ever read as `&str`.
+    ///
+    /// `trigger_moved_cards` is likewise borrowed (`&SmallVec`): the scan
+    /// loop clones the movement snapshot once, then re-cloned it per
+    /// triggered ability only for `_refs` to clone it a second time into
+    /// the queue entry. Passing a reference removes that per-ability clone
+    /// (the entry's owned copy is the one that is actually stored).
     #[allow(clippy::too_many_arguments)]
 pub fn trigger_auto_ability_by_index(
         &mut self,
         trigger_type: AbilityTrigger,
         player_id: impl Into<crate::core::player::PlayerId>,
-        source_card_id: Option<String>,
+        source_card_id: Option<&str>,
         explicit_card_id: Option<i16>,
         ability_index: usize,
-        trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
+        trigger_moved_cards: Option<&SmallVec<[i16; 4]>>,
         triggering_member_id: Option<i16>,
     ) {
         self.trigger_auto_ability_by_index_refs(
             trigger_type,
             &player_id.into(),
-            source_card_id.as_deref(),
+            source_card_id,
             explicit_card_id,
             ability_index,
             trigger_moved_cards,
@@ -1481,14 +1493,14 @@ pub fn trigger_auto_ability_by_index(
     }
 
     #[allow(clippy::too_many_arguments)]
-fn trigger_auto_ability_by_index_refs(
+    fn trigger_auto_ability_by_index_refs(
         &mut self,
         trigger_type: AbilityTrigger,
         player_id: &str,
         source_card_id: Option<&str>,
         explicit_card_id: Option<i16>,
         ability_index: usize,
-        trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
+        trigger_moved_cards: Option<&SmallVec<[i16; 4]>>,
         triggering_member_id: Option<i16>,
     ) {
         if let Some(card_id) = explicit_card_id {
@@ -1505,7 +1517,7 @@ fn trigger_auto_ability_by_index_refs(
                         player_id.to_string(),
                         AbilityTriggerContext {
                             trigger_type: trigger_type.clone(),
-                            trigger_moved_cards: trigger_moved_cards.clone(),
+                            trigger_moved_cards: trigger_moved_cards.map(|mc| mc.clone()),
                             triggering_member_id,
                         },
                     );

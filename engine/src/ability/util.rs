@@ -779,7 +779,14 @@ pub fn card_name_matches_group(
                     && norm_group_name(n).as_ref().contains(gn))
         });
     }
-    card_db.get_card_names(card_id).iter().any(|n| {
+    // Multi-name card: the parts are `name_key.split('&')`, which is
+    // exactly what `get_card_names` returns — but it collects them
+    // into a `Vec` first. Iterating the split directly is the same
+    // predicate with no per-(card, group) allocation. `card_db` and
+    // `card_id` stay in the signature: the caller already resolved
+    // the card, so neither is needed to re-derive the parts.
+    let _ = (card_db, card_id);
+    card.name_key.split('&').any(|n| {
         n.contains(gn)
             || ((n.contains('\u{FF01}') || n.contains('\u{00B5}'))
                 && norm_group_name(n).as_ref().contains(gn))
@@ -795,6 +802,27 @@ pub fn card_matches_group_str(
         Some(g) => card_db
             .get_card(card_id)
             .is_some_and(|c| card_matches_group_str_card(card_db, c, card_id, g)),
+        None => true,
+    };
+    debug_group_match(card_db, card_id, group_name, result);
+    result
+}
+
+/// Card-resolved form of [`card_matches_group_str`] for callers that
+/// already hold the `Option<&Card>` from a single `get_card` probe
+/// (`CardFilter::matches` binds it once for every field check).
+/// Identical semantics — including the debug log — minus the per-group
+/// hash probe of the same key, which `check_group` used to pay once
+/// for `group`, once per `groups` entry and once per
+/// `exclude_group_names` entry.
+pub fn card_matches_group_str_with_card(
+    card_db: &CardDatabase,
+    card: Option<&Card>,
+    card_id: i16,
+    group_name: Option<&str>,
+) -> bool {
+    let result = match group_name {
+        Some(g) => card.is_some_and(|c| card_matches_group_str_card(card_db, c, card_id, g)),
         None => true,
     };
     debug_group_match(card_db, card_id, group_name, result);
@@ -1545,11 +1573,11 @@ impl<'a> CardFilter<'a> {
         true
     }
 
-    fn check_group(&self, db: &CardDatabase, id: i16) -> bool {
+    fn check_group(&self, db: &CardDatabase, id: i16, card: Option<&Card>) -> bool {
         if let Some(g) = self.group {
-            if !card_matches_group_str(db, id, Some(g)) {
+            if !card_matches_group_str_with_card(db, card, id, Some(g)) {
                 if let Some(gs) = self.groups {
-                    if !gs.iter().any(|gn| card_matches_group_str(db, id, Some(gn))) {
+                    if !gs.iter().any(|gn| card_matches_group_str_with_card(db, card, id, Some(gn))) {
                         return false;
                     }
                 } else {
@@ -1557,13 +1585,13 @@ impl<'a> CardFilter<'a> {
                 }
             }
         } else if let Some(gs) = self.groups {
-            if !gs.iter().any(|gn| card_matches_group_str(db, id, Some(gn))) {
+            if !gs.iter().any(|gn| card_matches_group_str_with_card(db, card, id, Some(gn))) {
                 return false;
             }
         }
         if let Some(ex_gns) = self.exclude_group_names {
             for g in ex_gns {
-                if card_matches_group_str(db, id, Some(g.as_str())) {
+                if card_matches_group_str_with_card(db, card, id, Some(g.as_str())) {
                     return false;
                 }
             }
@@ -1760,7 +1788,7 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
-        if !self.check_group(db, id) {
+        if !self.check_group(db, id, card) {
             return false;
         }
         if let Some(lim) = self.cost_limit {
