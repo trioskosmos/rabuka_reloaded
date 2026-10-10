@@ -821,7 +821,7 @@ pub(crate) fn execute_gain_surplus_heart(
         if self.handle_bp6_pattern(gs, effect)? {
             return Ok(());
         }
-        let resource = effect.resource_any().unwrap_or("").to_string();
+        let resource = effect.resource_any().unwrap_or("");
         // Normalize once — card data spells resources in EN or JA; ad-hoc
         // string matching scattered through this function is how the two
         // spellings drift apart.
@@ -829,11 +829,11 @@ pub(crate) fn execute_gain_surplus_heart(
         let count = effect
             .resource_icon_count_any()
             .unwrap_or(effect.count_or(1));
-        let target = effect.target_name().to_string();
+        let target = effect.target_name();
         let duration = effect.duration_any();
         let is_temporary = duration.is_some() && duration != Some("permanent");
-        let card_type_filter = effect.card_type_any().map(|s| s.to_string());
-        let group_filter = effect.group_name().map(|s| s.to_string());
+        let card_type_filter = effect.card_type_any().map(|s| s.as_card_str());
+        let group_filter = effect.group_name();
         let per_unit_type_str = effect.per_unit_type_any();
         let heart_selection = effect.heart_selection_any().unwrap_or(false);
         let per_unit = effect.per_unit_any().unwrap_or(false);
@@ -903,7 +903,7 @@ pub(crate) fn execute_gain_surplus_heart(
             let result = self.resolve_gain_heart_color(
                 gs,
                 effect,
-                resource.as_str(),
+                resource,
                 count,
                 &effective_heart_colors,
                 heart_selection,
@@ -1072,16 +1072,16 @@ pub(crate) fn execute_gain_surplus_heart(
             effect,
             &GainResourceRequest {
                 kind,
-                resource: resource.as_str(),
+                resource: resource,
                 count,
                 per_unit,
                 per_unit_type_str,
                 this_ability_moved: &this_ability_moved,
-                target: &target,
+                target: target,
                 is_all,
                 is_self_target,
-                card_type_filter: card_type_filter.as_deref(),
-                group_filter: group_filter.as_deref(),
+                card_type_filter: card_type_filter,
+                group_filter: group_filter,
                 activating_card_id,
                 exclude_self_id,
                 all_selected: &all_selected,

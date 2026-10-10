@@ -52,7 +52,7 @@ struct SelectionFilter<'a> {
     cost_operator: Option<&'a str>,
     group: Option<&'a str>,
     characters: Option<&'a Vec<String>>,
-    card_property: Option<String>,
+    card_property: Option<&'a str>,
     property_negation: bool,
 }
 
@@ -366,7 +366,7 @@ pub fn execute_selected_cards_from_zone(
             characters,
             card_property: gs
                 .entry_effect()
-                .and_then(|e| e.card_property_any().map(|s| s.to_string())),
+                .and_then(|e| e.card_property_any()),
             property_negation: gs
                 .entry_effect()
                 .and_then(|e| e.negation_any())

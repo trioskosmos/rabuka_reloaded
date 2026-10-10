@@ -655,9 +655,26 @@ fn make_params() -> ActionParameters {
     }
 }
 
+/// Materialize a display-only `card_no`/`card_name` string only when
+/// action display is on. Returns `None` (no allocation) in headless
+/// mode: `execute_action` and the bots route every action by `card_id`
+/// alone, so these fields are read only by the web UI and by debug
+/// output (which already falls back to `"-"`). Mirrors the gate that
+/// `make_action`/`with_ja` apply to the description fields.
+#[inline]
+fn display_str<T: core::fmt::Display>(value: T) -> Option<String> {
+    if action_display_enabled() {
+        Some(value.to_string())
+    } else {
+        None
+    }
+}
+
 pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
     #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("generate_possible_actions");
+    #[cfg(feature = "alloc_tracker")]
+    let _alloc_trace = crate::alloc_counter::maybe_arm("generate_possible_actions");
     if let Some(choice) = game_state.get_pending_choice() {
         return generate_pending_choice_actions(game_state, choice);
     }
@@ -690,7 +707,7 @@ fn make_choice_pair(action_type: ActionType, yes_text: &str, no_text: &str) -> V
             yes_text,
             ActionParameters {
                 card_id: Some(1),
-                card_no: Some("yes".to_string()),
+                card_no: display_str("yes"),
                 ..make_params()
             },
         ),
@@ -699,7 +716,7 @@ fn make_choice_pair(action_type: ActionType, yes_text: &str, no_text: &str) -> V
             no_text,
             ActionParameters {
                 card_id: Some(0),
-                card_no: Some("no".to_string()),
+                card_no: display_str("no"),
                 ..make_params()
             },
         ),
@@ -722,7 +739,7 @@ fn make_pay_skip_pair(
             &pay_label,
             ActionParameters {
                 card_id: Some(1),
-                card_no: Some(pay_card_no.to_string()),
+                card_no: display_str(pay_card_no),
                 ..make_params()
             },
         )
@@ -732,7 +749,7 @@ fn make_pay_skip_pair(
             &skip_label,
             ActionParameters {
                 card_id: Some(0),
-                card_no: Some("skip_optional_cost".to_string()),
+                card_no: display_str("skip_optional_cost"),
                 ..make_params()
             },
         )
@@ -866,7 +883,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             ActionParameters {
                                 card_id: Some(card_id),
                                 stage_area: Some(stage_area),
-                                card_no: Some("select".to_string()),
+                                card_no: display_str("select"),
                                 ..make_params()
                             },
                         )
@@ -880,7 +897,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             "Skip (don't change position)",
                             ActionParameters {
                                 card_id: Some(-1),
-                                card_no: Some("skip".to_string()),
+                                card_no: display_str("skip"),
                                 ..make_params()
                             },
                         )
@@ -912,7 +929,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             &label,
                             ActionParameters {
                                 card_id: Some(n),
-                                card_no: Some(n.to_string()),
+                                card_no: display_str(n),
                                 ..make_params()
                             },
                         )
@@ -935,7 +952,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             &label,
                             ActionParameters {
                                 card_id: Some(n.i16_count()),
-                                card_no: Some(n.to_string()),
+                                card_no: display_str(n),
                                 ..make_params()
                             },
                         )
@@ -968,7 +985,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             if bilingual { en_parts[i] } else { *opt_ja },
                             ActionParameters {
                                 card_id: Some(i.i16_count()),
-                                card_no: Some(i.to_string()),
+                                card_no: display_str(i),
                                 ..make_params()
                             },
                         );
@@ -985,7 +1002,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             ActionType::ChoiceSkip,
                             "Skip",
                             ActionParameters {
-                                card_no: Some("skip".to_string()),
+                                card_no: display_str("skip"),
                                 ..make_params()
                             },
                         )
@@ -1001,7 +1018,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         action_desc!("Primary: {}", description),
                         ActionParameters {
                             card_id: Some(0),
-                            card_no: Some("primary".to_string()),
+                            card_no: display_str("primary"),
                             ..make_params()
                         },
                     )
@@ -1011,7 +1028,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         action_desc!("Alternative: {}", description),
                         ActionParameters {
                             card_id: Some(1),
-                            card_no: Some("alternative".to_string()),
+                            card_no: display_str("alternative"),
                             ..make_params()
                         },
                     )
@@ -1037,7 +1054,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 opt,
                                 ActionParameters {
                                     card_id: Some(i.i16_count()),
-                                    card_no: Some(i.to_string()),
+                                    card_no: display_str(i),
                                     ..make_params()
                                 },
                             )
@@ -1057,7 +1074,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                     opt,
                                     ActionParameters {
                                         card_id: Some(i.i16_count()),
-                                        card_no: Some(i.to_string()),
+                                        card_no: display_str(i),
                                         ..make_params()
                                     },
                                 )
@@ -1078,7 +1095,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 opt,
                                 ActionParameters {
                                     card_id: Some(i.i16_count()),
-                                    card_no: Some(i.to_string()),
+                                    card_no: display_str(i),
                                     ..make_params()
                                 },
                             )
@@ -1102,7 +1119,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 opt,
                                 ActionParameters {
                                     card_id: Some(i.i16_count()),
-                                    card_no: Some(i.to_string()),
+                                    card_no: display_str(i),
                                     ..make_params()
                                 },
                             )
@@ -1232,7 +1249,11 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             for (zone_index, card_id) in &card_ids {
                 let card = game_state.card_database.get_card(*card_id);
                 let card_name = card.map(|c| c.name.as_ref()).unwrap_or("Unknown");
-                let real_card_no = card.map(|c| c.card_no.to_string()).unwrap_or_default();
+                let real_card_no = if action_display_enabled() {
+                    card.map(|c| c.card_no.to_string()).unwrap_or_default()
+                } else {
+                    String::new()
+                };
 
                 // Hard filter: card_type mismatch → hide entirely
                 // For looked_at zone (look abilities), skip this — show all cards,
@@ -1310,8 +1331,8 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         } else {
                             None
                         },
-                        card_name: Some(card_name.to_string()),
-                        card_no: Some(real_card_no.clone()),
+                        card_name: display_str(card_name),
+                        card_no: display_str(&real_card_no),
                         disabled: if is_selectable { None } else { Some(true) },
                         ..make_params()
                     },
@@ -1324,7 +1345,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     action_desc!("Select card(s): {}", description),
                     ActionParameters {
                         card_indices: Some(Vec::new()),
-                        card_no: Some("select".to_string()),
+                        card_no: display_str("select"),
                         ..make_params()
                     },
                 );
@@ -1341,7 +1362,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     ActionType::ChoiceSkip,
                     "Skip",
                     ActionParameters {
-                        card_no: Some("skip".to_string()),
+                        card_no: display_str("skip"),
                         ..make_params()
                     },
                 );
@@ -1387,7 +1408,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         ActionParameters {
                             card_id,
                             stage_area: stage_area_str,
-                            card_no: Some("select".to_string()),
+                            card_no: display_str("select"),
                             ..make_params()
                         },
                     );
@@ -1420,7 +1441,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     action_desc!("{}  E{}", color, description),
                     ActionParameters {
                         card_id: Some(i.i16_count()),
-                        card_no: Some(color.clone()),
+                        card_no: display_str(color),
                         ..make_params()
                     },
                 )
@@ -1439,7 +1460,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     action_desc!("{}: {}", opt.card_name, description),
                     ActionParameters {
                         card_id: Some(i.i16_count()),
-                        card_no: Some(opt.card_name.clone()),
+                        card_no: display_str(&opt.card_name),
                         ..make_params()
                     },
                 )
@@ -1458,7 +1479,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     action_desc!("{}: {}", opt.card_name, description),
                     ActionParameters {
                         card_id: Some(i.i16_count()),
-                        card_no: Some(opt.card_name.clone()),
+                        card_no: display_str(&opt.card_name),
                         ..make_params()
                     },
                 )

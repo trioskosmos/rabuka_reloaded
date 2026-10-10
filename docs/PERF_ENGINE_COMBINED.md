@@ -480,6 +480,178 @@ build, or cargo reuses dependency objects cached under the
 identical RUSTFLAGS string and the thin-LTO link fails on
 conflicting `ProfileSummary` module flags.
 
+**2026-10-10 (allocation audit round 2 — two borrow
+conversions; `total_actions` byte-identical):** ranked the
+remaining allocation sites with the timer report's
+**inclusive per-call-path allocation table** and its
+**size-class breakdown** (the doc's own ranking signal),
+then confirmed each candidate with a single-call
+`RABUKA_TRACE_AT` trace (the innermost-3-frame tracer).
+Baseline on the bench deck (warmup off): 1,247,252 alloc
+calls / 200 games, `total_actions=29875`.
+
+- **`execute_gain_resource`** (`ability/effects/resource.rs`)
+  built four owned `String`s — `resource`, `target`,
+  `card_type_filter`, `group_filter` — via `.to_string()`
+  on values the accessors already return borrowed
+  (`resource_any()`/`target_name()`/`group_name()` →
+  `&str`; `card_type_any()` → `&CardType`, whose
+  `as_card_str()` is `&'static str`), then re-borrowed
+  them for the `GainResourceRequest` (whose fields are
+  already `&'a str`). All four are now borrowed directly.
+  `−2,589` alloc calls (−0.2%); `total_actions=29875`
+  byte-identical. Small because the per-call-site estimate
+  overpredicts (the catalogue's §19.3 correction again):
+  `card_type_filter`/`group_filter` are `None` on the
+  common path, so only `resource`+`target` (2/call) were
+  actually removed.
+- **`SelectionFilter.card_property`**
+  (`ability/effects/move/handlers.rs`) was the one
+  `Option<String>` among `Option<&'a str>` siblings; the
+  construction did `e.card_property_any().map(|s|
+  s.to_string())` and the only reader did
+  `.as_deref()`. Now `Option<&'a str>`, borrowed straight
+  from `card_property_any()`. Correct and outcome-neutral
+  (`total_actions` byte-identical), but **not measurable on
+  this deck** — `card_property` is `None` on the common
+  path, so the alloc it removes only fires for effects that
+  carry a card-property filter. Kept because it is the
+  right shape (matches the sibling fields) and removes a
+   real alloc on the decks that use it.
+
+**2026-10-10 (allocation audit round 3 — pending-choice
+`card_no`/`card_name` display-gating; `total_actions`
+byte-identical):** the `generate_pending_choice_actions`
+arms built `ActionParameters.card_no` (23 sites) and
+`card_name` (1 site) unconditionally —
+`Some("select".to_string())`, `Some(n.to_string())`,
+`Some(real_card_no.clone())`, `Some(opt.card_name.clone())`,
+etc. — even though `execute_action` and the bots route
+every action by `card_id` alone and only the web UI and
+debug output (which already falls back to `"-"`) read
+these fields. The main-phase arms already gated them on
+`cfg!(not(feature = "profiling")) && display`; the
+pending-choice arms were the outliers. All now go through
+a `display_str` helper that returns `None` (no allocation)
+when `action_display_enabled()` is off — the same gate
+`make_action`/`with_ja` apply to the description — and the
+`real_card_no` scratch in the `SelectCard` arm is likewise
+gated. `−79,461` alloc calls (−6.4%: 1,247,252 →
+1,167,791); `total_actions=29875` byte-identical.
+
+**2026-10-10 (allocation audit round 4 — profiler
+call-path interning; `total_actions` byte-identical):**
+the `Timer::drop` call-path key was a fresh
+`Arc<[&'static str]>` on *every* drop — the single
+largest allocator in a `--features profiling,
+alloc_tracker` build (~42% of every counted
+allocation, and the reason the inclusive per-call-path
+table's own rows were dominated by the profiler). Call
+paths are highly repetitive (the engine replays the
+same ability sequences thousands of times), so the key
+is now interned in a per-thread `PATH_CACHE:
+HashMap<Box<[&'static str]>, TimerKey>`: a repeated
+path reuses the cached `Arc` (a refcount bump) and a
+fresh `Arc` is allocated only the first time a given
+path is seen on a thread. The `Arc` keys still hash and
+compare by value, so the four global maps aggregate
+across threads exactly as before and `timer_report.txt`
+is unchanged (same paths, counts, and times — verified
+against the pre-change report). `−474,715` alloc calls
+(−40.6%: 1,167,791 → 693,076); `total_actions=29875`
+byte-identical; 4346 passed / 21 failed (the
+pre-existing profiling-feature `batch_movements`
+failures, unchanged). This is instrumentation overhead,
+not engine work — it vanishes in the production
+(no-`profiling`) build — but it was drowning the
+allocation signal the audit measures by, so collapsing
+it makes every remaining engine allocation visible.
+
+**What the audit found is left, and why each is not a
+quick win** (so it is not rediscovered as if new):
+- ~~The **`Timer` instrumentation is ~42% of every
+  allocation counted in a `--features profiling,
+  alloc_tracker` build**: each `Timer::drop` allocates
+  one `Arc<[&'static str]>` call-path key (already
+  reduced from four map-insert clones to one).~~
+  **Addressed in round 4** (above): the key is now
+  interned per unique path, so `Timer::drop` no longer
+  allocates on repeated paths. `check_timing`'s engine
+  work remains allocation-free.
+- The **`execute_move_cards` `destination`/`target`
+  `String`s are blocked by a borrow conflict**, not by
+  effort: `dest` (derived from `destination`) is live
+  across the `gs.resolve_target_player_mut(&target)` call
+  (handlers.rs:407), so a `Cow`/borrowed `destination`
+  would borrow `gs` across a mutable `gs` borrow. The
+  `card_property` half of the same item *was* landable
+  (above) because its `filter` dies at the `retain_valid`
+  call before any mutable borrow.
+- The **`card_indices: Some(vec![hand_index])`** on every
+  `SelectLiveCard` action (~75k allocs, the dominant 8–15 B
+  class in `generate_live_card_set_actions`) is
+  **load-bearing**: `resolve_hand_answer_index` prefers
+  `card_indices.first()` over the `card_id` fallback, and
+  `get_card_index_by_id` returns the *first* match, so a
+  hand holding two copies of the same card id is
+  disambiguated only by the exact `hand_index`. Removing it
+  needs a `SmallVec` type change across every `card_indices`
+  consumer, not a local fix.
+- The **choice-action label `String`s** (`generate_pending_choice_actions`'
+  PAY_SKIP arm uses raw `.to_string()`, not the display-gated
+  `action_desc!`) are display-only — `make_action` and
+  `with_ja` both gate on `action_display_enabled()` and
+  discard them in headless mode — but gating the *caller's*
+  construction is low-frequency (the cost prompt) and the
+  `card_no` field may be read by bots, so it is left for a
+  deliberate pass.
+- The rest are **genuine**: the `EffectOwner` deep clones
+  (the 128–255 B class in the ability-resolution path), the
+  `TemporaryEffect` owned `String`s (stored in a `Vec`, they
+  outlive the call), and `push_temporary_effect`'s three
+  `to_string()`s. Already-correct and not re-proposed:
+  `push_movement_event` (`ArcStr` cause, gated
+  `batch_movements`, conditional `recently_moved_from_zone`),
+  `make_params`/`make_action_params` (all-`None`, empty
+  description), `action_desc!` (gated, `String::new()` in
+  headless).
+
+**Pre-existing test failures under `--features
+"profiling alloc_tracker"` (test-infrastructure, not a
+perf regression and not from these changes):** `cargo
+test --release --features "profiling alloc_tracker"
+--test run_all` fails **21 tests** (4346 passed) on the
+*clean* tree — identical before and after this round's
+edits, so these edits add zero failures. The failures
+cluster in the auto-ability trigger path:
+`jidou/energy_watch/*` (energy-placed-by-own-effect →
+gain blade), `rules/trigger_paths/*` (paired abilities,
+trigger scope), `effects/recover/per_card/
+movement_tracking_characterization_test`
+(`push_movement_event_syncs_all_views`), and
+`bp7_parser_gap_cards`. These are **`profiling`-feature-
+specific, not correctness regressions**: the tests assert
+on behaviour that depends on `batch_movements`, which
+`push_movement_event` gates behind
+`cfg!(not(feature = "profiling"))`. The
+energy-placement condition
+(`ability/condition/movement.rs:810-861`) reads
+`batch_movements` for its **pre-enqueue** scan (the
+durable `snapshot_movements` governs only post-enqueue),
+so in a `profiling` build the pre-enqueue scan finds no
+movements and the watcher does not fire — hence the
+blade-count assertions read 0. `push_movement_event_
+syncs_all_views` asserts on `batch_movements` directly.
+The non-profiling confirmation run (`cargo test --release
+--test run_all`, no features) was attempted but its
+from-scratch LTO recompile exceeded the session budget;
+the profiling-specificity is established from the code
+path, not from that run. The doc's "4364/4364" gate
+should be read as the **no-feature** run; the
+`profiling,alloc_tracker` run is the allocation-
+measurement build, where these 21 are expected to fail.
+Separate from the allocation work.
+
 ## 4. What is left
 
 Statuses are as of 2026-10-08. Several items have landed since the
@@ -543,7 +715,7 @@ per-call-site Scale figures were worth ~10× less than estimated.
 | **`get_card_names` allocation-free + `normalize_name` borrowing** — 4 allocs × 67 call sites × per-candidate | high | medium | exhaustive corpus equivalence test | ✓ landed 2026-10-09 (`Vec<&str>`, −71,301 allocs/200 games, 4364/4364) |
 | `store_pending_choice` gating | ~20/choice offer | low | `total_actions` + grep log assertions | ✓ landed 2026-10-10 — the dedup-signature block is gated on `logging_enabled() \|\| log_enabled!(Debug)`; −25% alloc calls on the bench deck (§7) |
 | `filter_subset` / `CardFilter::from_effect` single-bind | 200–300 dependent loads; 10 probes → 1 | medium | `total_actions` + full suite |
-| `execute_move_cards` borrow its 8 `String`s | ~9/MoveCards | low | `total_actions` |
+| `execute_move_cards` borrow its 8 `String`s | ~9/MoveCards | low | `total_actions` | partial 2026-10-10 — the `SelectionFilter.card_property` `String` → `Option<&'a str>` landed (borrowed from `card_property_any()`); the `destination`/`target` `String`s are **blocked by a borrow conflict** (`dest` is live across the `resolve_target_player_mut` call at handlers.rs:407), not by effort |
 | `Option<&Ability>` in `AbilityRef` (the remaining ~50 tight-loop `resolve()` sites) | ~200–300 atomics/action | small | measure at `--jobs 1` **and** `--jobs 256` | partial — `AbilityRef::peek()` (`Option<&'static Ability>` off the `OnceLock` cache) exists; the ~50 `resolve()` call sites are not yet converted to it |
 | `EffectOwner` **writes** are deep clones (§5.4) — the accessors were fixed, the writes were not | ~1.7 KB per write | high | needs a new corpus harness; the `resolver.rs:102-119` comment records that this area has produced bugs before |
 

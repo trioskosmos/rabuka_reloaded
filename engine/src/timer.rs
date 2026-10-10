@@ -73,6 +73,37 @@ thread_local! {
     static CALL_STACK: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
 }
 
+// Call-path key cache. The profiler attributes its own allocations, so
+// the one `Arc` it allocated per Drop to rebuild the call path made it
+// ~42% of every allocation counted in a profiling build. Call paths are
+// highly repetitive — the engine replays the same ability sequences
+// thousands of times — so caching the `Arc` per unique path collapses
+// that to one allocation per unique path. The cache is per-thread like
+// CALL_STACK; the `Arc` keys still hash and compare by value, so the
+// global maps aggregate across threads exactly as they did with fresh
+// `Arc`s, and the report is unchanged.
+#[cfg(feature = "profiling")]
+thread_local! {
+    static PATH_CACHE: RefCell<HashMap<Box<[&'static str]>, TimerKey>> =
+        RefCell::new(HashMap::default());
+}
+
+/// Return the shared `Arc` key for a call path, allocating a fresh one
+/// only the first time this exact path is seen on this thread.
+#[cfg(feature = "profiling")]
+#[inline]
+fn intern_call_path(path: &[&'static str]) -> TimerKey {
+    PATH_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(key) = cache.get(path) {
+            return key.clone();
+        }
+        let key: TimerKey = std::sync::Arc::from(path);
+        cache.insert(path.into(), key.clone());
+        key
+    })
+}
+
 fn get_timers() -> std::sync::MutexGuard<'static, Option<TimerMap>> {
     let mut guard = TIMERS.lock().unwrap();
     if guard.is_none() {
@@ -173,15 +204,17 @@ impl Drop for Timer {
             let elapsed = self.start.elapsed().as_nanos();
 
             // Reconstruct the full call path (entire stack at this moment).
-            // One `Arc` allocation for the whole drop; the four map inserts
-            // below then share it by refcount.
+            // The `Arc` is interned per unique path (see PATH_CACHE), so a
+            // repeated path reuses the same `Arc` instead of allocating a
+            // fresh one on every drop; the four map inserts below share it
+            // by refcount either way.
             let call_path: TimerKey = CALL_STACK.with(|stack| {
                 let stack = stack.borrow();
                 // Check that we're at the top of the stack
                 if stack.last() == Some(&self.label) {
-                    stack.as_slice().into()
+                    intern_call_path(stack.as_slice())
                 } else {
-                    std::sync::Arc::from([self.label])
+                    intern_call_path(&[self.label])
                 }
             });
 

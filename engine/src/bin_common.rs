@@ -86,6 +86,8 @@ pub fn deal_default_game(db: &Arc<CardDatabase>, t1: &Deck, t2: &Deck) -> GameSt
 /// result (the existing per-bin blocks discard it with `let _`).
 pub fn execute_and_settle(gs: &mut GameState, action: &game_setup::Action) -> Result<(), String> {
     let _timer = crate::timer::Timer::start("bin_common::execute_and_settle");
+    #[cfg(feature = "alloc_tracker")]
+    let _alloc_trace = crate::alloc_counter::maybe_arm("execute_and_settle");
     let res = game_setup::execute_action(gs, action);
     game_setup::settle_single_player_state(gs);
     res
