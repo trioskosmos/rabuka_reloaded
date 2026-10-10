@@ -24,7 +24,7 @@ pub(crate) fn drain_under_cards_to_energy_zone(
         moved.push(cid);
         let pid = gs.ability_queue.current_entry()
             .map(|e| e.player_id.clone())
-            .unwrap_or_else(|| "p1".to_string());
+            .unwrap_or_else(|| crate::core::player::PlayerId::p1().clone());
         gs.push_movement_event_typed(
             cid,
             crate::core::types::ZoneId::UnderMember,

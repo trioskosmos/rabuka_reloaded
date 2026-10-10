@@ -26,7 +26,7 @@ use smallvec::SmallVec;
 /// impls keep every existing `player.id == "p1"` comparison compiling — std
 /// provides no `Arc<str> == &str` impl. Serialization is byte-identical to the
 /// old `String`: it writes as a plain string.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PlayerId(Arc<str>);
 
 impl PlayerId {

@@ -1242,7 +1242,7 @@ impl TurnEngine {
     ) {
         game_state.ability_queue.pause_for_choice(choice);
         if let Some(entry) = game_state.ability_queue.current_entry_mut() {
-            entry.choice_player_id = Some(player_id.to_string());
+            entry.choice_player_id = Some(crate::core::player::PlayerId::from(player_id));
         }
     }
 
@@ -1443,10 +1443,10 @@ impl TurnEngine {
         game_state.ability_queue.pause_for_choice(choice);
         if let Some(entry) = game_state.ability_queue.current_entry_mut() {
             entry.card_id = Some(card_id);
-            entry.player_id = player_id.to_string();
-            entry.choice_player_id = Some(player_id.to_string());
+            entry.player_id = crate::core::player::PlayerId::from(player_id);
+            entry.choice_player_id = Some(crate::core::player::PlayerId::from(player_id));
             if let Some(card) = game_state.card_database.get_card(card_id) {
-                entry.card_no = card.card_no.to_string();
+                entry.card_no = card.card_no.clone();
             }
         }
         true

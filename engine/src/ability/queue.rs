@@ -386,7 +386,7 @@ impl AbilityQueue {
             | QueueState::ExecutingEffect { entry_index } => {
                 let idx = *entry_index as usize;
                 // G1/G3: route choice to opponent when spawn context says opponent
-                let opponent_id: Option<String> = self.entries.get(idx).and_then(|entry| {
+                let opponent_id: Option<crate::core::player::PlayerId> = self.entries.get(idx).and_then(|entry| {
                     if entry.choice_player_id.is_some() {
                         return None;
                     }
@@ -415,7 +415,7 @@ impl AbilityQueue {
                         return None;
                     }
                     let opp = if entry.player_id == "p1" { "p2" } else { "p1" };
-                    Some(opp.to_string())
+                    Some(crate::core::player::PlayerId::from(opp))
                 });
                 if let Some(pid) = opponent_id {
                     if let Some(entry) = self.entries.get_mut(idx) {
@@ -438,8 +438,8 @@ entry_index: u8::try_from(idx).unwrap(),
             QueueState::Idle | QueueState::Completed { .. } => {
                 // Store the choice directly without an entry
                 let dummy_entry = AbilityQueueEntry {
-                    card_no: String::new(),
-                    player_id: String::new(),
+                    card_no: crate::core::types::ArcStr::default(),
+                    player_id: crate::core::player::PlayerId::default(),
                     ability: Arc::new(Ability {
                         full_text: String::new(),
                         triggerless_text: None,
@@ -540,10 +540,10 @@ entry_index: u8::try_from(idx).unwrap(),
     /// This gives resolve_target_player (which reads ability_master_id)
     /// the correct player context when evaluating success zone constants
     /// outside the normal ability queue flow.
-    pub fn push_constant_context(&mut self, player_id: String) {
+    pub fn push_constant_context(&mut self, player_id: crate::core::player::PlayerId) {
         let idx = self.entries.len();
         self.entries.push(AbilityQueueEntry {
-            card_no: String::new(),
+            card_no: crate::core::types::ArcStr::default(),
             player_id,
             ability: Arc::new(Ability {
                 full_text: String::new(),

@@ -12,14 +12,14 @@ impl GameState {
         self.pending_loop_protocol.is_some() || self.ability_queue.is_waiting_for_choice().is_some()
     }
 
-    pub fn get_pending_choice_player_id(&self) -> Option<String> {
+    pub fn get_pending_choice_player_id(&self) -> Option<crate::core::player::PlayerId> {
         if self.pending_loop_protocol.is_some() {
             let active = if core::ptr::eq(self.active_player(), &self.player1) {
                 &self.player2.id
             } else {
                 &self.player1.id
             };
-            return Some(active.to_string());
+            return Some(active.clone());
         }
         let entry = self.ability_queue.current_entry();
         // A REAL entry always carries a stamp: `pause_for_choice` applies the universal
@@ -64,7 +64,7 @@ impl GameState {
                         return None;
                     }
                 }
-                Some(self.active_player().id.to_string())
+                Some(self.active_player().id.clone())
             }
             other => other.and_then(|e| e.choice_player_id.clone()),
         }

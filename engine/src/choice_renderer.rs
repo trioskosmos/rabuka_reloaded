@@ -84,7 +84,7 @@ pub fn render_card_choice_grid(
 
     // Card number of the ability currently being resolved (L shows its
     // detail screen). Cloned up front so the input loop stays simple.
-    let source_card_no: Option<String> = gs
+    let source_card_no: Option<crate::core::types::ArcStr> = gs
         .ability_queue
         .current_entry()
         .map(|e| e.card_no.clone())

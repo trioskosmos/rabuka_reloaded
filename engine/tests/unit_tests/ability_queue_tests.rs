@@ -13,8 +13,8 @@ use rabuka_engine::ability::queue::*;
 
     fn make_entry(card_no: &str, player_id: &str) -> AbilityQueueEntry {
         AbilityQueueEntry {
-            card_no: card_no.to_string(),
-            player_id: player_id.to_string(),
+            card_no: card_no.into(),
+            player_id: player_id.into(),
             ability: Arc::new(Ability::default()),
             ability_index: 0,
             card_id: None,

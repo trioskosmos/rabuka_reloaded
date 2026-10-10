@@ -3341,7 +3341,7 @@ fn revealed_cards_filtered_by_player_ownership() {
 
     // Set choice_player_id so generate_possible_actions resolves "self" to P1
     if let Some(entry) = game.state.ability_queue.current_entry_mut() {
-        entry.choice_player_id = Some("p1".to_string());
+        entry.choice_player_id = Some("p1".into());
     }
 
     // Generate possible actions and check which cards are selectable

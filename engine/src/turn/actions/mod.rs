@@ -32,7 +32,7 @@ macro_rules! tdbg {
 /// `complete_current()` removes it) plus the caller-side resume flags.
 struct ResumeSnapshot {
     just_completed_key: Option<u32>,
-    entry_player_id: Option<String>,
+    entry_player_id: Option<crate::core::player::PlayerId>,
     cost_entry_trigger: Option<crate::game_state::AbilityTrigger>,
     cost_entry_card_id: Option<i16>,
     cost_entry_opt_result: Option<bool>,
@@ -1264,7 +1264,7 @@ impl super::TurnEngine {
     /// per choice answer (a `String` clone per call, on top of the
     /// capture clone, for a value that is always "p1"/"p2"/"player1"/
     /// "player2").
-    fn entry_player_or_p1(entry_player_id: &Option<String>) -> &str {
+    fn entry_player_or_p1(entry_player_id: &Option<crate::core::player::PlayerId>) -> &str {
         entry_player_id.as_deref().unwrap_or("p1")
     }
 
@@ -1467,7 +1467,7 @@ impl super::TurnEngine {
             let opponent_id = game_state.opponent_id(&current);
             log::debug!("[RWC_G1] SET choice_player_id={}", opponent_id);
             if let Some(entry) = game_state.ability_queue.current_entry_mut() {
-                entry.choice_player_id = Some(opponent_id.to_string());
+                entry.choice_player_id = Some(opponent_id);
             }
         } else if self_targeted {
             log::debug!("[RWC_G1] RESET choice_player_id to activator={}", current);
@@ -1523,7 +1523,7 @@ impl super::TurnEngine {
                 .ability_queue
                 .current_entry()
                 .map(|e| e.player_id.clone())
-                .unwrap_or_else(|| "p1".to_string());
+                .unwrap_or_else(|| crate::core::player::PlayerId::p1().clone());
             game_state.process_with_completed_key(snap.just_completed_key, &player_id);
         } else {
             // Effect completed without sub-choice — process any newly

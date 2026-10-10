@@ -143,9 +143,9 @@ impl AbilityResolver {
             if choice_maker == Some("opponent") {
                 let current_player_id = entry.player_id.clone();
                 let opponent_id = if current_player_id == "p1" {
-                    "p2".to_string()
+                    crate::core::player::PlayerId::p2().clone()
                 } else {
-                    "p1".to_string()
+                    crate::core::player::PlayerId::p1().clone()
                 };
                 entry.choice_player_id = Some(opponent_id);
             } else {

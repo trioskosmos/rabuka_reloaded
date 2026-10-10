@@ -1647,12 +1647,12 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             let trigger_str = format!("{:?}", entry.trigger_type);
             AbilityQueueEntryDisplay {
                 card_no: entry.card_no.to_string(),
-                player_id: entry.player_id.clone(),
+                player_id: entry.player_id.to_string(),
                 trigger_type: trigger_str,
                 completed: entry.completed,
                 cost_paid: entry.cost_paid,
                 effect_started: entry.effect_started,
-                choice_player_id: entry.choice_player_id.clone(),
+                choice_player_id: entry.choice_player_id.as_ref().map(|p| p.to_string()),
                 ability_text: entry.ability.full_text.clone(),
                 card_id: entry.card_id,
                 ability_index: entry.ability_index,

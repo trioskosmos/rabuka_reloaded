@@ -2643,7 +2643,7 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
                     _ => "player1",
                 };
                 self.ability_queue
-                    .push_constant_context(owner_id.to_string());
+                    .push_constant_context(crate::core::player::PlayerId::from(owner_id));
                 let mut resolver = AbilityResolver::new(self.card_database.clone(), Some(cid));
                 let _ = resolver.execute_modify_required_hearts(self, effect);
                 self.ability_queue.pop_constant_context();

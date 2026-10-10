@@ -348,7 +348,7 @@ impl GameState {
                     } else {
                         &entry.player_id
                     };
-                    entry.choice_player_id = Some(choice_player.to_string());
+                    entry.choice_player_id = Some(crate::core::player::PlayerId::from(choice_player));
                 }
                 log::debug!(
                     "[CHOICE_ROUTING] owner={} picker={:?} explicit_picker={:?} preserved={} targets_opponent={} spawn={:?} action={:?}",

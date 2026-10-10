@@ -82,7 +82,7 @@ fn an_opponent_stamped_choice_routes_to_that_opponent() {
         .ability_queue
         .current_entry_mut()
         .expect("pause_for_choice must leave a queue entry to stamp");
-    entry.choice_player_id = Some("p2".to_string());
+    entry.choice_player_id = Some("p2".into());
 
     assert_routed_to(&game, "p2");
     assert_json_key(&game, "p2");
@@ -267,7 +267,7 @@ fn both_seats_live_start_abilities_get_distinctly_stamped_prompts() {
         .ability_queue
         .current_entry_mut()
         .expect("pause_for_choice must leave a queue entry to stamp")
-        .choice_player_id = Some("p2".to_string());
+        .choice_player_id = Some("p2".into());
 
     assert!(
         game.state.can_player_act(1),

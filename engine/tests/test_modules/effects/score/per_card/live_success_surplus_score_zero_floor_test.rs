@@ -37,7 +37,7 @@ fn surplus_conditioned_score_live_total_minus_one_clamped_at_zero() {
     game.state.player1.success_live_card_zone.cards.clear();
     let shiori = game.id("PL!N-bp5-010-R");
     game.state.activating_card = Some(shiori);
-    game.state.ability_queue.push_constant_context("p1".to_string());
+    game.state.ability_queue.push_constant_context("p1".into());
     // Load the real second action (-1) from abilities.json
     let abilities: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string("../cards/abilities.json").unwrap()).unwrap();
@@ -192,7 +192,7 @@ fn surplus_conditioned_score_p2_live_total_floor() {
     game.state.player2.live_card_zone.cards.clear();
     game.state.player2.success_live_card_zone.cards.clear();
     game.state.activating_card = Some(shiori);
-    game.state.ability_queue.push_constant_context("p2".to_string());
+    game.state.ability_queue.push_constant_context("p2".into());
     let abilities: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string("../cards/abilities.json").unwrap()).unwrap();
     let entry = abilities["unique_abilities"]
