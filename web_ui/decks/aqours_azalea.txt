@@ -1,0 +1,42 @@
+// AZALEA三神 deck — the most-guided archetype in Loveca (5 guides, 4 authors).
+// Doctrine (ミウミ@ラブカ「デッキ紹介: AZALEA三神」+ 4 more):
+//   Turn 3: stage 「2夏美-13曜」→ 曜's debut digs the top 7 cards for
+//     green-heart members; 5-point live is the aspirational outcome.
+//   Turn 4: stage 「9-20」(三神 9-cost + 曜&夏美&瑠璃乃 20-cost)
+//     → トリコリコPLEASE!! + アオクハルカ = 9 points.
+//   Turn 5: 11 points. Turn 6: 16 points with 果南's yell-reveal
+//     green heart active.
+// 25 of 48 members are 曜/夏美/瑠璃乃-named, so the 曜&夏美&瑠璃乃
+// live-start discard engine (discard those names from hand for +1 blade
+// each) can always hold ~2 in hand.
+// Members: 三神 (果南/ダイヤ/花丸 9-cost) x12, 曜 13-cost x4,
+//   夏美 2-cost x4, 曜&夏美&瑠璃乃 20-cost x4, 瑠璃乃 x1, plus
+//   green-heart 三神 alternate prints and CYaRon/GuiltyKiss green
+//   members as 曜's dig targets and early-turn curve.
+PL!S-bp2-003-P x 4
+PL!S-bp2-013-N x 4
+PL!S-bp3-007-P x 4
+PL!S-bp2-005-P x 4
+PL!SP-pb1-009-P＋ x 4
+LL-bp2-001-R＋ x 4
+PL!HS-bp1-005-P x 1
+PL!S-pb1-003-P＋ x 2
+PL!S-pb1-007-P＋ x 2
+PL!S-pb1-004-P＋ x 2
+PL!S-sd1-012-SD x 2
+PL!S-sd1-016-SD x 2
+PL!S-sd1-013-SD x 2
+PL!S-bp2-015-N x 2
+PL!S-bp2-001-P x 2
+PL!S-bp2-018-N x 2
+PL!S-bp2-012-N x 2
+PL!S-bp3-016-N x 2
+PL!S-bp2-014-N x 1
+// Lives: トリコリコ (6, +2 at 10+ green on stage), アオクハルカ
+// (2, +1 at 3+ Three's Bouquet lives in waitroom), 眩耀夜行 (5, yell
+// draw — also feeds アオクハルカ's waitroom condition).
+PL!S-pb1-020-L x 4
+PL!HS-bp2-022-L x 4
+PL!HS-bp2-021-L x 4
+// Energy: AZALEA-unit energy from the premium booster.
+PL!S-pb1-027-PE x 12
