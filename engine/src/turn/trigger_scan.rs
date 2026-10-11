@@ -445,7 +445,14 @@ impl super::TurnEngine {
                 let Some(card) = game_state.card_database.get_card(card_id) else {
                     continue;
                 };
-                let card_no = card.card_no.to_string();
+                // `card_no` is only read by the two `to_trigger`
+                // pushes below, and only for cards that actually
+                // carry a LiveSuccess ability — the rare case. Most
+                // cards answer `trigger_ability_indices` with an
+                // empty slice, so the `to_string` stays unevaluated
+                // for them (it used to allocate per stage/live card
+                // on every scan).
+                let mut card_no: Option<String> = None;
                 let (zone, zone_label) = if position.is_some() {
                     ("stage", "ステージ")
                 } else {
@@ -463,7 +470,20 @@ impl super::TurnEngine {
                     let Some(ability_ref) = card.abilities.get(ability_index) else {
                         continue;
                     };
-                    let ability = ability_ref.resolve();
+                    // `peek()` — every use of `ability` below is a
+                    // read (position check, debug text), so the
+                    // `Arc::clone` that `resolve()` pays per ability
+                    // is pure overhead on the common already-decoded
+                    // path; `resolve()` only covers a not-yet-decoded
+                    // slot.
+                    let owned;
+                    let ability = match ability_ref.peek() {
+                        Some(a) => a,
+                        None => {
+                            owned = ability_ref.resolve();
+                            &owned
+                        }
+                    };
                     if position.is_some_and(|area| {
                         !crate::zones::check_effect_position(
                             ability
@@ -505,6 +525,8 @@ impl super::TurnEngine {
                             },
                         );
                     }
+                    let card_no =
+                        card_no.get_or_insert_with(|| card.card_no.to_string());
                     printed_to_trigger.push((
                         ability_index,
                         card_no.clone(),
@@ -558,6 +580,8 @@ impl super::TurnEngine {
                             },
                         );
                     }
+                    let card_no =
+                        card_no.get_or_insert_with(|| card.card_no.to_string());
                     gained_to_trigger.push((
                         format!("{}_gained_{}", card_no, gained_index),
                         card_no.clone(),

@@ -1505,6 +1505,11 @@ fn push_revealed_internal(
         } else {
             chosen
         };
+        // One join serves all three consumers below (the debug line,
+        // the structured entry text and the rule-log line); the
+        // metadata takes `chosen_final` by move instead of cloning
+        // it — the labels are only ever read here.
+        let joined = chosen_final.join(", ");
         log::debug!(
             target: "rabuka_engine::events",
             "[T{} {:?}] {} answered '{}': {} | options={} skipped={} source={:?}",
@@ -1514,7 +1519,7 @@ fn push_revealed_internal(
                 .map(|entry| entry.choice_player_id.as_deref().unwrap_or(&entry.player_id))
                 .unwrap_or(&self.active_player().id),
             choice.description(),
-            chosen_final.join(", "),
+            joined,
             offered_count,
             skipped,
             self.activating_card
@@ -1523,7 +1528,7 @@ fn push_revealed_internal(
             text: format!(
                 "[choice] resolved: offered {} option(s), picked {}",
                 offered_count,
-                chosen_final.join(", ")
+                joined
             ),
             turn: self.turn_number,
             player_label: self.player_prefix(),
@@ -1535,7 +1540,7 @@ fn push_revealed_internal(
             category: "choice_resolved".to_string(),
             metadata: Some(crate::core::types::LogMetadata::ChoiceResolved {
                 offered_count,
-                chosen: chosen_final.clone(),
+                chosen: chosen_final,
                 skipped,
                 prompt: choice.description().to_string(),
                 prompt_ja: choice.description_ja().map(|s| s.to_string()),
@@ -1547,7 +1552,7 @@ fn push_revealed_internal(
         self.push_rule_log_fmt(format_args!(
             "[choice] resolved: offered {} option(s), picked {}",
             offered_count,
-            chosen_final.join(", ")
+            joined
         ));
     }
 

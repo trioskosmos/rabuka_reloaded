@@ -24,14 +24,16 @@ use rabuka_engine::bot::strategy_v7::*;
 
         let member_ids: Vec<i16> = db
             .cards
-            .values()
+            .iter()
+            .flatten()
             .filter(|c| c.card_type == CardType::Member)
             .take(12)
             .map(|c| db.get_card_id(c.card_no.as_ref()).unwrap())
             .collect();
         let live_ids: Vec<i16> = db
             .cards
-            .values()
+            .iter()
+            .flatten()
             .filter(|c| c.card_type == CardType::Live)
             .take(6)
             .map(|c| db.get_card_id(c.card_no.as_ref()).unwrap())
@@ -80,7 +82,8 @@ use rabuka_engine::bot::strategy_v7::*;
         let db = rabuka_engine::Arc::new(CardDatabase::load_or_create(cards));
         let live_ids: Vec<i16> = db
             .cards
-            .values()
+            .iter()
+            .flatten()
             .filter(|c| c.card_type == CardType::Live)
             .take(5)
             .map(|c| db.get_card_id(c.card_no.as_ref()).unwrap())

@@ -122,9 +122,8 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         let max_cost = gs
             .card_database
-            .cards
-            .values()
-            .filter_map(|c| c.cost)
+            .iter_cards()
+            .filter_map(|(_, c)| c.cost)
             .max()
             .unwrap_or(10);
         let mut options: Vec<String> = (1..=max_cost).map(|n| n.to_string()).collect();

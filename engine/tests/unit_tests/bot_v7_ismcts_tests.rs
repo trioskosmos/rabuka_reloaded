@@ -37,7 +37,8 @@ use rabuka_engine::bot::v7_ismcts::*;
         );
         let energy = db
             .cards
-            .values()
+            .iter()
+            .flatten()
             .find(|card| card.is_energy())
             .and_then(|card| db.get_card_id(card.card_no.as_ref()))
             .expect("database has energy cards");

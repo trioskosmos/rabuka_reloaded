@@ -95,7 +95,7 @@ fn every_duration_in_the_corpus_is_parseable() {
         }
     }
 
-    for card in db.cards.values() {
+    for card in db.cards.iter().flatten() {
         for ab in card.resolved_abilities() {
             if let Some(eff) = ab.effect.as_deref() {
                 scan(eff, card.card_no.as_ref(), &mut unparseable, &mut seen);
@@ -148,7 +148,7 @@ fn no_per_unit_divisor_in_the_corpus_is_zero() {
         }
     }
 
-    for card in db.cards.values() {
+    for card in db.cards.iter().flatten() {
         for ab in card.resolved_abilities() {
             if let Some(eff) = ab.effect.as_deref() {
                 scan(eff, card.card_no.as_ref(), &mut offenders, &mut seen);
@@ -175,7 +175,7 @@ fn every_ability_names_a_recognized_trigger() {
     let mut unrecognised: Vec<String> = Vec::new();
     let mut checked = 0usize;
 
-    for card in db.cards.values() {
+    for card in db.cards.iter().flatten() {
         for ab in card.resolved_abilities() {
             if ab.is_null {
                 continue;
@@ -213,7 +213,7 @@ fn no_effect_decodes_to_the_no_op_custom_action() {
     let mut custom: BTreeSet<String> = BTreeSet::new();
     let mut seen = 0usize;
 
-    for card in db.cards.values() {
+    for card in db.cards.iter().flatten() {
         for ab in card.resolved_abilities() {
             if let Some(eff) = ab.effect.as_deref() {
                 collect_custom(eff, card.card_no.as_ref(), &mut custom, &mut seen);

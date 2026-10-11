@@ -20,7 +20,7 @@
         let db = test_db();
         let mut lives_with_ability_bits = 0;
         let mut lives_seen = 0;
-        for (&id, card) in db.cards.iter() {
+        for (id, card) in db.iter_cards() {
             if card.card_type != rabuka_engine::card::CardType::Live {
                 continue;
             }
@@ -69,7 +69,7 @@
         // Collect distinct signatures per card_type bucket.
         let mut live: Vec<[u32; 17]> = Vec::new();
         let mut member: Vec<[u32; 17]> = Vec::new();
-        for (&id, card) in db.cards.iter() {
+        for (id, card) in db.iter_cards() {
             let v = locm_card_features(&db, id);
             let key: [u32; 17] = std::array::from_fn(|i| v[i].to_bits());
             let bucket = match card.card_type {

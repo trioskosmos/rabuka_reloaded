@@ -638,7 +638,18 @@ pub(crate) fn build_ability_indexes(card: &Card) -> AbilityIndexes {
 #[derive(Debug, Clone)]
 
 pub struct CardDatabase {
-    pub cards: HashMap<i16, Card>,
+    /// Every physical card, indexed by its dense id.
+    ///
+    /// This used to be a `HashMap<i16, Card>`, and `get_card` — the
+    /// single hottest lookup in the engine, reached from every zone
+    /// walk, every condition evaluation and every ability resolution —
+    /// paid a SipHash probe per call. Ids are assigned densely from 0
+    /// (`load_or_create` sorts by `card_no` and counts up; `create_copy`
+    /// hands out `next_id`), so a `Vec` indexed by the id answers the
+    /// same question with one bounds check and no hashing. Sparse ids
+    /// (a snapshot restore) resize the table on insert; a hole reads as
+    /// `None`, exactly like a missing HashMap key.
+    pub cards: Vec<Option<Card>>,
     pub card_no_to_id: HashMap<String, i16>,
     /// Normalized (uppercase, fullwidth→halfwidth) card_no → id. Built once at
     /// load so `get_card_id` fallback lookups are O(1) instead of an
@@ -693,6 +704,18 @@ pub struct CardDatabase {
     /// pending duplicates or orphans to move.
     pub live_ids: Vec<bool>,
     pub energy_ids: Vec<bool>,
+    /// Dense per-card bitset over the five canonical groups (see
+    /// [`crate::ability::util::CANONICAL_GROUPS`]): bit `i` is set
+    /// when the card matches canonical group `i` via any path
+    /// (`card_matches_group_str_card`). Populated once at load by
+    /// [`CardDatabase::load_or_create`]; `distinct_stage_groups` reads
+    /// a byte here instead of re-running the match per (stage member,
+    /// group) pair. A database built without that pass (a hand-constructed
+    /// fixture or a snapshot restore) leaves this empty, and
+    /// `distinct_stage_groups` falls back to the on-the-fly match for
+    /// any id not present — so an empty bitset is always correct, just
+    /// slower.
+    pub card_group_bits: Vec<u8>,
     pub next_id: i16,
 }
 
@@ -723,7 +746,7 @@ impl CardDatabase {
 
     pub fn new() -> Self {
         Self {
-            cards: HashMap::default(),
+            cards: Vec::new(),
             card_no_to_id: HashMap::default(),
             normalized_no_to_id: HashMap::default(),
             auto_abilities: HashMap::default(),
@@ -733,6 +756,7 @@ impl CardDatabase {
             discard_abilities: HashMap::default(),
             live_ids: Vec::new(),
             energy_ids: Vec::new(),
+            card_group_bits: Vec::new(),
             next_id: 0,
         }
     }
@@ -849,8 +873,7 @@ impl CardDatabase {
     /// Used to give each card copy its own ID for per-copy modifier tracking.
     pub fn create_copy(&mut self, template_id: i16) -> i16 {
         let card = self
-            .cards
-            .get(&template_id)
+            .get_card(template_id)
             .expect("Template card not found")
             .clone();
         let copy_id = self.next_id;
@@ -882,7 +905,22 @@ impl CardDatabase {
         }
         self.live_ids[i] = self.live_ids.get(t).copied() == Some(true);
         self.energy_ids[i] = self.energy_ids.get(t).copied() == Some(true);
-        self.cards.insert(copy_id, card);
+        // The copy carries the template's printed data, so it
+        // inherits the template's canonical-group membership
+        // bit-for-bit. Only when the bitset is in sync with the
+        // id space (the load-time pass ran and nothing has
+        // desynced it); a hand-built database (e.g. a snapshot
+        // restore) leaves it empty and `distinct_stage_groups`
+        // falls back to the on-the-fly match.
+        if self.card_group_bits.len() == copy_id as usize {
+            let bits = self
+                .card_group_bits
+                .get(template_id.max(0) as usize)
+                .copied()
+                .unwrap_or(0);
+            self.card_group_bits.push(bits);
+        }
+        self.insert_card(copy_id, card);
         copy_id
     }
 
@@ -901,8 +939,26 @@ impl CardDatabase {
             let card_id = db.card_no_to_id[card.card_no.as_ref()];
             db.index_abilities(card_id, &card);
             db.index_card_types(card_id, &card);
-            db.cards.insert(card_id, card);
+            db.insert_card(card_id, card);
         }
+
+        // Dense per-card canonical-group bitset (see
+        // `ability::util::card_group_bits`). A second pass over the
+        // just-assigned dense ids: each card's membership is a pure
+        // function of its printed data, so it is computed once here and
+        // `distinct_stage_groups` reads a byte per member instead of
+        // re-running the `card_matches_group_str_card` match — string
+        // normalization plus a `SetCardIdentity` ability walk — for
+        // every (stage member, group) pair, once per main-phase
+        // generation and once per activatable ability.
+        let mut card_group_bits = Vec::with_capacity(db.next_id as usize);
+        for id in 0..db.next_id {
+            let bits = db.get_card(id).map_or(0, |card| {
+                crate::ability::util::card_group_bits(&db, card, id)
+            });
+            card_group_bits.push(bits);
+        }
+        db.card_group_bits = card_group_bits;
 
         // R1-adjacent perf fix: pre-build the normalized lookup index once so
         // get_card_id's fallback is O(1) instead of an allocating scan over
@@ -922,7 +978,40 @@ impl CardDatabase {
     }
 
     pub fn get_card(&self, card_id: i16) -> Option<&Card> {
-        self.cards.get(&card_id)
+        if card_id < 0 {
+            return None;
+        }
+        self.cards
+            .get(card_id as usize)
+            .and_then(|slot| slot.as_ref())
+    }
+
+    /// Insert `card` at `id` in the dense slot table, resizing to
+    /// fit. Mirrors `HashMap::insert`: returns the card previously
+    /// stored at `id`, if any. Ids are assigned densely from 0, so
+    /// the common path is an append; the resize exists for the
+    /// exception — a snapshot restore that hands back sparse ids.
+    /// Negative ids are refused rather than silently aliasing
+    /// slot 0 (no caller inserts one; `bot_arena`'s restore
+    /// rejects them up front).
+    pub fn insert_card(&mut self, id: i16, card: Card) -> Option<Card> {
+        if id < 0 {
+            return None;
+        }
+        let i = id as usize;
+        if i >= self.cards.len() {
+            self.cards.resize(i + 1, None);
+        }
+        self.cards[i].replace(card)
+    }
+
+    /// Iterate every stored card as `(id, &Card)`, in id order.
+    /// The dense table's equivalent of the old `cards.iter()`.
+    pub fn iter_cards(&self) -> impl Iterator<Item = (i16, &Card)> {
+        self.cards
+            .iter()
+            .enumerate()
+            .filter_map(|(i, slot)| slot.as_ref().map(|c| (i as i16, c)))
     }
 
     /// Look up a card by its printed number.
@@ -937,7 +1026,7 @@ impl CardDatabase {
     /// therefore resolve to different cards depending on which accessor was used
     /// or which run you were in. Delegating makes that divergence impossible.
     pub fn get_card_by_no(&self, card_no: &str) -> Option<&Card> {
-        self.get_card_id(card_no).and_then(|id| self.cards.get(&id))
+        self.get_card_id(card_no).and_then(|id| self.get_card(id))
     }
 
     /// Parse card_no into (base, rarity) where base is everything before last dash.
@@ -1121,7 +1210,7 @@ impl CardDatabase {
     /// `CardFilter` boundary, whose field type is shared with the
     /// effect's printed `card_names`) map `String::from` at their site.
     pub fn get_card_names(&self, card_id: i16) -> Vec<&str> {
-        if let Some(card) = self.cards.get(&card_id) {
+        if let Some(card) = self.get_card(card_id) {
             // `name_key` is already whitespace-free and has '＆' folded to '&'
             // (cards/scrape_expansion.py), so this is a plain split. It used to be
             // `normalize_name(name).replace('＆', "&").split('&')` — four heap

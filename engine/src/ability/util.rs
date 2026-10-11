@@ -888,6 +888,43 @@ pub fn card_matches_group_str_card(
         })
 }
 
+/// The five canonical groups `GameState::distinct_stage_groups` counts.
+///
+/// Defined here — beside the matching predicate and the load-time index
+/// that both depend on it — so the runtime counter and the
+/// [`CardDatabase::card_group_bits`] bitset can never drift apart.
+pub const CANONICAL_GROUPS: [&str; 5] = ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"];
+
+/// Dense per-card bitset over [`CANONICAL_GROUPS`]: bit `i` is set when
+/// `card_matches_group_str_card` matches canonical group `i`.
+///
+/// `distinct_stage_groups` runs once per main-phase action generation and
+/// once per activatable ability (via `effective_activation_cost` and the
+/// mandatory-cost pre-check), and each call re-ran the full
+/// `card_matches_group_str_card` match — string normalization plus a
+/// `SetCardIdentity` ability walk — for every (stage member, group) pair.
+/// Group membership is a pure function of the card's printed data (name,
+/// unit, group, series, and its printed `SetCardIdentity` abilities; gained
+/// abilities live in a separate `GameState` map this predicate never reads),
+/// so it is computed once at load and stored as one byte per card id.
+///
+/// Built by calling the same `card_matches_group_str_card` the runtime used,
+/// so the bitset is definitionally identical to the on-the-fly result —
+/// `distinct_stage_groups` ORs these bytes instead of re-deriving them.
+pub fn card_group_bits(
+    card_db: &CardDatabase,
+    card: &crate::core::card::Card,
+    card_id: i16,
+) -> u8 {
+    let mut bits = 0u8;
+    for (i, group) in CANONICAL_GROUPS.iter().enumerate() {
+        if card_matches_group_str_card(card_db, card, card_id, group) {
+            bits |= 1u8 << i;
+        }
+    }
+    bits
+}
+
 /// Returns true if `card_id` matches ANY group in `groups`, or if `groups` is
 /// empty (meaning no group filter). This replaces the repeated pattern:
 ///   `effect.group_names.as_ref().and_then(|gn| gn.first().map(|g| card_matches_group_str(...)))`

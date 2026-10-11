@@ -58,11 +58,12 @@ fn own_visible_pool(gs: &GameState, me: u8) -> Vec<String> {
 }
 
 fn first_live_id(db: &CardDatabase) -> i16 {
-    // `min_by_key`, not `find`: `db.cards` is a `HashMap`, so `find` picked a
-    // first-match-wins live card out of an arbitrary permutation of the whole
-    // database, and the rollout's fallback life therefore varied per process.
-    db.cards
-        .values()
+    // `min_by_key`, not `find`: the table is iterated in id order, so
+    // `find` would pick the lowest-id live card — but `min_by_key`
+    // states the actual intent (the deterministically smallest
+    // card_no) and stays correct if the storage ever changes again.
+    db.iter_cards()
+        .map(|(_, card)| card)
         .filter(|card| card.card_type == CardType::Live)
         .min_by_key(|card| card.card_no.as_ref())
         .and_then(|card| db.get_card_id(card.card_no.as_ref()))

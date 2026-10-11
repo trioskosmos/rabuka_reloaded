@@ -3428,7 +3428,7 @@ async fn init_game(
 
 fn build_cached_card_registry(card_database: &CardDatabase) -> serde_json::Value {
     let mut cards_with_abilities = Vec::new();
-    for (card_id, card) in card_database.cards.iter() {
+    for (card_id, card) in card_database.iter_cards() {
         let card_data = serde_json::json!({
             "id": card_id,
             "name": card.name,

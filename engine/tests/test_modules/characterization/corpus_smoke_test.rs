@@ -88,7 +88,8 @@ fn every_card_executes_without_panicking() {
     let card_nos: Vec<String> = {
         let mut v: Vec<String> = db
             .cards
-            .values()
+            .iter()
+            .flatten()
             .map(|c| c.card_no.to_string())
             .collect();
         v.sort();

@@ -712,21 +712,44 @@ impl GameState {
     /// action-generation hot path (~52 calls per game, each feeding the
     /// effective-cost gate of every offered activation).
     pub fn distinct_stage_groups(&self, player_id: &str) -> u8 {
-        const CANONICAL_GROUPS: [&str; 5] = ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"];
         let player = self
             .try_player_by_id(player_id)
             .unwrap_or(&self.player1);
-        // Bitset over `CANONICAL_GROUPS`: bit i is set once any stage
-        // member matches group i.
+        // Bitset over the canonical groups: bit i is set once any
+        // stage member matches group i.
         let mut matched = 0u8;
         for &cid in player.stage.stage.iter() {
             if cid == -1 {
                 continue;
             }
+            // Fast path: the load-time canonical-group bitset (one
+            // byte per card id, see `ability::util::card_group_bits`).
+            // `distinct_stage_groups` runs once per main-phase
+            // generation and once per activatable ability, so the
+            // per-(member, group) `card_matches_group_str_card`
+            // match — string normalization plus a `SetCardIdentity`
+            // ability walk — was re-derived on every call. Group
+            // membership is a pure function of the card's printed
+            // data, computed once at load.
+            if let Some(&bits) = self
+                .card_database
+                .card_group_bits
+                .get(cid.max(0) as usize)
+            {
+                matched |= bits;
+                continue;
+            }
+            // Fallback: a database whose bitset was not built at
+            // load (a hand-constructed fixture or a snapshot
+            // restore) still answers correctly via the original
+            // on-the-fly match.
             let Some(card) = self.card_database.get_card(cid) else {
                 continue;
             };
-            for (i, group) in CANONICAL_GROUPS.iter().enumerate() {
+            for (i, group) in crate::ability::util::CANONICAL_GROUPS
+                .iter()
+                .enumerate()
+            {
                 let bit = 1u8 << i;
                 if matched & bit != 0 {
                     continue;

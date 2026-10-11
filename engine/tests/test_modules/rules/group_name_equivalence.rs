@@ -73,7 +73,7 @@ fn fast_path_matches_allocating_path_for_whole_corpus() {
     let groups = probe_groups();
 
     let mut checked = 0usize;
-    for (&card_id, card) in db.cards.iter() {
+    for (card_id, card) in db.iter_cards() {
         for g in &groups {
             let fast = card_name_matches_group(&db, card, card_id, g);
             let slow = reference_name_matches_group(&db, card_id, g);
@@ -101,7 +101,7 @@ fn fast_path_matches_allocating_path_for_whole_corpus() {
 fn fast_path_precondition_matches_get_card_names_semantics() {
     let db = load_real_database();
     let mut verified = 0usize;
-    for (&card_id, card) in db.cards.iter() {
+    for (card_id, card) in db.iter_cards() {
         let name: &str = card.name.as_ref();
         let has_ws = name.contains(char::is_whitespace);
         let has_fullwidth_amp = name.contains('＆');
@@ -136,7 +136,8 @@ fn multi_name_cards_are_covered() {
     let db = load_real_database();
     let multi: Vec<&str> = db
         .cards
-        .values()
+        .iter()
+        .flatten()
         .map(|c| c.name.as_ref())
         .filter(|n| n.contains('&') || n.contains('＆'))
         .collect();

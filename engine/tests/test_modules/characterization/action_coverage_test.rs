@@ -31,7 +31,7 @@ fn all_action_types_fire_without_crash() {
 
     // Collect all unique action types found on member cards
     let mut action_types: HashSet<ActionType> = HashSet::new();
-    for card in db.cards.values() {
+    for card in db.cards.iter().flatten() {
         if !matches!(card.card_type, rabuka_engine::card::CardType::Member) {
             continue;
         }
@@ -60,7 +60,7 @@ if let Some(actions) = eff.compound_branch().and_then(|c| c.actions.as_deref()) 
 
     for action in &action_list {
         let mut test_card_no: Option<String> = None;
-        for card in db.cards.values() {
+        for card in db.cards.iter().flatten() {
             if !matches!(card.card_type, rabuka_engine::card::CardType::Member) {
                 continue;
             }

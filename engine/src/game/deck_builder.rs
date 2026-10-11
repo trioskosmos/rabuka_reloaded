@@ -195,11 +195,10 @@ impl DeckBuilder {
             // `min_by_key` on the card number makes the choice a function of the
             // card data rather than of the map's iteration order.
             let template_energy_id = card_db
-                .cards
-                .iter()
+                .iter_cards()
                 .filter(|(_, card)| card.is_energy())
                 .min_by_key(|(_, card)| card.card_no.as_ref())
-                .map(|(id, _)| *id);
+                .map(|(id, _)| id);
 
             if let Some(template_id) = template_energy_id {
                 for _ in 0..needed {

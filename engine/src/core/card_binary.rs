@@ -364,7 +364,7 @@ fn color_from_u8(v: u8) -> HeartColor {
 /// Reads each card from the CARD_BLOB by index, decodes it, and assigns a sequential ID.
 #[cfg(not(feature = "snes"))]
 pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
-    let mut cards: HashMap<i16, super::card::Card> = HashMap::default();
+    let mut cards: Vec<Option<super::card::Card>> = Vec::new();
     let mut card_no_to_id: HashMap<String, i16> = HashMap::default();
     let mut next_id: i16 = 0;
 
@@ -373,7 +373,7 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
             let card_no = card.card_no.to_string();
             if !card_no_to_id.contains_key(&card_no) {
                 card_no_to_id.insert(card_no.clone(), next_id);
-                cards.insert(next_id, card);
+                cards.push(Some(card));
                 next_id += 1;
             }
         }
@@ -391,7 +391,9 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
         HashMap::default();
     let mut suppress_cards: crate::HashSet<i16> = crate::HashSet::default();
     let mut discard_abilities: HashMap<i16, Vec<u16>> = HashMap::default();
-    for (&id, card) in cards.iter() {
+    for (id, card) in cards.iter().enumerate().filter_map(|(id, slot)| {
+        slot.as_ref().map(|card| (id as i16, card))
+    }) {
         let indexes = super::card::build_ability_indexes(card);
         if !indexes.auto.is_empty() {
             auto_abilities.insert(id, indexes.auto);
@@ -415,7 +417,9 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
     // below; `Card` carries no id field, so the id comes from that map.
     let mut live_ids: Vec<bool> = Vec::new();
     let mut energy_ids: Vec<bool> = Vec::new();
-    for (&id, card) in cards.iter() {
+    for (id, card) in cards.iter().enumerate().filter_map(|(id, slot)| {
+        slot.as_ref().map(|card| (id as i16, card))
+    }) {
         let i = (id.max(0)) as usize;
         if i >= live_ids.len() {
             live_ids.resize(i + 1, false);
@@ -425,7 +429,7 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
         energy_ids[i] = card.is_energy();
     }
 
-    super::card::CardDatabase {
+    let mut database = super::card::CardDatabase {
         normalized_no_to_id: card_no_to_id
             .keys()
             .map(|k| (super::card::CardDatabase::normalize_card_no(k), card_no_to_id[k]))
@@ -440,7 +444,22 @@ pub fn load_cards_from_blob(indices: &[usize]) -> super::card::CardDatabase {
         next_id,
         live_ids,
         energy_ids,
+        card_group_bits: Vec::new(),
+    };
+    // Dense per-card canonical-group bitset — the same second pass
+    // `CardDatabase::load_or_create` runs (see
+    // `ability::util::card_group_bits`). `distinct_stage_groups`
+    // reads a byte per stage member instead of re-running the
+    // `card_matches_group_str_card` match per (member, group) pair.
+    let mut card_group_bits = Vec::with_capacity(database.next_id as usize);
+    for id in 0..database.next_id {
+        let bits = database.get_card(id).map_or(0, |card| {
+            crate::ability::util::card_group_bits(&database, card, id)
+        });
+        card_group_bits.push(bits);
     }
+    database.card_group_bits = card_group_bits;
+    database
 }
 
 /// Number of cards stored in the embedded CARD_BLOB.

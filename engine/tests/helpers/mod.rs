@@ -83,7 +83,7 @@ pub fn load_real_database() -> Arc<CardDatabase> {
         let cards =
             CardLoader::load_cards_from_strs(CARDS_JSON).expect("Failed to load embedded cards");
         let mut db = CardDatabase::load_or_create(cards);
-        let tids: Vec<i16> = db.cards.keys().copied().collect();
+        let tids: Vec<i16> = db.iter_cards().map(|(id, _)| id).collect();
         let mut pool: HashMap<i16, Vec<i16>> = HashMap::new();
         for &tid in &tids {
             let mut v = Vec::with_capacity(11);

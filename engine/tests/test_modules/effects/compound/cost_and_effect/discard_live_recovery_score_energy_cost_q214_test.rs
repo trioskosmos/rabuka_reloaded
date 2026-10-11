@@ -9,7 +9,8 @@ fn discard_then_live_recovery_pays_score_energy_or_declines_q214() {
     // Find a live card with score 2
     let live_score_2_no = db
         .cards
-        .values()
+        .iter()
+        .flatten()
         .find(|c| c.card_type == rabuka_engine::core::card::CardType::Live && c.score == Some(2))
         .expect("should find a live card with score 2")
         .card_no
@@ -18,7 +19,8 @@ fn discard_then_live_recovery_pays_score_energy_or_declines_q214() {
     // Find a live card with score 0
     let live_score_0_no = db
         .cards
-        .values()
+        .iter()
+        .flatten()
         .find(|c| c.card_type == rabuka_engine::core::card::CardType::Live && c.score == Some(0))
         .expect("should find a live card with score 0")
         .card_no

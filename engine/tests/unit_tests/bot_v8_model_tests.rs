@@ -17,7 +17,7 @@ use rabuka_engine::game_state::*;
         }
 
     fn first_member_with(db: &CardDatabase, skip: usize, pred: impl Fn(&rabuka_engine::card::Card) -> bool) -> i16 {
-        let mut ids: Vec<i16> = db.cards.keys().copied().collect();
+        let mut ids: Vec<i16> = db.iter_cards().map(|(id, _)| id).collect();
         ids.sort();
         ids.into_iter()
             .filter(|&id| {
@@ -609,7 +609,7 @@ use rabuka_engine::game_state::*;
         // Three real members ordered by printed hearts, so "weak" and "strong"
         // are the same cards in different quantities.
         let mut members: Vec<i16> = {
-            let mut ids: Vec<i16> = db.cards.keys().copied().collect();
+            let mut ids: Vec<i16> = db.iter_cards().map(|(id, _)| id).collect();
             ids.sort();
             ids.into_iter()
                 .filter(|&id| {

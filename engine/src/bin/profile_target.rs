@@ -101,6 +101,20 @@ fn run_game_to_completion(
 }
 
 fn main() {
+    // Match sim_bench's headless defaults so the profile reflects the
+    // throughput workload: no UI Action strings, no log materialization.
+    // The bots (bot_arena) and training runs use the same configuration.
+    // RABUKA_ACTION_DISPLAY=1 / RABUKA_LOGS=1 restore the UI path for
+    // same-binary A/B.
+    let display = std::env::var("RABUKA_ACTION_DISPLAY")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    let logs = std::env::var("RABUKA_LOGS")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    rabuka_engine::core::runtime_flags::set_action_display(display);
+    rabuka_engine::core::runtime_flags::set_logging_enabled(logs);
+
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards =
         card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");

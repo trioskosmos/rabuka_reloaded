@@ -46,10 +46,9 @@ impl DeterminizationSampler {
         let opp_pool = opp_card_numbers.map(|c| c.to_vec());
 
         let mut energy_ids: Vec<i16> = card_database
-            .cards
-            .iter()
+            .iter_cards()
             .filter(|(_, c)| c.is_energy())
-            .map(|(id, _)| *id)
+            .map(|(id, _)| id)
             .collect();
         crate::rng::shuffle_slice(&mut energy_ids);
 
@@ -158,7 +157,7 @@ impl DeterminizationSampler {
                 }
             }
             None => {
-                for card in self.card_database.cards.values() {
+                for card in self.card_database.iter_cards().map(|(_, card)| card) {
                     if matches!(card.card_type, crate::card::CardType::Energy) {
                         continue;
                     }
@@ -240,12 +239,14 @@ impl DeterminizationSampler {
 
     /// Any non-energy card_no, used to pad undersized decks in fair mode.
     fn fallback_card_no(&self) -> Option<String> {
-        // `min_by_key`, not `find`: `find` over a `HashMap` made the padding
-        // card a function of iteration order, so an undersized deck was padded
-        // with a different card in every process.
+        // `min_by_key`, not `find`: the table is iterated in id
+        // order, so `find` would take the lowest-id non-energy
+        // card; `min_by_key` states the actual intent (the
+        // deterministically smallest card_no) and stays correct
+        // if the storage ever changes again.
         self.card_database
-            .cards
-            .values()
+            .iter_cards()
+            .map(|(_, c)| c)
             .filter(|c| !matches!(c.card_type, crate::card::CardType::Energy))
             .min_by_key(|c| c.card_no.as_ref())
             .map(|c| c.card_no.to_string())

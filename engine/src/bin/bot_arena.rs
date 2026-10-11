@@ -1084,9 +1084,8 @@ impl SavedPosition {
         }
         let db = &gs.card_database;
         let mut cards = db
-            .cards
-            .iter()
-            .map(|(&id, card)| {
+            .iter_cards()
+            .map(|(id, card)| {
                 Ok(SavedCard {
                     id,
                     card_no: card.card_no.to_string(),
@@ -1148,7 +1147,7 @@ impl SavedPosition {
             }
             if saved.id < 0
                 || saved.id >= self.next_id
-                || db.cards.insert(saved.id, card.clone()).is_some()
+                || db.insert_card(saved.id, card.clone()).is_some()
             {
                 return Err("invalid or duplicate physical card ID".into());
             }

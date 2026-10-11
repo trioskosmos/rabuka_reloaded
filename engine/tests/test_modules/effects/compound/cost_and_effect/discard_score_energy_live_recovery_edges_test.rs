@@ -4,7 +4,8 @@ use rabuka_engine::turn::TurnEngine;
 
 fn live_score_2_no(db: &rabuka_engine::core::card::CardDatabase) -> String {
     db.cards
-        .values()
+        .iter()
+        .flatten()
         .find(|c| c.card_type == rabuka_engine::core::card::CardType::Live && c.score == Some(2))
         .unwrap()
         .card_no
