@@ -111,17 +111,19 @@ pub(crate) fn execute_conditional_on_optional(
         if opt.action == ActionType::PayEnergy {
             let need = opt.energy_count_any().unwrap_or(0) as usize;
             if need > 0 {
-                let pp = gs.player_prefix();
                 let active = gs
                     .resolve_target_player(opt.target.as_deref().unwrap_or("self"))
                     .energy_zone
                     .active_count() as usize;
                 if active < need {
                     log::debug!("[CONDITION] source={:?} action={} branch=conditional next_action={} reason=insufficient_energy active={} need={} negation={}", resolver.session.activating_card_id, effect.action, cond.action, active, need, is_negation);
-                    gs.push_rule_log_fmt(format_args!(
-                        "{}: [[log_cost_skip:reason=compound_insufficient_energy,need={},active={}]]",
-                        pp, need, active
-                    ));
+                    if crate::core::runtime_flags::logging_enabled() {
+                        let pp = gs.player_prefix();
+                        gs.push_rule_log_fmt(format_args!(
+                            "{}: [[log_cost_skip:reason=compound_insufficient_energy,need={},active={}]]",
+                            pp, need, active
+                        ));
+                    }
                     let cmd = *cond.clone();
                     gs.ability_queue.set_pending_actions(vec![cmd]);
                     return resolver.resume_pending_actions(gs);

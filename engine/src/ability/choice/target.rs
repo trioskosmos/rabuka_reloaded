@@ -489,29 +489,31 @@ cost.compound_branch()
         };
         if let Some(options) = Self::pending_choice_cost_options(gs) {
             if idx < options.len() {
-                let label = options[idx]
-                    .text
-                    .split("}}")
-                    .last()
-                    .unwrap_or(&options[idx].text)
-                    .trim()
-                    .to_string();
-                let pp = gs.player_prefix();
-                let act_name = gs
-                    .activating_card
-                    .and_then(|id| gs.card_database.get_card(id))
-                    .map(|c| c.name.to_string());
-                gs.log_entry(
-                    format!(
-                        "{pp} {}: [choice] {} ✓",
-                        act_name.as_deref().unwrap_or(""),
-                        label
-                    ),
-                    &pp,
-                    gs.activating_card,
-                    act_name,
-                    "choice",
-                );
+                if crate::core::runtime_flags::logging_enabled() {
+                    let label = options[idx]
+                        .text
+                        .split("}}")
+                        .last()
+                        .unwrap_or(&options[idx].text)
+                        .trim()
+                        .to_string();
+                    let pp = gs.player_prefix();
+                    let act_name = gs
+                        .activating_card
+                        .and_then(|id| gs.card_database.get_card(id))
+                        .map(|c| c.name.to_string());
+                    gs.log_entry(
+                        format!(
+                            "{pp} {}: [choice] {} ✓",
+                            act_name.as_deref().unwrap_or(""),
+                            label
+                        ),
+                        &pp,
+                        gs.activating_card,
+                        act_name,
+                        "choice",
+                    );
+                }
                 // Take the pending SelectTarget so we can detect if pay_cost
                 // creates a new sub-choice (e.g., SelectCard for discard from hand).
                 let old_choice = self.awaiting.choice.take();

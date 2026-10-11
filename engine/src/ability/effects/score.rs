@@ -332,16 +332,18 @@ impl AbilityResolver {
                 }
             }
             let card_id = gs.activating_card.unwrap_or(-1);
-            let pp = gs.player_prefix();
-            let act_name = gs
-                .activating_card
-                .and_then(|id| gs.card_database.get_card(id))
-                .map(|c| c.name.to_string())
-                .unwrap_or_default();
-            gs.push_rule_log_fmt(format_args!(
-                "{} {}: [[log_score_modify:op={},value={},applied={},live_total=true,floor={}]]",
-                pp, act_name, operation, effective_value, if clamped_delta != 0 {1} else {0}, has_floor
-            ));
+            if crate::core::runtime_flags::logging_enabled() {
+                let pp = gs.player_prefix();
+                let act_name = gs
+                    .activating_card
+                    .and_then(|id| gs.card_database.get_card(id))
+                    .map(|c| c.name.to_string())
+                    .unwrap_or_default();
+                gs.push_rule_log_fmt(format_args!(
+                    "{} {}: [[log_score_modify:op={},value={},applied={},live_total=true,floor={}]]",
+                    pp, act_name, operation, effective_value, if clamped_delta != 0 {1} else {0}, has_floor
+                ));
+            }
             gs.record_ability_application(
                 gs.activating_card.unwrap_or(-1),
                 effect.text.to_string(),
@@ -589,7 +591,7 @@ impl AbilityResolver {
             ),
             effect_data,
         );
-        {
+        if crate::core::runtime_flags::logging_enabled() {
             let pp = gs.player_prefix();
             let act_name = gs
                 .activating_card

@@ -624,7 +624,7 @@ let source = cost.source_str().unwrap_or("");
         self.awaiting.choice = Some(
             Choice::select_cards(source.to_string(), effective_count, desc, is_optional)
                 .description_ja(Some(desc_ja))
-                .card_type(card_type.clone())
+                .card_type(card_type)
                 .cost_limit(
                     cost.cost_limit_any(),
                     cost.cost_limit_operator_any().map(|s| s.to_string()),
@@ -1347,7 +1347,10 @@ let source = cost.source_str().unwrap_or("");
 
     pub fn pay_cost(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
         let result = self.pay_cost_inner(gs, cost);
-        if result.is_ok() && self.awaiting.choice.is_none() {
+        if result.is_ok()
+            && self.awaiting.choice.is_none()
+            && crate::core::runtime_flags::logging_enabled()
+        {
             let pp = gs.player_prefix();
             let act_name = gs
                 .activating_card

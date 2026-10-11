@@ -188,11 +188,6 @@ pub fn execute_draw(
         per_unit_count: u8,
         per_unit_type: Option<&str>,
     ) -> Result<(), String> {
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
         let card_db = self.card_db();
         let is_any_number = effect.any_number_any().unwrap_or(false);
         let is_distinct = effect.distinct_any();
@@ -464,10 +459,17 @@ pub fn execute_draw(
         } else {
             destination
         };
-        gs.push_rule_log_fmt(format_args!(
-            "{} {}: [[log_draw:n={},from=zone_{},to=zone_{}]]",
-            pp, act_name, drawn_now, source, dst
-        ));
+        if crate::core::runtime_flags::logging_enabled() {
+            let pp = self.player_prefix(gs);
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.push_rule_log_fmt(format_args!(
+                "{} {}: [[log_draw:n={},from=zone_{},to=zone_{}]]",
+                pp, act_name, drawn_now, source, dst
+            ));
+        }
         Ok(())
     }
 

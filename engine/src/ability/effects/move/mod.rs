@@ -469,7 +469,7 @@ impl AbilityResolver {
         );
 
         // Character name filter from the effect
-        let character_filter: Option<Vec<String>> = effect.characters_any().cloned();
+        let character_filter: Option<&Vec<String>> = effect.characters_any();
 
         // Resolve name_constraint (e.g. "contains_all" from a revealed card)
         let name_fragments: Option<Vec<String>> = Self::resolve_name_fragments(gs, effect);
@@ -606,7 +606,7 @@ impl AbilityResolver {
                 // Honor the operator (e.g. 「コスト9以上」 >=) — dropping it let
                 // below-threshold cards through the selection.
                 effect.cost_limit_operator_any().map(Operator::as_str),
-                character_filter.as_ref(),
+                character_filter,
                 name_fragments.as_ref(),
                 None, // distinct
                 None, // exclude_self
