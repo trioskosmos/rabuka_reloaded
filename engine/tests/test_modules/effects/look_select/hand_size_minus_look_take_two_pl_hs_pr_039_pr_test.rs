@@ -64,7 +64,6 @@ struct Run {
     offer: Pools,
     after: Pools,
     offered: usize,
-    game: TestGame,
 }
 
 /// Stand `card_no` with `hand_extra` fillers beside it, play it, and read the look's
@@ -137,7 +136,6 @@ fn run(card_no: &str, hand_extra: usize, take: usize) -> Run {
         offer,
         after,
         offered,
-        game,
     }
 }
 

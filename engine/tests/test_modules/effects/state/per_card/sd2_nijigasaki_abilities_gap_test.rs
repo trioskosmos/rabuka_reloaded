@@ -59,37 +59,6 @@ fn drain(g: &mut TestGame, pay: bool) {
     }
 }
 
-/// Fire an ability matching `trigger_str` and resolve all its choices.
-fn fire(g: &mut TestGame, card_id: i16, trigger_str: &str) {
-    let card = g.db.get_card(card_id).unwrap();
-    let ab = card
-        .resolved_abilities()
-        .find(|a| a.triggers.as_deref() == Some(trigger_str))
-        .unwrap();
-    let pid = g.state.player1.id.clone();
-    let trigger = if trigger_str == "登場" {
-        AbilityTrigger::Debut
-    } else if trigger_str == "ライブ開始時" {
-        AbilityTrigger::LiveStart
-    } else if trigger_str == "起動" {
-        AbilityTrigger::Activation
-    } else {
-        AbilityTrigger::Auto
-    };
-    g.state.trigger_auto_ability(
-        format!("{}_{}", card.card_no, ab.full_text),
-        trigger,
-        pid.clone(),
-        Some(card.card_no.to_string()),
-        Some(card_id),
-        None,
-        None,
-    );
-    g.state.activating_card = Some(card_id);
-    g.state.process_pending_auto_abilities(&pid);
-    drain(g, true);
-}
-
 // ====================================================================
 // 006 近江彼方 (ライブ開始時): wait 1 own 虹 member (optional) -> blade+2
 // ====================================================================

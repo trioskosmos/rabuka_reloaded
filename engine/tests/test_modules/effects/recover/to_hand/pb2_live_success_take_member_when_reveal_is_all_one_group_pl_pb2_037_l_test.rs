@@ -123,10 +123,6 @@ fn taken_member(revealed: &[&str]) -> Option<String> {
         .map(|c| c.card_no.to_string())
 }
 
-fn takes_one(revealed: &[&str]) -> bool {
-    taken_member(revealed).is_some()
-}
-
 /// All three branches of the three-way 「すべて…のいずれか」 choice, at the size
 /// that raises a prompt. Two cards of one group is the case the old file called a
 /// defect; it is the plain reading of the card.

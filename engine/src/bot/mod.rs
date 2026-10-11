@@ -21,9 +21,8 @@ pub mod strategy_v8;
 pub mod v8_live;
 mod v8_main;
 pub mod v8_model;
+pub mod strategy_azalea;
 pub mod registry;
-pub mod weights;
-
 pub use registry::BotKind;
 pub use ismcts::search;
 pub use ismcts::search_1ply;
@@ -42,6 +41,7 @@ pub use strategy_v5::{choose_action_v5, choose_live_set_v5, choose_mulligan_v5, 
 pub use strategy_v6::{choose_action_v6, choose_live_set_v6, choose_mulligan_v6, choose_action as choose_action_v6_alias, choose_live_set as choose_live_set_v6_alias, choose_mulligan as choose_mulligan_v6_alias};
 pub use strategy_v7::{choose_action_v7, choose_live_set_v7, choose_mulligan_v7, choose_action as choose_action_v7_alias, choose_live_set as choose_live_set_v7_alias, choose_mulligan as choose_mulligan_v7_alias};
 pub use strategy_v8::{choose_action as choose_action_v8, choose_live_set as choose_live_set_v8, choose_mulligan as choose_mulligan_v8, score_actions_v8};
+pub use strategy_azalea::{choose_action as choose_action_azalea, choose_live_set as choose_live_set_azalea, choose_mulligan as choose_mulligan_azalea};
 
 use crate::card::CardDatabase;
 use crate::game_setup::{Action, ActionType};

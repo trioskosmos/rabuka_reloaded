@@ -35,6 +35,7 @@ const P_MEMBER2: &str = "PL!-bp5-012-N"; // 南 ことり
 
 #[derive(Debug, Clone, Copy)]
 struct Pools {
+    #[allow(dead_code)]
     hand: usize,
     waitroom: usize,
     #[allow(dead_code)]

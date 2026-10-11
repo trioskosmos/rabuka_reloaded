@@ -40,12 +40,6 @@ use rabuka_engine::core::types::AbilityTrigger;
 use rabuka_engine::zones::MemberArea;
 
 const PSYCHIC: &str = "PL!-pb2-042-L";
-// The condition filters on CHARACTER names, not card numbers. Kept separate from
-// the card consts above because the two are different things and conflating them
-// is how a test ends up asserting a card number where the data holds a name.
-const NICO_NAME: &str = "矢澤にこ";
-const MAKI_NAME: &str = "西木野真姫";
-const ERI_NAME: &str = "絢瀬絵里";
 /// The three named characters, all BiBi, all revealed.
 const NICO: &str = "PL!-PR-017-PR"; // 矢澤にこ, cost 2
 const MAKI: &str = "PL!-pb2-006-PP"; // 西木野真姫, cost 2

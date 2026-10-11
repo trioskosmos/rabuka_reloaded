@@ -236,7 +236,12 @@ fn hand_context(gs: &GameState, me: u8, db: &CardDatabase) -> HandContext {
     }
 }
 
-fn collect_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<Life> {
+fn collect_lives(
+    gs: &GameState,
+    me: u8,
+    db: &CardDatabase,
+    score_fn: fn(&GameState, u8, &CardDatabase, i16) -> i32,
+) -> Vec<Life> {
     let p = gs.seat_player(me);
     p.hand
         .cards
@@ -262,7 +267,7 @@ fn collect_lives(gs: &GameState, me: u8, db: &CardDatabase) -> Vec<Life> {
             Some(Life {
                 index,
                 need,
-                score: v8_model::printed_score(db, cid),
+                score: score_fn(gs, me, db, cid),
             })
         })
         .collect()
@@ -534,6 +539,21 @@ pub(crate) struct LiveCfg {
     /// weighting between reliability and score in the ranking, and the data says
     /// the weighting is off by about ten points of contested placement.
     pub score_bias: f64,
+    /// Deck-specific life scorer. `None` prices every life at its
+    /// printed score (`printed_life_score`); `Some` prices a life
+    /// at a deck-aware effective score. The azalea specialist uses
+    /// this to add the conditional live-start bonuses (トリコリコ
+    /// +2 at 10 green hearts on stage, アオクハルカ +1 at 3
+    /// Three's Bouquet lives in the waitroom) inside this lookahead,
+    /// so the deck knowledge rides the proven mechanism instead of
+    /// replacing it. A bare function pointer so `LiveCfg` stays
+    /// `Copy`.
+    pub score_fn: Option<fn(&GameState, u8, &CardDatabase, i16) -> i32>,
+}
+
+/// The default life scorer: the printed score.
+fn printed_life_score(_gs: &GameState, _me: u8, db: &CardDatabase, cid: i16) -> i32 {
+    v8_model::printed_score(db, cid)
 }
 
 /// `V8_COMMIT_GAME=<w>`: choose the live set as an EQUILIBRIUM of the commitment
@@ -951,7 +971,7 @@ fn enumerate_candidates(
     let my_success = p.success_live_card_zone.cards.len();
     let yell_score = v8_model::expected_yell_score(gs, me, db, v8_model::active_blades(gs, me, db));
 
-    let lives = collect_lives(gs, me, db);
+    let lives = collect_lives(gs, me, db, cfg.score_fn.unwrap_or(printed_life_score));
     let ctx = hand_context(gs, me, db);
     let junk = collect_junk(gs, me, db, &lives, &ctx);
     // Setting a spare slot is only worth it if the card we burn is worth less
@@ -1781,6 +1801,37 @@ pub fn choose_live_set_v8(gs: &GameState, actions: &[Action], db: &CardDatabase)
     choose_live_set_v8_inner(gs, actions, db, LiveCfg::default())
 }
 
+/// `choose_live_set_v8` with a deck-specific life scorer.
+///
+/// The default prices every life at its printed score. A
+/// deck specialist prices a life at its effective score —
+/// the printed score plus the conditional live-start
+/// bonuses — so the deck knowledge rides this lookahead's
+/// placement-probability model instead of replacing it
+/// with a hand-rolled greedy fill (which measured 12.75pp
+/// worse than v7 in a paired arena run, because it
+/// discards the heart-pass sampling this function does).
+///
+/// The scorer is a bare function pointer so `LiveCfg`
+/// stays `Copy`; it must be a pure function of
+/// `(gs, me, db, cid)`.
+pub fn choose_live_set_v8_scored(
+    gs: &GameState,
+    actions: &[Action],
+    db: &CardDatabase,
+    score_fn: fn(&GameState, u8, &CardDatabase, i16) -> i32,
+) -> Action {
+    choose_live_set_v8_inner(
+        gs,
+        actions,
+        db,
+        LiveCfg {
+            score_fn: Some(score_fn),
+            ..LiveCfg::default()
+        },
+    )
+}
+
 /// `choose_live_set_v8` with the set-width cap raised from one life to two.
 ///
 /// ## Why this exists
@@ -2245,7 +2296,10 @@ pub fn predict_live_set(gs: &GameState, db: &CardDatabase) -> Option<LivePredict
         opp_set_size: opp.set_size,
         my_success: p.success_live_card_zone.cards.len(),
         opp_success: opp.success,
-        n_lives_in_hand: collect_lives(gs, me, db).len(),
+        // The count is scorer-independent — `collect_lives` filters by
+        // card type and passability, and the scorer only prices the
+        // score — so the default scorer gives the same count here.
+        n_lives_in_hand: collect_lives(gs, me, db, printed_life_score).len(),
         n_candidates: candidates.len(),
         runner_up,
         board_hearts,

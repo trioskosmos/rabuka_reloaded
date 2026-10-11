@@ -26,9 +26,6 @@
 use crate::helpers::*;
 
 const SHIRO: &str = "PL!-pb2-014-P＋";
-const FILLER: &str = "PL!-sd1-010-SD";
-/// A `lily white` live — what the cost reveals.
-const LW_LIVE: &str = "PL!-pb1-029-SRL";
 /// A μ's live that is NOT lily white, so it cannot be revealed by the cost.
 const MUS_LIVE: &str = "PL!-bp4-025-SRL"; // 微熱からMystery, lily white — qualifies
 const OTHER: &str = "PL!-pb2-003-PP"; // 南 ことり, Printemps member, not a live

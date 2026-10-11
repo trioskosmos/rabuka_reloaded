@@ -11,7 +11,6 @@ use rabuka_engine::zones::MemberArea;
 ///   * the limit is 3 per turn, so a 4th wait transition changes nothing
 const ERI: &str = "PL!-PR-023-PR"; // 自動 [ターン3回], cost 11
 const WAITER: &str = "PL!-bp3-002-R"; // debut: wait up to 2 opponent members
-const MAKI: &str = "PL!-PR-022-PR"; // activation: this member becomes wait
 const OPP: &str = "PL!-sd1-010-SD"; // cost 4, eligible for the debut wait
 const FILLER: &str = "PL!-sd1-019-SD";
 

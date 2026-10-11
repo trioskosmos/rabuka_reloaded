@@ -14,7 +14,7 @@ use crate::card::CardDatabase;
 use crate::game_setup::{Action, ActionType};
 use crate::game_state::GameState;
 
-use super::{conductor, strategy, strategy_v2, strategy_v3, strategy_v4, strategy_v5, strategy_v6, strategy_v7, strategy_v8};
+use super::{conductor, strategy, strategy_v2, strategy_v3, strategy_v4, strategy_v5, strategy_v6, strategy_v7, strategy_v8, strategy_azalea};
 
 /// Every bot the arena can field. The string form is the CLI name.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -194,6 +194,23 @@ pub enum BotKind {
     /// Everything on record for these weights was read in mirrors, which cannot
     /// detect a one-seat change, so they have never had a valid test.
     V16,
+    /// AZALEA deck specialist. CLI name `azalea`.
+    ///
+    /// Not a new Main phase: the five public AZALEA
+    /// guides' deployment doctrine (cheap green members
+    /// early, 2-13 on turn 3, 9-20 on turn 4) is the
+    /// cost curve v7 already plays, so the Main phase
+    /// and its proven record carry over unchanged. The
+    /// deck-specific knowledge is encoded where the
+    /// guides actually differ from a generic heuristic:
+    /// the live set prices トリコリコPLEASE!! at 6 (8
+    /// once the stage carries 10+ green hearts),
+    /// アオクハルカ at 2 (3 once three Three's Bouquet
+    /// lives sit in the waitroom) and 眩耀夜行 at its
+    /// printed 5, and the mulligan keeps openings that
+    /// hold an engine piece (三神 / 曜 / 夏美 / 瑠璃乃 /
+    /// 曜&夏美&瑠璃乃) plus a live.
+    Azalea,
     Neural,
     Conductor,
     Random,
@@ -220,6 +237,7 @@ impl BotKind {
         "v15",
         "vbr",
         "v16",
+        "azalea",
         "neural",
         "conductor",
         "random",
@@ -245,6 +263,7 @@ impl BotKind {
             "v15" => BotKind::V15,
             "vbr" => BotKind::Vbr,
             "v16" => BotKind::V16,
+            "azalea" => BotKind::Azalea,
             "neural" => BotKind::Neural,
             "conductor" => BotKind::Conductor,
             _ => BotKind::Random,
@@ -271,6 +290,7 @@ impl BotKind {
             BotKind::V15 => "v15",
             BotKind::Vbr => "vbr",
             BotKind::V16 => "v16",
+            BotKind::Azalea => "azalea",
             BotKind::Neural => "neural",
             BotKind::Conductor => "conductor",
             BotKind::Random => "random",
@@ -359,6 +379,7 @@ impl BotKind {
             BotKind::V15 => strategy_v7::choose_action(gs, actions, me),
             BotKind::Vbr => strategy_v7::choose_action(gs, actions, me),
             BotKind::V16 => strategy_v8::choose_action_v16(gs, actions, me),
+            BotKind::Azalea => strategy_azalea::choose_action(gs, actions, me),
             // v10 is v8's Main, which becomes the confirmed configuration when
             // `V8_ALL_TERMS` is set. It is not forced on here: a bot's identity
             // should not depend on whether the caller remembered an env var, and
@@ -465,6 +486,7 @@ impl BotKind {
             BotKind::V15 => strategy_v8::choose_live_set(gs, actions, db),
             BotKind::Vbr => strategy_v8::choose_live_set_br(gs, actions, db),
             BotKind::V16 => strategy_v8::choose_live_set(gs, actions, db),
+            BotKind::Azalea => strategy_azalea::choose_live_set(gs, actions, db),
             BotKind::Neural => actions.first().cloned().unwrap_or(Action {
                 description: "pass".into(),
                 description_ja: None,
@@ -540,6 +562,7 @@ impl BotKind {
             BotKind::V15 => strategy_v8::choose_mulligan(gs, actions, db),
             BotKind::Vbr => strategy_v7::choose_mulligan(gs, actions, db),
             BotKind::V16 => strategy_v7::choose_mulligan(gs, actions, db),
+            BotKind::Azalea => strategy_azalea::choose_mulligan(gs, actions, db),
         }
     }
 }

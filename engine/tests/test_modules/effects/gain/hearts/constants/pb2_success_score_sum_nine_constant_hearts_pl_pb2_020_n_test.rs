@@ -17,18 +17,6 @@ const LIVE3: &str = "PL!-sd1-021-SD";
 /// Score 0 — six of these are 6 cards but a score sum of 0.
 const LIVE0: &str = "PL!-bp3-019-L";
 
-fn stage_and_total(eri: i16, lives: &[&str]) -> i16 {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    game.add_to_stage(MemberArea::Center, eri);
-    for card_no in lives {
-        let id = game.id(card_no);
-        game.state.player1.success_live_card_zone.add_card(id);
-    }
-    game.state.recalculate_constants();
-    game.state.mods.get_heart_modifier(eri, HeartColor::Heart01)
-}
-
 #[test]
 fn score_sum_nine_grants_both_printed_hearts() {
     let db = load_real_database();
