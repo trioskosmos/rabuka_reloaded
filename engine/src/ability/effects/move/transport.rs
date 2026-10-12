@@ -13,26 +13,30 @@ pub(crate) fn drain_under_cards_to_energy_zone(
         &mut gs.resolve_target_player_mut(target).stage.under_cards[stage_idx],
     );
     let mut moved = Vec::new();
+    let pid = gs.ability_queue.current_entry()
+        .map(|e| e.player_id.clone())
+        .unwrap_or_else(|| crate::core::player::PlayerId::p1().clone());
     for cid in under {
         let is_energy = gs.card_database.get_card(cid).is_some_and(|c| c.is_energy());
         if is_energy {
             gs.resolve_target_player_mut(target).energy_zone.cards.push(cid);
             gs.set_orientation(cid, "wait");
+            moved.push(cid);
+            gs.push_movement_event_typed(
+                cid,
+                crate::core::types::ZoneId::UnderMember,
+                crate::core::types::ZoneId::EnergyZone,
+                gs.activating_card,
+                &pid,
+                true,
+            );
         } else {
-            gs.resolve_target_player_mut(target).waitroom.add_card(cid);
+            // Burn!! (PL!N-bp7-029-L) moves only the ENERGY cards under a
+            // member (「すべてのエネルギーカード」). A member card stacked
+            // under the same member stays with its host (Rule 4.5.5) until
+            // the host itself leaves the stage (Rule 10.5.3).
+            gs.resolve_target_player_mut(target).stage.under_cards[stage_idx].push(cid);
         }
-        moved.push(cid);
-        let pid = gs.ability_queue.current_entry()
-            .map(|e| e.player_id.clone())
-            .unwrap_or_else(|| crate::core::player::PlayerId::p1().clone());
-        gs.push_movement_event_typed(
-            cid,
-            crate::core::types::ZoneId::UnderMember,
-            crate::core::types::ZoneId::EnergyZone,
-            gs.activating_card,
-            &pid,
-            true,
-        );
     }
     gs.recalculate_constants();
     moved

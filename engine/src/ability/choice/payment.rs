@@ -55,7 +55,7 @@ impl super::resolver::AbilityResolver {
             new_card_ids
         );
         let player = gs.resolve_target_player_mut(target);
-        let _ = util::move_cards(
+        let (_, _, _) = util::move_cards(
             player,
             &new_card_ids,
             Zone::Hand.to_str(),

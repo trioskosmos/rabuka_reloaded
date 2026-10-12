@@ -1105,17 +1105,26 @@ impl super::TurnEngine {
             }
         }
         // Replace both specified members first
-        let double_replaced_ids: Vec<i16> = {
+        let (double_replaced_ids, double_member_under, double_energy_under): (
+            Vec<i16>,
+            Vec<i16>,
+            Vec<i16>,
+        ) = {
             let player = game_state.active_player_mut();
             let mut replaced = Vec::new();
+            let mut member_under = Vec::new();
+            let mut energy_under = Vec::new();
             for &area2 in &db_areas {
                 if let Some(existing_card_id) = player.stage.get_area(area2) {
-                    let _ = player.remove_member_from_stage_with_recycling(area2 as usize, card_db);
+                    let (_removed, mu, eu) =
+                        player.remove_member_from_stage_with_recycling(area2 as usize, card_db);
+                    member_under.extend(mu);
+                    energy_under.extend(eu);
                     player.waitroom.cards.push(existing_card_id);
                     replaced.push(existing_card_id);
                 }
             }
-            replaced
+            (replaced, member_under, energy_under)
         };
         for &replaced_id in &double_replaced_ids {
             // B2: typed choke point — alias drift ("energy"/"energy_zone" etc) dies here
@@ -1128,6 +1137,15 @@ impl super::TurnEngine {
                 false,
             );
         }
+        // Rule 10.5.3-10.5.4: the under-cards of every replaced member
+        // are placed to the waitroom / energy deck by the same baton
+        // touch, so record them with the same cause (the arriving card).
+        game_state.record_under_card_recycling(
+            player_id,
+            &double_member_under,
+            &double_energy_under,
+            Some(card_id),
+        );
         // Track the non-placement vacated area for empty_area deployment
         let other_vacated = if db_areas[0] != area {
             Some(db_areas[0] as usize)
@@ -1348,7 +1366,14 @@ impl super::TurnEngine {
             .collect();
 
         let player = game_state.active_player_mut();
-        let (cost_paid, baton_touch_used, replaced_member_cost, replaced_member_id) = player
+        let (
+            cost_paid,
+            baton_touch_used,
+            replaced_member_cost,
+            replaced_member_id,
+            baton_member_under,
+            baton_energy_under,
+        ) = player
             .move_card_from_hand_to_stage(
                 idx,
                 area,
@@ -1388,6 +1413,16 @@ impl super::TurnEngine {
                     false,
                 );
             }
+            // Rule 10.5.3-10.5.4: the replaced member's under-cards are
+            // placed to the waitroom / energy deck by the same baton
+            // touch. Record them with the same cause (the arriving card)
+            // so the 「…控え室に置かれたとき」 watchers fire.
+            game_state.record_under_card_recycling(
+                &player_id,
+                &baton_member_under,
+                &baton_energy_under,
+                Some(card_id),
+            );
             // Enqueue movement-triggered auto abilities (baton_touch, discard, etc.)
             // but do NOT process yet — let them queue before appearance triggers.
             Self::trigger_auto_abilities_for_player(game_state, &player_id);

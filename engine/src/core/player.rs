@@ -310,14 +310,20 @@ impl Player {
 
     /// Rule 10.5.3-10.5.4: Remove a member from stage and recycle its under-cards.
     /// Member cards under 竊・waitroom. Energy cards under 竊・energy deck.
-    /// Returns the removed member card ID.
+    /// Returns (removed member card ID, member-under cards sent to the
+    /// waitroom, energy-under cards sent to the energy deck). The under-card
+    /// lists are returned rather than recorded here because this is a `Player`
+    /// method with no `GameState` handle; the movement events for the
+    /// rule-mandated placements (10.5.3/10.5.4) are pushed by the
+    /// `GameState`-level caller via `record_under_card_recycling`, so the
+    /// 「…控え室に置かれたとき」 watchers (e.g. 恋の自動) fire.
     pub fn remove_member_from_stage_with_recycling(
         &mut self,
         index: usize,
         card_db: &CardDatabase,
-    ) -> Option<i16> {
+    ) -> (Option<i16>, SmallVec<[i16; 4]>, SmallVec<[i16; 4]>) {
         if index >= 3 || self.stage.stage[index] == -1 {
-            return None;
+            return (None, SmallVec::new(), SmallVec::new());
         }
         let card_id = self.stage.stage[index];
         self.stage.stage[index] = crate::constants::EMPTY_SLOT;
@@ -327,13 +333,13 @@ impl Player {
         let (member_under, energy_under) = self.stage.recycle_under_cards(area, card_db);
         // Rule 9.6.2.1.2.1: Card is no longer on stage, clean up tracking.
         self.deployed_this_turn.retain(|id| *id != card_id);
-        for cid in member_under {
-            self.waitroom.add_card(cid);
+        for cid in &member_under {
+            self.waitroom.add_card(*cid);
         }
-        for cid in energy_under {
-            self.energy_deck.cards.push(cid);
+        for cid in &energy_under {
+            self.energy_deck.cards.push(*cid);
         }
-        Some(card_id)
+        (Some(card_id), member_under, energy_under)
     }
 
     // Rule 9.6.2 / Q206 / Q219 / Q225 / Q235: Play member card to stage
@@ -365,7 +371,7 @@ pub fn move_card_from_hand_to_stage(
         replaced_member_cost_mod: i16,
         played_card_cost_mod: i16,
         waited_stage_cards: &[i16],
-    ) -> Result<(u8, bool, Option<u8>, Option<i16>), String> {
+    ) -> Result<(u8, bool, Option<u8>, Option<i16>, Vec<i16>, Vec<i16>), String> {
         // Rule 8.2: Main Phase - Play member card from hand to stage
 
         if hand_index >= self.hand.cards.len() {
@@ -494,15 +500,21 @@ pub fn move_card_from_hand_to_stage(
                 crate::zones::MemberArea::RightSide => 2,
             };
 
-            let replaced_member = if self.stage.stage[index] != -1 {
-                let old_card_opt = self.remove_member_from_stage_with_recycling(index, card_db);
-                if let Some(old_card) = old_card_opt {
-                    self.waitroom.cards.push(old_card);
-                }
-                old_card_opt
-            } else {
-                None
-            };
+            // Rule 10.5.3-10.5.4: the replaced member's under-cards are
+            // recycled to the waitroom / energy deck. They are returned
+            // (not recorded here — this is a `Player` method) so the
+            // `GameState`-level caller can push their movement events.
+            let (replaced_member, baton_member_under, baton_energy_under) =
+                if self.stage.stage[index] != -1 {
+                    let (old_card_opt, mu, eu) =
+                        self.remove_member_from_stage_with_recycling(index, card_db);
+                    if let Some(old_card) = old_card_opt {
+                        self.waitroom.cards.push(old_card);
+                    }
+                    (old_card_opt, mu, eu)
+                } else {
+                    (None, SmallVec::new(), SmallVec::new())
+                };
 
             self.stage.stage[index] = card_id;
             // Rule 9.6.2.1.2.1: Card moved from hand (non-stage) to stage, track it.
@@ -518,6 +530,8 @@ pub fn move_card_from_hand_to_stage(
                 baton_touch_used,
                 baton_touch_replaced_cost,
                 replaced_id,
+                baton_member_under.into_iter().collect(),
+                baton_energy_under.into_iter().collect(),
             ))
         } else {
             self.hand.cards.insert(hand_index, card_id);

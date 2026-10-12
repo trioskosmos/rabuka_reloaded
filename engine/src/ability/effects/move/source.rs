@@ -169,7 +169,7 @@ impl AbilityResolver {
             return Ok(cards);
         }
         if source_str == "looked_at_remaining" {
-            return self.resolve_from_looked_at(gs, use_p2);
+            return self.resolve_from_looked_at(gs);
         }
         if source_str == "revealed_cards" {
             return self.resolve_from_revealed_cards(gs, selection, effect, filter, card_db);
@@ -262,21 +262,28 @@ impl AbilityResolver {
         Ok(cards)
     }
 
+    /// Resolve the `looked_at_remaining` source: the cards left
+    /// in the looked-at pool after a preceding sequential step
+    /// pulled its selection out.
+    ///
+    /// This only RESOLVES the source — it drains the pool and
+    /// returns the cards. It must NOT place them: the caller
+    /// (`execute_move_cards` → `place_taken_cards`) places
+    /// every resolved card into the effect's destination
+    /// through `place_card_in_zone` and records the movement
+    /// with `finalize_card_movement`. Banking the pool here
+    /// with a bare `waitroom.add_card` used to place each
+    /// card TWICE (once here, once in `place_taken_cards`)
+    /// and to record no movement event, so
+    /// ミア・テイラー's 「これにより公開されたほかのすべ
+    /// てのカードを控え室に置く」 duplicated every revealed
+    /// card in 控え室 and never armed an any-zone→waitroom
+    /// watcher.
     fn resolve_from_looked_at(
         &mut self,
         gs: &mut GameState,
-        use_p2: bool,
     ) -> Result<Vec<i16>, String> {
-        let player = if use_p2 {
-            &mut gs.player2
-        } else {
-            &mut gs.player1
-        };
-        let cards: Vec<i16> = gs.looked_at_cards.drain(..).collect();
-        for &card in &cards {
-            player.waitroom.add_card(card);
-        }
-        Ok(cards)
+        Ok(gs.looked_at_cards.drain(..).collect())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -795,10 +802,25 @@ impl AbilityResolver {
             );
 
             if c.destination != "same_area" {
-                Ok(player
-                    .remove_member_from_stage_with_recycling(idx, card_db)
-                    .into_iter()
-                    .collect())
+                let (member, member_under, energy_under) =
+                    player.remove_member_from_stage_with_recycling(idx, card_db);
+                // Rule 10.5.3-10.5.4: the recycling just placed the
+                // under-cards to the waitroom / energy deck. Record those
+                // placements so the 「…控え室に置かれたとき」 watchers
+                // fire. The `player` borrow ends with the removal above,
+                // so `gs` is free to push the movement events here.
+                let cause_pid = if c.use_p2 {
+                    gs.player2.id.clone()
+                } else {
+                    gs.player1.id.clone()
+                };
+                gs.record_under_card_recycling(
+                    cause_pid.as_str(),
+                    &member_under,
+                    &energy_under,
+                    c.activating_card_id,
+                );
+                Ok(member.into_iter().collect())
             } else {
                 Ok(vec![player.stage.stage[idx]])
             }
@@ -834,6 +856,8 @@ impl AbilityResolver {
             )? {
                 util::SelectionOutcome::Exact(indices) => {
                     let mut vacated = None;
+                    let mut member_under: Vec<i16> = Vec::new();
+                    let mut energy_under: Vec<i16> = Vec::new();
                     let cards = indices
                         .iter()
                         .rev()
@@ -847,7 +871,10 @@ impl AbilityResolver {
                                     area,
                                 );
                             }
-                            let cid = player.remove_member_from_stage_with_recycling(i, card_db);
+                            let (cid, mu, eu) =
+                                player.remove_member_from_stage_with_recycling(i, card_db);
+                            member_under.extend(mu);
+                            energy_under.extend(eu);
                             if cid.is_some() {
                                 vacated = Some(i.u8_count());
                             }
@@ -860,6 +887,20 @@ impl AbilityResolver {
                         cards,
                         vacated,
                         gs.last_vacated_stage_area
+                    );
+                    // Rule 10.5.3-10.5.4: record the under-card
+                    // placements the recycling performed, so the
+                    // 「…控え室に置かれたとき」 watchers fire.
+                    let cause_pid = if c.use_p2 {
+                        gs.player2.id.clone()
+                    } else {
+                        gs.player1.id.clone()
+                    };
+                    gs.record_under_card_recycling(
+                        cause_pid.as_str(),
+                        &member_under,
+                        &energy_under,
+                        c.activating_card_id,
                     );
                     Ok(cards)
                 }

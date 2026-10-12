@@ -2479,18 +2479,25 @@ pub fn remove_card_from_zone(
     card_id: i16,
     zone: &str,
     card_db: &CardDatabase,
-) -> bool {
+) -> (bool, SmallVec<[i16; 4]>, SmallVec<[i16; 4]>) {
     match Zone::from_str(zone) {
         Some(Zone::Hand) => {
             if let Some(pos) = player.hand.cards.iter().position(|&id| id == card_id) {
                 player.hand.cards.remove(pos);
-                return true;
+                return (true, SmallVec::new(), SmallVec::new());
             }
         }
         Some(Zone::Stage) => {
             if let Some(pos) = player.stage.stage.iter().position(|&id| id == card_id) {
-                player.remove_member_from_stage_with_recycling(pos, card_db);
-                return true;
+                // Rule 10.5.3-10.5.4: the under-cards are
+                // recycled to the waitroom / energy deck. This
+                // `Player`-only helper has no `GameState` handle,
+                // so the movement events for those placements are
+                // returned for the `GameState`-aware caller to
+                // push via `record_under_card_recycling`.
+                let (_removed, member_under, energy_under) =
+                    player.remove_member_from_stage_with_recycling(pos, card_db);
+                return (true, member_under, energy_under);
             }
         }
         Some(Zone::Energy) => {
@@ -2501,19 +2508,19 @@ pub fn remove_card_from_zone(
                 .position(|&id| id == card_id)
             {
                 player.energy_zone.cards.remove(pos);
-                return true;
+                return (true, SmallVec::new(), SmallVec::new());
             }
         }
         Some(Zone::Discard) | Some(Zone::Waitroom) => {
             if let Some(pos) = player.waitroom.cards.iter().position(|&id| id == card_id) {
                 player.waitroom.cards.remove(pos);
-                return true;
+                return (true, SmallVec::new(), SmallVec::new());
             }
         }
         Some(Zone::Deck) => {
             if let Some(pos) = player.main_deck.cards.iter().position(|&id| id == card_id) {
                 player.main_deck.cards.remove(pos);
-                return true;
+                return (true, SmallVec::new(), SmallVec::new());
             }
         }
         Some(Zone::LiveCardZone) => {
@@ -2524,7 +2531,7 @@ pub fn remove_card_from_zone(
                 .position(|&id| id == card_id)
             {
                 player.live_card_zone.cards.remove(pos);
-                return true;
+                return (true, SmallVec::new(), SmallVec::new());
             }
         }
         Some(Zone::SuccessLiveZone) => {
@@ -2535,12 +2542,12 @@ pub fn remove_card_from_zone(
                 .position(|&id| id == card_id)
             {
                 player.success_live_card_zone.cards.remove(pos);
-                return true;
+                return (true, SmallVec::new(), SmallVec::new());
             }
         }
         _ => {}
     }
-    false
+    (false, SmallVec::new(), SmallVec::new())
 }
 
 pub fn move_card(
@@ -2550,13 +2557,20 @@ pub fn move_card(
     dst_zone: &str,
     vacated_stage_area: Option<usize>,
     card_db: &CardDatabase,
-) -> bool {
-    // Attempt to remove from source zone
-    if remove_card_from_zone(player, card_id, src_zone, card_db) {
-        // Place in destination zone
-        return place_card_in_zone(player, card_id, dst_zone, vacated_stage_area, false, 1);
+) -> (bool, SmallVec<[i16; 4]>, SmallVec<[i16; 4]>) {
+    // Attempt to remove from source zone. The under-cards
+    // (Rule 10.5.3-10.5.4) are recycled during the removal,
+    // so they are returned for the `GameState`-aware caller
+    // to record regardless of whether the destination place
+    // then succeeds.
+    let (removed, member_under, energy_under) =
+        remove_card_from_zone(player, card_id, src_zone, card_db);
+    if removed {
+        let placed =
+            place_card_in_zone(player, card_id, dst_zone, vacated_stage_area, false, 1);
+        return (placed, member_under, energy_under);
     }
-    false
+    (false, SmallVec::new(), SmallVec::new())
 }
 
 pub fn resolve_indices_to_ids(
@@ -2578,21 +2592,26 @@ pub fn move_cards(
     dst_zone: &str,
     vacated_stage_area: Option<usize>,
     card_db: &CardDatabase,
-) -> usize {
+) -> (usize, SmallVec<[i16; 4]>, SmallVec<[i16; 4]>) {
     let mut count = 0;
+    let mut member_under = SmallVec::new();
+    let mut energy_under = SmallVec::new();
     for &card_id in card_ids {
-        if move_card(
+        let (moved, mu, eu) = move_card(
             player,
             card_id,
             src_zone,
             dst_zone,
             vacated_stage_area,
             card_db,
-        ) {
+        );
+        member_under.extend(mu);
+        energy_under.extend(eu);
+        if moved {
             count += 1;
         }
     }
-    count
+    (count, member_under, energy_under)
 }
 
 /// Place a card in the given destination zone, handling all zone types.

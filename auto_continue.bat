@@ -7,9 +7,9 @@ exit /b
 #>
 
 param(
-    [int]$IntervalMinutes = 2,
+    [int]$IntervalMinutes = 5,
     [string]$WindowTitle = "",
-    [string]$Message = "go crank up the speed then. keep auditing the engine find the worst offenders and do the work."
+    [string]$Message = "go reorganise the main rust engine and parser so it follows the actual ability texts and rules better. actually read the rules and abilties. properly audit and actually do the work."
 )
 
 Add-Type -AssemblyName System.Windows.Forms

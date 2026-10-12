@@ -32,7 +32,7 @@ impl super::resolver::AbilityResolver {
             .filter_map(|&i| player.live_card_zone.cards.get(i).copied())
             .filter(|&cid| validate_card(cid))
             .collect();
-        let moved = util::move_cards(
+        let (moved, _, _) = util::move_cards(
             player,
             &card_ids,
             Zone::LiveCardZone.to_str(),
@@ -355,7 +355,8 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                     last_vacated = Some(pos);
                 }
             }
-            let moved_count = util::move_cards(
+            let owner_id = player.id.clone();
+            let (moved_count, member_under, energy_under) = util::move_cards(
                 player,
                 &valid_ids,
                 Zone::Stage.to_str(),
@@ -369,8 +370,43 @@ gs.set_recently_moved_batch(moved.clone().into(), Some("under_member"));
                 }
                 self.selection.cards = valid_ids.clone().into();
                 self.selection.moved_cards = valid_ids.clone().into();
-gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
+                // Record the member's own movement
+                // (stage -> destination). A discard
+                // from the stage is a placement to
+                // the waitroom (Discard and Waitroom
+                // are the same zone here), so the
+                // 「メンバーが控え室に置かれたとき」
+                // watchers must fire. `effect_only`
+                // follows the phase: a cost-phase
+                // discard is not an effect, an
+                // effect-phase discard is.
+                let effect_only = gs
+                    .ability_queue
+                    .current_entry()
+                    .is_some_and(|e| e.effect_started);
+                for &cid in &valid_ids {
+                    gs.push_movement_event(
+                        cid,
+                        Zone::Stage.to_str(),
+                        &dst_str,
+                        gs.activating_card,
+                        owner_id.as_str(),
+                        effect_only,
+                    );
+                }
+                gs.set_recently_moved_batch(valid_ids.into(), Some("stage"));
             }
+            // Rule 10.5.3-10.5.4: the under-cards of
+            // every member discarded off the stage are
+            // placed to the waitroom / energy deck.
+            // Record those placements so the
+            // 「…控え室に置かれたとき」 watchers fire.
+            gs.record_under_card_recycling(
+                owner_id.as_str(),
+                &member_under,
+                &energy_under,
+                gs.activating_card,
+            );
         }
         Ok(())
     }

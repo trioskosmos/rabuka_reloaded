@@ -614,6 +614,72 @@ fn rina_rule_1053_under_member_goes_to_waitroom() {
     );
 }
 
+/// Rule 10.5.3 places the under-member into the waitroom (置きます).
+/// That placement is a movement the 「…控え室に置かれたとき」 watchers
+/// (e.g. 恋の自動) read off the turn movement log, so the baton-touch
+/// recycling path must record it.
+#[test]
+fn rina_rule_1053_under_member_recycling_records_movement_event() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let rina = game.id("PL!N-PR-026-PR");
+    let target = game.id("PL!N-PR-009-PR");
+    let arriver = game.id("PL!HS-sd1-008-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Place the member to be replaced on stage, with a member under it.
+    game.state.player1.stage.stage[1] = rina;
+    game.state
+        .player1
+        .stage
+        .place_under_card(MemberArea::Center, target);
+    // Filler cards in deck so the arriver's debut "draw 2" succeeds.
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.give_energy(30);
+
+    // Baton touch: play the arriver to the occupied center, which
+    // replaces rina and recycles its under-card (Rule 10.5.3).
+    game.state.player1.hand.cards.push(arriver);
+    game.state.player1.hand.cards.push(filler);
+    game.play_to_stage_baton(arriver, MemberArea::Center);
+    // Answer the arriver's mandatory debut "draw 2, discard 1" choice.
+    while game.has_pending_choice() {
+        let is_required_discard = game.state.get_pending_choice().is_some_and(|c| {
+            matches!(
+                c,
+                rabuka_engine::ability::types::Choice::SelectCard {
+                    count: 1,
+                    allow_skip: false,
+                    ..
+                }
+            )
+        });
+        if is_required_discard {
+            game.select_indices(&[0]);
+        } else {
+            game.select_indices(&[]);
+        }
+    }
+
+    // Rule 10.5.3: the under-card went to the waitroom...
+    assert!(
+        game.state.player1.waitroom.cards.contains(&target),
+        "Rule 10.5.3: under member goes to waitroom"
+    );
+    // ...and that placement is a movement event the watchers read.
+    let recorded = game
+        .state
+        .turn_movements
+        .iter()
+        .any(|e| e.moved_card_id == target);
+    assert!(
+        recorded,
+        "Rule 10.5.3 under-member placement to waitroom must record a movement event"
+    );
+}
+
 #[test]
 fn rina_rule_4553_under_member_follows_position_change() {
     let db = load_real_database();
@@ -1098,6 +1164,7 @@ fn member_with_under_energy_moving_to_hand_recycles_energy() {
         .state
         .player1
         .remove_member_from_stage_with_recycling(1, &game.db)
+        .0
         .expect("member should be removed");
     game.state.player1.hand.add_card(removed);
 

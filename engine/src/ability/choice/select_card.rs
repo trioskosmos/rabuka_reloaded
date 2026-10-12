@@ -825,7 +825,7 @@ impl super::resolver::AbilityResolver {
                 .filter(|&cid| validate_card(cid))
                 .collect();
             if !valid_ids.is_empty() {
-                let mc = util::move_cards(
+                let (mc, _, _) = util::move_cards(
                     player,
                     &valid_ids,
                     Zone::SuccessLiveZone.to_str(),

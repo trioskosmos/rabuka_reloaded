@@ -92,6 +92,7 @@ fn miyashita_ai_q160_displaced_debuts_still_count() {
         .state
         .player1
         .remove_member_from_stage_with_recycling(1, &game.db)
+        .0
         .expect("second debuted member should leave stage");
     game.state.player1.waitroom.cards.push(removed);
     game.state

@@ -14,7 +14,7 @@ use crate::card::CardDatabase;
 use crate::game_setup::{Action, ActionType};
 use crate::game_state::GameState;
 
-use super::{conductor, strategy, strategy_v2, strategy_v3, strategy_v4, strategy_v5, strategy_v6, strategy_v7, strategy_v8, strategy_azalea};
+use super::{conductor, strategy, strategy_v2, strategy_v3, strategy_v4, strategy_v5, strategy_v6, strategy_v7, strategy_v8, strategy_v17, strategy_azalea};
 
 /// Every bot the arena can field. The string form is the CLI name.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -211,6 +211,43 @@ pub enum BotKind {
     /// hold an engine piece (三神 / 曜 / 夏美 / 瑠璃乃 /
     /// 曜&夏美&瑠璃乃) plus a live.
     Azalea,
+    /// The draw-probability bot. CLI name `v17`.
+    ///
+    /// This is the bot the user asked for: one built around
+    /// the PERCENTAGE of getting a good card to play. Every
+    /// decision — mulligan, live set, Main phase, ability
+    /// usage — is an argmax over `v17_model::expected_
+    /// placements`, the expected number of cards placed over
+    /// the next few checks, where the number of good cards in
+    /// hand is a HYPERGEOMETRIC random variable drawn from our
+    /// own decklist (fair information, section 9).
+    ///
+    ///   * Mulligan: every legal discard set is scored by the
+    ///     expected placements of the opening, with the
+    ///     replacement modelled as a uniform sample of the
+    ///     shuffled (deck ∪ discarded) pool — not read off
+    ///     the top of the deck, because the deck order is
+    ///     unknown. Keep the opening with the highest
+    ///     conversion percentage.
+    ///   * Live set: argmax over every legal set of the
+    ///     rule-exact check payoff plus the discounted
+    ///     expected placements AFTER committing the ammo, so
+    ///     a life spent on a check we are likely to fail is
+    ///     priced as the future placement it forfeits. The
+    ///     fold (set nothing) is a candidate.
+    ///   * Main phase / ability usage: clone-and-execute
+    ///     every action and keep the one that most raises the
+    ///     placement forecast. A draw ability raises P(ammo)
+    ///     for every future check, a buff ability raises
+    ///     P(pass), a deploy raises both — so an ability is
+    ///     used exactly when it improves the percentage of
+    ///     getting a good card to play.
+    ///
+    /// The architecture is deliberately the opposite of v7's
+    /// (a chain of per-branch heuristics) and v8's (a two-ply
+    /// search over a deterministic walk): ONE currency, ONE
+    /// model, every decision an argmax over it.
+    V17,
     Neural,
     Conductor,
     Random,
@@ -241,6 +278,7 @@ impl BotKind {
         "neural",
         "conductor",
         "random",
+        "v17",
     ];
 
     pub fn parse(s: &str) -> Self {
@@ -266,6 +304,7 @@ impl BotKind {
             "azalea" => BotKind::Azalea,
             "neural" => BotKind::Neural,
             "conductor" => BotKind::Conductor,
+            "v17" => BotKind::V17,
             _ => BotKind::Random,
         }
     }
@@ -293,6 +332,7 @@ impl BotKind {
             BotKind::Azalea => "azalea",
             BotKind::Neural => "neural",
             BotKind::Conductor => "conductor",
+            BotKind::V17 => "v17",
             BotKind::Random => "random",
         }
     }
@@ -380,6 +420,11 @@ impl BotKind {
             BotKind::Vbr => strategy_v7::choose_action(gs, actions, me),
             BotKind::V16 => strategy_v8::choose_action_v16(gs, actions, me),
             BotKind::Azalea => strategy_azalea::choose_action(gs, actions, me),
+            // v17: the draw-probability bot. Every Main-phase
+            // and pending-choice action is an argmax over the
+            // expected placement forecast, so ability usage is
+            // priced by the percentage it improves.
+            BotKind::V17 => strategy_v17::choose_action(gs, actions, me),
             // v10 is v8's Main, which becomes the confirmed configuration when
             // `V8_ALL_TERMS` is set. It is not forced on here: a bot's identity
             // should not depend on whether the caller remembered an env var, and
@@ -487,6 +532,10 @@ impl BotKind {
             BotKind::Vbr => strategy_v8::choose_live_set_br(gs, actions, db),
             BotKind::V16 => strategy_v8::choose_live_set(gs, actions, db),
             BotKind::Azalea => strategy_azalea::choose_live_set(gs, actions, db),
+            // v17: argmax over every legal set of the
+            // rule-exact check payoff plus the discounted
+            // future placements after committing the ammo.
+            BotKind::V17 => strategy_v17::choose_live_set(gs, actions, db),
             BotKind::Neural => actions.first().cloned().unwrap_or(Action {
                 description: "pass".into(),
                 description_ja: None,
@@ -563,6 +612,10 @@ impl BotKind {
             BotKind::Vbr => strategy_v7::choose_mulligan(gs, actions, db),
             BotKind::V16 => strategy_v7::choose_mulligan(gs, actions, db),
             BotKind::Azalea => strategy_azalea::choose_mulligan(gs, actions, db),
+            // v17: every legal discard set scored by the
+            // expected placements of the opening, with the
+            // replacement modelled as a shuffled-deck sample.
+            BotKind::V17 => strategy_v17::choose_mulligan(gs, actions, db),
         }
     }
 }

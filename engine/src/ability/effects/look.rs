@@ -54,25 +54,93 @@ impl AbilityResolver {
             .collect()
     }
 
-    /// No looked-at card matched: discard the pool to waitroom and queue
-    /// the followup action, if any. Always handles the answer (caller
-    /// returns early).
+    /// Resolve the remainder destination for a zero-match
+    /// look-and-select pool: an explicit `remainder_destination`
+    /// wins, then `discard_remaining` (waitroom), then deck top.
+    /// `parent` is the enclosing look_and_select effect, consulted
+    /// only when the select action itself carries no field (legacy
+    /// effects that put them on the parent). Every real card that
+    /// can reach a zero-match branch says 「残りを控え室に置く」
+    /// (`discard_remaining`), but a filter card that instead
+    /// returns the rest to the deck must not silently dump them
+    /// into the waitroom.
+    fn resolve_remainder_destination(
+        select_action: &AbilityEffect,
+        parent: Option<&AbilityEffect>,
+    ) -> (String, bool) {
+        let remainder_dest = select_action
+            .remainder_destination_any()
+            .or_else(|| parent.and_then(|p| p.remainder_destination_any()))
+            .map(str::to_string);
+        let discard_remaining = select_action
+            .discard_remaining_any()
+            .or_else(|| parent.and_then(|p| p.discard_remaining_any()))
+            .unwrap_or(true);
+        let dest_zone = if let Some(ref rd) = remainder_dest {
+            rd.clone()
+        } else if discard_remaining {
+            Zone::Discard.to_str().to_string()
+        } else {
+            Zone::DeckTop.to_str().to_string()
+        };
+        (dest_zone, discard_remaining)
+    }
+
+    /// Place the looked-at pool into `dest_zone` and record the
+    /// movement so each_time watchers (e.g. Hazuki Ren ab#1,
+    /// PL!SP-bp5-005-R＋) see the placement. A bare
+    /// `waitroom.add_card` records no movement event, which is
+    /// why the pool must go through `place_card_in_zone` +
+    /// `finalize_card_movement` — the same pair the normal
+    /// selection path (move/handlers.rs) uses.
+    fn place_and_record_looked_at_pool(
+        &mut self,
+        gs: &mut GameState,
+        dest_zone: &str,
+        discard_remaining: bool,
+        player_target: &str,
+    ) {
+        let cards = core::mem::take(&mut gs.looked_at_cards);
+        {
+            let player = gs.resolve_target_player_mut(player_target);
+            for &card_id in &cards {
+                util::place_card_in_zone(player, card_id, dest_zone, None, false, 1);
+            }
+        }
+        if discard_remaining {
+            let source = self
+                .carried
+                .looked_at_origin
+                .clone()
+                .unwrap_or_else(|| Zone::DeckTop.to_str().to_string());
+            self.finalize_card_movement(gs, &cards, dest_zone, &source, &None, None);
+        }
+    }
+
+    /// No looked-at card matched: route the whole pool to the effect's
+    /// remainder destination and queue the followup action, if any.
+    /// Always handles the answer (caller returns early).
     fn discard_unmatched_looked_at(
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
+        select_action: &AbilityEffect,
     ) {
+        let (dest_zone, discard_remaining) =
+            Self::resolve_remainder_destination(select_action, Some(effect));
         log::warn!(
-            "[look] no matching cards among {} looked-at; discarding all to waitroom (effect: {})",
+            "[look] no matching cards among {} looked-at; sending all to {} (effect: {})",
             gs.looked_at_cards.len(),
+            dest_zone,
             effect.text
         );
-        let cards = core::mem::take(&mut gs.looked_at_cards);
         let player_target = effect.target_name();
-        let player = gs.resolve_target_player_mut(player_target);
-        for &card_id in &cards {
-            player.waitroom.add_card(card_id);
-        }
+        self.place_and_record_looked_at_pool(
+            gs,
+            &dest_zone,
+            discard_remaining,
+            player_target,
+        );
         if let Some(followup) = effect.followup_action() {
             let mut existing = gs.ability_queue.take_pending_actions();
             existing.push(followup.as_ref().clone());
@@ -105,7 +173,7 @@ impl AbilityResolver {
 
         let matching_count = matching_indices.len();
         if matching_count == 0 {
-            self.discard_unmatched_looked_at(gs, effect);
+            self.discard_unmatched_looked_at(gs, effect, select_action);
             return Ok(());
         }
         let is_max = select_action.max.unwrap_or(false);
@@ -819,12 +887,29 @@ pub fn execute_reveal(
 
         let matching_count = matching_indices.len();
         if matching_count == 0 {
-            let cards = core::mem::take(&mut gs.looked_at_cards);
+            // Zero matches: route the whole pool to the effect's
+            // remainder destination and record the movement so
+            // each_time watchers (e.g. Hazuki Ren ab#1) see the
+            // placement. This is the live zero-match branch —
+            // `look_and_select` is expanded into [look_at,
+            // select_cards] by `normalized_sequential_steps`, so
+            // the select step lands here, not in
+            // `discard_unmatched_looked_at`.
+            let (dest_zone, discard_remaining) =
+                Self::resolve_remainder_destination(effect, None);
+            log::warn!(
+                "[look] no matching cards among {} looked-at; sending all to {} (effect: {})",
+                gs.looked_at_cards.len(),
+                dest_zone,
+                effect.text
+            );
             let player_target = effect.target_name();
-            let player = gs.resolve_target_player_mut(player_target);
-            for &card_id in &cards {
-                player.waitroom.add_card(card_id);
-            }
+            self.place_and_record_looked_at_pool(
+                gs,
+                &dest_zone,
+                discard_remaining,
+                player_target,
+            );
             return Ok(());
         }
         let is_max = effect.max.unwrap_or(false);

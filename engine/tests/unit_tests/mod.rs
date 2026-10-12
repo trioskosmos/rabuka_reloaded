@@ -6,6 +6,7 @@ pub mod bot_encoding_locm_encoding_tests;
 pub mod bot_observation_tests;
 pub mod bot_strategy_tests;
 pub mod bot_strategy_azalea_tests;
+pub mod bot_strategy_v17_tests;
 pub mod bot_strategy_v7_mulligan_tests;
 pub mod bot_strategy_v7_live_experiment_tests;
 pub mod bot_v7_ismcts_tests;

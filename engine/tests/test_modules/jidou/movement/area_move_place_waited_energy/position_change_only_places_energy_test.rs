@@ -117,6 +117,7 @@ fn leaving_stage_does_not_place_waited_energy() {
         .state
         .player1
         .remove_member_from_stage_with_recycling(0, &game.db)
+        .0
         .expect("member should be removed from stage");
     assert_eq!(removed, chisato);
     game.state

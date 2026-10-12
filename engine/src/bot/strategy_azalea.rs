@@ -263,3 +263,38 @@ pub fn choose_mulligan(gs: &GameState, actions: &[Action], db: &CardDatabase) ->
     }
     emit_mulligan(gs, actions, &discard)
 }
+
+/// The guides' own mulligan: a KEEP/REDRAW decision, not a
+/// selective discard. An opening that holds an engine piece
+/// plus a live is kept WHOLE; anything else is redrawn.
+///
+/// Reached only through `AZALEA_MULLIGAN=guides`, which
+/// measures this all-or-nothing rule against the selective
+/// engine-keep above.
+fn choose_mulligan_guides(gs: &GameState, actions: &[Action], db: &CardDatabase) -> Action {
+    let me = gs.active_player();
+    let mut has_engine = false;
+    let mut has_live = false;
+    for &cid in &me.hand.cards {
+        let Some(card) = db.get_card(cid) else {
+            continue;
+        };
+        match card.card_type {
+            CardType::Live => has_live = true,
+            CardType::Member => {
+                if is_engine_name(card.name_key.as_ref()) {
+                    has_engine = true;
+                }
+            }
+            CardType::Energy => {}
+        }
+    }
+    if has_engine && has_live {
+        // Keep the whole opening.
+        emit_mulligan(gs, actions, &[])
+    } else {
+        // Redraw everything.
+        let all: Vec<usize> = (0..me.hand.cards.len()).collect();
+        emit_mulligan(gs, actions, &all)
+    }
+}

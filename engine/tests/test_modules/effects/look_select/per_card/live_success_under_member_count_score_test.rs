@@ -161,3 +161,44 @@ fn burn_wait_state_verification() {
         "Both under-cards joined the energy zone"
     );
 }
+
+/// Burn!! moves only the ENERGY cards under a member (「すべてのエネルギーカード」).
+/// A member card stacked under the same member must stay under its host
+/// (Rule 4.5.5) — it must not be swept to the waitroom by the drain.
+#[test]
+fn burn_moves_only_energy_member_card_stays_under() {
+    let (mut g, _mem) = stage_with_under(MEMBER, 1);
+    // Stack a MEMBER card under the same centre member alongside the energy.
+    let under_member = g.new_id(MEMBER);
+    g.state.player1.stage.place_under_card(MemberArea::Center, under_member);
+    assert_eq!(g.state.player1.stage.under_cards[1].len(), 2);
+    for _ in 0..9 { g.give_energy(1); }
+    let burn = g.id(BURN);
+    g.state.player1.success_live_card_zone.cards.push(burn);
+    trigger_burn_success(&mut g, burn);
+    select_burn_move(&mut g);
+    // The energy card moved to the energy zone in wait state; the member
+    // card stays under the host.
+    assert_eq!(
+        g.state.player1.energy_zone.cards.len(),
+        10,
+        "the 1 under-energy joined the 9 already in the zone"
+    );
+    assert_eq!(
+        g.state.player1.energy_zone.active_count(),
+        9,
+        "the moved energy landed in the wait state"
+    );
+    let under = g.state.player1.stage.get_under_cards(MemberArea::Center);
+    assert_eq!(
+        under,
+        &[under_member],
+        "the member card under the host is NOT swept to the waitroom"
+    );
+    assert!(
+        !g.state.player1.waitroom.cards.contains(&under_member),
+        "member card must not be moved to the waitroom by Burn!!"
+    );
+    let score = g.state.mods.get_score_modifier(burn);
+    assert_eq!(score, 1, "1 energy moved + 9 = 10 total -> score 1");
+}

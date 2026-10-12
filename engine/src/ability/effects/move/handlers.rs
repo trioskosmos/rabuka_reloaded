@@ -541,12 +541,31 @@ pub fn execute_selected_cards_from_zone(
                                 return Ok(());
                             }
                         }
-                        let player = gs.resolve_target_player_mut(&target);
-                        util::move_cards(player, &card_ids, zone, dest, None, &card_db);
-                        for &cid in &card_ids {
-                            log_move_result(player, &card_db, cid, zone, dest);
-                        }
+                        let (_, member_under, energy_under) = {
+                            let player = gs.resolve_target_player_mut(&target);
+                            let result =
+                                util::move_cards(player, &card_ids, zone, dest, None, &card_db);
+                            for &cid in &card_ids {
+                                log_move_result(player, &card_db, cid, zone, dest);
+                            }
+                            result
+                        };
                         moved = card_ids;
+                        // Rule 10.5.3-10.5.4: the under-cards
+                        // of every member moved off the stage
+                        // are placed to the waitroom / energy
+                        // deck. The member's own movement is
+                        // recorded by `finalize_card_movement`;
+                        // record the under-card placements here
+                        // so the 「…控え室に置かれたとき」
+                        // watchers fire.
+                        let owner_id = gs.resolve_target_player(&target).id.clone();
+                        gs.record_under_card_recycling(
+                            owner_id.as_str(),
+                            &member_under,
+                            &energy_under,
+                            gs.activating_card,
+                        );
                     }
                 }
 

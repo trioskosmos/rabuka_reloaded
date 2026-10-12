@@ -2218,6 +2218,47 @@ tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
         self.cards_moved_this_turn.push(moved_card_id);
     }
 
+    /// Rule 10.5.3-10.5.4: record the movement events for the under-cards
+    /// recycled when a member leaves its area. Member cards under the
+    /// member are placed to the waitroom (10.5.3); energy cards under
+    /// the member are placed to the energy deck (10.5.4). Both are
+    /// placements (置きます) the 「…控え室に置かれたとき」 watchers
+    /// (e.g. 恋の自動) read off the turn movement log, so they must be
+    /// recorded like any other placement. The under-cards were in the
+    /// `under_member` zone (see `place_energy_under_member_selected`),
+    /// so that is the source zone. `cause_card_id` is the card whose
+    /// departure triggered the recycling (the baton-touch arrival or the
+    /// effect's activating card), matching the cause recorded for the
+    /// departing member itself.
+    pub fn record_under_card_recycling(
+        &mut self,
+        player_id: &str,
+        member_under: &[i16],
+        energy_under: &[i16],
+        cause_card_id: Option<i16>,
+    ) {
+        for &cid in member_under {
+            self.push_movement_event_typed(
+                cid,
+                crate::types::ZoneId::UnderMember,
+                crate::types::ZoneId::Waitroom,
+                cause_card_id,
+                player_id,
+                false,
+            );
+        }
+        for &cid in energy_under {
+            self.push_movement_event_typed(
+                cid,
+                crate::types::ZoneId::UnderMember,
+                crate::types::ZoneId::EnergyDeck,
+                cause_card_id,
+                player_id,
+                false,
+            );
+        }
+    }
+
     pub fn has_card_moved_this_turn(&self, card_id: i16) -> bool {
         self.cards_moved_this_turn.iter().any(|x| x == &card_id)
     }
