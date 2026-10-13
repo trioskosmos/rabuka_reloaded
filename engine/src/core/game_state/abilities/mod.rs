@@ -10,6 +10,12 @@ use crate::core::types::Phase;
 use crate::player::Player;
 use smallvec::SmallVec;
 use crate::ability::enums::Zone;
+// `Vec`/`ToString` are in the std prelude but not the `no_std`
+// one; the gated import keeps the ungated code below (the
+// prohibition split and the ability-resolution log builder)
+// compiling on console targets.
+#[cfg(feature = "no_std")]
+use alloc::{string::ToString, vec::Vec};
 
 fn _prohibition_destination_blocks(prohibition: &str, zone: &str) -> bool {
     let parts: Vec<&str> = prohibition.split(':').collect();

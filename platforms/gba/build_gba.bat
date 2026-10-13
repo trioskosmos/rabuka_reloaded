@@ -7,7 +7,7 @@ REM   - agb crate (pulled by platforms\gba\Cargo.toml)
 REM   - agb-gbafix  (cargo install agb-gbafix)
 REM
 REM Builds to C:\rust_targets\thumbv4t-none-eabi\release\rabuka_gba
-setlocal
+setlocal enabledelayedexpansion
 REM Fix link.exe shadowing: devkitPro msys2 provides a Unix 'link' (hardlink util)
 REM that shadows MSVC's link.exe on PATH, breaking cargo's host build scripts.
 set "PATH=%PATH:C:\devkitPro\msys2\usr\bin;=%"
@@ -76,18 +76,18 @@ set "ROM_SRC=%TMP_GBABUILD%\rabuka_gba.gba"
 set "ROM_DST=%~dp0output\rabuka_gba.gba"
 set "ROM_DEPLOYED=0"
 for /L %%I in (1,1,10) do (
-  if not defined ROM_DEPLOYED (
+  if "!ROM_DEPLOYED!"=="0" (
     copy /Y "%ROM_SRC%" "%ROM_DST%" >nul 2>&1 && set "ROM_DEPLOYED=1"
-    if not defined ROM_DEPLOYED (
+    if "!ROM_DEPLOYED!"=="0" (
       ping -n 2 127.0.0.1 >nul
     )
   )
 )
-if not defined ROM_DEPLOYED (
+if "!ROM_DEPLOYED!"=="0" (
   del /F /Q "%ROM_DST%" >nul 2>&1
   copy /Y "%ROM_SRC%" "%ROM_DST%" >nul 2>&1 && set "ROM_DEPLOYED=1"
 )
-if defined ROM_DEPLOYED (
+if "!ROM_DEPLOYED!"=="1" (
   echo.
   echo Built output\rabuka_gba.gba
 ) else (

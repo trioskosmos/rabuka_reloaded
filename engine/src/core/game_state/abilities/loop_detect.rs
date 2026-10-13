@@ -2,6 +2,10 @@ use crate::core::game_state::GameState;
 use crate::core::game_state::PermanentLoopProtocol;
 use crate::core::types::GameResult;
 use crate::core::constants::CountCast;
+// The draw-game choice description strings call `.to_string()`;
+// `ToString` is in the std prelude but not the `no_std` one.
+#[cfg(feature = "no_std")]
+use alloc::string::ToString;
 
 impl GameState {
     pub fn set_opponent_live_success(&mut self, no_excess_heart: bool) {

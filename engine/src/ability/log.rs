@@ -221,3 +221,16 @@ pub fn push_cond_verdict(
         children,
     });
 }
+
+/// `no_std` stub: the verdict buffer is inert (`push_verdict` is a
+/// no-op and `debug_enabled()` is always false), so a condition
+/// verdict records nothing. The signature matches the std version
+/// so the condition-evaluation call sites compile unchanged.
+#[cfg(feature = "no_std")]
+pub fn push_cond_verdict(
+    _condition: &crate::card::Condition,
+    _extra_actual: &str,
+    _passed: bool,
+    _children: Vec<AbilityLogItem>,
+) {
+}

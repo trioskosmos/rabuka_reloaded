@@ -1,6 +1,11 @@
 use crate::core::game_state::GameState;
 use crate::core::constants::CountCast;
 use smallvec::SmallVec;
+// `Vec` (the debug-index collect) and `ToString` (the choice
+// description strings) come from the std prelude; under `no_std`
+// they need the gated `alloc` import.
+#[cfg(feature = "no_std")]
+use alloc::{string::ToString, vec::Vec};
 
 impl GameState {
     fn process_player_abilities(&mut self, raw_player_id: &str) {

@@ -70,6 +70,7 @@ impl GameState {
         }
     }
 
+    #[cfg(feature = "serde_support")]
     pub fn get_pending_choice_json(&self) -> Option<serde_json::Value> {
         let choice = self.get_pending_choice()?;
         let mut json = choice.to_frontend_json()?;

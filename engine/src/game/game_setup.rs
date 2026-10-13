@@ -1784,7 +1784,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
     #[cfg(not(feature = "no_std"))]
     let interned_area_names = &*INTERNED_AREA_NAMES;
     #[cfg(feature = "no_std")]
-    let interned_area_names =
+    let interned_area_names: [ArcStr; 3] =
         core::array::from_fn(|slot| ArcStr(Arc::from(AREA_NAMES[slot])));
 
     if !game_state.is_action_prohibited("play_member") {

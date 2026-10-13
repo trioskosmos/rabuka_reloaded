@@ -5,18 +5,22 @@
 //! screenshot. Judging "do the images show" by inference is how a completely
 //! broken decoder shipped as fine for hours, so this captures the real thing.
 //!
-//! Format: one full-resolution 240x160 frame of 4bpp samples, 19,200 bytes,
-//! which fits the 32 KiB SRAM window with the palettes alongside.
-//!   value 0        backdrop (every layer transparent)
-//!   value 1..=14   the BG palette-15 colour index at that pixel, exact
-//!   value 15       a sprite covered this pixel (its colour is not stored)
+//! Format: two full-resolution 240x160 coverage bitmaps (BG and
+//! OBJ), one bit per pixel = 4,800 bytes each, plus the BG palette
+//! bank. Two slots (an early menu and the frame after it) fit the
+//! 32 KiB SRAM window: 2*4800 (BG) + 0x220 (palette) + 2*4800
+//! (OBJ) ~= 19.3 KiB.
+//!   bit 0   backdrop (every layer transparent at that pixel)
+//!   bit 1   the BG layer is opaque there (text/chrome/cards)
+//!   OBJ slot set  a sprite covered this pixel (extent + layout)
 //!
-//! Full resolution and exact BG indices are the whole point. An earlier version
-//! sampled every second pixel to fit 8bpp, which turned 1px font strokes into
-//! speckle and made a working screen look like heavy glitch -- the diagnostic
-//! was the artefact. The BG layer is where text and chrome live and where
-//! corruption reads most clearly, so it is captured exactly; sprites are
-//! marked rather than colour-coded, which still shows their extent and layout.
+//! Full resolution is the whole point. An earlier version sampled
+//! every second pixel to fit 8bpp, which turned 1px font strokes
+//! into speckle and made a working screen look like heavy glitch --
+//! the diagnostic was the artefact. The BG layer is where text and
+//! chrome live and where corruption reads most clearly, so it is
+//! captured exactly; sprites are marked rather than colour-coded,
+//! which still shows their extent and layout.
 
 const SRAM: usize = 0x0E00_0000;
 const REG_RAM_CTRL: usize = 0x0400_0004;
@@ -26,12 +30,16 @@ const OAM: usize = 0x0700_0000;
 
 const OUT_W: usize = 240;
 const OUT_H: usize = 160;
-/// Two pixels per byte.
-const FRAME_BYTES: usize = OUT_W * OUT_H / 2;
+/// One bit per pixel (coverage only): 240*160 = 38,400 bits =
+/// 4,800 bytes. `BGBITS`/`sprite_bmp` are exactly this size, so the
+/// copy loop below stays in bounds.
+const FRAME_BYTES: usize = OUT_W * OUT_H / 8;
 
 const HDR: usize = 0x0000;
 const FRAME_BASE: usize = 0x0020;
-const PAL_BASE: usize = FRAME_BASE + FRAME_BYTES;
+/// After BOTH BG slots, so slot 1 does not collide with the palettes
+/// (the header records two frames).
+const PAL_BASE: usize = FRAME_BASE + 2 * FRAME_BYTES;
 const OBJ_BASE: usize = PAL_BASE + 0x220;
 
 #[inline]
@@ -134,6 +142,11 @@ fn bg_index(bg: &Bg, x: usize, y: usize) -> u8 {
 
 /// Bit-per-pixel BG index, 240*160 = 38,400 bits = 4,800 bytes.
 static mut BGBITS: [u8; 4800] = [0; 4800];
+/// OBJ coverage twin of [`BGBITS`], kept as a static so the host
+/// can read it back over the GDB stub: EWRAM is served live,
+/// SRAM is not. A stack local would die with `maybe_capture`'s
+/// frame and leave the sprite extent unobservable.
+static mut SPRITEBITS: [u8; 4800] = [0; 4800];
 static mut STATE: u32 = 0;
 
 fn sram_enable() {
@@ -201,7 +214,11 @@ pub fn maybe_capture(skip: u32) {
 
     // OBJ pass: mark coverage. A sprite is visible where the P0 layer is
     // transparent; this port puts card art on P1.
-    let mut sprite_bmp = [0u8; 4800];
+    let sprite_bmp: &mut [u8; 4800] =
+        unsafe { &mut *core::ptr::addr_of_mut!(SPRITEBITS) };
+    for i in sprite_bmp.iter_mut() {
+        *i = 0;
+    }
     if obj_on {
         let front = bgs.iter().find(|b| b.prio == 0).copied();
         for i in (0..128usize).rev() {

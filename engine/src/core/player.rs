@@ -7,10 +7,12 @@ use crate::zones::{
 use crate::card::CardDatabase;
 use crate::core::game_modifiers::ModifierEntry;
 
-use crate::{Arc, HashMap, VecDeque};
+use crate::{Arc, HashMap, OnceLock, VecDeque};
 use core::ops::Deref;
 #[cfg(feature = "no_std")]
 use alloc::string::{String, ToString};
+#[cfg(feature = "no_std")]
+use alloc::vec::Vec;
 use smallvec::SmallVec;
 
 /// A player id — always "p1" or "p2", i.e. two bytes.
@@ -65,13 +67,13 @@ impl PlayerId {
     /// Returns the static PlayerId for "p1" — no allocation on normalization.
     #[inline]
     pub fn p1() -> &'static Self {
-        static P1: std::sync::OnceLock<PlayerId> = std::sync::OnceLock::new();
+        static P1: OnceLock<PlayerId> = OnceLock::new();
         P1.get_or_init(|| PlayerId(Arc::from("p1")))
     }
     /// Returns the static PlayerId for "p2" — no allocation on normalization.
     #[inline]
     pub fn p2() -> &'static Self {
-        static P2: std::sync::OnceLock<PlayerId> = std::sync::OnceLock::new();
+        static P2: OnceLock<PlayerId> = OnceLock::new();
         P2.get_or_init(|| PlayerId(Arc::from("p2")))
     }
 }

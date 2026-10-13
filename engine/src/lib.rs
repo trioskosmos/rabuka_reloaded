@@ -54,7 +54,7 @@ macro_rules! eprintln {
 // types directly; they were `pub(crate)` only because those tests used to
 // live inside the crate.
 pub mod compat;
-pub use compat::{Arc, Box, HashMap, HashSet, VecDeque};
+pub use compat::{Arc, Box, HashMap, HashSet, OnceLock, VecDeque};
 #[cfg(feature = "serde_support")]
 pub use compat::BTreeMap;
 

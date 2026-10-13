@@ -3,7 +3,7 @@ use crate::ability::enums::Zone;
 use crate::card::{AbilityFilter, Condition};
 use crate::core::constants::CountCast;
 #[cfg(feature = "no_std")]
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 impl<'a> ConditionContext<'a> {
     /// The card set an `ability_filter` should be evaluated against.

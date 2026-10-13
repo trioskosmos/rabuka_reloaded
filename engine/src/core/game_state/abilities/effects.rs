@@ -1,6 +1,11 @@
 use crate::core::game_state::GameState;
 use crate::core::types::{Duration, TurnPhase, ReplacementEffect};
 use smallvec::SmallVec;
+// `String`/`Vec` (the replacement-effect signature) and
+// `ToString` (the player-id string) are std-prelude types; under
+// `no_std` they need the gated `alloc` import.
+#[cfg(feature = "no_std")]
+use alloc::{string::{String, ToString}, vec::Vec};
 
 impl GameState {
     /// Has `effect` run out of time?

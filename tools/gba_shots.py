@@ -20,7 +20,9 @@ HDR = 0x0000
 FRAME_BASE = 0x0020
 W, H = 240, 160
 FRAME_BYTES = W * H // 8
-PAL_BASE = FRAME_BASE + FRAME_BYTES
+# shot.rs records two slots (an early menu + the frame after it),
+# so the palettes sit after BOTH BG slots, not after slot 0.
+PAL_BASE = FRAME_BASE + 2 * FRAME_BYTES
 OBJ_BASE = PAL_BASE + 0x220
 
 

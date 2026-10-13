@@ -348,6 +348,10 @@ OUT_RS = REPO / "platforms" / "gba" / "src" / "card_art_gen.rs"
 BIN_DIR = REPO / "platforms" / "gba" / "baked" / "card_art"
 MAX_WORKERS = max(1, (os.cpu_count() or 4) - 1)  # Leave one core free
 
+# Fixed seed for the master-palette sample. Makes every bake of the
+# same source byte-identical (see main); any constant works.
+BAKE_SEED = 0x5EED
+
 # Global image cache for palette building (loaded once, reused)
 _image_cache: dict[str, Image.Image] = {}
 
@@ -655,12 +659,20 @@ def build_master_palette(card_nos: list[str], sample_size: int = 500) -> tuple:
 
 
 def process_card(card_no: str, master_q, master_pal_bytes):
-    """Process a single card - returns all baked data.
+    """Process a single card - returns all baked data, COMPRESSED.
 
     No per-card palette is returned or written: every card quantizes against
     the one shared MASTER_PAL, so the old `pal_<card>.bin` files were 1809
     byte-identical copies of it (985,905 bytes of ROM) and nothing ever read
     `CardArt.palette` — display.rs builds all 16 OBJ palettes from MASTER_PAL.
+
+    Compression runs HERE, in the worker, not in the sequential write phase:
+    deflate-9 on the 13,824B detail portrait and the pure-Python BIOS LZ77
+    (with its round-trip self-check) on the four fronts are the whole cost of
+    `write_gen`, and they are independent per card. Doing them in the pool
+    turns ~200s of serial compression into a few seconds of parallel work.
+    The codecs are deterministic, so the emitted .bin bytes are identical to
+    compressing them later — only the placement moved.
     """
     img = load_image_cached(card_no)
     if img is None:
@@ -675,58 +687,178 @@ def process_card(card_no: str, master_q, master_pal_bytes):
     # 32x24 slot. (Contain-fitting the unrotated portrait here used to bake
     # a shrunken upright card floating in padding — no visible wait state.)
     wtiles = bake_with_palette(up.rotate(90, expand=True), WAIT_W, WAIT_H, master_q, WAIT_GRID, dither=Image.Dither.ORDERED, sharpen=True)
-    return card_no, (tiles, ftiles, stiles, ltiles, wtiles, rotated)
+    # Index-0 audit runs on the UNCOMPRESSED tiles (a 0 byte in the packed
+    # grid is a hardware-transparent hole on an OBJ sprite). Computed here,
+    # before compression, so the write phase never has to inflate again.
+    total = len(tiles) + len(ftiles) + len(stiles) + len(ltiles) + len(wtiles)
+    zeros = tiles.count(0) + ftiles.count(0) + stiles.count(0) + ltiles.count(0) + wtiles.count(0)
+    return card_no, (
+        compress_detail(tiles),
+        compress_front(ftiles),
+        compress_front(stiles),
+        compress_front(ltiles),
+        compress_front(wtiles),
+        rotated,
+        zeros,
+        total,
+    )
+
+
+# The runtime LZ77 decoder emitted into card_art_gen.rs. Pure Rust
+# and bounds-checked: the previous revision emitted a hand-rolled
+# `asm!("swi 0x11", ..., options(nostack, preserves_flags))`, which
+# is undefined behavior -- the GBA BIOS LZ77 routine modifies the
+# flags register, so `preserves_flags` is a lie to the compiler
+# (agb's own syscall.rs uses `clobber_abi("C")` for every SWI for
+# exactly this reason) -- and it was not bounds-checked (it writes
+# the header-declared size, so a malformed blob overflows `dst`).
+# `tools/check_lz77_roundtrip.py` mirrors this decoder exactly and
+# round-trips every blob the baker emits, so the two cannot drift.
+LZ77_DECOMPRESS_SRC = r'''/// Decompress a BIOS LZ77 stream (type 0x10) into `dst`.
+///
+/// Pure Rust and bounds-checked: no SWI, no alignment requirement, no
+/// register-clobber risk. This is the runtime decoder for every
+/// per-frame art blob (fronts, stage, waited, live, back, board UI);
+/// `tools/check_lz77_roundtrip.py` mirrors it exactly and round-trips
+/// every blob the baker emits, so a re-bake can never ship an
+/// unreadable blob.
+///
+/// The stream is `[0x10, size_lo, size_mid, size_hi, ...]` with
+/// LSB-first flag bytes: a 0 bit is a literal byte, a 1 bit is a
+/// `(length, offset)` back-reference (`length = (b0>>4)+3`,
+/// `offset = (((b0&0x0F)<<8)|b1)+1`). `dst` is sized from the grid
+/// (`grid_w * grid_h * 64`), which the baker also writes into the
+/// header, so a well-formed blob fills it exactly.
+///
+/// A malformed blob (wrong type, truncated, or a back-reference past
+/// the output produced so far) zeroes `dst` instead of leaving
+/// half-decoded garbage on screen — a blank card beats a corrupt one.
+pub fn lz77_decompress_wram(src: &[u8], dst: &mut [u8]) {
+    if src.len() < 4 || src[0] != 0x10 {
+        dst.fill(0);
+        return;
+    }
+    let declared =
+        (src[1] as usize) | ((src[2] as usize) << 8) | ((src[3] as usize) << 16);
+    // The header size is blob-controlled: clamp it to `dst` so a blob
+    // claiming more than its grid can never write past the buffer.
+    let out_len = declared.min(dst.len());
+    let mut si = 4usize;
+    let mut di = 0usize;
+    let mut ok = true;
+    'outer: while di < out_len {
+        if si >= src.len() {
+            ok = false;
+            break;
+        }
+        let flags = src[si];
+        si += 1;
+        for bit in 0..8 {
+            if di >= out_len {
+                break 'outer;
+            }
+            if (flags >> bit) & 1 == 0 {
+                // Literal byte.
+                if si >= src.len() {
+                    ok = false;
+                    break 'outer;
+                }
+                dst[di] = src[si];
+                si += 1;
+                di += 1;
+            } else {
+                // Back-reference: 2 bytes, length 3..=18, offset 1..=4096.
+                if si + 1 >= src.len() {
+                    ok = false;
+                    break 'outer;
+                }
+                let b0 = src[si];
+                let b1 = src[si + 1];
+                si += 2;
+                let length = ((b0 >> 4) as usize) + 3;
+                let offset = (((b0 & 0x0F) as usize) << 8 | b1 as usize) + 1;
+                if offset > di {
+                    // Reference before the start of the output: malformed.
+                    ok = false;
+                    break 'outer;
+                }
+                for _ in 0..length {
+                    if di >= out_len {
+                        break;
+                    }
+                    // Byte-by-byte so overlapping runs (offset < length)
+                    // replicate, matching the BIOS decoder.
+                    let b = dst[di - offset];
+                    dst[di] = b;
+                    di += 1;
+                }
+            }
+        }
+    }
+    if !ok || di != out_len {
+        dst.fill(0);
+    }
+}
+
+'''
 
 
 def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_front, ui_tiles, master_pal_bytes):
-    """Generate card_art_gen.rs with include_bytes! references (zlib deflate)."""
+    """Generate card_art_gen.rs with include_bytes! references (zlib deflate).
+
+    Every per-card blob arrives already compressed (see `process_card`),
+    so this phase is file I/O and source emission only — the deflate-9
+    and BIOS LZ77 work happens in the parallel pool. `back_front` and
+    `ui_tiles` are the two blobs baked sequentially in `main`, so they
+    are compressed here (two blobs, negligible).
+    """
     BIN_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Helper to write compressed data (records sizes for the 4-aligned
+    # Helper to write pre-compressed data (records sizes for the 4-aligned
     # static declarations emitted below).
     written = set()
     blob_sizes = {}
 
-    def write_compressed(path: Path, data: bytes, fn=compress_front):
-        compressed = fn(data)
+    def write_blob(path: Path, data: bytes):
         with open(path, "wb") as f:
-            f.write(compressed)
+            f.write(data)
         written.add(path.name)
-        blob_sizes[path.name] = len(compressed)
+        blob_sizes[path.name] = len(data)
 
-    # Write binary files (compressed)
+    # Write binary files.
     # NOTE: master_pal stays RAW — display.rs indexes it directly as
     # rgb15 pairs (`MASTER_PAL[i*2]`), and the generated static demands
     # exactly 480 bytes. Compressing it breaks the type AND the palette
-    # parse. Everything else goes through write_compressed.
+    # parse. Everything else is already a compressed stream.
     with open(BIN_DIR / "master_pal.bin", "wb") as f:
         f.write(master_pal_bytes)
     written.add("master_pal.bin")
 
+    back_front = compress_front(back_front)
+    ui_tiles = compress_front(ui_tiles)
+
     for card_no, tiles, _f, _s, _l, _w in entries:
         safe = sanitize_filename(card_no)
-        # Detail only: deflate. See compress_detail/compress_front for why
-        # the two kinds take different codecs.
-        write_compressed(BIN_DIR / f"tiles_{safe}.bin", tiles, compress_detail)
+        write_blob(BIN_DIR / f"tiles_{safe}.bin", tiles)
 
     for card_no, tiles in fronts:
         safe = sanitize_filename(card_no)
-        write_compressed(BIN_DIR / f"front_{safe}.bin", tiles)
+        write_blob(BIN_DIR / f"front_{safe}.bin", tiles)
 
     for card_no, tiles in stage_fronts:
         safe = sanitize_filename(card_no)
-        write_compressed(BIN_DIR / f"stage_{safe}.bin", tiles)
+        write_blob(BIN_DIR / f"stage_{safe}.bin", tiles)
 
     for card_no, tiles in live_fronts:
         safe = sanitize_filename(card_no)
-        write_compressed(BIN_DIR / f"live_{safe}.bin", tiles)
+        write_blob(BIN_DIR / f"live_{safe}.bin", tiles)
 
     for card_no, tiles in waited_fronts:
         safe = sanitize_filename(card_no)
-        write_compressed(BIN_DIR / f"wait_{safe}.bin", tiles)
+        write_blob(BIN_DIR / f"wait_{safe}.bin", tiles)
 
-    write_compressed(BIN_DIR / "back_front.bin", back_front)
-    write_compressed(BIN_DIR / "board_ui.bin", ui_tiles)
+    write_blob(BIN_DIR / "back_front.bin", back_front)
+    write_blob(BIN_DIR / "board_ui.bin", ui_tiles)
 
     # Generate Rust source with include_bytes! + runtime decompression
     with open(OUT_RS, "w", encoding="utf-8") as f:
@@ -735,9 +867,11 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write("// Card fronts: 8bpp shared MASTER_PAL (4bpp on GBA via palette bank)\n")
         f.write("//\n")
         f.write("// TWO CODECS, deliberately:\n")
-        f.write("//   front/stage/wait/live/back/board_ui -> BIOS LZ77, decoded by SWI\n")
-        f.write("//       0x11 (native ARM asm). Drawn every frame, so decode cost is on\n")
-        f.write("//       the frame budget.\n")
+        f.write("//   front/stage/wait/live/back/board_ui -> BIOS LZ77, decoded by the\n")
+        f.write("//       pure-Rust lz77_decompress_wram below (bounds-checked, no SWI).\n")
+        f.write("//       Decode runs on sprite-cache misses (screen transitions), never\n")
+        f.write("//       in a steady frame, so the software decode cost is off the\n")
+        f.write("//       frame budget.\n")
         f.write("//   tiles_* (the detail portrait)          -> zlib deflate, inflated by\n")
         f.write("//       miniz_oxide. 13,824B/card and 73% of the art, so this is where\n")
         f.write("//       the ratio has to win; decompressed only when a card is opened,\n")
@@ -761,41 +895,16 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
         f.write("    pub tiles: &'static [u8],\n")
         f.write("}\n\n")
 
-        f.write("/// Alignment wrapper kept for the blob statics. inflate reads the\n")
-        f.write("/// stream byte-wise so it has no alignment requirement, but the BIOS\n")
-        f.write("/// word-loads its LZ77 SWI source and faults on unaligned addresses.\n")
+        f.write("/// Alignment wrapper kept for the blob statics. Neither decoder reads\n")
+        f.write("/// the stream word-wise (both are byte-wise), so alignment is not\n")
+        f.write("/// required for correctness; the wrapper just gives the ~40k blob\n")
+        f.write("/// statics a stable 4-byte-aligned layout.\n")
         f.write("#[repr(align(4))]\n")
         f.write("pub struct AlignedBlob<const N: usize>(pub [u8; N]);\n\n")
 
-        # LZ77 decompressor for the per-frame art (SWI 0x11).
-        f.write("/// Decompress a BIOS LZ77 stream (SWI 0x11) from WRAM to WRAM.\n")
-        f.write("///\n")
-        f.write("/// Every front/UI blob is written by tools/bake_card_art.py as a\n")
-        f.write("/// standard stream (0x10 + 3-byte LE size), so there is no format\n")
-        f.write("/// sniffing here. `src` must be 4-aligned — every blob is wrapped in\n")
-        f.write("/// an AlignedBlob below so the fast path always holds.\n")
-        f.write("pub fn lz77_decompress_wram(src: &[u8], dst: &mut [u8]) {\n")
-        f.write("    debug_assert_eq!(src.as_ptr() as usize % 4, 0, \"LZ77 src must be 4-aligned\");\n")
-        f.write("    let src_ptr = src.as_ptr() as u32;\n")
-        f.write("    let dst_ptr = dst.as_mut_ptr() as u32;\n")
-        f.write("    unsafe {\n")
-        f.write("        core::arch::asm!(\n")
-        f.write("            \"swi 0x11\",\n")
-        f.write("            in(\"r0\") src_ptr,\n")
-        f.write("            in(\"r1\") dst_ptr,\n")
-        f.write("            lateout(\"r0\") _,\n")
-        f.write("            lateout(\"r1\") _,\n")
-        f.write("            lateout(\"r2\") _,\n")
-        f.write("            lateout(\"r3\") _,\n")
-        f.write("            lateout(\"r12\") _,\n")
-        f.write("            lateout(\"lr\") _,\n")
-        f.write("            options(nostack, preserves_flags)\n")
-        f.write("        );\n")
-        f.write("    }\n")
-        f.write("    // The asm has no memory operands: without this fence the\n")
-        f.write("    // optimizer may hoist reads of `dst` above the SWI call.\n")
-        f.write("    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);\n")
-        f.write("}\n\n")
+        # LZ77 decompressor for the per-frame art (pure Rust,
+        # bounds-checked; see LZ77_DECOMPRESS_SRC above).
+        f.write(LZ77_DECOMPRESS_SRC)
 
         # 4-aligned blob statics (one per .bin; tables below borrow `&AL_x.0`).
         def emit_blob(var: str, name: str):
@@ -874,8 +983,6 @@ def write_gen(entries, fronts, stage_fronts, live_fronts, waited_fronts, back_fr
 
         f.write("pub static BACK_FRONT: &[u8] = &AL_back_front.0;\n\n")
         f.write(f"pub static BOARD_UI: &[u8] = &AL_board_ui.0;\n")
-    written.add("back_front.bin")
-    written.add("board_ui.bin")
 
     # Prune stale files (cards removed/renamed since the last bake).
     # Stale .bins are invisible to the build (only referenced files embed)
@@ -916,6 +1023,19 @@ def main():
     card_list = sorted(used)
     print(f"{len(card_list)} unique non-energy cards to bake")
 
+    # Deterministic builds. The master palette is quantized from a
+    # random 500-card sample, and the parallel pool returns cards in
+    # completion order — both varied run-to-run, so two bakes of the
+    # same source produced different ROMs (different card colours,
+    # different table order) and no baker change could be verified
+    # against a fixed reference. A fixed seed makes the sample (and
+    # therefore every quantized pixel) reproducible; the per-kind
+    # tables are sorted by card_no below so the emitted source is
+    # byte-stable too. Runtime lookups are unaffected: display.rs
+    # already binary-searches a card_no-sorted index (front_order),
+    # so table order never reached the console.
+    random.seed(BAKE_SEED)
+
     # Build master palette from a representative sample (much faster)
     print("Building master palette...")
     start = time.time()
@@ -929,6 +1049,9 @@ def main():
     live_fronts = []
     waited_fronts = []
     missing = []
+    # Index-0 audit, collected inline from the workers (see the
+    # result loop below): (zeros/total, card_no, zeros, total).
+    worst = []
 
     print("Processing cards...")
     start = time.time()
@@ -950,9 +1073,14 @@ def main():
             if result is None:
                 missing.append(card_no)
                 continue
-            tiles, ftiles, stiles, ltiles, wtiles, rotated = result
+            # Blobs arrive already compressed; `zeros`/`total` are the
+            # index-0 audit numbers computed on the uncompressed grids
+            # inside the worker (see process_card).
+            tiles, ftiles, stiles, ltiles, wtiles, rotated, zeros, total = result
             if rotated:
                 print(f"  upright: {card_no}")
+            if zeros:
+                worst.append((zeros / total, card_no, zeros, total))
             entries.append((card_no, tiles, ftiles, stiles, ltiles, wtiles))
             fronts.append((card_no, ftiles))
             stage_fronts.append((card_no, stiles))
@@ -964,15 +1092,22 @@ def main():
     if missing:
         print(f"missing: {missing[:20]}")
 
+    # The pool returns cards in completion order, which varies
+    # run-to-run. Sort every per-kind table by card_no so the
+    # emitted source (and the .bin write order) is byte-stable
+    # across bakes. Runtime lookups are order-independent (they
+    # binary-search a card_no-sorted index), so this is purely
+    # build reproducibility.
+    entries.sort(key=lambda e: e[0])
+    fronts.sort(key=lambda e: e[0])
+    stage_fronts.sort(key=lambda e: e[0])
+    live_fronts.sort(key=lambda e: e[0])
+    waited_fronts.sort(key=lambda e: e[0])
+
     # Audit: index 0 is hardware-transparent, so any art pixel quantized
     # to 0 renders as a hole. With magenta reserved at 0 this must be ~0
-    # everywhere; print the worst offenders either way.
-    worst = []
-    for card_no, tiles, f, s, li, w in entries:
-        total = len(tiles) + len(f) + len(s) + len(li) + len(w)
-        zeros = tiles.count(0) + f.count(0) + s.count(0) + li.count(0) + w.count(0)
-        if zeros:
-            worst.append((zeros / total, card_no, zeros, total))
+    # everywhere; print the worst offenders either way. (Collected inline
+    # above, on the uncompressed grids, while the worker still had them.)
     worst.sort(reverse=True)
     if worst:
         print(f"index-0 pixels: {len(worst)} cards affected, worst:")

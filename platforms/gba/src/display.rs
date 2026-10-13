@@ -1611,16 +1611,32 @@ impl<'a> Display<'a> {
             dimmed, rot_ccw, px, py, twin_tag,
         ) {
             Some(vrams) => {
-                for (vram, &(_, dx, dy)) in vrams.iter().zip(parts.iter()) {
+                for (vram, &(size, dx, dy)) in vrams.iter().zip(parts.iter()) {
                     let mut obj = Object::new(vram.clone());
-                    obj.set_pos((px + dx as i32, py + dy as i32));
-                    // A 180-degree rotation is hflip|vflip in OAM attributes,
-                    // not pixels. Rasterising it (which this used to do)
-                    // cost a separate VRAM upload for every opponent-side
-                    // slot: 3 stage + 6 live = 9,984B of byte-for-byte
-                    // duplicates, and because `flipped` was also in the cache
-                    // key the flipped copy could never share the unflipped
-                    // placement's VRAM. The hardware does it for free.
+                    // A 180-degree rotation is hflip|vflip in OAM attributes
+                    // PLUS a mirror of each part's position. The hardware
+                    // flips every part's pixels about its OWN centre, so the
+                    // parts must also be rearranged: a part at (dx, dy) with
+                    // size (w, h) belongs at (box_w-dx-w, box_h-dy-h) once
+                    // the whole box is turned 180 degrees. Without the mirror
+                    // the parts land in the wrong quadrants and the opponent's
+                    // card renders split apart. Rasterising the rotation (which
+                    // this used to do) cost a separate VRAM upload per
+                    // opponent-side slot: 3 stage + 6 live = 9,984B of
+                    // byte-for-byte duplicates, and because `flipped` was also
+                    // in the cache key the flipped copy could never share the
+                    // unflipped placement's VRAM. The hardware does the pixel
+                    // flip for free; the position mirror costs nothing.
+                    let (ox, oy) = if flipped {
+                        let (w, h) = size.to_width_height();
+                        (
+                            px + box_w as i32 - dx as i32 - w as i32,
+                            py + box_h as i32 - dy as i32 - h as i32,
+                        )
+                    } else {
+                        (px + dx as i32, py + dy as i32)
+                    };
+                    obj.set_pos((ox, oy));
                     if flipped {
                         obj.set_hflip(true);
                         obj.set_vflip(true);

@@ -78,6 +78,37 @@ pub use alloc::collections::VecDeque;
 #[cfg(not(feature = "no_std"))]
 pub use std::collections::VecDeque;
 
+/// `OnceLock` for `no_std` targets.
+///
+/// `std::sync::OnceLock` does not exist under `no_std`. Console
+/// ports are single-threaded, so a `core::cell::OnceCell` wrapper
+/// exposed as `Sync` is a drop-in for the lazy statics that use it
+/// (`PlayerId::p1`/`p2`): `get_or_init` runs at most once, from the
+/// single game thread.
+#[cfg(feature = "no_std")]
+pub mod once_lock {
+    pub struct OnceLock<T>(core::cell::OnceCell<T>);
+
+    impl<T> OnceLock<T> {
+        pub const fn new() -> Self {
+            OnceLock(core::cell::OnceCell::new())
+        }
+        pub fn get_or_init<F: FnOnce() -> T>(&self, f: F) -> &T {
+            self.0.get_or_init(f)
+        }
+    }
+
+    // Console ports are single-threaded; the lock is only ever
+    // initialised from the single game thread, so exposing it as
+    // Sync is safe (same reasoning as the `Atomic*` compat types).
+    unsafe impl<T> Sync for OnceLock<T> {}
+}
+
+#[cfg(feature = "no_std")]
+pub use once_lock::OnceLock;
+#[cfg(not(feature = "no_std"))]
+pub use std::sync::OnceLock;
+
 /// Atomic counter for the defensive runaway-loop guards.
 ///
 /// `core::sync::atomic::AtomicU32` does not exist on targets without 32-bit
